@@ -471,6 +471,23 @@ Implementation notes:
 
 Complete exposed options and golden coverage.
 
+Status: implemented.
+
+Implementation notes:
+
+- The typed `Centercut` processor now carries SoX-ng-style `-a` output gain,
+  `-b` bass-to-sides routing below 200 Hz, and `-w` spectral window size
+  options, with validation for finite gain and power-of-two window sizes in
+  `8..=32768`.
+- The `centercut` command parser accepts split and attached `-a`/`-w` values,
+  renders canonical option tokens, and rejects unsupported options or
+  non-stereo input with typed errors.
+- Effect chains and CLI positional chains can execute `centercut`, producing
+  three-channel left residual, right residual, and center output.
+- Standalone SoX-ng golden coverage includes the bare command and an option
+  case covering `-a`, `-b`, and `-w`; mono golden coverage is not applicable
+  because SoX-ng rejects non-stereo input.
+
 ## Milestone 6.4: biquad and tone filters
 
 ### Feature 6.4.1: biquad primitive

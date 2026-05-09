@@ -22,6 +22,8 @@ CORPUS_IDS = (
     "l0/near_zero_mono_8",
     "l0/odd_length_mono_17",
     "l0/sine_stereo_32",
+    "l0/opposite_phase_stereo_32",
+    "l0/opposite_phase_stereo_8192",
     "l0/short_mono_3",
     "l0/short_stereo_2",
     "chains/stereo_steps",
@@ -85,6 +87,8 @@ def corpus_case(corpus_id: str) -> CorpusCase:
             _sine(32, 1_000.0, 0.5, 0.0),
             _sine(32, 500.0, 0.25, 0.25),
         ),
+        "l0/opposite_phase_stereo_32": lambda: _opposite_phase_stereo(32),
+        "l0/opposite_phase_stereo_8192": lambda: _opposite_phase_stereo_8192(),
         "l0/short_mono_3": lambda: _mono(np.array([0.25, -0.25, 0.0], dtype=np.float32)),
         "l0/short_stereo_2": lambda: _stereo(
             np.array([0.25, -0.25], dtype=np.float32),
@@ -187,6 +191,15 @@ def _stereo(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     return np.stack(
         [np.asarray(left, dtype=np.float32), np.asarray(right, dtype=np.float32)]
     )
+
+
+def _opposite_phase_stereo_8192() -> np.ndarray:
+    return _opposite_phase_stereo(8192)
+
+
+def _opposite_phase_stereo(frames: int) -> np.ndarray:
+    left = _sine(frames, 750.0, 0.5, 0.0)
+    return _stereo(left, -left)
 
 
 def _impulse_mono_16() -> np.ndarray:

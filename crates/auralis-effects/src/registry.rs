@@ -24,6 +24,9 @@ const MAX_SUGGESTIONS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EffectKind {
+    /// SoX-ng-style center-cut stereo separation.
+    Centercut,
+
     /// SoX-ng-style explicit channel-count conversion.
     Channels,
 
@@ -161,6 +164,14 @@ impl EffectDescriptor {
 
 /// Implemented effects known to Auralis, in deterministic canonical-name order.
 pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor::new(
+        EffectKind::Centercut,
+        "centercut",
+        &[],
+        "Centercut",
+        "centercut [-a gain] [-b] [-w size]",
+        "separate stereo input into left residual, right residual, and center channels",
+    ),
     EffectDescriptor::new(
         EffectKind::Channels,
         "channels",
@@ -625,6 +636,7 @@ mod tests {
     #[test]
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
+            ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),

@@ -33,8 +33,8 @@ linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
-gain, channels, norm, contrast, softvol, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, and vol, and the CLI gain/channels/norm/contrast/softvol/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+gain, channels, norm, contrast, softvol, centercut, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
+fade, and vol, and the CLI gain/channels/norm/contrast/softvol/centercut/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -474,7 +474,7 @@ The crate root is a small facade; effect-local behavior lives in focused
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `repeat`, `remix`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
+`trim`, `pad`, `repeat`, `remix`, `centercut`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -526,8 +526,9 @@ The implemented `swap` command accepts no arguments and swaps adjacent decoded
 channel pairs, leaving mono input and an odd trailing channel unchanged.
 The typed `Centercut` processor implements the core spectral center-cut
 separation path and returns left residual, right residual, and extracted center
-channels from stereo input. The `centercut` command name and its `-a`, `-b`,
-and `-w` options remain reserved for the follow-up command/golden feature.
+channels from stereo input. The implemented `centercut` command accepts
+SoX-ng-style `-a gain`, `-b`, and `-w size` options for output gain,
+bass-to-sides routing below 200 Hz, and power-of-two spectral window sizes.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -817,7 +818,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `centercut`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -833,7 +834,9 @@ mono and explicit-argument stereo distortion forms; `saturation` coverage
 includes default tanh mono and explicit sqrt stereo distortion forms; `repeat`
 coverage includes default stereo and explicit-count mono finite repeats; `remix`
 coverage includes mono silent/copy routing, stereo mixdown, source gain
-modifiers, and automatic power-scaling forms; `oops` coverage includes stereo
+modifiers, and automatic power-scaling forms; `centercut` coverage includes
+bare stereo separation and exposed `-a`, `-b`, and `-w` option parsing;
+`oops` coverage includes stereo
 out-of-phase extraction because mono input is invalid; `swap` coverage includes mono
 identity and stereo pair-swap forms.
 Those standalone effect cases isolate effect behavior: output rate/channel

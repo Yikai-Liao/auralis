@@ -10,15 +10,18 @@ const OVERLAP_COUNT: usize = 4;
 const OVERLAP_EPSILON: f64 = 1.0e-18;
 const SPECTRAL_EPSILON: f64 = 1.0e-15;
 const POST_WINDOW_SCALE: f64 = 1.6;
+const MIN_WINDOW_SIZE: usize = 8;
+const MAX_WINDOW_SIZE: usize = 32_768;
 
 /// Core SoX-ng-style center-cut stereo separation.
 ///
 /// `Centercut` estimates the common stereo center in overlapping spectral
 /// windows, subtracts that estimate from the original left and right channels,
 /// and returns three output channels: left residual, right residual, then
-/// extracted center. The current typed API exposes the default core algorithm;
-/// SoX-ng command options such as `-a`, `-b`, and `-w` are intentionally left
-/// for the follow-up option feature.
+/// extracted center. The optional output gain matches SoX-ng's `-a`, the
+/// optional bass-to-sides mode keeps bins below 200 Hz out of the center
+/// estimate like `-b`, and the window size follows the validated `-w` command
+/// range.
 ///
 /// The processor requires exactly stereo input and preserves sample rate,
 /// sample format, and frame count.
@@ -48,14 +51,49 @@ const POST_WINDOW_SCALE: f64 = 1.6;
 /// assert_eq!(output.frames(), input.frames());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Centercut;
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Centercut {
+    /// Output gain applied to the left residual, right residual, and center.
+    pub gain: f32,
+
+    /// Whether low-frequency bins below 200 Hz are kept in the side channels.
+    pub bass_to_sides: bool,
+
+    /// Requested spectral window size.
+    pub window_size: usize,
+}
 
 impl Centercut {
     /// Creates a default center-cut processor.
     #[must_use]
     pub const fn new() -> Self {
-        Self
+        Self {
+            gain: 1.0,
+            bass_to_sides: false,
+            window_size: DEFAULT_WINDOW_SIZE,
+        }
+    }
+
+    /// Creates a center-cut processor with explicit SoX-ng-style options.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidCentercutGain`] when `gain` is not finite,
+    /// or [`EffectError::InvalidCentercutWindowSize`] when `window_size` is not
+    /// a power of two in `8..=32768`.
+    pub fn with_options(gain: f32, bass_to_sides: bool, window_size: usize) -> Result<Self> {
+        if !gain.is_finite() {
+            return Err(EffectError::InvalidCentercutGain);
+        }
+        if !valid_window_size(window_size) {
+            return Err(EffectError::InvalidCentercutWindowSize);
+        }
+
+        Ok(Self {
+            gain,
+            bass_to_sides,
+            window_size,
+        })
     }
 
     /// Applies center-cut stereo separation and returns a three-channel buffer.
@@ -84,7 +122,13 @@ impl Centercut {
         let right = audio
             .channel(1)
             .ok_or(EffectError::CentercutRequiresStereo)?;
-        let center = extract_center(left, right);
+        let center = extract_center(
+            left,
+            right,
+            self.window_size,
+            audio.spec().sample_rate().as_u32(),
+            self.bass_to_sides,
+        );
         let mut output = Vec::with_capacity(
             frames
                 .checked_mul(3)
@@ -94,17 +138,23 @@ impl Centercut {
         output.extend(
             left.iter()
                 .zip(&center)
-                .map(|(&sample, &center)| sample - center),
+                .map(|(&sample, &center)| (sample - center) * self.gain),
         );
         output.extend(
             right
                 .iter()
                 .zip(&center)
-                .map(|(&sample, &center)| sample - center),
+                .map(|(&sample, &center)| (sample - center) * self.gain),
         );
-        output.extend(center);
+        output.extend(center.into_iter().map(|sample| sample * self.gain));
 
         AudioBuffer::from_planar_f32(output_spec, audio.frames(), output).map_err(EffectError::from)
+    }
+}
+
+impl Default for Centercut {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -113,14 +163,28 @@ impl Centercut {
     clippy::cast_precision_loss,
     reason = "The spectral core evaluates bounded f64 FFT windows and returns Auralis f32 samples."
 )]
-fn extract_center(left: &[f32], right: &[f32]) -> Vec<f32> {
+fn extract_center(
+    left: &[f32],
+    right: &[f32],
+    requested_window_size: usize,
+    sample_rate: u32,
+    bass_to_sides: bool,
+) -> Vec<f32> {
     debug_assert_eq!(left.len(), right.len());
 
     if left.is_empty() {
         return Vec::new();
     }
 
-    let window_size = left.len().next_power_of_two().clamp(8, DEFAULT_WINDOW_SIZE);
+    let window_size = left
+        .len()
+        .next_power_of_two()
+        .clamp(MIN_WINDOW_SIZE, requested_window_size);
+    let bass_cutoff_bin = if bass_to_sides {
+        200_usize.saturating_mul(window_size) / usize::try_from(sample_rate).unwrap_or(usize::MAX)
+    } else {
+        0
+    };
     let hop = window_size / OVERLAP_COUNT;
     let analysis = raised_cosine_window(window_size, 1.0);
     let post = raised_cosine_window(window_size, 2.0)
@@ -143,7 +207,12 @@ fn extract_center(left: &[f32], right: &[f32]) -> Vec<f32> {
 
         forward.process(&mut left_spectrum);
         forward.process(&mut right_spectrum);
-        fill_center_spectrum(&left_spectrum, &right_spectrum, &mut center_spectrum);
+        fill_center_spectrum(
+            &left_spectrum,
+            &right_spectrum,
+            &mut center_spectrum,
+            bass_cutoff_bin,
+        );
         inverse.process(&mut center_spectrum);
 
         for (window_index, (center_bin, (&analysis_weight, &post_weight))) in center_spectrum
@@ -194,10 +263,15 @@ fn fill_center_spectrum(
     left: &[Complex<f64>],
     right: &[Complex<f64>],
     center: &mut [Complex<f64>],
+    bass_cutoff_bin: usize,
 ) {
     center.fill(Complex::default());
 
     for bin in 1..left.len() / 2 {
+        if bin < bass_cutoff_bin {
+            continue;
+        }
+
         let sum = left[bin] + right[bin];
         let diff = left[bin] - right[bin];
         let sum_energy = sum.norm_sqr();
@@ -221,6 +295,10 @@ fn raised_cosine_window(size: usize, power: f64) -> Vec<f64> {
     (0..size)
         .map(|index| (0.5 * (1.0 - (TAU * (index as f64 + 0.5) / size as f64).cos())).powf(power))
         .collect()
+}
+
+fn valid_window_size(window_size: usize) -> bool {
+    (MIN_WINDOW_SIZE..=MAX_WINDOW_SIZE).contains(&window_size) && window_size.is_power_of_two()
 }
 
 #[cfg(test)]
@@ -264,6 +342,42 @@ mod tests {
             "expected center rms above half of input rms: input={input_rms}, center={center_rms}"
         );
         assert!(center.iter().any(|sample| sample.abs() > 0.4));
+    }
+
+    #[test]
+    fn applies_output_gain_to_all_channels() {
+        let samples = sine(256, 3.0, 0.5);
+        let audio = stereo_buffer(samples.clone(), samples);
+
+        let unity = Centercut::new().process_buffer(&audio).unwrap();
+        let halved = Centercut::with_options(0.5, false, 8192)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+
+        assert_close_scaled(
+            halved.as_planar_f32(),
+            unity.as_planar_f32(),
+            0.5,
+            0.000_001,
+        );
+    }
+
+    #[test]
+    fn validates_window_size_and_gain_options() {
+        assert_eq!(
+            Centercut::with_options(f32::NAN, false, 8192).unwrap_err(),
+            EffectError::InvalidCentercutGain
+        );
+        assert_eq!(
+            Centercut::with_options(1.0, false, 7).unwrap_err(),
+            EffectError::InvalidCentercutWindowSize
+        );
+        assert_eq!(
+            Centercut::with_options(1.0, false, 12).unwrap_err(),
+            EffectError::InvalidCentercutWindowSize
+        );
+        assert!(Centercut::with_options(1.0, true, 32_768).is_ok());
     }
 
     #[test]
@@ -333,6 +447,17 @@ mod tests {
             assert!(
                 (actual - expected).abs() <= epsilon,
                 "sample {index}: expected {expected}, got {actual}"
+            );
+        }
+    }
+
+    fn assert_close_scaled(actual: &[f32], expected: &[f32], scale: f32, epsilon: f32) {
+        assert_eq!(actual.len(), expected.len());
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            assert!(
+                (actual - expected * scale).abs() <= epsilon,
+                "sample {index}: expected {}, got {actual}",
+                expected * scale
             );
         }
     }

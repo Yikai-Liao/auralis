@@ -2,6 +2,28 @@
 # output rate/channel conversion is absent, guard/norm are absent, and the
 # Python runner invokes SoX-ng with `-R -D` so automatic dither is disabled.
 
+[id.effect_centercut_stereo_default]
+input = "effects/centercut_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["centercut"]
+sox_ng = ["centercut"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_centercut_stereo_options]
+input = "effects/centercut_options_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["centercut", "-a", "0.5", "-b", "-w", "16"]
+sox_ng = ["centercut", "-a", "0.5", "-b", "-w", "16"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 80.0
+
 [id.effect_channels_mono_to_stereo]
 input = "effects/channels_mono.wav"
 corpus_id = "auto/mono_channels"

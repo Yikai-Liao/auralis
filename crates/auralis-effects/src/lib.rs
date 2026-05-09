@@ -29,6 +29,7 @@ mod chain_dispatch;
 mod chain_gain;
 mod channels;
 mod command;
+mod command_centercut;
 mod command_channels;
 mod command_contrast;
 mod command_dcshift;

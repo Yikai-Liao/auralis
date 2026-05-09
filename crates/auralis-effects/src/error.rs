@@ -51,6 +51,14 @@ pub enum EffectError {
     #[error("centercut can only process stereo input")]
     CentercutRequiresStereo,
 
+    /// A centercut output gain was not finite.
+    #[error("centercut output gain must be finite")]
+    InvalidCentercutGain,
+
+    /// A centercut window size was outside SoX-ng's supported range.
+    #[error("centercut window size must be a power of two from 8 to 32768")]
+    InvalidCentercutWindowSize,
+
     /// A DC shift amount was not finite or not in the supported normalized range.
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,

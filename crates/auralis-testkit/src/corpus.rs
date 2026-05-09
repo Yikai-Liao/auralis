@@ -25,6 +25,8 @@ pub const CORPUS_IDS: &[&str] = &[
     "l0/near_zero_mono_8",
     "l0/odd_length_mono_17",
     "l0/sine_stereo_32",
+    "l0/opposite_phase_stereo_32",
+    "l0/opposite_phase_stereo_8192",
     "l0/short_mono_3",
     "l0/short_stereo_2",
     "chains/stereo_steps",
@@ -186,6 +188,16 @@ pub fn corpus_case(id: &str) -> Result<CorpusCase, CorpusError> {
                 .collect(),
         ),
         "l0/sine_stereo_32" => stereo(id, sine(32, 1_000.0, 0.5, 0.0), sine(32, 500.0, 0.25, 0.25)),
+        "l0/opposite_phase_stereo_32" => {
+            let left = sine(32, 750.0, 0.5, 0.0);
+            let right = left.iter().map(|sample| -*sample).collect();
+            stereo(id, left, right)
+        }
+        "l0/opposite_phase_stereo_8192" => {
+            let left = sine(8192, 750.0, 0.5, 0.0);
+            let right = left.iter().map(|sample| -*sample).collect();
+            stereo(id, left, right)
+        }
         "l0/short_mono_3" => mono(id, vec![0.25, -0.25, 0.0]),
         "l0/short_stereo_2" => stereo(id, vec![0.25, -0.25], vec![-0.5, 0.5]),
         "chains/stereo_steps" => {

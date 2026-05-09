@@ -15,6 +15,7 @@ pub(crate) fn apply_command(
     gain_headroom: &mut GainHeadroomState,
 ) -> std::result::Result<(), (&'static str, EffectError)> {
     match command {
+        EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio),
         EffectCommand::Channels(channels) => {
             let converted = channels
                 .process_buffer_with_backend(audio, requested_backend)
@@ -114,10 +115,23 @@ pub(crate) fn apply_command(
     }
 }
 
+fn apply_centercut_command(
+    centercut: crate::Centercut,
+    audio: &mut AudioBuffer,
+) -> std::result::Result<(), (&'static str, EffectError)> {
+    let separated = centercut
+        .process_buffer(audio)
+        .map_err(|source| ("channels", source))?;
+    *audio = separated;
+
+    Ok(())
+}
+
 pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usize) -> usize {
     let args_start = command_start + 1;
 
     match kind {
+        EffectKind::Centercut => centercut_arg_end(tokens, args_start),
         EffectKind::Channels => optional_arg_end(tokens, args_start, 1),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
@@ -134,6 +148,20 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::SoftVol | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn centercut_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        let token = tokens[end];
+        end += 1;
+        if matches!(token, "-a" | "-w") && end < tokens.len() && !is_command_boundary(tokens[end]) {
+            end += 1;
+        }
+    }
+
+    end
 }
 
 fn trim_arg_end(tokens: &[&str], args_start: usize) -> usize {

@@ -763,7 +763,8 @@ mod tests {
                         vol.process_samples(chunk);
                     }
                 }
-                EffectCommand::Channels(_)
+                EffectCommand::Centercut(_)
+                | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Oops(_)

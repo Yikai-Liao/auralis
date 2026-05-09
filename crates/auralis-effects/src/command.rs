@@ -38,6 +38,7 @@ use std::{
 use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
+use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
@@ -57,9 +58,9 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade,
-    Gain, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo,
-    Trim, Vol,
+    Centercut, Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError,
+    EffectRegistry, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation,
+    SoftVol, Swap, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -75,6 +76,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
+    /// SoX-ng-style center-cut stereo separation.
+    Centercut(Centercut),
+
     /// SoX-ng-style explicit channel-count conversion.
     Channels(Channels),
 
@@ -144,6 +148,7 @@ impl EffectCommand {
         let effect = descriptor.canonical_name();
 
         match descriptor.kind() {
+            EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
@@ -169,6 +174,7 @@ impl EffectCommand {
     #[must_use]
     pub const fn kind(&self) -> EffectKind {
         match self {
+            Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
@@ -200,6 +206,7 @@ impl EffectCommand {
     #[must_use]
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
+            Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
@@ -490,8 +497,8 @@ pub(super) fn render_f32(value: f32) -> String {
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
-        Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
-        Saturation, SoftVol, Trim, TrimPosition,
+        Centercut, Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad,
+        PositionedPad, Saturation, SoftVol, Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
@@ -516,6 +523,10 @@ mod tests {
         assert_eq!(
             parse_effect_command(&["contrast"]).unwrap(),
             EffectCommand::Contrast(Contrast::default_amount())
+        );
+        assert_eq!(
+            parse_effect_command(&["centercut"]).unwrap(),
+            EffectCommand::Centercut(Centercut::new())
         );
         assert_eq!(
             parse_effect_command(&["pad"]).unwrap(),

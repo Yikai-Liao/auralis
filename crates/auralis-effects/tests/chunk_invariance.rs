@@ -207,7 +207,8 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::Tremolo(tremolo) => {
                 process_tremolo_by_channel_chunks(audio, *tremolo, schedule);
             }
-            EffectCommand::Norm(_)
+            EffectCommand::Centercut(_)
+            | EffectCommand::Norm(_)
             | EffectCommand::Oops(_)
             | EffectCommand::Pad(_)
             | EffectCommand::Repeat(_)

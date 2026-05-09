@@ -2,8 +2,9 @@
 
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
-    Channels, Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad, PositionedPad,
-    Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
+    Centercut, Channels, Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad,
+    PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim,
+    parse_effect_command,
 };
 
 #[test]
@@ -16,6 +17,10 @@ fn parses_supported_effect_commands_into_typed_configs() {
         (
             &["channels", "2"][..],
             EffectCommand::Channels(Channels::new(ChannelCount::new(2).unwrap())),
+        ),
+        (
+            &["centercut", "-a", "0.5", "-b", "-w", "16"][..],
+            EffectCommand::Centercut(Centercut::with_options(0.5, true, 16).unwrap()),
         ),
         (
             &["gain", "-3"][..],

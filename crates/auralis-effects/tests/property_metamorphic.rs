@@ -4,8 +4,9 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
+    Centercut, Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix,
+    RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap,
+    Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -329,6 +330,15 @@ proptest! {
             prop_assert_all_finite(&out_of_phase)?;
             prop_assert_eq!(out_of_phase.channels(), ChannelCount::new(2).unwrap());
             prop_assert_eq!(out_of_phase.frames(), source.frames());
+        }
+
+        if source.channels().as_usize() == 2 {
+            let centered = Centercut::new()
+                .process_buffer(&source)
+                .expect("generated stereo audio is valid for centercut");
+            prop_assert_all_finite(&centered)?;
+            prop_assert_eq!(centered.channels(), ChannelCount::new(3).unwrap());
+            prop_assert_eq!(centered.frames(), source.frames());
         }
 
         let mut reversed = source;

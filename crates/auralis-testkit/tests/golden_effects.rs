@@ -12,6 +12,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
     assert_eq!(
         ids,
         [
+            "effect_centercut_stereo_default",
+            "effect_centercut_stereo_options",
             "effect_channels_mono_to_stereo",
             "effect_channels_stereo_to_mono",
             "effect_contrast_mono_default",
@@ -78,6 +80,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
 
     for effect in [
         "gain",
+        "centercut",
         "dcshift",
         "trim",
         "pad",
@@ -103,7 +106,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
             .iter()
             .any(|(id, case)| id.contains(effect) && case.corpus_id().unwrap().contains("stereo"));
 
-        if effect != "oops" {
+        if !matches!(effect, "oops" | "centercut") {
             assert!(mono, "missing mono standalone golden case for {effect}");
         }
         assert!(stereo, "missing stereo standalone golden case for {effect}");
@@ -118,6 +121,7 @@ fn effects_golden_manifest_renders_representative_commands() {
     let fade = manifest
         .get("effect_fade_stereo_linear_stop_position")
         .unwrap();
+    let centercut = manifest.get("effect_centercut_stereo_options").unwrap();
 
     assert_eq!(
         gain.render_auralis_command_line("auralis", "in.wav", "out.wav"),
@@ -130,6 +134,10 @@ fn effects_golden_manifest_renders_representative_commands() {
     assert_eq!(
         fade.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
         "sox_ng -R -D in.wav out.wav fade t 0 24s 6s"
+    );
+    assert_eq!(
+        centercut.render_auralis_command_line("auralis", "in.wav", "out.wav"),
+        "auralis run in.wav out.wav centercut -a 0.5 -b -w 16"
     );
 }
 
