@@ -414,7 +414,7 @@ Implementation notes:
 
 ### Feature 5.6.6: enforce the no-thousand-line-file policy
 
-Status: planned.
+Status: implemented.
 
 Add a repeatable guard so future work does not recreate the same maintenance
 problem.
@@ -426,6 +426,17 @@ Acceptance tests:
   reason;
 - the check is documented in the root development guide;
 - the check can be added to CI later without changing semantics.
+
+Implementation notes:
+
+- `tools/check_rust_source_lines.py` scans checked-in Rust source files and
+  fails when any file exceeds the 1,000-line policy.
+- The remaining oversized CLI integration test file was split into focused
+  workflow files with shared WAV helpers in `crates/auralis-cli/tests/support/`.
+- The oversized testkit golden module now keeps runtime code in
+  `src/golden.rs` and validates public behavior from
+  `tests/golden_manifest.rs`.
+- There are no generated or vendored Rust source exemptions.
 
 ## Milestone 5.7: layered test conformance
 

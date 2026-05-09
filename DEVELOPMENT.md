@@ -177,6 +177,13 @@ Policy:
   files when they dominate source size;
 - future features must not reintroduce thousand-line single files.
 
+Run the checked-in guard before completing feature work that adds or moves Rust
+source:
+
+```bash
+python3 tools/check_rust_source_lines.py
+```
+
 Known offenders at the time this plan was written:
 
 | File | Approximate lines | Required action |
@@ -190,7 +197,8 @@ The exact Feature 5.6.1 file-size audit and ownership map is checked in at
 [`doc/development/05-source-module-map.md`](doc/development/05-source-module-map.md).
 That audit supersedes the approximate counts above and identifies additional
 oversized test/testkit files that must be split before the no-thousand-line-file
-policy can be enforced.
+policy can be enforced. Feature 5.6.6 completed those remaining splits and
+added the guard command above.
 
 The source modularization plan is Feature 5.6.x.
 

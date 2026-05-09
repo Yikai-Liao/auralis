@@ -105,8 +105,9 @@ modules. `auralis-effects` has also been split into per-effect implementation
 modules with focused unit tests while preserving the existing public effect
 types and command/chain behavior. `auralis-wav` now keeps PCM16 reader,
 writer, format validation, sample-conversion glue, and focused integration
-tests in separate ownership modules; the remaining oversized files are tracked
-by the same 5.6 development plan.
+tests in separate ownership modules. The remaining oversized CLI and testkit
+files have been split, and `python3 tools/check_rust_source_lines.py` enforces
+the no-thousand-line Rust source policy locally.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

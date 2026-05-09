@@ -246,8 +246,18 @@ format diagnostics must stay stable.
 
 ### Additional Oversized Files
 
+Feature 5.6.6 completed these follow-up splits. At completion, the largest
+resulting files from this work were:
+
+| Lines | File |
+|---:|---|
+| 912 | `crates/auralis-testkit/src/golden.rs` |
+| 597 | `crates/auralis-cli/tests/effects.rs` |
+| 477 | `crates/auralis-testkit/tests/golden_manifest.rs` |
+| 444 | `crates/auralis-cli/tests/chains_effects_file.rs` |
+
 The policy applies to all Rust source files, not only crate roots. These files
-are outside the original 5.6.2-5.6.5 target list but must be handled before
+were outside the original 5.6.2-5.6.5 target list and are now handled so
 Feature 5.6.6 can enforce the limit:
 
 - `crates/auralis-cli/tests/inspect.rs`: split by CLI workflow into inspect,
