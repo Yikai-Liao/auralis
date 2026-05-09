@@ -13,6 +13,7 @@ path = "src/lib.rs"
 [dependencies]
 auralis-core = { path = "../auralis-core" }
 auralis-dsp = { path = "../auralis-dsp" }
+thiserror.workspace = true
 
 [lints]
 workspace = true

@@ -190,6 +190,93 @@ fn run_gain_output_matches_library_pipeline() {
 }
 
 #[test]
+fn run_trim_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-run-trim-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-trim-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-trim-frame-library-output", "wav");
+    write_pcm16_wav(
+        &input,
+        2,
+        &[-1000, 1000, -2000, 2000, -3000, 3000, -4000, 4000],
+    );
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .trim_frames(1, 3)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--trim-start-frame",
+            "1",
+            "--trim-end-frame",
+            "3",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+    assert_eq!(
+        read_pcm16_wav(&cli_output),
+        (2, vec![-2000, 2000, -3000, 3000])
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
+fn run_trim_seconds_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-run-trim-seconds-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-trim-seconds-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-trim-seconds-library-output", "wav");
+    write_pcm16_wav(&input, 1, &[-1000, -500, 0, 500, 1000]);
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .trim_seconds(1.0 / 48_000.0, 4.0 / 48_000.0)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--trim-start-seconds",
+            "0.000020833333333333333",
+            "--trim-end-seconds",
+            "0.000083333333333333333",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+    assert_eq!(read_pcm16_wav(&cli_output), (1, vec![-500, 0, 500]));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
 fn run_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
@@ -217,7 +304,63 @@ fn run_invalid_gain_argument_returns_clear_error() {
 }
 
 #[test]
-fn run_help_documents_gain_units() {
+fn run_invalid_trim_range_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-invalid-trim-input", "wav");
+    let output = temp_path("auralis-cli-run-invalid-trim-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--trim-start-frame",
+            "3",
+            "--trim-end-frame",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: trim start frame must be less than or equal"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_incomplete_trim_range_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-incomplete-trim-input", "wav");
+    let output = temp_path("auralis-cli-run-incomplete-trim-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--trim-start-frame",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: frame trim requires both --trim-start-frame and --trim-end-frame"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_help_documents_gain_and_trim_units() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["run", "--help"])
         .output()
@@ -230,6 +373,13 @@ fn run_help_documents_gain_units() {
         stdout.contains("Constant gain to apply, in decibels"),
         "{stdout}"
     );
+    assert!(stdout.contains("--trim-start-frame <FRAME>"), "{stdout}");
+    assert!(stdout.contains("--trim-end-frame <FRAME>"), "{stdout}");
+    assert!(
+        stdout.contains("--trim-start-seconds <SECONDS>"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--trim-end-seconds <SECONDS>"), "{stdout}");
 }
 
 #[test]

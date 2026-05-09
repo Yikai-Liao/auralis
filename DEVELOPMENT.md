@@ -575,6 +575,8 @@ Python tests:
 
 ### Feature 2.5: `trim`
 
+Status: implemented.
+
 Implement typed trim by frame range and seconds range.
 
 Acceptance tests:

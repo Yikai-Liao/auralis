@@ -20,9 +20,9 @@
 
 use std::path::Path;
 
-pub use auralis_core::{AudioBuffer, Decibels};
+pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 
-use auralis_effects::Gain;
+use auralis_effects::{Gain, Trim};
 use thiserror::Error;
 
 /// Crate-local result type using [`Error`].
@@ -39,6 +39,14 @@ pub enum Error {
     /// WAV decoding or encoding failed.
     #[error(transparent)]
     Wav(#[from] auralis_wav::WavError),
+
+    /// A typed effect processor rejected its configuration or input buffer.
+    #[error(transparent)]
+    Effect(#[from] auralis_effects::EffectError),
+
+    /// A seconds-based trim range could not be represented as frames.
+    #[error("trim seconds range cannot be represented as frame positions")]
+    InvalidTrimSecondsRange,
 }
 
 impl PartialEq for Error {
@@ -46,6 +54,8 @@ impl PartialEq for Error {
         match (self, other) {
             (Self::Core(left), Self::Core(right)) => left == right,
             (Self::Wav(left), Self::Wav(right)) => left == right,
+            (Self::Effect(left), Self::Effect(right)) => left == right,
+            (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }
     }
@@ -134,6 +144,69 @@ impl Pipeline {
         self
     }
 
+    /// Keeps the half-open frame range `start..end` from every channel.
+    ///
+    /// Frame positions are end-exclusive and measured in audio frames, not
+    /// individual samples. The transform preserves channel grouping and returns
+    /// an empty buffer when `start == end`. Processing is deterministic and
+    /// allocates a new planar buffer for the retained range.
+    #[must_use]
+    pub fn trim_frames(mut self, start: u64, end: u64) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        match Trim::new(FrameCount::new(start), FrameCount::new(end))
+            .and_then(|trim| trim.process_buffer(audio))
+        {
+            Ok(trimmed) => *audio = trimmed,
+            Err(error) => self.audio = Err(error.into()),
+        }
+
+        self
+    }
+
+    /// Keeps the half-open seconds range `start..end` from every channel.
+    ///
+    /// Seconds are non-negative finite values. A seconds position is converted
+    /// to a frame position by flooring `seconds * sample_rate`; for example,
+    /// `0.0000625` at `48_000 Hz` becomes frame `3`. This deterministic rule is
+    /// documented so fractional-frame requests never depend on floating-point
+    /// rounding mode or CLI formatting. The resulting frame range follows the
+    /// same validation and end-exclusive behavior as [`Self::trim_frames`].
+    #[must_use]
+    pub fn trim_seconds(mut self, start: f64, end: f64) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        let result = TimeSeconds::new(start)
+            .map_err(Error::from)
+            .and_then(|start| {
+                TimeSeconds::new(end)
+                    .map_err(Error::from)
+                    .map(|end| (start, end))
+            })
+            .and_then(|(start, end)| {
+                let sample_rate = audio.spec().sample_rate().as_u32();
+                seconds_to_frame(start, sample_rate)
+                    .zip(seconds_to_frame(end, sample_rate))
+                    .ok_or(Error::InvalidTrimSecondsRange)
+            })
+            .and_then(|(start, end)| {
+                Trim::new(start, end)
+                    .and_then(|trim| trim.process_buffer(audio))
+                    .map_err(Error::from)
+            });
+
+        match result {
+            Ok(trimmed) => *audio = trimmed,
+            Err(error) => self.audio = Err(error),
+        }
+
+        self
+    }
+
     /// Returns the processed audio buffer.
     ///
     /// # Errors
@@ -160,6 +233,27 @@ impl Pipeline {
 
         Ok(())
     }
+}
+
+fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount> {
+    let scaled = seconds.as_f64() * f64::from(sample_rate);
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "This boundary check only needs the representable f64 magnitude of u64::MAX before the explicit saturating cast below."
+    )]
+    let max_frame = u64::MAX as f64;
+    if !scaled.is_finite() || scaled > max_frame {
+        return None;
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "TimeSeconds validates finite non-negative input; floor defines fractional-frame behavior before a checked range comparison."
+    )]
+    let frame = scaled.floor() as u64;
+
+    Some(FrameCount::new(frame))
 }
 
 #[cfg(test)]
@@ -190,6 +284,60 @@ mod tests {
             .unwrap();
 
         assert_samples_close(actual.as_planar_f32(), expected.as_planar_f32());
+    }
+
+    #[test]
+    fn chain_trim_frames_preserves_stereo_frame_grouping() {
+        let source = stereo_audio_buffer(vec![0.0, 0.25, 0.5, 0.75, 1.0, -0.25, -0.5, -0.75]);
+
+        let actual = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .trim_frames(1, 3)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.as_planar_f32(), &[0.25, 0.5, -0.25, -0.5]);
+    }
+
+    #[test]
+    fn chain_trim_seconds_uses_floor_conversion() {
+        let actual = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25, 0.5, 0.75]))
+            .into_pipeline()
+            .trim_seconds(1.0 / 48_000.0, 3.9 / 48_000.0)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.as_planar_f32(), &[0.25, 0.5]);
+    }
+
+    #[test]
+    fn invalid_trim_range_propagates_without_panic() {
+        let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25]))
+            .into_pipeline()
+            .trim_frames(2, 1)
+            .into_audio_buffer()
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            Error::Effect(auralis_effects::EffectError::InvalidTrimOrder)
+        );
+    }
+
+    #[test]
+    fn invalid_trim_seconds_propagates_without_panic() {
+        let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25]))
+            .into_pipeline()
+            .trim_seconds(f64::NAN, 1.0)
+            .into_audio_buffer()
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            Error::Core(auralis_core::AuralisError::InvalidTimeSeconds)
+        );
     }
 
     #[test]
@@ -248,6 +396,18 @@ mod tests {
         let spec = AudioSpec::new(
             SampleRate::new(48_000).unwrap(),
             ChannelCount::new(1).unwrap(),
+            SampleFormat::Float32,
+        );
+
+        AudioBuffer::from_planar_f32(spec, FrameCount::new(frames), samples).unwrap()
+    }
+
+    fn stereo_audio_buffer(samples: Vec<f32>) -> AudioBuffer {
+        assert_eq!(samples.len() % 2, 0);
+        let frames = u64::try_from(samples.len() / 2).unwrap();
+        let spec = AudioSpec::new(
+            SampleRate::new(48_000).unwrap(),
+            ChannelCount::new(2).unwrap(),
             SampleFormat::Float32,
         );
 
