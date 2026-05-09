@@ -87,7 +87,7 @@ pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
-pub use remix::{Remix, RemixOutputSpec, RemixSource};
+pub use remix::{Remix, RemixGain, RemixLevelMode, RemixOutputSpec, RemixSource};
 pub use repeat::Repeat;
 pub use reverse::Reverse;
 pub use saturation::{Saturation, SaturationType};

@@ -382,19 +382,35 @@ Implementation notes:
 - Added a typed `Remix` effect for SoX-ng-style basic out-spec routing with
   1-based channel numbers, comma-separated contributors, channel ranges,
   open ranges, the `-` all-channel range, and standalone `0` silent outputs.
-- Multi-input output specs use SoX-ng's default `1 / n` scaling. Gain
-  modifiers (`v`, `p`, `i`) and `-a`, `-m`, and `-p` option interactions are
-  deliberately rejected until Feature 6.3.3.
+- Multi-input output specs use SoX-ng's default `1 / n` scaling when no source
+  gain modifier is present. Feature 6.3.3 extends this same model with gain
+  modifiers and level-scaling options.
 - Chain execution treats `remix` as a whole-buffer channel-shape transform and
   reports out-of-bounds input channels as typed command-context failures.
 - Golden coverage includes mono silent/copy routing and stereo mixdown cases
   against SoX-ng, with L4 identity/finite-output coverage and an L7 fuzz seed.
-  L5 and L6 are not applicable because basic remix is a structural channel
+  L5 and L6 are not applicable because remix is a structural channel
   routing/mixing transform without a SIMD kernel.
 
 ### Feature 6.3.3: `remix` gain modifiers
 
+Status: implemented.
+
 Add gain modifiers and option interactions.
+
+Implementation notes:
+
+- `RemixOutputSpec` now stores optional per-source gain modifiers alongside
+  source routing specs, covering SoX-ng's `v` voltage multiplier, `p` power-dB
+  multiplier, and `i` inverted power-dB multiplier forms.
+- The `remix` command parser accepts `-a` automatic scaling, `-m` manual
+  scaling, and `-p` power scaling in SoX-ng order. Default semi-automatic mode
+  applies `1 / n` scaling only to output specs with no explicit gain modifier;
+  `-p` changes automatic scaling to `1 / sqrt(n)`.
+- Chain execution clips remixed samples to the normalized full-scale range
+  before later commands see them, matching SoX-ng's effect-local clipping.
+- Golden coverage includes stereo source-gain and automatic power-scaling cases
+  against SoX-ng, with analytical/parser coverage and an updated L7 fuzz seed.
 
 ### Feature 6.3.4: `swap`
 

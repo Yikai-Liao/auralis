@@ -44,6 +44,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_pad_stereo_both_sides",
             "effect_pad_stereo_positioned",
             "effect_remix_mono_silent_copy",
+            "effect_remix_stereo_auto_power",
+            "effect_remix_stereo_gain_modifiers",
             "effect_remix_stereo_mixdown",
             "effect_repeat_mono_count_2",
             "effect_repeat_stereo_default",

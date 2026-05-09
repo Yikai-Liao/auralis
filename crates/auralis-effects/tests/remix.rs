@@ -1,9 +1,9 @@
-//! Integration coverage for SoX-ng-style basic remix routing.
+//! Integration coverage for SoX-ng-style remix routing.
 
 use auralis_core::{AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_effects::{
-    EffectChainParseError, EffectCommand, EffectCommandParseError, Remix, RemixOutputSpec,
-    RemixSource, parse_effect_chain,
+    EffectChainParseError, EffectCommand, EffectCommandParseError, Remix, RemixGain,
+    RemixLevelMode, RemixOutputSpec, RemixSource, parse_effect_chain,
 };
 
 #[test]
@@ -43,6 +43,68 @@ fn remix_mixes_routes_and_inserts_silence_in_chain() {
 }
 
 #[test]
+fn remix_supports_gain_modifiers_and_level_options() {
+    let chain = parse_effect_chain(&["remix", "-a", "-p", "1v0.5,2p-6,2i0"]).unwrap();
+
+    assert_eq!(
+        chain.commands(),
+        &[EffectCommand::Remix(
+            Remix::with_level_options(
+                [RemixOutputSpec::with_gains(
+                    [
+                        RemixSource::channel(1).unwrap(),
+                        RemixSource::channel(2).unwrap(),
+                        RemixSource::channel(2).unwrap(),
+                    ],
+                    [
+                        Some(RemixGain::voltage(0.5).unwrap()),
+                        Some(RemixGain::PowerDb(
+                            auralis_core::Decibels::new(-6.0).unwrap()
+                        )),
+                        Some(RemixGain::InvertedPowerDb(
+                            auralis_core::Decibels::new(0.0).unwrap()
+                        )),
+                    ],
+                )
+                .unwrap()],
+                RemixLevelMode::Automatic,
+                true,
+            )
+            .unwrap()
+        )]
+    );
+    assert_eq!(
+        chain.render_tokens(),
+        ["remix", "-a", "-p", "1v0.5,2p-6,2i0"]
+    );
+}
+
+#[test]
+fn remix_gain_modifiers_affect_chain_output() {
+    let mut semi = stereo_audio(vec![0.25, 0.75], vec![0.5, -0.5]);
+    parse_effect_chain(&["remix", "1v0.5,2"])
+        .unwrap()
+        .process_buffer(&mut semi)
+        .unwrap();
+
+    let mut auto = stereo_audio(vec![0.25, 0.75], vec![0.5, -0.5]);
+    parse_effect_chain(&["remix", "-a", "1v0.5,2"])
+        .unwrap()
+        .process_buffer(&mut auto)
+        .unwrap();
+
+    let mut manual = stereo_audio(vec![0.75, 0.5], vec![0.75, 0.75]);
+    parse_effect_chain(&["remix", "-m", "1,2"])
+        .unwrap()
+        .process_buffer(&mut manual)
+        .unwrap();
+
+    assert_eq!(semi.as_planar_f32(), &[0.625, -0.125]);
+    assert_eq!(auto.as_planar_f32(), &[0.375, 0.125]);
+    assert_eq!(manual.as_planar_f32(), &[1.0, 1.0]);
+}
+
+#[test]
 fn remix_supports_open_ranges() {
     let mut audio = audio_buffer(3, vec![0.0, 0.3, 1.0, 1.3, -1.0, -0.4]);
 
@@ -56,7 +118,7 @@ fn remix_supports_open_ranges() {
 }
 
 #[test]
-fn remix_rejects_missing_future_options_invalid_specs_and_out_of_bounds_channels() {
+fn remix_rejects_missing_invalid_specs_bad_options_and_out_of_bounds_channels() {
     let missing = parse_effect_chain(&["remix"]).unwrap_err();
     assert!(matches!(
         missing,
@@ -69,22 +131,16 @@ fn remix_rejects_missing_future_options_invalid_specs_and_out_of_bounds_channels
         }
     ));
 
-    let option = parse_effect_chain(&["remix", "-a", "1,2"]).unwrap_err();
+    let option = parse_effect_chain(&["remix", "-a", "-m", "1,2"]).unwrap_err();
     assert!(matches!(
         option,
         EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::UnsupportedOption { effect: "remix", option },
+            source: EffectCommandParseError::InvalidOptionCombination {
+                effect: "remix",
+                ..
+            },
             ..
-        } if option == "-a"
-    ));
-
-    let gain_modifier = parse_effect_chain(&["remix", "1v0.5"]).unwrap_err();
-    assert!(matches!(
-        gain_modifier,
-        EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::UnsupportedOption { effect: "remix", option },
-            ..
-        } if option == "v"
+        }
     ));
 
     let invalid = parse_effect_chain(&["remix", "0,1"]).unwrap_err();

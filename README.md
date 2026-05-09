@@ -53,8 +53,8 @@ clipping-avoidant volume control with optional recovery and headroom, and
 `tremolo speed [depth]` sinusoidal amplitude modulation, and
 `overdrive [gain [color]]` cubic soft-clipping distortion, and
 `saturation [type [blend [offset [drive|color|threshold]]]]` nonlinear
-saturation, finite `repeat [count]` output duplication, and basic
-`remix out-spec...` channel routing.
+saturation, finite `repeat [count]` output duplication, and
+`remix [-a|-m] [-p] out-spec...` channel routing with source gain modifiers.
 The chain path also supports explicit SoX-ng-style `channels number` conversion
 at a user-visible effect position, using the same conversion primitive as the
 output `--channels` policy. `auralis run <input.wav> <output.wav> gain -3 channels 1 norm -6 contrast softvol 2 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 remix 1 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
@@ -510,11 +510,12 @@ mixing it with the dry input.
 The implemented `repeat` command accepts an optional finite count, defaults to
 `1`, treats `0` as an identity transform, validates output length, and rejects
 SoX-ng's unbounded `repeat -` form.
-The implemented `remix` command accepts basic SoX-ng out-spec routing with
+The implemented `remix` command accepts SoX-ng out-spec routing with
 1-based channel numbers, ranges, open ranges, `-` for all channels, and
-standalone `0` silent outputs. It uses default `1 / n` scaling for multi-input
-mixes and rejects gain modifiers and `-a`, `-m`, and `-p` until those are
-implemented separately.
+standalone `0` silent outputs. It supports `v` voltage, `p` power-dB, and `i`
+inverted power-dB source modifiers, plus `-a` automatic scaling, `-m` manual
+scaling, and `-p` power scaling. The default semi-automatic mode uses `1 / n`
+scaling only when an output spec has no explicit gain modifiers.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -819,7 +820,8 @@ explicit-depth stereo modulation forms; `overdrive` coverage includes default
 mono and explicit-argument stereo distortion forms; `saturation` coverage
 includes default tanh mono and explicit sqrt stereo distortion forms; `repeat`
 coverage includes default stereo and explicit-count mono finite repeats; `remix`
-coverage includes mono silent/copy routing and stereo mixdown forms.
+coverage includes mono silent/copy routing, stereo mixdown, source gain
+modifiers, and automatic power-scaling forms.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.
@@ -1046,8 +1048,8 @@ Examples:
 - `saturation`: SoX-ng's tanh, sqrt, or diode nonlinear transfer, wet/dry
   blend, asymmetric offset, and safety gain compensation
 - `repeat`: finite output count and planar channel grouping
-- `remix`: basic channel out-spec routing, silent channels, and default-scaled
-  multi-input mixdown
+- `remix`: channel out-spec routing, silent channels, default-scaled
+  multi-input mixdown, source gain modifiers, and level-scaling options
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
   does not clip unless SoX-ng's optional limiter gain is configured, while
   PCM16 WAV output clips plain shifted samples to the representable range
