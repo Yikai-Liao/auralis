@@ -1,0 +1,317 @@
+# 6.x Effect Coverage Milestone
+
+Implement effects in the order below. Each effect must satisfy the effect test
+contract from [`03-test-infrastructure.md`](03-test-infrastructure.md), update
+the layered coverage matrix from Feature 5.7.7, include scalar and SIMD work
+where applicable, and update the SoX-ng coverage entry.
+
+## Milestone 6.1: complete existing SoX-ng semantics
+
+### Feature 6.1.1: `gain` headroom and reclaim options
+
+Implement `gain -h` and `gain -r`.
+
+Acceptance tests:
+
+- manifest case per option;
+- option interactions tested where SoX-ng documents combinations;
+- scalar-vs-SIMD tests for gain kernels;
+- SoX-ng golden comparisons.
+
+### Feature 6.1.2: `gain` normalize and limiter options
+
+Implement remaining level-management options that belong to `gain`, without
+confusing them with pipeline `--norm`.
+
+### Feature 6.1.3: `gain` channel equalize and balance options
+
+Implement channel-aware gain semantics and document differences from output
+channel policies.
+
+### Feature 6.1.4: `fade` curve types
+
+Add supported SoX-ng fade curve families with analytical and golden coverage.
+
+### Feature 6.1.5: `fade` stop position and fade-out length
+
+Complete SoX-ng positional fade semantics beyond the initial frame-count subset.
+
+### Feature 6.1.6: `dcshift` limiter gain
+
+Implement the limiter gain option and document clipping/limiting behavior.
+
+### Feature 6.1.7: `pad` positioned padding
+
+Support SoX-ng-style positioned padding, not only start/end padding.
+
+### Feature 6.1.8: `trim` multiple and relative positions
+
+Support multiple trim ranges and relative-position forms.
+
+## Milestone 6.2: volume, level, and simple modulation effects
+
+### Feature 6.2.1: `vol`
+
+Implement volume scaling and supported option syntax.
+
+### Feature 6.2.2: `norm`
+
+Implement effect-level normalization semantics separately from output `--norm`.
+
+### Feature 6.2.3: `contrast`
+
+Implement contrast enhancement with analytical and golden coverage.
+
+### Feature 6.2.4: `softvol`
+
+Implement soft volume scaling if SoX-ng semantics are well-defined enough for
+golden coverage.
+
+### Feature 6.2.5: `tremolo`
+
+Implement deterministic tremolo modulation.
+
+### Feature 6.2.6: `overdrive`
+
+Implement overdrive with documented transfer function and clipping behavior.
+
+### Feature 6.2.7: `saturation`
+
+Implement saturation with documented transfer function and golden coverage.
+
+### Feature 6.2.8: `repeat`
+
+Implement deterministic repeat semantics and output-length validation.
+
+## Milestone 6.3: channel and mixing effects
+
+### Feature 6.3.1: `channels`
+
+Implement the explicit `channels` effect. It should share conversion primitives
+with output channel policy without hiding behavior.
+
+### Feature 6.3.2: `remix` basic routing
+
+Implement basic channel routing.
+
+### Feature 6.3.3: `remix` gain modifiers
+
+Add gain modifiers and option interactions.
+
+### Feature 6.3.4: `swap`
+
+Implement channel swapping.
+
+### Feature 6.3.5: `oops`
+
+Implement out-of-phase stereo behavior.
+
+### Feature 6.3.6: `centercut` core
+
+Implement the core center-cut algorithm.
+
+### Feature 6.3.7: `centercut` options
+
+Complete exposed options and golden coverage.
+
+## Milestone 6.4: biquad and tone filters
+
+### Feature 6.4.1: biquad primitive
+
+Implement a scalar biquad primitive before exposing effect names.
+
+### Feature 6.4.2: `biquad` effect
+
+Expose direct coefficient-based biquad processing.
+
+### Feature 6.4.3: RBJ coefficient helpers
+
+Add reusable coefficient helpers for tone filters.
+
+### Feature 6.4.4: `allpass`
+
+### Feature 6.4.5: `band`
+
+### Feature 6.4.6: `bandpass`
+
+### Feature 6.4.7: `bandreject`
+
+### Feature 6.4.8: `bass`
+
+### Feature 6.4.9: `treble`
+
+### Feature 6.4.10: `equalizer`
+
+### Feature 6.4.11: `lowpass`
+
+### Feature 6.4.12: `highpass`
+
+### Feature 6.4.13: `deemph`
+
+### Feature 6.4.14: `riaa`
+
+Each filter effect requires analytical frequency-response tests, chunk
+invariance, golden tests, and explicit tolerance rationale.
+
+## Milestone 6.5: delay, echo, and modulation effects
+
+### Feature 6.5.1: `delay`
+
+### Feature 6.5.2: `echo`
+
+### Feature 6.5.3: `echos`
+
+### Feature 6.5.4: `chorus` core
+
+### Feature 6.5.5: `chorus` interpolation and multi-delay options
+
+### Feature 6.5.6: `flanger`
+
+### Feature 6.5.7: `phaser`
+
+### Feature 6.5.8: `reverb`
+
+These effects are stateful. Each feature must document latency, tail behavior,
+flush behavior, and whether chunked output is exact or tolerance-based.
+
+## Milestone 6.6: sample-rate and time-domain effects
+
+### Feature 6.6.1: `downsample`
+
+### Feature 6.6.2: `upsample`
+
+### Feature 6.6.3: `speed`
+
+### Feature 6.6.4: `rate` specification and scaffolding
+
+### Feature 6.6.5: `rate` quick and low-quality modes
+
+### Feature 6.6.6: `rate` high-quality modes
+
+### Feature 6.6.7: `rate` override options
+
+### Feature 6.6.8: `stretch`
+
+### Feature 6.6.9: `tempo` core
+
+### Feature 6.6.10: `tempo` tuning options
+
+### Feature 6.6.11: `pitch`
+
+### Feature 6.6.12: `bend`
+
+### Feature 6.6.13: `splice`
+
+Resampling and time-domain features require output-length tests, spectral tests
+where applicable, SoX-ng golden comparisons, and explicit aliasing/tolerance
+documentation.
+
+## Milestone 6.7: dynamics, silence, and noise effects
+
+### Feature 6.7.1: `compand` parser and transfer function
+
+### Feature 6.7.2: `compand` processor
+
+### Feature 6.7.3: `mcompand`
+
+### Feature 6.7.4: `loudness`
+
+### Feature 6.7.5: `silence`
+
+### Feature 6.7.6: `vad` core
+
+### Feature 6.7.7: `vad` advanced options
+
+### Feature 6.7.8: `noiseprof`
+
+### Feature 6.7.9: `noisered`
+
+Dynamics and noise effects require deterministic state handling and careful
+golden tolerances.
+
+## Milestone 6.8: FIR, analysis, generation, and dither effects
+
+### Feature 6.8.1: `fir` coefficient input
+
+### Feature 6.8.2: `fir` streaming processor
+
+### Feature 6.8.3: `firfit`
+
+### Feature 6.8.4: `hilbert`
+
+### Feature 6.8.5: `sinc` low-pass and high-pass
+
+### Feature 6.8.6: `sinc` band-pass and band-reject
+
+### Feature 6.8.7: `dither` TPDF and sloped TPDF
+
+Implement deterministic dither primitives and an explicit `dither` effect before
+any automatic insertion policy.
+
+Acceptance tests:
+
+- explicit seed/config policy is documented;
+- tests do not rely on implicit randomness;
+- SoX-ng dither golden tests use dither-specific invocation rules, not `-D`;
+- silence and near-zero behavior is tested.
+
+### Feature 6.8.8: automatic dither insertion policy
+
+Moved here from the old Feature 5.5.4.
+
+Implement only after Feature 6.8.7 exists.
+
+Acceptance tests:
+
+- automatic insertion rules are explicit and testable;
+- library APIs expose dither insertion as an output-boundary policy, not hidden
+  behavior;
+- disabling dither is possible in tests;
+- SoX-ng comparison tests record when SoX-ng auto-inserted `dither`;
+- deterministic seed or repeatability behavior is documented;
+- the policy composes correctly with guard, norm, sample-rate conversion, and
+  channel conversion.
+
+### Feature 6.8.9: `dither` noise shaping
+
+Add noise-shaping modes after the base dither behavior and automatic insertion
+policy are stable.
+
+### Feature 6.8.10: `stat`
+
+### Feature 6.8.11: `stats`
+
+### Feature 6.8.12: `synth` basic waveforms
+
+### Feature 6.8.13: `synth` noise, sweep, and combine modes
+
+Analysis and generation effects must define deterministic output and metadata
+behavior before CLI integration.
+
+## Milestone 6.9: specialized and integration effects
+
+### Feature 6.9.1: `dolbyb` feasibility and spec
+
+Record whether a safe, testable implementation path exists. If blocked, the CLI
+diagnostic must be stable and actionable.
+
+### Feature 6.9.2: `dolbyb` implementation
+
+Implement only if Feature 6.9.1 records a safe implementation path.
+
+### Feature 6.9.3: `dop`
+
+### Feature 6.9.4: `earwax`
+
+### Feature 6.9.5: `ladspa` host or stable block
+
+If blocked, CLI diagnostics must be stable and actionable.
+
+### Feature 6.9.6: `sdm` feasibility and spec
+
+Record whether a safe, testable implementation path exists. If blocked, the CLI
+diagnostic must be stable and actionable.
+
+### Feature 6.9.7: `sdm` implementation
+
+Implement only if Feature 6.9.6 records a safe implementation path.

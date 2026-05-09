@@ -1,0 +1,543 @@
+# 5.x Pipeline Parity Milestone
+
+Pipeline behavior is higher priority than additional file formats because many
+SoX-ng effects only make sense inside chains.
+
+## Milestone 5.1: effect command model
+
+### Feature 5.1.1: effect registry and name resolution
+
+Status: implemented.
+
+Acceptance tests:
+
+- supported names resolve to typed effect descriptors;
+- unknown names fail with suggestions;
+- unsupported SoX-ng effects fail with a message that names missing coverage;
+- existing typed APIs remain unchanged.
+
+### Feature 5.1.2: command parser for implemented effects
+
+Status: implemented.
+
+Acceptance tests:
+
+- parse implemented effect names and options into typed configs;
+- reject unsupported options with a diagnostic that names the effect and option;
+- no stringly typed effect config leaks into public library APIs;
+- preserve typed API behavior for existing effects.
+
+### Feature 5.1.3: deterministic command rendering
+
+Status: implemented.
+
+Acceptance tests:
+
+- equivalent command values render identically;
+- quoting and escaping are deterministic;
+- golden manifest command rendering is stable across runs.
+
+## Milestone 5.2: multi-effect chains
+
+### Feature 5.2.1: in-memory sequential chain
+
+Status: implemented.
+
+Acceptance tests:
+
+- multiple effects execute in user-specified order;
+- chain output matches repeated direct library calls;
+- failures report which effect and option failed;
+- chunk invariance holds across the full chain;
+- scalar and SIMD backends can be forced for the full chain.
+
+### Feature 5.2.2: CLI sequential chain syntax
+
+Status: implemented.
+
+Acceptance tests:
+
+- CLI order matches user-specified order;
+- CLI output matches in-memory chain output;
+- invalid chain syntax reports the failing effect and argument;
+- existing single-effect CLI behavior remains compatible.
+
+### Feature 5.2.3: SoX-ng golden tests for chains
+
+Status: implemented.
+
+Acceptance tests:
+
+- at least one editing chain, one level chain, and one filter-style chain;
+- Auralis and SoX-ng command lines are recorded;
+- decoded samples and metadata are compared with documented tolerances.
+
+## Milestone 5.3: effects files and chain boundaries
+
+### Feature 5.3.1: effects file parser
+
+Status: implemented.
+
+Acceptance tests:
+
+- read effects from a text file;
+- ignore blank lines and documented comments;
+- reject malformed files with line and column diagnostics;
+- parsed effects match equivalent CLI args.
+
+### Feature 5.3.2: effects file CLI integration
+
+Status: implemented.
+
+Acceptance tests:
+
+- CLI accepts an effects file;
+- effects file output matches equivalent CLI args;
+- missing files and unreadable files fail clearly;
+- golden tests cover the same chain from CLI args and effects file.
+
+### Feature 5.3.3: chain boundary syntax
+
+Status: implemented.
+
+Acceptance tests:
+
+- boundary syntax is accepted in CLI args and effects files;
+- empty chains are rejected or documented;
+- boundary rendering is deterministic in manifests;
+- unsupported `newfile` and `restart` semantics report stable diagnostics until
+  their leaf features are implemented.
+
+## Milestone 5.4: input combiners
+
+### Feature 5.4.1: concatenate combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- mono and stereo inputs;
+- mismatched lengths;
+- mismatched channel count behavior documented;
+- SoX-ng golden comparison;
+- full-chain test combining inputs before effects.
+
+### Feature 5.4.2: sequence combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- mono and stereo inputs;
+- sequence boundary behavior matches documented semantics;
+- SoX-ng golden comparison;
+- full-chain test combining inputs before effects.
+
+### Feature 5.4.3: mix combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- equal-length and mismatched-length inputs;
+- clipping and normalization behavior documented;
+- scalar-vs-SIMD tests for mixing kernels;
+- SoX-ng golden comparison.
+
+### Feature 5.4.4: mix-power combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- equal-length and mismatched-length inputs;
+- power scaling behavior documented;
+- scalar-vs-SIMD tests for mixing kernels;
+- SoX-ng golden comparison.
+
+### Feature 5.4.5: merge combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- mono-to-stereo merge;
+- multichannel merge;
+- mismatched length behavior documented;
+- SoX-ng golden comparison.
+
+### Feature 5.4.6: multiply combiner
+
+Status: implemented.
+
+Acceptance tests:
+
+- mono and stereo inputs;
+- zero and one identity cases;
+- scalar-vs-SIMD tests for multiply kernels;
+- SoX-ng golden comparison.
+
+## Milestone 5.5: automatic pipeline effects
+
+Define explicit equivalents for SoX-ng automatic behavior. Automatic behavior
+must remain visible in library policy types and test controls.
+
+### Feature 5.5.1: automatic channel conversion policy
+
+Status: implemented.
+
+Acceptance tests:
+
+- no hidden behavior in library APIs;
+- CLI defaults are documented;
+- disabling automatic channel conversion is possible in tests;
+- SoX-ng comparison tests record when SoX-ng auto-inserted channel conversion.
+
+### Feature 5.5.2: automatic sample-rate conversion policy
+
+Status: implemented.
+
+Acceptance tests:
+
+- no hidden behavior in library APIs;
+- CLI defaults are documented;
+- disabling automatic rate conversion is possible in tests;
+- SoX-ng comparison tests record when SoX-ng auto-inserted `rate`.
+
+### Feature 5.5.3: guard and norm pipeline behavior
+
+Status: implemented.
+
+Acceptance tests:
+
+- guard behavior is explicit in library APIs;
+- CLI `--guard` and `--norm` behavior is documented;
+- SoX-ng golden tests cover representative clipping cases.
+
+### Feature 5.5.4: automatic dither insertion policy
+
+Status: moved to Feature 6.8.8.
+
+This was previously recorded as blocked by commit `18d002f`. The blocker was a
+planning error: automatic dither insertion cannot be implemented or tested
+before the `dither` effect exists. Do not implement this as a 5.5 leaf feature.
+
+The replacement feature is
+[`Feature 6.8.8`](06-effect-coverage.md#feature-688-automatic-dither-insertion-policy),
+after `dither` TPDF behavior exists.
+
+## Milestone 5.6: source modularization debt
+
+Status: planned. This milestone must be completed before adding more effect
+surface area.
+
+The current codebase has several implementation-heavy `lib.rs` files. This
+violates the project maintainability goal and makes future feature work harder
+to review, test, and parallelize.
+
+Target policy:
+
+- no Rust source file above 1,000 lines after the pass;
+- `lib.rs` files should be crate docs, module declarations, and re-exports;
+- split by functional ownership, not by arbitrary chunks;
+- avoid unrelated behavior changes during modularization;
+- keep public APIs stable unless the feature explicitly says otherwise.
+
+### Feature 5.6.1: file-size audit and module map
+
+Status: planned next.
+
+Produce a checked-in module map for the oversized files and document ownership
+boundaries before moving code.
+
+Acceptance tests:
+
+- record current line counts for every Rust source file;
+- identify all files at or above 1,000 lines and files likely to cross the limit;
+- define target modules for `auralis`, `auralis-simd`, `auralis-effects`, and
+  `auralis-wav`;
+- define where large test modules should move;
+- add or document a repeatable file-size check command for future use;
+- no runtime behavior changes.
+
+### Feature 5.6.2: split `crates/auralis/src/lib.rs`
+
+Status: planned.
+
+Split the high-level facade by functional ownership.
+
+Suggested modules:
+
+- `audio_file`
+- `pipeline`
+- `combine`
+- `output_policy`
+- `level_policy`
+- `rate_policy`
+- `channel_policy`
+- `errors`
+- focused test modules or integration tests
+
+Acceptance tests:
+
+- no public facade behavior changes;
+- existing library and CLI tests pass;
+- every resulting Rust source file is below 1,000 lines;
+- `lib.rs` becomes crate docs, module declarations, and re-exports;
+- moved tests remain focused and discoverable.
+
+### Feature 5.6.3: split `crates/auralis-simd/src/lib.rs`
+
+Status: planned.
+
+Split backend selection, sample conversion, arithmetic kernels, and tests.
+
+Suggested modules:
+
+- `backend`
+- `selection`
+- `convert`
+- `gain`
+- `dcshift`
+- `fade`
+- `mix`
+- `multiply`
+- `testing` or focused `tests/` files
+
+Acceptance tests:
+
+- scalar and SIMD behavior is unchanged;
+- forced backend tests still pass;
+- conversion and kernel conformance tests remain easy to find;
+- no resulting Rust source file exceeds 1,000 lines;
+- `rten-simd` remains hidden behind Auralis-owned APIs.
+
+### Feature 5.6.4: split `crates/auralis-effects/src/lib.rs`
+
+Status: planned.
+
+Split effect implementations and tests by effect family.
+
+Suggested modules:
+
+- `gain`
+- `dcshift`
+- `trim`
+- `pad`
+- `reverse`
+- `fade`
+- shared `processor` or `types` module if needed
+- focused effect test modules
+
+Acceptance tests:
+
+- public effect types and constructors remain compatible;
+- parser, registry, and chain modules continue to compile unchanged unless
+  imports require mechanical updates;
+- all existing effect and chain tests pass;
+- no resulting Rust source file exceeds 1,000 lines.
+
+### Feature 5.6.5: split `crates/auralis-wav/src/lib.rs`
+
+Status: planned.
+
+Split WAV reader, writer, format validation, backend hooks, and tests.
+
+Suggested modules:
+
+- `reader`
+- `writer`
+- `format`
+- `sample_conversion`
+- `error`
+- focused decode/encode/golden test modules
+
+Acceptance tests:
+
+- PCM16 decode/encode behavior is unchanged;
+- unsupported-format diagnostics remain stable;
+- scalar/SIMD WAV conformance tests still pass;
+- SoX-ng WAV reference tests still pass;
+- no resulting Rust source file exceeds 1,000 lines.
+
+### Feature 5.6.6: enforce the no-thousand-line-file policy
+
+Status: planned.
+
+Add a repeatable guard so future work does not recreate the same maintenance
+problem.
+
+Acceptance tests:
+
+- a local command or script fails when a Rust source file exceeds 1,000 lines;
+- generated or vendored files are either absent or explicitly exempted with a
+  reason;
+- the check is documented in the root development guide;
+- the check can be added to CI later without changing semantics.
+
+## Milestone 5.7: layered test conformance
+
+Status: planned. This milestone converts the README testing philosophy into
+enforced, reusable test infrastructure.
+
+Audit summary:
+
+| Layer | Current coverage | Required follow-up |
+|---|---|---|
+| L0 deterministic corpus | partial | build one reusable corpus library covering every README signal family |
+| L1 WAV I/O correctness | strong for PCM16 | fold into the shared corpus/metadata matrix |
+| L2 SoX-ng golden regression | medium-strong | add missing standalone effect coverage and required metadata/artifacts |
+| L3 analytical DSP tests | strong | keep as required acceptance for mathematical effects |
+| L4 property/metamorphic tests | partial | add systematic property-test framework and core properties |
+| L5 chunk invariance | basic | implement the required chunk-size matrix and seeded random chunks |
+| L6 scalar-vs-SIMD differential | strong | keep as a required gate for data-parallel kernels |
+| L7 fuzzing/sanitizers/coverage | absent | add harnesses and documented commands |
+
+### Feature 5.7.1: L0 deterministic corpus library
+
+Status: planned.
+
+Create a unified Rust/Python corpus layer instead of constructing ad hoc samples
+inside individual tests.
+
+Required corpus families:
+
+- silence;
+- impulse;
+- step;
+- sine;
+- sweep;
+- seeded noise;
+- full-scale signal;
+- near-zero signal;
+- odd-length buffers;
+- mono and stereo buffers;
+- short files shorter than filter windows or delay lines.
+
+Acceptance tests:
+
+- corpus generation is deterministic across runs;
+- Rust and Python helpers agree on sample values for shared cases;
+- existing golden tests can request corpus cases by stable ID;
+- no large hand-picked audio files are required.
+
+### Feature 5.7.2: L2 golden metadata and failure artifacts
+
+Status: planned.
+
+Complete the README requirement that golden tests record reproducibility
+metadata and useful numerical failure data.
+
+Acceptance tests:
+
+- every golden case records the Auralis command, SoX-ng command, corpus ID,
+  metric thresholds, and output metadata;
+- test reports include SoX-ng version and Auralis version or commit;
+- JSON failure artifacts include case ID, backend, sample rate, channel count,
+  frame count, failing metric, expected value, actual value, and first offending
+  index where applicable;
+- Python and Rust golden runners use the same report schema.
+
+### Feature 5.7.3: L2 standalone golden coverage for implemented effects
+
+Status: planned.
+
+Ensure every implemented effect has direct SoX-ng golden coverage, not only
+chain coverage.
+
+Required initial effects:
+
+- `gain`;
+- `dcshift`;
+- `trim`;
+- `pad`;
+- `reverse`;
+- `fade`.
+
+Acceptance tests:
+
+- `fade` has standalone SoX-ng golden cases;
+- all implemented effects have mono and stereo corpus coverage where meaningful;
+- each case records whether SoX-ng automatic behavior such as rate, channels,
+  guard, norm, or dither was disabled, absent, or explicitly tested;
+- chain golden tests remain as integration coverage, not a substitute for
+  standalone effect coverage.
+
+### Feature 5.7.4: L4 property and metamorphic test framework
+
+Status: planned.
+
+Move from hand-written examples toward systematic property tests.
+
+Acceptance tests:
+
+- introduce `proptest` for Rust-side property tests unless a better local
+  reason is documented;
+- add optional Python-side property tests only through `uv`, with `hypothesis`
+  if needed;
+- cover identity parameters for implemented effects;
+- cover `reverse` twice equals original;
+- cover full-range `trim` identity;
+- cover `pad 0` identity;
+- cover `gain +x` followed by `gain -x` approximately returns the original
+  signal within documented tolerance for non-clipping input;
+- finite-input behavior is checked for effects that should preserve finiteness.
+
+### Feature 5.7.5: L5 chunk invariance matrix
+
+Status: planned.
+
+Replace scattered chunk tests with a shared matrix.
+
+Required chunk sizes:
+
+```text
+1, 2, 7, 15, 16, 17, 31, 32, 33, 64, 255, 1024, random seeded chunks
+```
+
+Acceptance tests:
+
+- shared helpers run whole-buffer versus chunked processing for every
+  streaming-capable effect;
+- seeded random chunk schedules are deterministic and report the seed on
+  failure;
+- `Gain`, `DcShift`, `Fade`, chain execution, and future stateful effects use
+  the same matrix;
+- empty chunks and final flush behavior are covered where relevant.
+
+### Feature 5.7.6: L7 fuzzing, sanitizers, and coverage baseline
+
+Status: planned.
+
+Add the missing README L7 infrastructure.
+
+Initial fuzz targets:
+
+- WAV parser behavior;
+- effect command parsing;
+- effects-file parsing;
+- pipeline manifest parsing when implemented;
+- unsupported-format rejection paths.
+
+Acceptance tests:
+
+- fuzz targets compile and run for a short smoke duration;
+- sanitizer commands are documented for Linux development;
+- coverage command is documented and scoped to touched code/DSP modules rather
+  than a misleading repository-wide percentage;
+- failures produce minimized or reproducible inputs where the tool supports it.
+
+### Feature 5.7.7: layered coverage report and feature gate
+
+Status: planned.
+
+Make L0-L7 coverage visible for every future feature.
+
+Acceptance tests:
+
+- add a machine-readable or Markdown coverage matrix for implemented effects
+  and pipeline primitives;
+- each row records L0-L7 status, N/A reason, and linked tests;
+- the acceptance checklist in `DEVELOPMENT.md` is updated if the report reveals
+  missing gates;
+- future effect features must update the matrix in the same commit.

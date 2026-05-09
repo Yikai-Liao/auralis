@@ -639,9 +639,9 @@ final buffer only when its absolute peak exceeds full scale. They can use
 `OutputLevelPolicy::Normalize(Decibels)` to scale non-silent output to a target
 peak before writing. The CLI exposes these policies as `--guard` and
 `--norm[=DB]`; `--norm` defaults to 0 dBFS, and `--guard` cannot be combined
-with `--norm`. Automatic dither insertion remains blocked until the `dither`
-effect itself is implemented, so current Auralis output never adds hidden
-dither noise.
+with `--norm`. Automatic dither insertion has been deferred to the post-`dither`
+effect plan in DEVELOPMENT, so current Auralis output never adds hidden dither
+noise.
 
 Selected crates:
 
@@ -754,6 +754,12 @@ diagnostic presentation at the CLI boundary. `hound` handles initial WAV I/O,
 but Auralis tests compare decoded PCM and metadata rather than whole WAV bytes
 unless a test is specifically about serialization.
 
+Future format support follows a pure Rust policy unless DEVELOPMENT explicitly
+changes that policy. Codec adapters may depend on audited pure Rust crates
+behind feature gates, but the current roadmap does not plan external `ffmpeg`
+command backends, `ffmpeg-next`, libFLAC wrappers, LAME wrappers, libvorbis
+wrappers, `libopusenc`, FDK-AAC, or other native codec-library bindings.
+
 ### Selected direction, but optional or later
 
 | Area | Choice | Rule |
@@ -771,6 +777,7 @@ unless a test is specifically about serialization.
 |---|---|
 | `rubato` | Do not make it the core resampler. Later it may be a reference or benchmark target against Auralis scalar rate and SoX-ng golden tests. |
 | `symphonia` | Do not add until the WAV-only milestone is stable and multi-format decoding is actually in scope. |
+| `ffmpeg` / `ffmpeg-next` | Not planned under the current pure Rust codec policy. |
 | `ndarray` | Do not use in `auralis-core` public APIs. Keep the core buffer as planar `Vec<f32>` and convert at Python/test boundaries later. |
 | `serde_yaml` | Do not use. Configuration is TOML; machine reports are JSON. |
 | `tokio` | Do not use in the initial offline CPU-bound DSP phase. Use synchronous file I/O and add batch parallelism later via Rayon if needed. |
