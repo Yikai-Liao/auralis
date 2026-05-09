@@ -37,6 +37,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"allpass -1 500",
         b"band -n 1000 2q",
         b"bandpass -c 1000 2q",
+        b"bandreject 1000 2q",
         b"biquad 0.5 0 0 1 -0.5 0",
         b"centercut -a 0.5 -b -w 16",
         b"channels 2",

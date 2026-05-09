@@ -33,6 +33,9 @@ pub enum EffectKind {
     /// SoX-ng-style RBJ band-pass filter.
     BandPass,
 
+    /// SoX-ng-style RBJ band-reject filter.
+    BandReject,
+
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad,
 
@@ -199,6 +202,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "BandPass",
         "bandpass [-c] frequency width",
         "apply an RBJ band-pass filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::BandReject,
+        "bandreject",
+        &[],
+        "BandReject",
+        "bandreject frequency width",
+        "apply an RBJ band-reject filter",
     ),
     EffectDescriptor::new(
         EffectKind::Biquad,
@@ -683,6 +694,7 @@ mod tests {
             ("allpass", EffectKind::AllPass),
             ("band", EffectKind::Band),
             ("bandpass", EffectKind::BandPass),
+            ("bandreject", EffectKind::BandReject),
             ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
@@ -754,18 +766,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("bandreject").unwrap_err();
+        let error = EffectRegistry::resolve("bass").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "bandreject".to_owned(),
+                name: "bass".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `bandreject`")
+                .contains("missing SoX-ng coverage entry for `bass`")
         );
     }
 

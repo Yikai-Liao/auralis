@@ -2,9 +2,9 @@
 
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
-    Band, BandPass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels, Contrast,
-    DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad, PositionedPad, Reverse, Saturation,
-    SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
+    Band, BandPass, BandReject, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels,
+    Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad, PositionedPad, Reverse,
+    Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
 };
 
 #[test]
@@ -19,6 +19,10 @@ fn parses_supported_effect_commands_into_typed_configs() {
             EffectCommand::BandPass(
                 BandPass::constant_skirt(1_000.0, BiquadWidth::q(2.0)).unwrap(),
             ),
+        ),
+        (
+            &["bandreject", "1000", "2q"][..],
+            EffectCommand::BandReject(BandReject::new(1_000.0, BiquadWidth::q(2.0)).unwrap()),
         ),
         (
             &["biquad", "2", "1", "0.5", "4", "-1", "0.25"][..],

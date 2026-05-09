@@ -41,6 +41,7 @@ use thiserror::Error;
 use crate::command_allpass::{parse_allpass, render_allpass};
 use crate::command_band::{parse_band, render_band};
 use crate::command_bandpass::{parse_bandpass, render_bandpass};
+use crate::command_bandreject::{parse_bandreject, render_bandreject};
 use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
@@ -62,9 +63,9 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    AllPass, Band, BandPass, Biquad, Centercut, Channels, Contrast, DcShift, EffectError,
-    EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix,
-    Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo, Trim, Vol,
+    AllPass, Band, BandPass, BandReject, Biquad, Centercut, Channels, Contrast, DcShift,
+    EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm, Oops, Overdrive,
+    Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -88,6 +89,9 @@ pub enum EffectCommand {
 
     /// SoX-ng-style RBJ band-pass filter.
     BandPass(BandPass),
+
+    /// SoX-ng-style RBJ band-reject filter.
+    BandReject(BandReject),
 
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad(Biquad),
@@ -167,6 +171,7 @@ impl EffectCommand {
             EffectKind::AllPass => parse_allpass(effect, args),
             EffectKind::Band => parse_band(effect, args),
             EffectKind::BandPass => parse_bandpass(effect, args),
+            EffectKind::BandReject => parse_bandreject(effect, args),
             EffectKind::Biquad => parse_biquad(effect, args),
             EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
@@ -197,6 +202,7 @@ impl EffectCommand {
             Self::AllPass(_) => EffectKind::AllPass,
             Self::Band(_) => EffectKind::Band,
             Self::BandPass(_) => EffectKind::BandPass,
+            Self::BandReject(_) => EffectKind::BandReject,
             Self::Biquad(_) => EffectKind::Biquad,
             Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
@@ -233,6 +239,7 @@ impl EffectCommand {
             Self::AllPass(all_pass) => render_allpass(*all_pass),
             Self::Band(band) => render_band(*band),
             Self::BandPass(band_pass) => render_bandpass(*band_pass),
+            Self::BandReject(band_reject) => render_bandreject(*band_reject),
             Self::Biquad(biquad) => render_biquad(*biquad),
             Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
@@ -782,11 +789,11 @@ mod tests {
 
     #[test]
     fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
-        let unsupported = parse_effect_command(&["bandreject"]).unwrap_err();
+        let unsupported = parse_effect_command(&["bass"]).unwrap_err();
         assert!(
             unsupported
                 .to_string()
-                .contains("known SoX-ng effect `bandreject`")
+                .contains("known SoX-ng effect `bass`")
         );
 
         let unknown = parse_effect_command(&["gian"]).unwrap_err();

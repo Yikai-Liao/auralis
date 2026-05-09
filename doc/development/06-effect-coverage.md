@@ -608,6 +608,23 @@ Implementation notes:
 
 ### Feature 6.4.7: `bandreject`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `BandReject` effect matching SoX-ng's RBJ `bandreject
+  frequency width` command family.
+- Processing delegates to the scalar stateful biquad primitive with independent
+  per-channel state, so chunked processing is exact when callers preserve
+  `BiquadState` per channel.
+- Width accepts hertz, kilohertz, Q, and octave suffixes; invalid slope widths,
+  non-positive frequencies, and frequencies at or above Nyquist are rejected as
+  invalid biquad designs.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for mono and
+  stereo input.
+
 ### Feature 6.4.8: `bass`
 
 ### Feature 6.4.9: `treble`
