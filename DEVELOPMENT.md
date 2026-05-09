@@ -1220,6 +1220,8 @@ Acceptance tests:
 
 #### Feature 5.4.4: mix-power combiner
 
+Status: implemented.
+
 Implement the mix-power combiner.
 
 Acceptance tests:

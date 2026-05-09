@@ -347,6 +347,13 @@ fn open_pipeline(input: &Path, options: &RunOptions) -> Result<auralis::Pipeline
 
             auralis::AudioFile::open_wavs_mixed_with_backend(inputs, options.backend)?
         }
+        auralis::CombineMethod::MixPower => {
+            let mut inputs = Vec::with_capacity(options.additional_inputs.len() + 1);
+            inputs.push(input);
+            inputs.extend(options.additional_inputs.iter().map(PathBuf::as_path));
+
+            auralis::AudioFile::open_wavs_mix_powered_with_backend(inputs, options.backend)?
+        }
         _ => unreachable!("the CLI parser only accepts implemented combine methods"),
     };
 
@@ -385,8 +392,9 @@ fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
 }
 
 fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
-    auralis::CombineMethod::from_name(value)
-        .ok_or_else(|| "combine method must be `concatenate`, `sequence`, or `mix`".to_owned())
+    auralis::CombineMethod::from_name(value).ok_or_else(|| {
+        "combine method must be `concatenate`, `sequence`, `mix`, or `mix-power`".to_owned()
+    })
 }
 
 #[derive(Debug)]

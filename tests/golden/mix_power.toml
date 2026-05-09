@@ -1,0 +1,21 @@
+# Representative mix-power-combiner golden cases. Auralis mirrors SoX-ng's
+# equal-power balancing by scaling each input by 1 / sqrt(input_count) before
+# summing.
+
+[id.mix_power_mono_mismatched_lengths]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+combine = "mix-power"
+auralis = []
+sox_ng = []
+max_abs = 0.00004
+rms = 0.00004
+snr_db = 90.0
+
+[id.mix_power_stereo_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+combine = "mix-power"
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.00004
+rms = 0.00004
+snr_db = 90.0

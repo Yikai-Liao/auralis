@@ -1763,6 +1763,15 @@ mod tests {
     }
 
     #[test]
+    fn mix_f32_supports_equal_power_scaling() {
+        let first = [1.0, -1.0, 0.5];
+        let second = [0.5, 1.0, -0.5];
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+
+        assert_scalar_and_simd_mix_match(&[&first, &second], 3, scale);
+    }
+
+    #[test]
     fn mix_f32_rejects_input_longer_than_output() {
         let first = [0.0, 0.25, 0.5];
         let mut output = [0.0; 2];

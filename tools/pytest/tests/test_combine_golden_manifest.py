@@ -20,6 +20,7 @@ MANIFEST_PATHS = (
     REPO_ROOT / "tests" / "golden" / "concat.toml",
     REPO_ROOT / "tests" / "golden" / "sequence.toml",
     REPO_ROOT / "tests" / "golden" / "mix.toml",
+    REPO_ROOT / "tests" / "golden" / "mix_power.toml",
 )
 SAMPLE_RATE = 48_000
 PCM16_SCALE = np.float64(32_768.0)

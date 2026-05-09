@@ -100,6 +100,9 @@ pub enum CombineMethod {
 
     /// Mix corresponding channels after SoX-ng-style automatic input balancing.
     Mix,
+
+    /// Mix corresponding channels with SoX-ng-style equal-power input balancing.
+    MixPower,
 }
 
 impl CombineMethod {
@@ -110,6 +113,7 @@ impl CombineMethod {
             Self::Concatenate => "concatenate",
             Self::Sequence => "sequence",
             Self::Mix => "mix",
+            Self::MixPower => "mix-power",
         }
     }
 
@@ -120,6 +124,7 @@ impl CombineMethod {
             "concatenate" => Some(Self::Concatenate),
             "sequence" => Some(Self::Sequence),
             "mix" => Some(Self::Mix),
+            "mix-power" => Some(Self::MixPower),
             _ => None,
         }
     }
@@ -342,6 +347,55 @@ pub fn mix_audio_buffers_with_backend(
     inputs: &[AudioBuffer],
     requested_backend: BackendKind,
 ) -> std::result::Result<AudioBuffer, InputCombineError> {
+    parallel_mix_audio_buffers_with_backend(inputs, requested_backend, mix_balance_scale)
+}
+
+/// Mixes already-decoded planar audio buffers using SoX-ng `mix-power` semantics.
+///
+/// Auralis applies SoX-ng's default equal-power balancing: every input is
+/// scaled by `1 / sqrt(input_count)` before corresponding channels are summed.
+/// The output frame count is the longest input and the output channel count is
+/// the largest input channel count. Missing tail frames and missing channels
+/// are treated as silence. Inputs must share sample rate and internal sample
+/// format.
+///
+/// Mixing itself does not clip or normalize beyond the equal-power balancing
+/// factor. If mixed samples are outside `[-1.0, 1.0]`, later boundary writers
+/// such as PCM16 WAV encoding apply their documented clipping.
+///
+/// # Errors
+///
+/// Returns [`InputCombineError::EmptyInputList`] for no inputs, a mismatch
+/// variant when an input's sample rate or sample format is incompatible with
+/// the first input, or an overflow/shape/kernel error if the output buffer
+/// cannot be represented.
+pub fn mix_power_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    mix_power_audio_buffers_with_backend(inputs, BackendKind::Scalar)
+}
+
+/// Mixes already-decoded planar audio buffers with equal-power balancing and a requested backend.
+///
+/// `requested_backend` selects the scalar or SIMD mixing kernel through the
+/// same deterministic backend fallback rules used by backend-aware effects.
+/// Numerical behavior matches [`mix_power_audio_buffers`].
+///
+/// # Errors
+///
+/// Returns the same errors as [`mix_power_audio_buffers`].
+pub fn mix_power_audio_buffers_with_backend(
+    inputs: &[AudioBuffer],
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    parallel_mix_audio_buffers_with_backend(inputs, requested_backend, mix_power_balance_scale)
+}
+
+fn parallel_mix_audio_buffers_with_backend(
+    inputs: &[AudioBuffer],
+    requested_backend: BackendKind,
+    scale_for_input_count: fn(usize) -> f32,
+) -> std::result::Result<AudioBuffer, InputCombineError> {
     let Some(first) = inputs.first() else {
         return Err(InputCombineError::EmptyInputList);
     };
@@ -362,7 +416,7 @@ pub fn mix_audio_buffers_with_backend(
     let output_spec = AudioSpec::new(spec.sample_rate(), max_channels, spec.sample_format());
     let mut output = AudioBuffer::zeroed(output_spec, max_frames)?;
     let selection = auralis_simd::select_backend(requested_backend);
-    let scale = mix_balance_scale(inputs.len());
+    let scale = scale_for_input_count(inputs.len());
 
     for channel_index in 0..max_channels.as_usize() {
         let mut channel_inputs = Vec::with_capacity(inputs.len());
@@ -487,6 +541,16 @@ fn mix_balance_scale(input_count: usize) -> f32 {
     )]
     {
         1.0 / input_count as f32
+    }
+}
+
+fn mix_power_balance_scale(input_count: usize) -> f32 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Mix-power balancing is an f32 sample operation; huge input counts cannot be represented as decoded in-memory buffers in practice."
+    )]
+    {
+        1.0 / (input_count as f32).sqrt()
     }
 }
 
@@ -724,6 +788,60 @@ impl AudioFile {
         Self::from_audio_buffers_mixed_with_backend(&inputs, requested_backend)
     }
 
+    /// Opens multiple PCM16 WAV files and mixes them with equal-power balancing.
+    ///
+    /// This is the library counterpart to `auralis run --combine mix-power`.
+    /// Each input is decoded into planar `f32`, scaled by
+    /// `1 / sqrt(input_count)`, and summed with corresponding channels before
+    /// any later effects are applied. The output length is the longest input;
+    /// missing tail frames and missing channels are silence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the mixed buffer cannot be
+    /// represented.
+    pub fn open_wavs_mix_powered<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        Self::open_wavs_mix_powered_with_backend(paths, BackendKind::Scalar)
+    }
+
+    /// Opens multiple PCM16 WAV files and mixes them with equal-power balancing and a requested backend.
+    ///
+    /// `requested_backend` controls decode conversion, the scalar/SIMD mix
+    /// kernel, later backend-aware effects, and output encoding after
+    /// [`Self::into_pipeline`]. SIMD requests follow Auralis' deterministic
+    /// scalar fallback rules when SIMD is unavailable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the mixed buffer cannot be
+    /// represented.
+    pub fn open_wavs_mix_powered_with_backend<I, P>(
+        paths: I,
+        requested_backend: BackendKind,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut inputs = Vec::new();
+        for path in paths {
+            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+                path,
+                requested_backend,
+            )?);
+        }
+
+        Self::from_audio_buffers_mix_powered_with_backend(&inputs, requested_backend)
+    }
+
     /// Wraps an existing audio buffer in the high-level file type.
     ///
     /// This is primarily useful for tests and applications that decoded audio
@@ -841,6 +959,42 @@ impl AudioFile {
     ) -> Result<Self> {
         Ok(Self {
             audio: mix_audio_buffers_with_backend(inputs, requested_backend)?,
+            requested_backend,
+        })
+    }
+
+    /// Mixes existing audio buffers into the high-level file type with equal-power balancing.
+    ///
+    /// Inputs are combined before the returned value enters the effect
+    /// pipeline. Each input is scaled by `1 / sqrt(input_count)` and summed
+    /// into the corresponding output channel. The output length is the longest
+    /// input; missing tail frames and missing channels are silence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the mixed buffer cannot be
+    /// represented.
+    pub fn from_audio_buffers_mix_powered(inputs: &[AudioBuffer]) -> Result<Self> {
+        Self::from_audio_buffers_mix_powered_with_backend(inputs, BackendKind::Scalar)
+    }
+
+    /// Mixes existing audio buffers with equal-power balancing and a requested processing backend.
+    ///
+    /// The backend is recorded for later pipeline stages and selects the
+    /// scalar/SIMD mix kernel for this combiner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the mixed buffer cannot be
+    /// represented.
+    pub fn from_audio_buffers_mix_powered_with_backend(
+        inputs: &[AudioBuffer],
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
+        Ok(Self {
+            audio: mix_power_audio_buffers_with_backend(inputs, requested_backend)?,
             requested_backend,
         })
     }
@@ -1153,7 +1307,7 @@ mod tests {
     use super::{
         AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
         concatenate_audio_buffers, mix_audio_buffers, mix_audio_buffers_with_backend,
-        sequence_audio_buffers,
+        mix_power_audio_buffers, mix_power_audio_buffers_with_backend, sequence_audio_buffers,
     };
     use std::{
         fs,
@@ -1853,6 +2007,154 @@ mod tests {
 
         let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
         assert_samples_close(decoded.as_planar_f32(), &[0.5, -0.25, -0.125]);
+        fs::remove_dir_all(tempdir).unwrap();
+    }
+
+    #[test]
+    fn mix_power_audio_buffers_uses_equal_power_scale_for_equal_length_mono_inputs() {
+        let first = audio_buffer(vec![1.0, -1.0, 0.5]);
+        let second = audio_buffer(vec![0.5, 1.0, -0.5]);
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+
+        let actual = mix_power_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.channels(), ChannelCount::new(1).unwrap());
+        assert_sample_bits_eq(
+            actual.as_planar_f32(),
+            &[
+                1.0 * scale + 0.5 * scale,
+                -scale + scale,
+                0.5 * scale - 0.5 * scale,
+            ],
+        );
+    }
+
+    #[test]
+    fn mix_power_audio_buffers_treats_mismatched_lengths_as_trailing_silence() {
+        let first = audio_buffer(vec![0.5, -0.5]);
+        let second = audio_buffer(vec![1.0, 1.0, 1.0]);
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+
+        let actual = mix_power_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_sample_bits_eq(
+            actual.as_planar_f32(),
+            &[
+                0.5 * scale + 1.0 * scale,
+                -0.5 * scale + 1.0 * scale,
+                1.0 * scale,
+            ],
+        );
+    }
+
+    #[test]
+    fn mix_power_audio_buffers_accepts_mismatched_channel_counts_with_silence() {
+        let mono = audio_buffer(vec![0.5, -0.5]);
+        let stereo = stereo_audio_buffer(vec![1.0, 0.0, -1.0, 0.5]);
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+
+        let actual = mix_power_audio_buffers(&[mono, stereo]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_sample_bits_eq(
+            actual.as_planar_f32(),
+            &[0.5 * scale + 1.0 * scale, -0.5 * scale, -scale, 0.5 * scale],
+        );
+    }
+
+    #[test]
+    fn mix_power_audio_buffers_rejects_mismatched_sample_rate() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 44_100, 1, SampleFormat::Float32);
+
+        let error = mix_power_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleRate {
+                input_index: 1,
+                expected: SampleRate::new(48_000).unwrap(),
+                actual: SampleRate::new(44_100).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn mix_power_audio_buffers_matches_under_forced_scalar_and_requested_simd() {
+        let first = audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+        ]);
+        let second = audio_buffer(vec![1.0, 0.999_984_74, 0.5, 0.0, -0.0]);
+
+        let scalar = mix_power_audio_buffers_with_backend(
+            &[first.clone(), second.clone()],
+            BackendKind::Scalar,
+        )
+        .unwrap();
+        let simd =
+            mix_power_audio_buffers_with_backend(&[first, second], BackendKind::Simd).unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+    }
+
+    #[test]
+    fn mix_powered_audio_enters_effect_pipeline_before_effects() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 0.0, -0.25]);
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+
+        let actual = AudioFile::from_audio_buffers_mix_powered(&[first, second])
+            .unwrap()
+            .into_pipeline()
+            .gain_db(6.0)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        let multiplier = 10.0_f32.powf(6.0 / 20.0);
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[
+                (-0.25 * scale) * multiplier,
+                (-0.5 * scale) * multiplier,
+                (0.25 * scale + 0.75 * scale) * multiplier,
+            ],
+        );
+    }
+
+    #[test]
+    fn open_wavs_mix_powered_round_trips_through_file_boundary() {
+        let tempdir = temp_dir();
+        fs::create_dir(&tempdir).unwrap();
+        let first = tempdir.join("first.wav");
+        let second = tempdir.join("second.wav");
+        let output = tempdir.join("output.wav");
+
+        auralis_wav::encode_pcm16_path(&first, &audio_buffer(vec![0.25, -0.5])).unwrap();
+        auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75, 0.0, -0.25])).unwrap();
+
+        AudioFile::open_wavs_mix_powered([&first, &second])
+            .unwrap()
+            .into_pipeline()
+            .write_wav(&output)
+            .unwrap();
+
+        let scale = 1.0_f32 / 2.0_f32.sqrt();
+        let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+        assert_samples_close(
+            decoded.as_planar_f32(),
+            &[scale, -0.5 * scale, -0.25 * scale],
+        );
         fs::remove_dir_all(tempdir).unwrap();
     }
 
