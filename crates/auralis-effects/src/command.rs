@@ -42,6 +42,7 @@ use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
+use crate::command_overdrive::{parse_overdrive, render_overdrive};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
@@ -49,7 +50,7 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
-    Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
+    Overdrive, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -79,6 +80,9 @@ pub enum EffectCommand {
 
     /// SoX-ng-style whole-buffer peak normalization.
     Norm(Norm),
+
+    /// SoX-ng-style overdrive distortion.
+    Overdrive(Overdrive),
 
     /// Zero padding measured in frames, including optional positioned insertions.
     Pad(Pad),
@@ -118,6 +122,7 @@ impl EffectCommand {
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
             EffectKind::Norm => parse_norm(effect, args),
+            EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
@@ -136,6 +141,7 @@ impl EffectCommand {
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
             Self::Norm(_) => EffectKind::Norm,
+            Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::SoftVol(_) => EffectKind::SoftVol,
@@ -166,6 +172,7 @@ impl EffectCommand {
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
             Self::Norm(norm) => render_norm(*norm),
+            Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::SoftVol(softvol) => render_softvol(*softvol),

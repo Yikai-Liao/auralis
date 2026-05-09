@@ -765,6 +765,7 @@ mod tests {
                 }
                 EffectCommand::Contrast(_)
                 | EffectCommand::Norm(_)
+                | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Reverse(_)
                 | EffectCommand::SoftVol(_)

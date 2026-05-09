@@ -288,7 +288,21 @@ Implementation notes:
 
 ### Feature 6.2.6: `overdrive`
 
+Status: implemented.
+
 Implement overdrive with documented transfer function and clipping behavior.
+
+Implementation notes:
+
+- Added a typed `Overdrive` effect matching SoX-ng's `overdrive [gain [color]]`
+  command shape, with gain and color in the documented `0..=100` range and
+  defaults of `20`.
+- Processing follows SoX-ng's driven cubic soft-clip transfer, `color / 200`
+  bias, and channel-local high-pass output state; `overdrive 0` remains a null
+  effect in the non-keymapped command path.
+- Golden coverage includes standalone mono default and stereo explicit-argument
+  cases against SoX-ng, with L4 finite-output coverage, L5 stateful chunk
+  coverage, and an L7 fuzz seed for overdrive command parsing.
 
 ### Feature 6.2.7: `saturation`
 

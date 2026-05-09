@@ -39,6 +39,9 @@ pub enum EffectKind {
     /// Whole-buffer peak normalization.
     Norm,
 
+    /// SoX-ng-style overdrive distortion.
+    Overdrive,
+
     /// Zero padding before and after the input.
     Pad,
 
@@ -179,6 +182,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Norm",
         "norm [level]",
         "normalize peak level at this point in the effect chain",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Overdrive,
+        "overdrive",
+        &[],
+        "Overdrive",
+        "overdrive [gain [color]]",
+        "apply stateful cubic soft-clipping overdrive",
     ),
     EffectDescriptor::new(
         EffectKind::Pad,
@@ -552,6 +563,7 @@ mod tests {
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
             ("norm", EffectKind::Norm),
+            ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
             ("softvol", EffectKind::SoftVol),

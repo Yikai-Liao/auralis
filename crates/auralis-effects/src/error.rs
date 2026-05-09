@@ -73,6 +73,10 @@ pub enum EffectError {
     )]
     InvalidTremolo,
 
+    /// An `overdrive` value was not finite or outside SoX-ng's supported range.
+    #[error("overdrive gain and color must be finite and in the range 0..=100")]
+    InvalidOverdrive,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

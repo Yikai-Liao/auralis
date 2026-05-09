@@ -41,6 +41,10 @@ pub(crate) fn apply_command(
         EffectCommand::Norm(norm) => norm
             .process_buffer_with_backend(audio, requested_backend)
             .map_err(|source| ("level", source)),
+        EffectCommand::Overdrive(overdrive) => {
+            overdrive.process_buffer(audio);
+            Ok(())
+        }
         EffectCommand::Pad(pad) => {
             let padded = pad
                 .process_buffer(audio)
@@ -81,7 +85,9 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
-        EffectKind::DcShift | EffectKind::Tremolo => optional_arg_end(tokens, args_start, 2),
+        EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
+            optional_arg_end(tokens, args_start, 2)
+        }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),

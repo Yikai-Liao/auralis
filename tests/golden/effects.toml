@@ -134,6 +134,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_overdrive_mono_default]
+input = "effects/overdrive_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["overdrive"]
+sox_ng = ["overdrive"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 80.0
+
+[id.effect_overdrive_stereo_explicit]
+input = "effects/overdrive_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["overdrive", "12", "25"]
+sox_ng = ["overdrive", "12", "25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 80.0
+
 [id.effect_vol_mono_half_amplitude]
 input = "effects/vol_mono.wav"
 corpus_id = "l0/sine_mono_32"

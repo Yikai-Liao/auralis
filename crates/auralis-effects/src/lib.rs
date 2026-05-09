@@ -31,6 +31,7 @@ mod command_contrast;
 mod command_fade;
 mod command_gain;
 mod command_norm;
+mod command_overdrive;
 mod command_pad;
 mod command_softvol;
 mod command_tremolo;
@@ -43,6 +44,7 @@ mod error;
 mod fade;
 mod gain;
 mod norm;
+mod overdrive;
 mod pad;
 mod registry;
 mod reverse;
@@ -68,6 +70,7 @@ pub use error::{EffectError, Result};
 pub use fade::{Fade, FadeCurve};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};
 pub use norm::Norm;
+pub use overdrive::{Overdrive, OverdriveState};
 pub use pad::{Pad, PositionedPad};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,

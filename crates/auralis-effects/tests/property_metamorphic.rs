@@ -4,7 +4,7 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Contrast, DcShift, Fade, Gain, Norm, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
+    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -233,6 +233,12 @@ proptest! {
             .expect("generated tremolo settings are valid")
             .process_buffer(&mut tremolo_modulated);
         prop_assert_all_finite(&tremolo_modulated)?;
+
+        let mut overdriven = source.clone();
+        Overdrive::new(12.0, 25.0)
+            .expect("generated overdrive settings are valid")
+            .process_buffer(&mut overdriven);
+        prop_assert_all_finite(&overdriven)?;
 
         let mut faded = source.clone();
         let fade_in = FrameCount::new(u64::try_from(audio.frames / 2).expect("frame strategy fits u64"));

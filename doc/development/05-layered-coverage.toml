@@ -82,6 +82,21 @@ l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are 
 l7 = { status = "covered", reason = "Effect command fuzzing covers norm argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/norm"] }
 
 [[subject]]
+id = "effect.overdrive"
+kind = "effect"
+name = "overdrive"
+summary = "SoX-ng-style stateful overdrive distortion with cubic soft clipping and high-pass output blend."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone default and explicit-argument SoX-ng golden cases cover the implemented overdrive command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check SoX-ng's gain, color bias, cubic soft clip, channel-local high-pass state, null-effect edge case, parser syntax, and validation.", tests = ["crates/auralis-effects/src/overdrive.rs", "crates/auralis-effects/src/command_overdrive.rs", "crates/auralis-effects/tests/overdrive.rs"] }
+l4 = { status = "covered", reason = "Property tests include finite-output coverage for overdrive on bounded finite input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "Stateful unit coverage compares whole-buffer overdrive processing with frame-ordered chunk processing using the same runtime state.", tests = ["crates/auralis-effects/src/overdrive.rs"] }
+l6 = { status = "not_applicable", reason = "Overdrive is a scalar stateful nonlinear filter and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers overdrive argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/overdrive"] }
+
+[[subject]]
 id = "effect.pad"
 kind = "effect"
 name = "pad"
