@@ -624,7 +624,7 @@ mod tests {
     #[test]
     fn parses_flat_tokens_into_user_ordered_effect_chain() {
         let chain = parse_effect_chain(&[
-            "gain", "-3", "dcshift", "0.125", "fade", "l", "2", "1", "reverse",
+            "gain", "-3", "dcshift", "0.125", "fade", "t", "2", "1", "reverse",
         ])
         .unwrap();
 
@@ -638,7 +638,7 @@ mod tests {
             vec![
                 vec!["gain", "-3"],
                 vec!["dcshift", "0.125"],
-                vec!["fade", "l", "2", "1"],
+                vec!["fade", "t", "2", "1"],
                 vec!["reverse"],
             ]
         );

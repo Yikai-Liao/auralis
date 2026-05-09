@@ -464,7 +464,7 @@ mod tests {
             # one effect per line is the common form
             gain -3
             dcshift 0.125 # comments may follow commands
-            fade l 2 1
+            fade t 2 1
             reverse
             ",
         )
@@ -482,7 +482,7 @@ mod tests {
             [
                 ["gain", "-3"].map(String::from).to_vec(),
                 ["dcshift", "0.125"].map(String::from).to_vec(),
-                ["fade", "l", "2", "1"].map(String::from).to_vec(),
+                ["fade", "t", "2", "1"].map(String::from).to_vec(),
                 ["reverse"].map(String::from).to_vec(),
             ]
         );
@@ -513,12 +513,12 @@ mod tests {
             "
             gain -3
             dcshift 0.125 reverse
-            fade l 2 1
+            fade t 2 1
             ",
         )
         .unwrap();
         let cli_chain = parse_effect_chain(&[
-            "gain", "-3", "dcshift", "0.125", "reverse", "fade", "l", "2", "1",
+            "gain", "-3", "dcshift", "0.125", "reverse", "fade", "t", "2", "1",
         ])
         .unwrap();
 

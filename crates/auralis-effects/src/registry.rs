@@ -139,7 +139,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         &[],
         "Fade",
         "fade [type] fade-in-length [stop-position [fade-out-length]]",
-        "apply a linear fade-in and fade-out envelope",
+        "apply a typed SoX-ng fade-in and fade-out envelope",
     ),
     EffectDescriptor::new(
         EffectKind::Gain,

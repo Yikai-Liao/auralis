@@ -85,7 +85,23 @@ Implementation notes:
 
 ### Feature 6.1.4: `fade` curve types
 
+Status: implemented.
+
 Add supported SoX-ng fade curve families with analytical and golden coverage.
+
+Implementation notes:
+
+- The typed fade model now carries a `FadeCurve` with SoX-ng `q`, `h`, `l`,
+  `t`, and `p` variants; `Fade::new` remains the existing linear constructor
+  and command parsing without an explicit type follows SoX-ng's logarithmic
+  default.
+- Linear `t` fades continue to use the backend-dispatched fade kernel. The
+  non-linear curves use deterministic scalar coefficient evaluation and fall
+  back to that scalar path even when SIMD is requested.
+- Analytical tests cover the SoX-ng coefficient formulas for quarter-sine,
+  half-sine, logarithmic, linear, and inverted-parabola fade-in curves.
+- Golden coverage includes standalone fade-in cases for all five curve
+  families. Fade-out positional semantics remain scheduled for Feature 6.1.5.
 
 ### Feature 6.1.5: `fade` stop position and fade-out length
 

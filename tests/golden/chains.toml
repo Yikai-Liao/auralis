@@ -31,7 +31,7 @@ snr_db = 90.0
 [id.chain_filter_fade_gain]
 input = "chains/stereo_ramp_tone.wav"
 corpus_id = "chains/stereo_ramp_tone"
-auralis = ["fade", "5", "gain", "-2"]
+auralis = ["fade", "t", "5", "gain", "-2"]
 sox_ng = ["fade", "t", "5s", "gain", "-2"]
 max_abs = 0.000031
 rms = 0.000031

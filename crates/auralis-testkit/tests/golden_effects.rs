@@ -14,7 +14,11 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
         [
             "effect_dcshift_mono_positive",
             "effect_dcshift_stereo_negative",
+            "effect_fade_mono_half_sine_in",
+            "effect_fade_mono_inverted_parabola_in",
             "effect_fade_mono_linear_in",
+            "effect_fade_mono_logarithmic_in",
+            "effect_fade_mono_quarter_sine_in",
             "effect_fade_stereo_linear_in",
             "effect_gain_balance_no_clip_stereo_plus_6",
             "effect_gain_balance_stereo_plus_6",

@@ -16,9 +16,9 @@
 //! assert_eq!(gain, EffectCommand::Gain(Gain::new(Decibels::new(-3.0)?)));
 //! assert_eq!(gain.render_tokens(), ["gain", "-3"]);
 //!
-//! let fade = EffectCommand::parse("fade", &["l", "10", "20"])?;
+//! let fade = EffectCommand::parse("fade", &["t", "10", "20"])?;
 //! assert_eq!(fade, EffectCommand::Fade(Fade::new(FrameCount::new(10), FrameCount::new(20))));
-//! assert_eq!(fade.render_tokens(), ["fade", "l", "10", "20"]);
+//! assert_eq!(fade.render_tokens(), ["fade", "t", "10", "20"]);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -32,8 +32,8 @@ use thiserror::Error;
 
 use crate::command_gain::{parse_gain, render_gain};
 use crate::{
-    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Pad, Reverse,
-    Trim,
+    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Pad,
+    Reverse, Trim,
 };
 
 /// Crate-local result type for command parsing.
@@ -44,9 +44,8 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 /// This enum is the command-model boundary: parsing may start from tokenized
 /// command strings, but successful results contain typed effect processors
 /// only. It intentionally models the currently implemented Auralis subset:
-/// future SoX-ng options such as fade curve types, dcshift limiter gain, and
-/// positioned padding are rejected until their corresponding features are
-/// implemented.
+/// future SoX-ng options such as dcshift limiter gain and positioned padding
+/// are rejected until their corresponding features are implemented.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
@@ -120,7 +119,7 @@ impl EffectCommand {
             }
             Self::Fade(fade) => vec![
                 "fade".to_owned(),
-                "l".to_owned(),
+                fade.curve.token().to_owned(),
                 fade.fade_in.as_u64().to_string(),
                 fade.fade_out.as_u64().to_string(),
             ],
@@ -347,15 +346,9 @@ fn parse_reverse(effect: &'static str, args: &[&str]) -> CommandResult<EffectCom
 }
 
 fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let args = match args {
-        ["l", rest @ ..] => rest,
-        [curve @ ("q" | "h" | "t" | "p"), ..] => {
-            return Err(EffectCommandParseError::UnsupportedOption {
-                effect,
-                option: (*curve).to_owned(),
-            });
-        }
-        _ => args,
+    let (curve, args) = match args.first().and_then(|token| FadeCurve::from_token(token)) {
+        Some(curve) => (curve, &args[1..]),
+        None => (FadeCurve::Logarithmic, args),
     };
 
     let fade_in = required_arg(effect, args, "fade-in-frame")?;
@@ -366,7 +359,9 @@ fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<EffectComman
     };
     reject_extra_arguments(effect, args.get(2..).unwrap_or_default())?;
 
-    Ok(EffectCommand::Fade(Fade::new(fade_in, fade_out)))
+    Ok(EffectCommand::Fade(Fade::with_curve(
+        curve, fade_in, fade_out,
+    )))
 }
 
 pub(super) fn required_arg<'args>(
@@ -488,7 +483,7 @@ fn render_f32(value: f32) -> String {
 #[cfg(test)]
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
-    use crate::{DcShift, EffectError, Fade, Gain, GainChannelMode, Pad, Reverse, Trim};
+    use crate::{DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, Reverse, Trim};
     use auralis_core::{Decibels, FrameCount};
 
     #[test]
@@ -512,7 +507,7 @@ mod tests {
             ),
             (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
             (
-                &["fade", "4", "2"][..],
+                &["fade", "t", "4", "2"][..],
                 EffectCommand::Fade(Fade::new(FrameCount::new(4), FrameCount::new(2))),
             ),
         ];
@@ -547,30 +542,34 @@ mod tests {
         );
         assert_eq!(
             parse_effect_command(&["fade", "3"]).unwrap(),
-            EffectCommand::Fade(Fade::new(FrameCount::new(3), FrameCount::new(0)))
+            EffectCommand::Fade(Fade::with_curve(
+                FadeCurve::Logarithmic,
+                FrameCount::new(3),
+                FrameCount::new(0),
+            ))
         );
     }
 
     #[test]
-    fn explicit_linear_fade_curve_parses_but_other_curves_are_unsupported() {
-        assert_eq!(
-            parse_effect_command(&["fade", "l", "3", "2"]).unwrap(),
-            EffectCommand::Fade(Fade::new(FrameCount::new(3), FrameCount::new(2)))
-        );
+    fn sox_ng_fade_curve_types_parse_into_typed_configs() {
+        let expected = [
+            ("q", FadeCurve::QuarterSine),
+            ("h", FadeCurve::HalfSine),
+            ("l", FadeCurve::Logarithmic),
+            ("t", FadeCurve::Linear),
+            ("p", FadeCurve::InvertedParabola),
+        ];
 
-        let error = parse_effect_command(&["fade", "h", "3"]).unwrap_err();
-
-        assert_eq!(
-            error,
-            EffectCommandParseError::UnsupportedOption {
-                effect: "fade",
-                option: "h".to_owned(),
-            }
-        );
-        assert_eq!(
-            error.to_string(),
-            "unsupported option `h` for effect `fade`"
-        );
+        for (token, curve) in expected {
+            assert_eq!(
+                parse_effect_command(&["fade", token, "3", "2"]).unwrap(),
+                EffectCommand::Fade(Fade::with_curve(
+                    curve,
+                    FrameCount::new(3),
+                    FrameCount::new(2),
+                ))
+            );
+        }
     }
 
     #[test]
@@ -796,9 +795,9 @@ mod tests {
             ),
             (&["pad"][..], &["pad", "0", "0"][..], &["pad", "0", "0"][..]),
             (
-                &["fade", "3"][..],
-                &["fade", "l", "3", "0"][..],
-                &["fade", "l", "3", "0"][..],
+                &["fade", "t", "3"][..],
+                &["fade", "t", "3", "0"][..],
+                &["fade", "t", "3", "0"][..],
             ),
         ];
 
@@ -822,8 +821,8 @@ mod tests {
                 &["reverse"][..],
             ),
             (
-                parse_effect_command(&["fade", "l", "4", "2"]).unwrap(),
-                &["fade", "l", "4", "2"][..],
+                parse_effect_command(&["fade", "q", "4", "2"]).unwrap(),
+                &["fade", "q", "4", "2"][..],
             ),
         ];
 

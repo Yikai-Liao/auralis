@@ -50,7 +50,7 @@ pub use effects_file::{
     parse_effects_file, parse_effects_file_str,
 };
 pub use error::{EffectError, Result};
-pub use fade::Fade;
+pub use fade::{Fade, FadeCurve};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};
 pub use pad::Pad;
 pub use registry::{

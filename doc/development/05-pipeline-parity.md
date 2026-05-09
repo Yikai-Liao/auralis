@@ -556,7 +556,9 @@ Acceptance tests:
 Implementation notes:
 
 - `tests/golden/effects.toml` now records standalone mono and stereo L2 golden
-  cases for `gain`, `dcshift`, `trim`, `pad`, `reverse`, and linear `fade`.
+  cases for `gain`, `dcshift`, `trim`, `pad`, `reverse`, and `fade`; later
+  Feature 6.1.4 extended the fade cases to cover all supported SoX-ng curve
+  families.
 - `crates/auralis-testkit/tests/golden_effects.rs` validates that the manifest
   covers every implemented effect directly, preserves deterministic command
   rendering, and keeps automatic rate/channel conversion absent for each case.
