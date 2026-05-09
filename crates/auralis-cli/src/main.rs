@@ -6,7 +6,7 @@ use std::{
     process::ExitCode,
 };
 
-use auralis_wav::{WavError, decode_pcm16_path};
+use auralis_wav::{WavError, decode_pcm16_path, encode_pcm16_path};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -23,6 +23,15 @@ enum Command {
         /// PCM16 WAV input file to inspect.
         input: PathBuf,
     },
+
+    /// Decode and re-encode a PCM16 WAV file without applying effects.
+    Run {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// PCM16 WAV output file to create.
+        output: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -38,11 +47,12 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Inspect { input } => inspect(&input),
+        Command::Run { input, output } => run_copy_pipeline(&input, &output),
     }
 }
 
 fn inspect(input: &Path) -> Result<(), CliError> {
-    ensure_wav_extension(input)?;
+    ensure_wav_extension(input, PathRole::Input)?;
     let audio = decode_pcm16_path(input)?;
     let sample_rate = audio.spec().sample_rate().as_u32();
     let frames = audio.frames().as_u64();
@@ -58,12 +68,22 @@ fn inspect(input: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn ensure_wav_extension(input: &Path) -> Result<(), CliError> {
-    if input.extension().and_then(OsStr::to_str) == Some("wav") {
+fn run_copy_pipeline(input: &Path, output: &Path) -> Result<(), CliError> {
+    ensure_wav_extension(input, PathRole::Input)?;
+    ensure_wav_extension(output, PathRole::Output)?;
+    let audio = decode_pcm16_path(input)?;
+    encode_pcm16_path(output, &audio)?;
+
+    Ok(())
+}
+
+fn ensure_wav_extension(path: &Path, role: PathRole) -> Result<(), CliError> {
+    if path.extension().and_then(OsStr::to_str) == Some("wav") {
         Ok(())
     } else {
         Err(CliError::UnsupportedFormat {
-            path: input.to_path_buf(),
+            path: path.to_path_buf(),
+            role,
         })
     }
 }
@@ -80,17 +100,32 @@ fn format_duration_seconds(frames: u64, sample_rate: u32) -> String {
 #[derive(Debug)]
 enum CliError {
     Wav(WavError),
-    UnsupportedFormat { path: PathBuf },
+    UnsupportedFormat { path: PathBuf, role: PathRole },
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PathRole {
+    Input,
+    Output,
+}
+
+impl std::fmt::Display for PathRole {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Input => formatter.write_str("input"),
+            Self::Output => formatter.write_str("output"),
+        }
+    }
 }
 
 impl std::fmt::Display for CliError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wav(error) => write!(formatter, "{error}"),
-            Self::UnsupportedFormat { path } => {
+            Self::UnsupportedFormat { path, role } => {
                 write!(
                     formatter,
-                    "unsupported input format for {}; only PCM16 WAV is supported",
+                    "unsupported {role} format for {}; only PCM16 WAV is supported",
                     path.display()
                 )
             }

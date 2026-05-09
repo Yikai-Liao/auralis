@@ -84,8 +84,131 @@ fn inspect_unsupported_wav_sample_format_returns_clear_error() {
     );
 }
 
+#[test]
+fn run_copies_mono_wav_through_decode_encode_pipeline() {
+    let input = temp_path("auralis-cli-run-mono-input", "wav");
+    let output = temp_path("auralis-cli-run-mono-output", "wav");
+    let samples = [-32768, -1024, 0, 1024, 32767];
+    write_pcm16_wav_with_metadata(&input, 1, &samples);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, samples.to_vec()));
+    assert!(metadata_chunk_is_absent(&output));
+    assert_ne!(fs::read(&input).unwrap(), fs::read(&output).unwrap());
+
+    let inspect_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["inspect", output.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(inspect_output.status.success());
+    let stdout = stdout(&inspect_output);
+    assert!(stdout.contains("sample_rate: 48000"));
+    assert!(stdout.contains("channels: 1"));
+    assert!(stdout.contains("duration_frames: 5"));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_copies_stereo_wav_samples_and_metadata() {
+    let input = temp_path("auralis-cli-run-stereo-input", "wav");
+    let output = temp_path("auralis-cli-run-stereo-output", "wav");
+    let samples = [-32768, 32767, -12_000, 12_000, 0, 4096];
+    write_pcm16_wav(&input, 2, &samples);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (2, samples.to_vec()));
+
+    let inspect_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["inspect", output.to_str().unwrap()])
+        .output()
+        .unwrap();
+    fs::remove_file(output).unwrap();
+    assert!(inspect_output.status.success());
+    let stdout = stdout(&inspect_output);
+    assert!(stdout.contains("channels: 2"));
+    assert!(stdout.contains("duration_frames: 3"));
+}
+
+#[test]
+fn run_unsupported_input_extension_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-input-unsupported", "flac");
+    let output = temp_path("auralis-cli-run-output", "wav");
+    fs::write(&input, b"not a supported input").unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: unsupported input format"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("only PCM16 WAV is supported"), "{stderr}");
+}
+
+#[test]
+fn run_unsupported_output_extension_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-input", "wav");
+    let output = temp_path("auralis-cli-run-output-unsupported", "flac");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: unsupported output format"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("only PCM16 WAV is supported"), "{stderr}");
+}
+
 fn write_pcm16_wav(path: &Path, channels: u16, samples: &[i16]) {
     let mut bytes = riff_header(channels, 16, 1, samples.len() * 2);
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    fs::write(path, bytes).unwrap();
+}
+
+fn write_pcm16_wav_with_metadata(path: &Path, channels: u16, samples: &[i16]) {
+    let data_bytes = samples.len() * 2;
+    let metadata = b"LIST\x04\0\0\0INFO";
+    let mut bytes = riff_header_with_extra(channels, 16, 1, data_bytes, metadata.len());
+    bytes.extend_from_slice(metadata);
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&u32::try_from(data_bytes).unwrap().to_le_bytes());
     for sample in samples {
         bytes.extend_from_slice(&sample.to_le_bytes());
     }
@@ -99,11 +222,26 @@ fn write_float_wav(path: &Path) {
 }
 
 fn riff_header(channels: u16, bits_per_sample: u16, format_tag: u16, data_bytes: usize) -> Vec<u8> {
+    let mut bytes = riff_header_with_extra(channels, bits_per_sample, format_tag, data_bytes, 0);
+
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&u32::try_from(data_bytes).unwrap().to_le_bytes());
+
+    bytes
+}
+
+fn riff_header_with_extra(
+    channels: u16,
+    bits_per_sample: u16,
+    format_tag: u16,
+    data_bytes: usize,
+    extra_bytes: usize,
+) -> Vec<u8> {
     let sample_rate = 48_000_u32;
     let bytes_per_sample = u32::from(bits_per_sample) / 8;
     let byte_rate = sample_rate * u32::from(channels) * bytes_per_sample;
     let block_align = channels * (bits_per_sample / 8);
-    let riff_size = 36 + u32::try_from(data_bytes).unwrap();
+    let riff_size = 36 + u32::try_from(data_bytes).unwrap() + u32::try_from(extra_bytes).unwrap();
     let mut bytes = Vec::new();
 
     bytes.extend_from_slice(b"RIFF");
@@ -116,10 +254,49 @@ fn riff_header(channels: u16, bits_per_sample: u16, format_tag: u16, data_bytes:
     bytes.extend_from_slice(&byte_rate.to_le_bytes());
     bytes.extend_from_slice(&block_align.to_le_bytes());
     bytes.extend_from_slice(&bits_per_sample.to_le_bytes());
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&u32::try_from(data_bytes).unwrap().to_le_bytes());
 
     bytes
+}
+
+fn read_pcm16_wav(path: &Path) -> (u16, Vec<i16>) {
+    let bytes = fs::read(path).unwrap();
+    assert_eq!(&bytes[0..4], b"RIFF");
+    assert_eq!(&bytes[8..12], b"WAVE");
+    let channels = u16::from_le_bytes(bytes[22..24].try_into().unwrap());
+    let data_offset = data_chunk_offset(&bytes);
+    let data_len = u32::from_le_bytes(bytes[data_offset + 4..data_offset + 8].try_into().unwrap());
+    let data_start = data_offset + 8;
+    let data_end = data_start + usize::try_from(data_len).unwrap();
+    let samples = bytes[data_start..data_end]
+        .chunks_exact(2)
+        .map(|sample| i16::from_le_bytes(sample.try_into().unwrap()))
+        .collect();
+
+    (channels, samples)
+}
+
+fn metadata_chunk_is_absent(path: &Path) -> bool {
+    !fs::read(path)
+        .unwrap()
+        .windows(4)
+        .any(|window| window == b"LIST")
+}
+
+fn data_chunk_offset(bytes: &[u8]) -> usize {
+    let mut offset = 12;
+
+    while offset + 8 <= bytes.len() {
+        let chunk_len = usize::try_from(u32::from_le_bytes(
+            bytes[offset + 4..offset + 8].try_into().unwrap(),
+        ))
+        .unwrap();
+        if &bytes[offset..offset + 4] == b"data" {
+            return offset;
+        }
+        offset += 8 + chunk_len;
+    }
+
+    panic!("missing data chunk");
 }
 
 fn temp_path(prefix: &str, extension: &str) -> PathBuf {

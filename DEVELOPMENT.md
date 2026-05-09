@@ -448,6 +448,8 @@ Do not implement transform CLI yet.
 
 ### Feature 1.5: CLI copy pipeline
 
+Status: implemented.
+
 Implement:
 
 ```bash

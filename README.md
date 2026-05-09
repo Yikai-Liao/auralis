@@ -23,8 +23,10 @@ workspace skeleton, uv-based Python test harness, and core audio type
 vocabulary with planar internal audio buffers. The codec trait boundary is in
 place for WAV-only scope and explicit unsupported-format reporting. PCM16 WAV
 decoding into planar `f32` buffers and encoding back to PCM16 WAV are
-implemented, and the `auralis inspect` CLI reports PCM16 WAV metadata. DSP
-kernels and transform CLI commands are still intentionally unimplemented.
+implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
+`auralis run input.wav output.wav` performs a decode-through-buffer copy
+pipeline. DSP kernels and effect transform CLI options are still intentionally
+unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -341,6 +343,7 @@ Initial CLI goals:
 ```bash
 auralis --version
 auralis inspect input.wav
+auralis run input.wav output.wav
 auralis run input.wav output.wav --gain-db -3
 auralis run pipeline.toml
 auralis completions zsh
