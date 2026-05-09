@@ -341,6 +341,7 @@ Tests:
 [ ] L5 chunk invariance tests, if applicable
 [ ] L6 scalar-vs-SIMD tests, or SIMD N/A reason checked
 [ ] L7 fuzz/sanitizer/coverage target added or explicitly not applicable
+[ ] Layered coverage matrix row added or updated, if behavior or test surface changes
 [ ] Unit tests
 [ ] Doc tests
 [ ] Integration tests

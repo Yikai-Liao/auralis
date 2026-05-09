@@ -671,7 +671,7 @@ Implementation notes:
 
 ### Feature 5.7.7: layered coverage report and feature gate
 
-Status: planned.
+Status: implemented.
 
 Make L0-L7 coverage visible for every future feature.
 
@@ -683,3 +683,17 @@ Acceptance tests:
 - the acceptance checklist in `DEVELOPMENT.md` is updated if the report reveals
   missing gates;
 - future effect features must update the matrix in the same commit.
+
+Implementation notes:
+
+- `doc/development/05-layered-coverage.toml` is the machine-readable L0-L7
+  coverage matrix for implemented effects and pipeline primitives.
+- `tools/check_layered_coverage.py` validates the matrix shape, requires linked
+  tests for covered layers, requires narrow reasons for N/A layers, and checks
+  that effect and combiner rows match the currently implemented registry and
+  `CombineMethod` surface.
+- `tools/pytest/tests/test_layered_coverage.py` runs the validator as part of
+  the uv-managed Python suite, making matrix updates a gate for future effect
+  and pipeline work.
+- `DEVELOPMENT.md` now includes the matrix-update requirement in the feature
+  acceptance checklist.

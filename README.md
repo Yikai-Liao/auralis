@@ -883,6 +883,13 @@ No new feature should be started until the current feature has passed its accept
 
 ## Layered test design
 
+The checked-in coverage gate is
+`doc/development/05-layered-coverage.toml`. It records the L0-L7 status, linked
+tests, and N/A reason for each implemented effect and pipeline primitive. Run
+`python3 tools/check_layered_coverage.py` after changing effect, combiner,
+policy, parser, or test coverage so future feature work cannot drift away from
+the matrix.
+
 ### L0: deterministic corpus
 
 Generate small, controlled test signals:

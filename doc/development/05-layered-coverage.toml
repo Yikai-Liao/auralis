@@ -1,0 +1,277 @@
+# Machine-readable L0-L7 coverage matrix for Feature 5.7.7.
+#
+# Each subject is an implemented effect or pipeline primitive. Covered layers
+# must link the tests or manifests that exercise the layer. Not-applicable
+# layers must record a narrow reason and intentionally link no tests.
+
+schema_version = 1
+
+[[subject]]
+id = "effect.dcshift"
+kind = "effect"
+name = "dcshift"
+summary = "Constant normalized full-scale offset effect."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented dcshift command form.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check additive offset behavior, range validation, and clipping boundaries.", tests = ["crates/auralis-effects/src/dcshift.rs"] }
+l4 = { status = "covered", reason = "Property tests include identity and finite-output coverage for dcshift.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers dcshift whole-buffer versus chunked processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for dcshift kernels and typed effect dispatch.", tests = ["crates/auralis-simd/src/dcshift_tests.rs", "crates/auralis-effects/src/dcshift.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers dcshift argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "effect.fade"
+kind = "effect"
+name = "fade"
+summary = "Linear fade-in and fade-out envelope."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover the currently implemented linear fade-in command subset.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check the implemented linear envelope and chunk-position helper behavior.", tests = ["crates/auralis-effects/src/fade.rs"] }
+l4 = { status = "covered", reason = "Property tests include identity and finite-output coverage for fade.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers frame-position-aware fade processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for fade kernels and typed effect dispatch.", tests = ["crates/auralis-simd/src/fade_tests.rs", "crates/auralis-effects/src/fade.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers fade argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "effect.gain"
+kind = "effect"
+name = "gain"
+summary = "Constant decibel gain effect."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented constant-gain command form.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check the decibel-to-multiplier scalar reference behavior.", tests = ["crates/auralis-effects/src/gain.rs", "crates/auralis-dsp/src/lib.rs"] }
+l4 = { status = "covered", reason = "Property tests include identity, inverse-gain round-trip, and finite-output coverage for gain.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers gain whole-buffer versus chunked processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for gain kernels and typed effect dispatch.", tests = ["crates/auralis-simd/src/gain_tests.rs", "crates/auralis-effects/src/gain.rs", "crates/auralis-cli/tests/effects.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers gain argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "effect.pad"
+kind = "effect"
+name = "pad"
+summary = "Zero padding before and after decoded audio."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented start/end padding form.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check inserted silence, metadata shape, and overflow errors.", tests = ["crates/auralis-effects/src/pad.rs"] }
+l4 = { status = "covered", reason = "Property tests include zero-padding identity and finite-output coverage for pad.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current pad API is a whole-buffer structural transform and has no streaming processor to chunk.", tests = [] }
+l6 = { status = "not_applicable", reason = "Pad inserts structural silence and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers pad argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "effect.reverse"
+kind = "effect"
+name = "reverse"
+summary = "Frame-order reversal within each channel."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover reverse behavior directly.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check mono and stereo frame ordering.", tests = ["crates/auralis-effects/src/reverse.rs"] }
+l4 = { status = "covered", reason = "Property tests cover reverse-twice identity and finite-output behavior.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "Reverse is inherently whole-buffer for the current API because final output depends on the complete input tail.", tests = [] }
+l6 = { status = "not_applicable", reason = "Reverse is a structural reorder and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers reverse parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "effect.trim"
+kind = "effect"
+name = "trim"
+summary = "End-exclusive decoded frame range selection."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented frame and seconds trim forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check exact retained ranges, empty ranges, and invalid bounds.", tests = ["crates/auralis-effects/src/trim.rs"] }
+l4 = { status = "covered", reason = "Property tests cover full-range identity and finite-output behavior for trim.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current trim API returns a new whole-buffer range and has no streaming processor to chunk.", tests = [] }
+l6 = { status = "not_applicable", reason = "Trim is a structural slice and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers trim argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+
+[[subject]]
+id = "pipeline.effect_chain"
+kind = "pipeline"
+name = "effect-chain"
+summary = "Sequential typed effect chain execution and positional command parsing."
+[subject.layers]
+l0 = { status = "covered", reason = "Chain golden cases use deterministic corpus IDs for representative editing, level, and fade/gain chains.", tests = ["tests/golden/chains.toml", "crates/auralis-testkit/tests/golden_chains.rs"] }
+l1 = { status = "not_applicable", reason = "Effect-chain semantics operate after decode and before encode; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Representative chain manifests compare Auralis and SoX-ng command lines and decoded samples.", tests = ["tests/golden/chains.toml", "tools/pytest/tests/test_chain_golden_manifest.py", "crates/auralis-testkit/tests/golden_chains.rs"] }
+l3 = { status = "covered", reason = "Unit and CLI integration tests check chain ordering, errors, deterministic rendering, and typed pipeline equivalence.", tests = ["crates/auralis-effects/src/chain.rs", "crates/auralis-cli/tests/chains_effects_file.rs", "crates/auralis/tests/pipeline.rs"] }
+l4 = { status = "not_applicable", reason = "The chain primitive composes effect properties instead of defining an independent mathematical transform.", tests = [] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers streaming-safe effect-chain execution.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "covered", reason = "Backend-aware chain execution is compared under forced scalar and requested SIMD dispatch.", tests = ["crates/auralis-effects/src/chain.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers positional chain command parsing.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs"] }
+
+[[subject]]
+id = "pipeline.effects_file"
+kind = "pipeline"
+name = "effects-file"
+summary = "SoX-ng-style effects-file parsing and CLI integration."
+[subject.layers]
+l0 = { status = "covered", reason = "Effects-file golden execution reuses the same deterministic corpus IDs as chain manifests.", tests = ["tests/golden/chains.toml", "tools/pytest/tests/test_chain_golden_manifest.py"] }
+l1 = { status = "not_applicable", reason = "Effects files are command sources, not WAV container behavior.", tests = [] }
+l2 = { status = "covered", reason = "The Python chain golden runner executes equivalent positional and effects-file command paths.", tests = ["tools/pytest/tests/test_chain_golden_manifest.py", "tests/golden/chains.toml"] }
+l3 = { status = "covered", reason = "Parser and CLI tests cover comments, quoting, diagnostics, and equivalence with positional chains.", tests = ["crates/auralis-effects/src/effects_file.rs", "crates/auralis-cli/tests/chains_effects_file.rs"] }
+l4 = { status = "not_applicable", reason = "Effects-file parsing is syntax handling rather than a DSP property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "Chunking applies to the parsed effect processors, not the text file parser.", tests = [] }
+l6 = { status = "not_applicable", reason = "Effects-file parsing does not process samples or select SIMD kernels.", tests = [] }
+l7 = { status = "covered", reason = "A dedicated effects-file fuzz target covers parser edge cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effects_file.rs", "fuzz/corpus/effects_file/simple-chain"] }
+
+[[subject]]
+id = "pipeline.chain_boundary"
+kind = "pipeline"
+name = "chain-boundary"
+summary = "Explicit ':' chain boundary preservation and unsupported newfile/restart diagnostics."
+[subject.layers]
+l0 = { status = "covered", reason = "Boundary tests reuse deterministic chain fixtures and corpus-backed chain manifests.", tests = ["crates/auralis-cli/tests/chains_effects_file.rs", "tests/golden/chains.toml"] }
+l1 = { status = "not_applicable", reason = "Boundary tokens affect command segmentation, not WAV container behavior.", tests = [] }
+l2 = { status = "covered", reason = "Golden manifest rendering tests preserve ':' tokens deterministically for Auralis and SoX-ng command displays.", tests = ["crates/auralis-testkit/tests/golden_chains.rs"] }
+l3 = { status = "covered", reason = "Unit and CLI tests cover boundary preservation, current no-op execution, empty segments, and unsupported controls.", tests = ["crates/auralis-effects/src/chain.rs", "crates/auralis-effects/src/effects_file.rs", "crates/auralis-cli/tests/chains_effects_file.rs"] }
+l4 = { status = "not_applicable", reason = "Boundary preservation is command syntax behavior, not a mathematical DSP property.", tests = [] }
+l5 = { status = "not_applicable", reason = "Chunking applies to the effects inside segments; current boundary semantics are preserved metadata.", tests = [] }
+l6 = { status = "not_applicable", reason = "Boundary parsing does not process samples or select SIMD kernels.", tests = [] }
+l7 = { status = "covered", reason = "Effect-command and effects-file fuzz targets cover ':' and unsupported boundary-control parser paths.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/fuzz_targets/effects_file.rs"] }
+
+[[subject]]
+id = "pipeline.combine.concatenate"
+kind = "pipeline"
+name = "concatenate"
+summary = "Serial append input combiner."
+[subject.layers]
+l0 = { status = "covered", reason = "The concatenate golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/concat.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Concatenate has direct SoX-ng golden coverage for mismatched mono lengths and a stereo reverse chain.", tests = ["tests/golden/concat.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover append semantics, validation, and pipeline use.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_concat_sequence.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; concatenate is covered by structural tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "Concatenate copies full decoded ranges and has no SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by concatenate cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.combine.sequence"
+kind = "pipeline"
+name = "sequence"
+summary = "Serial sequence input combiner with explicit boundary validation."
+[subject.layers]
+l0 = { status = "covered", reason = "The sequence golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/sequence.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Sequence has direct SoX-ng golden coverage for mono boundaries and a stereo reverse chain.", tests = ["tests/golden/sequence.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover representable sequence boundaries and diagnostics.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_concat_sequence.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; sequence is covered by structural tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "Sequence copies full decoded ranges and has no SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by sequence cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.combine.mix"
+kind = "pipeline"
+name = "mix"
+summary = "Balanced summing input combiner."
+[subject.layers]
+l0 = { status = "covered", reason = "The mix golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/mix.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Mix has direct SoX-ng golden coverage for mismatched mono lengths and a stereo reverse chain.", tests = ["tests/golden/mix.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover scaling, length mismatch, channel mismatch, and pipeline use.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_mix.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; mix is covered by structural and numerical tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "covered", reason = "Scalar and requested SIMD mix kernels are compared across deterministic and random cases.", tests = ["crates/auralis-simd/src/mix_tests.rs", "crates/auralis/tests/combine.rs"] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by mix cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.combine.mix_power"
+kind = "pipeline"
+name = "mix-power"
+summary = "Equal-power summing input combiner."
+[subject.layers]
+l0 = { status = "covered", reason = "The mix-power golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/mix_power.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Mix-power has direct SoX-ng golden coverage for mismatched mono lengths and a stereo reverse chain.", tests = ["tests/golden/mix_power.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover power scaling, length mismatch, channel mismatch, and pipeline use.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_mix.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; mix-power is covered by structural and numerical tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "covered", reason = "Mix-power uses the same scalar/SIMD mix kernel coverage with a distinct scaling factor.", tests = ["crates/auralis-simd/src/mix_tests.rs", "crates/auralis/tests/combine.rs"] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by mix-power cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.combine.merge"
+kind = "pipeline"
+name = "merge"
+summary = "Channel-stacking input combiner."
+[subject.layers]
+l0 = { status = "covered", reason = "The merge golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/merge.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Merge has direct SoX-ng golden coverage for mono-to-stereo and multichannel reverse-chain cases.", tests = ["tests/golden/merge.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover channel stacking, mismatched lengths, and pipeline use.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_merge_multiply.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; merge is covered by structural tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "Merge copies channels structurally and has no SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by merge cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.combine.multiply"
+kind = "pipeline"
+name = "multiply"
+summary = "Pointwise multiplication input combiner."
+[subject.layers]
+l0 = { status = "covered", reason = "The multiply golden manifest uses deterministic multi-input corpus IDs.", tests = ["tests/golden/multiply.toml", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l1 = { status = "not_applicable", reason = "The combiner operates on decoded AudioBuffer inputs; WAV I/O correctness is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Multiply has direct SoX-ng golden coverage for mismatched mono lengths and a stereo reverse chain.", tests = ["tests/golden/multiply.toml", "tools/pytest/tests/test_combine_golden_manifest.py", "crates/auralis-testkit/tests/golden_combine.rs"] }
+l3 = { status = "covered", reason = "Library and CLI integration tests cover pointwise multiplication, identities, mismatches, and pipeline use.", tests = ["crates/auralis/tests/combine.rs", "crates/auralis-cli/tests/combine_merge_multiply.rs"] }
+l4 = { status = "not_applicable", reason = "Property/metamorphic requirements currently target effects; multiply is covered by structural and numerical tests.", tests = [] }
+l5 = { status = "not_applicable", reason = "Input combining is a whole-input operation and has no streaming effect processor.", tests = [] }
+l6 = { status = "covered", reason = "Scalar and requested SIMD multiply kernels are compared across deterministic and random cases.", tests = ["crates/auralis-simd/src/multiply_tests.rs", "crates/auralis/tests/combine.rs"] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers combine metadata parsing used by multiply cases.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.auto_channels"
+kind = "pipeline"
+name = "automatic-channel-conversion"
+summary = "Explicit output channel conversion policy used to mirror SoX-ng automatic channels insertion."
+[subject.layers]
+l0 = { status = "covered", reason = "Auto-channel golden cases use deterministic corpus IDs for mono/stereo conversion examples.", tests = ["tests/golden/auto_channels.toml", "crates/auralis-testkit/tests/golden_auto_channels.rs"] }
+l1 = { status = "not_applicable", reason = "The policy changes decoded output channel layout; WAV container parsing is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Auto-channel manifests record when SoX-ng auto-inserts channels conversion and compare decoded samples.", tests = ["tests/golden/auto_channels.toml", "tools/pytest/tests/test_auto_channels_golden_manifest.py", "crates/auralis-testkit/tests/golden_auto_channels.rs"] }
+l3 = { status = "covered", reason = "Library and CLI tests cover explicit policy defaults, disabling, and output-channel behavior.", tests = ["crates/auralis/tests/output_policies.rs", "crates/auralis-cli/tests/output_policies.rs"] }
+l4 = { status = "not_applicable", reason = "Automatic channel policy is an explicit pipeline policy, not a standalone effect property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current policy is applied at output materialization rather than as a streaming processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "The implemented channel policy has no SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers auto-channel metadata fields and validation.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.auto_rate"
+kind = "pipeline"
+name = "automatic-sample-rate-conversion"
+summary = "Explicit output sample-rate policy used to mirror SoX-ng automatic rate insertion."
+[subject.layers]
+l0 = { status = "covered", reason = "Auto-rate golden cases use deterministic corpus IDs for representative output-rate changes.", tests = ["tests/golden/auto_rate.toml", "crates/auralis-testkit/tests/golden_auto_rate.rs"] }
+l1 = { status = "not_applicable", reason = "The policy changes decoded output sample-rate metadata; WAV container parsing is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Auto-rate manifests record when SoX-ng auto-inserts rate conversion and compare decoded samples.", tests = ["tests/golden/auto_rate.toml", "tools/pytest/tests/test_auto_rate_golden_manifest.py", "crates/auralis-testkit/tests/golden_auto_rate.rs"] }
+l3 = { status = "covered", reason = "Library and CLI tests cover explicit policy defaults, disabling, and output-rate behavior.", tests = ["crates/auralis/tests/output_policies.rs", "crates/auralis-cli/tests/output_policies.rs"] }
+l4 = { status = "not_applicable", reason = "Automatic rate policy is an explicit pipeline policy, not a standalone effect property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current policy is applied at output materialization rather than as a streaming processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "The implemented rate policy has no SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers auto-rate metadata fields and validation.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.auto_level"
+kind = "pipeline"
+name = "guard-and-norm-output-level"
+summary = "Explicit output guard and normalization policies."
+[subject.layers]
+l0 = { status = "covered", reason = "Auto-level golden cases use deterministic corpus IDs for clipping and normalization examples.", tests = ["tests/golden/auto_level.toml", "crates/auralis-testkit/tests/golden_auto_level.rs"] }
+l1 = { status = "not_applicable", reason = "The policy changes decoded sample levels before writing; WAV container parsing is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Auto-level manifests compare explicit guard and normalization behavior with SoX-ng.", tests = ["tests/golden/auto_level.toml", "tools/pytest/tests/test_auto_level_golden_manifest.py", "crates/auralis-testkit/tests/golden_auto_level.rs"] }
+l3 = { status = "covered", reason = "Library and CLI tests cover guard and norm policy behavior and diagnostics.", tests = ["crates/auralis/tests/output_policies.rs", "crates/auralis-cli/tests/output_policies.rs"] }
+l4 = { status = "not_applicable", reason = "Guard and norm are explicit output policies, not standalone effect property surfaces.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current policies are applied at output materialization rather than as streaming processors.", tests = [] }
+l6 = { status = "not_applicable", reason = "The implemented output-level policies have no SIMD kernels.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers output-level metadata fields and validation.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
