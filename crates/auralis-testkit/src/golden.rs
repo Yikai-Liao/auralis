@@ -113,6 +113,7 @@ impl GoldenManifest {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoldenCase {
     inputs: Vec<PathBuf>,
+    combine: Option<String>,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     tolerance: GoldenTolerance,
@@ -136,6 +137,15 @@ impl GoldenCase {
     #[must_use]
     pub fn inputs(&self) -> &[PathBuf] {
         &self.inputs
+    }
+
+    /// Returns the requested multi-input combiner method, if explicitly set.
+    ///
+    /// Multi-input manifests that omit this field retain the historical
+    /// `concatenate` rendering default.
+    #[must_use]
+    pub fn combine_method(&self) -> Option<&str> {
+        self.combine.as_deref()
     }
 
     /// Returns the Auralis argument fragment recorded by the manifest.
@@ -179,10 +189,11 @@ impl GoldenCase {
 
     /// Renders a deterministic Auralis command vector for one or more inputs.
     ///
-    /// Multi-input cases render through Auralis' current concatenate CLI shape:
+    /// Multi-input cases render through Auralis' current combine CLI shape:
     /// the first input remains positional, later inputs are passed as repeated
-    /// `--input <FILE>` options, and `--combine concatenate` is emitted before
-    /// recorded effect arguments.
+    /// `--input <FILE>` options, and `--combine <METHOD>` is emitted before
+    /// recorded effect arguments. Cases that omit `combine` default to
+    /// `concatenate` for backwards compatibility.
     #[must_use]
     pub fn render_auralis_command_with_inputs<I, P>(
         &self,
@@ -205,7 +216,7 @@ impl GoldenCase {
         command.push(path_to_command_arg(output_path.as_ref()));
         if input_paths.len() > 1 {
             command.push("--combine".to_owned());
-            command.push("concatenate".to_owned());
+            command.push(self.rendered_combine_method().to_owned());
             for input in input_paths.iter().skip(1) {
                 command.push("--input".to_owned());
                 command.push(input.clone());
@@ -270,9 +281,10 @@ impl GoldenCase {
 
     /// Renders a deterministic SoX-ng command vector for one or more inputs.
     ///
-    /// Multi-input cases include `--combine concatenate` before the input
-    /// paths. The `-R` and `-D` flags are always included to match Auralis'
-    /// repeatable golden-test policy.
+    /// Multi-input cases include `--combine <METHOD>` before the input paths.
+    /// Cases that omit `combine` default to `concatenate`. The `-R` and `-D`
+    /// flags are always included to match Auralis' repeatable golden-test
+    /// policy.
     #[must_use]
     pub fn render_sox_ng_command_with_inputs<I, P>(
         &self,
@@ -295,7 +307,7 @@ impl GoldenCase {
         ];
         if input_paths.len() > 1 {
             command.push("--combine".to_owned());
-            command.push("concatenate".to_owned());
+            command.push(self.rendered_combine_method().to_owned());
         }
         command.extend(input_paths);
         command.push(path_to_command_arg(output_path.as_ref()));
@@ -342,6 +354,7 @@ impl GoldenCase {
 
     fn from_raw(id: &str, raw: RawGoldenCase) -> Result<Self> {
         let inputs = validate_inputs(id, raw.input, raw.inputs)?;
+        validate_combine_method(id, raw.combine.as_deref())?;
 
         validate_args(id, GoldenCommand::Auralis, &raw.auralis)?;
         validate_args(id, GoldenCommand::SoxNg, &raw.sox_ng)?;
@@ -351,6 +364,7 @@ impl GoldenCase {
 
         Ok(Self {
             inputs,
+            combine: raw.combine,
             auralis: raw.auralis,
             sox_ng: raw.sox_ng,
             tolerance: GoldenTolerance {
@@ -359,6 +373,10 @@ impl GoldenCase {
                 snr_db: raw.snr_db,
             },
         })
+    }
+
+    fn rendered_combine_method(&self) -> &str {
+        self.combine.as_deref().unwrap_or("concatenate")
     }
 }
 
@@ -470,6 +488,15 @@ pub enum GoldenManifestError {
         id: String,
     },
 
+    /// A case requested an unknown multi-input combiner method.
+    InvalidCombineMethod {
+        /// Case identifier containing the invalid combiner method.
+        id: String,
+
+        /// Rejected combiner method.
+        combine: String,
+    },
+
     /// A command argument was an empty string.
     EmptyArgument {
         /// Case identifier containing the invalid argument.
@@ -520,6 +547,12 @@ impl fmt::Display for GoldenManifestError {
                     "golden manifest case `{id}` must not define both `input` and `inputs`"
                 )
             }
+            Self::InvalidCombineMethod { id, combine } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` has invalid combine method `{combine}`"
+                )
+            }
             Self::EmptyArgument { id, command } => {
                 write!(
                     formatter,
@@ -545,6 +578,7 @@ impl Error for GoldenManifestError {
             | Self::EmptyInput { .. }
             | Self::MissingInput { .. }
             | Self::AmbiguousInput { .. }
+            | Self::InvalidCombineMethod { .. }
             | Self::EmptyArgument { .. }
             | Self::InvalidTolerance { .. } => None,
         }
@@ -604,12 +638,22 @@ struct RawManifest {
 struct RawGoldenCase {
     input: Option<String>,
     inputs: Option<Vec<String>>,
+    combine: Option<String>,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     max_abs: f64,
     rms: f64,
     snr_db: f64,
 }
+
+const SUPPORTED_COMBINE_METHODS: &[&str] = &[
+    "concatenate",
+    "sequence",
+    "mix",
+    "mix-power",
+    "merge",
+    "multiply",
+];
 
 fn is_valid_case_id(id: &str) -> bool {
     !id.is_empty()
@@ -651,6 +695,21 @@ fn validate_inputs(
                 Ok(inputs.into_iter().map(PathBuf::from).collect())
             }
         }
+    }
+}
+
+fn validate_combine_method(id: &str, combine: Option<&str>) -> Result<()> {
+    let Some(combine) = combine else {
+        return Ok(());
+    };
+
+    if SUPPORTED_COMBINE_METHODS.contains(&combine) {
+        Ok(())
+    } else {
+        Err(GoldenManifestError::InvalidCombineMethod {
+            id: id.to_owned(),
+            combine: combine.to_owned(),
+        })
     }
 }
 
@@ -722,6 +781,7 @@ mod tests {
 
         assert_eq!(case.input().to_string_lossy(), "mono/sine.wav");
         assert_eq!(case.inputs(), [PathBuf::from("mono/sine.wav")]);
+        assert_eq!(case.combine_method(), None);
         assert_eq!(case.auralis_args(), ["--gain-db", "-3"]);
         assert_eq!(case.sox_ng_args(), ["gain", "-3"]);
         assert_float_eq(case.tolerance().max_abs, 0.000_1);
@@ -834,6 +894,42 @@ mod tests {
     }
 
     #[test]
+    fn manifest_parse_preserves_explicit_combine_method() {
+        let manifest = GoldenManifest::parse_toml(
+            r#"
+            [id.sequence_then_reverse]
+            inputs = ["combine/first.wav", "combine/second.wav"]
+            combine = "sequence"
+            auralis = ["reverse"]
+            sox_ng = ["reverse"]
+            max_abs = 0.0
+            rms = 0.0
+            snr_db = 120.0
+            "#,
+        )
+        .unwrap();
+        let case = manifest.get("sequence_then_reverse").unwrap();
+
+        assert_eq!(case.combine_method(), Some("sequence"));
+        assert_eq!(
+            case.render_auralis_command_line_with_inputs(
+                "auralis",
+                ["first.wav", "second.wav"],
+                "out.wav",
+            ),
+            "auralis run first.wav out.wav --combine sequence --input second.wav reverse"
+        );
+        assert_eq!(
+            case.render_sox_ng_command_line_with_inputs(
+                "sox_ng",
+                ["first.wav", "second.wav"],
+                "out.wav",
+            ),
+            "sox_ng -R -D --combine sequence first.wav second.wav out.wav reverse"
+        );
+    }
+
+    #[test]
     fn invalid_manifest_is_rejected_for_missing_or_ambiguous_input_fields() {
         let missing = GoldenManifest::parse_toml(
             r#"
@@ -867,6 +963,29 @@ mod tests {
         assert!(matches!(
             ambiguous,
             GoldenManifestError::AmbiguousInput { id } if id == "ambiguous_input"
+        ));
+    }
+
+    #[test]
+    fn invalid_manifest_is_rejected_for_unknown_combine_method() {
+        let error = GoldenManifest::parse_toml(
+            r#"
+            [id.unknown_combine]
+            inputs = ["first.wav", "second.wav"]
+            combine = "overlay"
+            auralis = ["gain", "-3"]
+            sox_ng = ["gain", "-3"]
+            max_abs = 0.0001
+            rms = 0.000001
+            snr_db = 90.0
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            GoldenManifestError::InvalidCombineMethod { id, combine }
+                if id == "unknown_combine" && combine == "overlay"
         ));
     }
 

@@ -1,0 +1,21 @@
+# Representative sequence-combiner golden cases. Auralis currently writes one
+# output WAV, so these cases cover sequence boundaries that can be represented
+# without reopening or changing the output stream shape.
+
+[id.sequence_mono_boundary]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+combine = "sequence"
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.sequence_stereo_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+combine = "sequence"
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

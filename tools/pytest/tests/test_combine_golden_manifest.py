@@ -16,30 +16,41 @@ from auralis_testkit.metrics import max_abs_error, peak, rms_error, snr_db
 from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng_with_inputs
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MANIFEST_PATH = REPO_ROOT / "tests" / "golden" / "concat.toml"
+MANIFEST_PATHS = (
+    REPO_ROOT / "tests" / "golden" / "concat.toml",
+    REPO_ROOT / "tests" / "golden" / "sequence.toml",
+)
 SAMPLE_RATE = 48_000
 PCM16_SCALE = np.float64(32_768.0)
 
 
-def _load_concat_cases() -> tuple[tuple[str, dict[str, Any]], ...]:
-    manifest = tomllib.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    return tuple(sorted(manifest["id"].items()))
+def _load_combine_cases() -> tuple[tuple[str, dict[str, Any]], ...]:
+    cases: list[tuple[str, dict[str, Any]]] = []
+    for manifest_path in MANIFEST_PATHS:
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        for case_id, case in manifest["id"].items():
+            case = dict(case)
+            case.setdefault("combine", "concatenate")
+            cases.append((case_id, case))
+
+    return tuple(sorted(cases))
 
 
-CONCAT_CASES = _load_concat_cases()
+COMBINE_CASES = _load_combine_cases()
 
 
 @pytest.mark.golden
 @pytest.mark.parametrize(
     ("case_id", "case"),
-    CONCAT_CASES,
-    ids=[case_id for case_id, _ in CONCAT_CASES],
+    COMBINE_CASES,
+    ids=[case_id for case_id, _ in COMBINE_CASES],
 )
-def test_cli_concatenate_matches_sox_ng_golden_manifest(
+def test_cli_combine_matches_sox_ng_golden_manifest(
     case_id: str,
     case: dict[str, Any],
     tmp_path: Path,
 ) -> None:
+    combine = case["combine"]
     input_paths = [
         _write_fixture(input_name, tmp_path / input_name)
         for input_name in case["inputs"]
@@ -57,7 +68,7 @@ def test_cli_concatenate_matches_sox_ng_golden_manifest(
         str(input_paths[0]),
         str(auralis_output),
         "--combine",
-        "concatenate",
+        combine,
         *[
             option
             for input_path in input_paths[1:]
@@ -74,7 +85,12 @@ def test_cli_concatenate_matches_sox_ng_golden_manifest(
     )
 
     try:
-        sox_result = run_sox_ng_with_inputs(input_paths, sox_output, case["sox_ng"])
+        sox_result = run_sox_ng_with_inputs(
+            input_paths,
+            sox_output,
+            case["sox_ng"],
+            combine=combine,
+        )
     except SoxNgUnavailable as error:
         pytest.skip(str(error))
 
@@ -110,6 +126,7 @@ def test_cli_concatenate_matches_sox_ng_golden_manifest(
         report = {
             "case_id": case_id,
             "inputs": case["inputs"],
+            "combine": combine,
             "auralis_command": auralis_result.args,
             "sox_ng_command": sox_result.args,
             "tolerances": {

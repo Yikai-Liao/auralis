@@ -57,11 +57,13 @@ comment, quote, escape, and line/column diagnostic handling, and
 ordered pipeline as positional CLI effect chains. Positional chains and effects
 files preserve explicit `:` chain boundaries for deterministic rendering and
 diagnostics, while unsupported `newfile` and `restart` boundary controls return
-stable not-yet-implemented errors. The high-level facade and CLI also support a
-SoX-ng-style concatenate input combiner. In
+stable not-yet-implemented errors. The high-level facade and CLI also support
+SoX-ng-style concatenate and sequence input combiners. In
 `auralis run first.wav out.wav --combine concatenate --input second.wav`,
 decoded inputs are appended before effects run and must have matching sample
-rates and channel counts. The SIMD crate defines
+rates and channel counts. `--combine sequence` uses the same serial playback
+order for boundaries that can be represented in one output WAV, and reports a
+clear boundary error if the sample rate or channel count changes. The SIMD crate defines
 the Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -282,7 +284,9 @@ Provides the high-level library facade:
 
 - `AudioFile::open_wav`
 - `AudioFile::open_wavs_concatenated`
+- `AudioFile::open_wavs_sequenced`
 - `concatenate_audio_buffers`
+- `sequence_audio_buffers`
 - `AudioFile::into_pipeline`
 - `Pipeline::gain_db`
 - `Pipeline::dc_shift`
@@ -515,6 +519,7 @@ auralis run input.wav output.wav gain -3 : dcshift 0.125 reverse
 auralis run input.wav output.wav --backend simd gain -3 fade l 24000 24000
 auralis run input.wav output.wav --effects-file chain.effects
 auralis run first.wav output.wav --combine concatenate --input second.wav reverse
+auralis run first.wav output.wav --combine sequence --input second.wav reverse
 auralis run pipeline.toml
 auralis completions zsh
 ```
@@ -529,13 +534,17 @@ Backend selection remains an option, but legacy one-effect flags such as
 because their relative order would be ambiguous. Effects files use the same
 parser as the library `parse_effects_file` API.
 
-The concatenate input combiner runs before the effect chain. The first input is
-the existing positional input, and each additional input is supplied with
-`--input <FILE>` while `--combine concatenate` records the combiner method.
-Concatenation accepts inputs with different frame lengths, appends them in
+The serial input combiners run before the effect chain. The first input is the
+existing positional input, and each additional input is supplied with
+`--input <FILE>` while `--combine <METHOD>` records the combiner method.
+`concatenate` accepts inputs with different frame lengths, appends them in
 caller order, and rejects mismatched sample rates or channel counts before any
-effects are applied. Future combine methods such as sequence, mix, merge, and
-multiply remain unimplemented until their own DEVELOPMENT.md features.
+effects are applied. `sequence` also appends representable boundaries in caller
+order; because Auralis currently produces one output buffer and one PCM16 WAV
+file, a sequence boundary that changes sample rate or channel count is rejected
+instead of reopening the output stream as SoX-ng may do for some devices.
+Future combine methods such as mix, merge, and multiply remain unimplemented
+until their own DEVELOPMENT.md features.
 
 Selected crates:
 
@@ -581,9 +590,10 @@ displays.
 
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
 for a structural editing chain, a level-processing chain, and the currently
-implemented fade/gain filter-style chain. `tests/golden/concat.toml` records
-concatenate-combiner coverage for mismatched mono input lengths and a stereo
-combine-before-reverse chain. The Python golden runners generate the
+implemented fade/gain filter-style chain. `tests/golden/concat.toml` and
+`tests/golden/sequence.toml` record serial-combiner coverage for mismatched
+mono input lengths and stereo combine-before-reverse chains. The Python golden
+runners generate the
 deterministic PCM16 fixtures, execute both command lines, compare decoded
 sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
 report when output drifts outside its manifest tolerance.

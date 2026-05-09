@@ -86,7 +86,7 @@ impl PartialEq for Error {
 
 /// Input-combiner method selected before any effects are applied.
 ///
-/// Only SoX-ng-style `concatenate` is implemented in the current feature. Later
+/// Implemented methods are SoX-ng-style serial combiners. Later parallel
 /// combine modes remain absent from this enum until their own DEVELOPMENT.md
 /// leaf features add tests and documented semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -94,6 +94,9 @@ impl PartialEq for Error {
 pub enum CombineMethod {
     /// Append every input in order, preserving channels and sample values.
     Concatenate,
+
+    /// Play inputs in order, preserving explicit sequence-boundary semantics.
+    Sequence,
 }
 
 impl CombineMethod {
@@ -102,6 +105,7 @@ impl CombineMethod {
     pub const fn as_name(self) -> &'static str {
         match self {
             Self::Concatenate => "concatenate",
+            Self::Sequence => "sequence",
         }
     }
 
@@ -110,6 +114,7 @@ impl CombineMethod {
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "concatenate" => Some(Self::Concatenate),
+            "sequence" => Some(Self::Sequence),
             _ => None,
         }
     }
@@ -120,7 +125,7 @@ impl CombineMethod {
 #[non_exhaustive]
 pub enum InputCombineError {
     /// The caller supplied no input buffers.
-    #[error("concatenate requires at least one input")]
+    #[error("input combiner requires at least one input")]
     EmptyInputList,
 
     /// One input's sample rate did not match the first input.
@@ -168,8 +173,62 @@ pub enum InputCombineError {
         actual: SampleFormat,
     },
 
+    /// A sequence boundary changed sample rate, which one output buffer cannot represent.
+    #[error(
+        "sequence boundary before input {input_index} cannot be represented in one output: sample rate {actual} does not match previous input {previous_index} sample rate {expected}"
+    )]
+    SequenceBoundarySampleRate {
+        /// Zero-based input index after the failing boundary.
+        input_index: usize,
+
+        /// Zero-based input index before the failing boundary.
+        previous_index: usize,
+
+        /// Sample rate before the boundary.
+        expected: SampleRate,
+
+        /// Sample rate after the boundary.
+        actual: SampleRate,
+    },
+
+    /// A sequence boundary changed channel count, which one output buffer cannot represent.
+    #[error(
+        "sequence boundary before input {input_index} cannot be represented in one output: channel count {actual} does not match previous input {previous_index} channel count {expected}"
+    )]
+    SequenceBoundaryChannelCount {
+        /// Zero-based input index after the failing boundary.
+        input_index: usize,
+
+        /// Zero-based input index before the failing boundary.
+        previous_index: usize,
+
+        /// Channel count before the boundary.
+        expected: ChannelCount,
+
+        /// Channel count after the boundary.
+        actual: ChannelCount,
+    },
+
+    /// A sequence boundary changed sample format, which one output buffer cannot represent.
+    #[error(
+        "sequence boundary before input {input_index} cannot be represented in one output: sample format {actual} does not match previous input {previous_index} sample format {expected}"
+    )]
+    SequenceBoundarySampleFormat {
+        /// Zero-based input index after the failing boundary.
+        input_index: usize,
+
+        /// Zero-based input index before the failing boundary.
+        previous_index: usize,
+
+        /// Sample format before the boundary.
+        expected: SampleFormat,
+
+        /// Sample format after the boundary.
+        actual: SampleFormat,
+    },
+
     /// The combined frame count cannot be represented by Auralis.
-    #[error("concatenated frame count cannot be represented")]
+    #[error("combined frame count cannot be represented")]
     FrameCountOverflow,
 
     /// The combined planar buffer shape was rejected by the core buffer model.
@@ -198,9 +257,54 @@ pub fn concatenate_audio_buffers(
     };
 
     let spec = first.spec();
-    let mut total_frames = 0_u64;
     for (input_index, input) in inputs.iter().enumerate() {
         validate_concatenate_input(input_index, spec, input)?;
+    }
+
+    append_serial_audio_buffers(inputs)
+}
+
+/// Sequences already-decoded planar audio buffers for a single output buffer.
+///
+/// SoX-ng `sequence` can close and reopen some output devices at input
+/// boundaries when stream parameters change. Auralis currently writes one
+/// in-memory buffer and one PCM16 WAV output file, so only boundaries that keep
+/// the same sample rate, channel count, and sample format can be represented.
+/// For representable boundaries, samples are appended in caller order just like
+/// serial playback: each output channel contains that channel from input 0,
+/// then input 1, and so on. Frame lengths may differ.
+///
+/// # Errors
+///
+/// Returns [`InputCombineError::EmptyInputList`] for no inputs, a sequence
+/// boundary mismatch when one output buffer cannot represent the transition, or
+/// an overflow/shape error if the combined buffer cannot be represented.
+pub fn sequence_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    let Some(first) = inputs.first() else {
+        return Err(InputCombineError::EmptyInputList);
+    };
+
+    let mut previous = first.spec();
+    for (input_index, input) in inputs.iter().enumerate().skip(1) {
+        validate_sequence_boundary(input_index - 1, input_index, previous, input.spec())?;
+        previous = input.spec();
+    }
+
+    append_serial_audio_buffers(inputs)
+}
+
+fn append_serial_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    let Some(first) = inputs.first() else {
+        return Err(InputCombineError::EmptyInputList);
+    };
+
+    let spec = first.spec();
+    let mut total_frames = 0_u64;
+    for input in inputs {
         total_frames = total_frames
             .checked_add(input.frames().as_u64())
             .ok_or(InputCombineError::FrameCountOverflow)?;
@@ -253,6 +357,40 @@ fn validate_concatenate_input(
     if actual.sample_format() != expected.sample_format() {
         return Err(InputCombineError::MismatchedSampleFormat {
             input_index,
+            expected: expected.sample_format(),
+            actual: actual.sample_format(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_sequence_boundary(
+    previous_index: usize,
+    input_index: usize,
+    expected: AudioSpec,
+    actual: AudioSpec,
+) -> std::result::Result<(), InputCombineError> {
+    if actual.sample_rate() != expected.sample_rate() {
+        return Err(InputCombineError::SequenceBoundarySampleRate {
+            input_index,
+            previous_index,
+            expected: expected.sample_rate(),
+            actual: actual.sample_rate(),
+        });
+    }
+    if actual.channels() != expected.channels() {
+        return Err(InputCombineError::SequenceBoundaryChannelCount {
+            input_index,
+            previous_index,
+            expected: expected.channels(),
+            actual: actual.channels(),
+        });
+    }
+    if actual.sample_format() != expected.sample_format() {
+        return Err(InputCombineError::SequenceBoundarySampleFormat {
+            input_index,
+            previous_index,
             expected: expected.sample_format(),
             actual: actual.sample_format(),
         });
@@ -355,6 +493,58 @@ impl AudioFile {
         Self::from_audio_buffers_concatenated_with_backend(&inputs, requested_backend)
     }
 
+    /// Opens multiple PCM16 WAV files and sequences them in caller order.
+    ///
+    /// This is the library counterpart to `auralis run --combine sequence`.
+    /// Auralis writes one output buffer/file, so sequence boundaries must keep
+    /// the same sample rate and channel count. Representable boundaries append
+    /// decoded input samples in serial playback order before any later effects
+    /// are applied. Frame lengths may differ.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty or a sequence
+    /// boundary cannot be represented by one output buffer.
+    pub fn open_wavs_sequenced<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        Self::open_wavs_sequenced_with_backend(paths, BackendKind::Scalar)
+    }
+
+    /// Opens multiple PCM16 WAV files and sequences them with a requested backend.
+    ///
+    /// `requested_backend` controls decode conversion, later backend-aware
+    /// effects, and output encoding after [`Self::into_pipeline`]. Sequencing
+    /// itself is a structural copy after boundary validation and does not
+    /// select a SIMD kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty or a sequence
+    /// boundary cannot be represented by one output buffer.
+    pub fn open_wavs_sequenced_with_backend<I, P>(
+        paths: I,
+        requested_backend: BackendKind,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut inputs = Vec::new();
+        for path in paths {
+            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+                path,
+                requested_backend,
+            )?);
+        }
+
+        Self::from_audio_buffers_sequenced_with_backend(&inputs, requested_backend)
+    }
+
     /// Wraps an existing audio buffer in the high-level file type.
     ///
     /// This is primarily useful for tests and applications that decoded audio
@@ -399,6 +589,43 @@ impl AudioFile {
     ) -> Result<Self> {
         Ok(Self {
             audio: concatenate_audio_buffers(inputs)?,
+            requested_backend,
+        })
+    }
+
+    /// Sequences existing audio buffers into the high-level file type.
+    ///
+    /// Inputs are combined before the returned value enters the effect
+    /// pipeline. Auralis currently represents one output buffer, so every
+    /// sequence boundary must keep the same sample rate, channel count, and
+    /// internal sample format. Mismatched frame counts are accepted and appended
+    /// in caller order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, a sequence
+    /// boundary cannot be represented, or the combined buffer shape cannot be
+    /// represented.
+    pub fn from_audio_buffers_sequenced(inputs: &[AudioBuffer]) -> Result<Self> {
+        Self::from_audio_buffers_sequenced_with_backend(inputs, BackendKind::Scalar)
+    }
+
+    /// Sequences existing audio buffers with a requested processing backend.
+    ///
+    /// The backend is recorded for later pipeline stages. Sequencing itself is
+    /// a deterministic structural copy after boundary validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, a sequence
+    /// boundary cannot be represented, or the combined buffer shape cannot be
+    /// represented.
+    pub fn from_audio_buffers_sequenced_with_backend(
+        inputs: &[AudioBuffer],
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
+        Ok(Self {
+            audio: sequence_audio_buffers(inputs)?,
             requested_backend,
         })
     }
@@ -710,7 +937,7 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 mod tests {
     use super::{
         AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
-        concatenate_audio_buffers,
+        concatenate_audio_buffers, sequence_audio_buffers,
     };
     use std::{
         fs,
@@ -1132,6 +1359,108 @@ mod tests {
         auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75])).unwrap();
 
         AudioFile::open_wavs_concatenated([&first, &second])
+            .unwrap()
+            .into_pipeline()
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+        assert_samples_close(decoded.as_planar_f32(), &[0.25, -0.5, 0.75]);
+        fs::remove_dir_all(tempdir).unwrap();
+    }
+
+    #[test]
+    fn sequence_audio_buffers_accepts_mismatched_mono_lengths() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 0.0, -0.25]);
+
+        let actual = sequence_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(5));
+        assert_eq!(actual.channels(), ChannelCount::new(1).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[0.25, -0.5, 0.75, 0.0, -0.25]);
+    }
+
+    #[test]
+    fn sequence_audio_buffers_preserves_stereo_channel_grouping() {
+        let first = stereo_audio_buffer(vec![1.0, 2.0, -1.0, -2.0]);
+        let second = stereo_audio_buffer(vec![3.0, -3.0]);
+
+        let actual = sequence_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[1.0, 2.0, 3.0, -1.0, -2.0, -3.0]);
+    }
+
+    #[test]
+    fn sequence_audio_buffers_rejects_unrepresentable_channel_boundary() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = stereo_audio_buffer(vec![1.0, 2.0, -1.0, -2.0]);
+
+        let error = sequence_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::SequenceBoundaryChannelCount {
+                input_index: 1,
+                previous_index: 0,
+                expected: ChannelCount::new(1).unwrap(),
+                actual: ChannelCount::new(2).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn sequence_audio_buffers_rejects_unrepresentable_sample_rate_boundary() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 44_100, 1, SampleFormat::Float32);
+
+        let error = sequence_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::SequenceBoundarySampleRate {
+                input_index: 1,
+                previous_index: 0,
+                expected: SampleRate::new(48_000).unwrap(),
+                actual: SampleRate::new(44_100).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn sequenced_audio_enters_effect_pipeline_before_effects() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75]);
+
+        let actual = AudioFile::from_audio_buffers_sequenced(&[first, second])
+            .unwrap()
+            .into_pipeline()
+            .gain_db(6.0)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        let multiplier = 10.0_f32.powf(6.0 / 20.0);
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[0.75 * multiplier, -0.5 * multiplier, 0.25 * multiplier],
+        );
+    }
+
+    #[test]
+    fn open_wavs_sequenced_round_trips_through_file_boundary() {
+        let tempdir = temp_dir();
+        fs::create_dir(&tempdir).unwrap();
+        let first = tempdir.join("first.wav");
+        let second = tempdir.join("second.wav");
+        let output = tempdir.join("output.wav");
+
+        auralis_wav::encode_pcm16_path(&first, &audio_buffer(vec![0.25, -0.5])).unwrap();
+        auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75])).unwrap();
+
+        AudioFile::open_wavs_sequenced([&first, &second])
             .unwrap()
             .into_pipeline()
             .write_wav(&output)

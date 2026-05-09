@@ -1190,6 +1190,8 @@ Acceptance tests:
 
 #### Feature 5.4.2: sequence combiner
 
+Status: implemented.
+
 Implement the sequence combiner.
 
 Acceptance tests:
