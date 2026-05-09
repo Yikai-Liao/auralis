@@ -6,6 +6,8 @@
 //! callers that need to fail directly on length changes should assert lengths
 //! separately.
 
+pub mod golden;
+
 /// Returns the largest absolute sample error between `reference` and `actual`.
 ///
 /// Inputs are linear full-scale samples. If the slices have different lengths,

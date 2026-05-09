@@ -712,6 +712,8 @@ uv run pytest
 
 ### Feature 3.3: golden manifest format
 
+Status: implemented.
+
 Define a manifest format for golden tests:
 
 ```toml

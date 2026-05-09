@@ -36,7 +36,9 @@ gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
 testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
-tests. Other effect transform CLI options are still intentionally unimplemented.
+tests. The Rust testkit also parses TOML golden manifests and renders stable
+Auralis and SoX-ng command vectors for reproducible comparison reports. Other
+effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -406,6 +408,23 @@ Contains test utilities shared by Rust tests and Python tests:
 - SoX-ng command wrapper
 - tolerance definitions
 - failure artifact generation
+
+Golden manifests use TOML tables keyed under `id`:
+
+```toml
+[id.gain_minus_3_mono]
+input = "sine_48k_mono.wav"
+auralis = ["--gain-db", "-3"]
+sox_ng = ["gain", "-3"]
+max_abs = 1e-4
+rms = 1e-6
+snr_db = 90.0
+```
+
+The `auralis` array is appended after `auralis run <input> <output>`, while
+`sox_ng` is appended after `sox_ng -R -D <input> <output>`. Case IDs, tolerance
+fields, and command arguments are validated before tests run so failure reports
+can rely on deterministic command rendering.
 
 ### `auralis-python` future placeholder
 
