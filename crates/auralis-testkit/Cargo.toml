@@ -19,5 +19,8 @@ auralis-simd = { path = "../auralis-simd", default-features = false }
 serde.workspace = true
 toml.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

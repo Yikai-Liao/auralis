@@ -8,8 +8,19 @@ import pytest
 from scipy.io import wavfile
 
 from auralis_testkit.corpus import CORPUS_IDS, corpus_case, pcm16_fixture, sine_wave
+from auralis_testkit.golden_report import (
+    GOLDEN_FAILURE_REPORT_SCHEMA,
+    build_golden_failure_report,
+    comparison_metadata,
+    first_offending_index,
+    golden_metric_failures,
+    golden_metrics,
+    json_number,
+)
 from auralis_testkit.metrics import dc_offset, max_abs_error, peak, rms_error, snr_db
 from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_pytest_harness_imports_testkit_modules() -> None:
@@ -90,6 +101,47 @@ def test_metrics_match_documented_edge_behavior() -> None:
     assert snr_db(np.zeros(2, dtype=np.float32), actual[:2]) == -math.inf
     assert peak(np.array([-0.25, 0.75], dtype=np.float32)) == 0.75
     assert dc_offset(np.array([1.0, -0.5], dtype=np.float32)) == 0.25
+
+
+def test_golden_failure_report_helpers_use_stable_schema() -> None:
+    reference = np.array([0.0, 0.5, -0.5], dtype=np.float64)
+    actual = np.array([0.0, 0.25, -0.9], dtype=np.float64)
+    metrics = golden_metrics(reference, actual)
+    thresholds = {"max_abs": 0.1, "rms": 1.0, "snr_db": 0.0}
+
+    outputs = comparison_metadata(48_000, actual, 48_000, reference)
+    failures = golden_metric_failures(metrics, thresholds, reference, actual)
+    report = build_golden_failure_report(
+        case_id="example",
+        case={
+            "input": "fixture.wav",
+            "corpus_id": "l0/sine_mono_32",
+            "max_abs": 0.1,
+            "rms": 1.0,
+            "snr_db": 0.0,
+        },
+        backend="scalar",
+        repo_root=REPO_ROOT,
+        auralis_command=["auralis", "run"],
+        sox_ng_command=["/does/not/exist/sox_ng"],
+        outputs=outputs,
+        metrics=metrics,
+        failures=failures,
+    )
+
+    assert GOLDEN_FAILURE_REPORT_SCHEMA == "auralis.golden.failure.v1"
+    assert report["schema"] == GOLDEN_FAILURE_REPORT_SCHEMA
+    assert report["backend"] == "scalar"
+    assert report["sox_ng_version"] == "unknown"
+    assert outputs["auralis"] == {
+        "sample_rate": 48_000,
+        "channel_count": 1,
+        "frame_count": 3,
+    }
+    assert failures[0]["metric"] == "max_abs"
+    assert failures[0]["first_offending_index"] == 1
+    assert first_offending_index(reference, actual, 0.3) == 2
+    assert json_number(math.inf) == "inf"
 
 
 def test_sox_ng_wrapper_reports_missing_binary(

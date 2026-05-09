@@ -690,7 +690,8 @@ Contains test utilities shared by Rust tests and Python tests:
 - scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
-- failure artifact generation
+- shared `auralis.golden.failure.v1` failure artifact generation for Rust and
+  Python golden runners
 
 Golden manifests use TOML tables keyed under `id`:
 
@@ -738,7 +739,13 @@ cases. The Python golden runners
 resolve each manifest `corpus_id` or `corpus_ids`, generate deterministic PCM16
 fixtures, execute both command lines, compare decoded sample metadata plus
 max-abs/RMS/SNR/peak metrics, and write a JSON failure report when output drifts
-outside its manifest tolerance.
+outside its manifest tolerance. Failure reports use the shared
+`auralis.golden.failure.v1` schema and include the case ID, backend, Auralis and
+SoX-ng versions, manifest input and corpus IDs, Auralis and SoX-ng command
+vectors, metric thresholds, decoded output sample rate/channel/frame metadata,
+measured metrics, and structured failing-metric entries with expected value,
+actual value, comparison direction, and first offending flattened sample index
+where the metric is sample-local.
 
 ### `auralis-python` future placeholder
 
@@ -917,7 +924,7 @@ Golden tests should record:
 - SoX-ng version
 - Auralis version or commit
 - metric thresholds
-- failure artifacts
+- failure artifacts using `auralis.golden.failure.v1`
 
 ### L3: analytical DSP tests
 

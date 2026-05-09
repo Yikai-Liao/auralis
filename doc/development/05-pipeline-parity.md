@@ -497,7 +497,7 @@ Implementation notes:
 
 ### Feature 5.7.2: L2 golden metadata and failure artifacts
 
-Status: planned.
+Status: implemented.
 
 Complete the README requirement that golden tests record reproducibility
 metadata and useful numerical failure data.
@@ -511,6 +511,22 @@ Acceptance tests:
   frame count, failing metric, expected value, actual value, and first offending
   index where applicable;
 - Python and Rust golden runners use the same report schema.
+
+Implementation notes:
+
+- `auralis-testkit::golden_report` defines the shared
+  `auralis.golden.failure.v1` JSON schema for L2 failure artifacts, including
+  case ID, backend, Auralis version, SoX-ng version, manifest inputs, corpus
+  IDs, commands, thresholds, decoded output metadata, measured metrics, and
+  structured threshold failures.
+- `auralis_testkit.golden_report` mirrors the schema for Python golden runners
+  and centralizes decoded metadata collection, standard max-abs/RMS/SNR/peak
+  metrics, first offending sample index detection for max-abs failures, and
+  deterministic JSON writing.
+- Existing Python L2 runners for chain, combiner, automatic channel/rate, and
+  output-level golden manifests now emit the shared report schema when a case
+  fails while preserving feature-specific context such as effects-file command,
+  combiner method, and automatic output policy flags.
 
 ### Feature 5.7.3: L2 standalone golden coverage for implemented effects
 
