@@ -826,6 +826,8 @@ Acceptance tests:
 
 #### Feature 4.1.3: scalar-vs-SIMD conformance helpers
 
+Status: implemented.
+
 Implement shared test helpers for backend differential tests.
 
 Acceptance tests:

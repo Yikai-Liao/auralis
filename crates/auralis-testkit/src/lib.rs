@@ -6,6 +6,7 @@
 //! callers that need to fail directly on length changes should assert lengths
 //! separately.
 
+pub mod backend_conformance;
 pub mod golden;
 
 /// Returns the largest absolute sample error between `reference` and `actual`.

@@ -10,7 +10,12 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+simd = ["auralis-simd/simd"]
+
 [dependencies]
+auralis-simd = { path = "../auralis-simd", default-features = false }
 serde.workspace = true
 toml.workspace = true
 

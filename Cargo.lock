@@ -113,6 +113,7 @@ dependencies = [
 name = "auralis-testkit"
 version = "0.0.0"
 dependencies = [
+ "auralis-simd",
  "serde",
  "toml",
 ]

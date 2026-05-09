@@ -36,12 +36,13 @@ gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
 testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
-tests. The Rust testkit also parses TOML golden manifests and renders stable
-Auralis and SoX-ng command vectors for reproducible comparison reports. The
-SIMD crate defines the Auralis-owned backend trait skeleton with a scalar
-reference backend, deterministic `scalar` / `simd` backend selection, and an
-optional `rten-simd`-backed placeholder marker. Other effect transform CLI
-options are still intentionally unimplemented.
+tests. The Rust testkit also parses TOML golden manifests, renders stable
+Auralis and SoX-ng command vectors for reproducible comparison reports, and
+provides backend conformance helpers for exact and tolerance-based
+scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
+backend trait skeleton with a scalar reference backend, deterministic `scalar` /
+`simd` backend selection, and an optional `rten-simd`-backed placeholder marker.
+Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -422,6 +423,7 @@ Contains test utilities shared by Rust tests and Python tests:
 - WAV decode helpers
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
 - golden test manifest handling
+- scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
 - failure artifact generation
@@ -679,6 +681,10 @@ Required cases:
 - seeded random values
 
 SIMD is not accepted on benchmark results alone. It must pass differential correctness first.
+The Rust testkit provides `backend_conformance` helpers that run one case under
+forced scalar and requested SIMD backend selection, then report the case ID,
+backend labels, first failing index, and error metrics for exact or
+tolerance-based comparisons.
 
 ### L7: fuzzing, sanitizers, and coverage
 
