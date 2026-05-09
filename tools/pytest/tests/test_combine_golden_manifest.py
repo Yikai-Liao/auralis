@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_PATHS = (
     REPO_ROOT / "tests" / "golden" / "concat.toml",
     REPO_ROOT / "tests" / "golden" / "sequence.toml",
+    REPO_ROOT / "tests" / "golden" / "mix.toml",
 )
 SAMPLE_RATE = 48_000
 PCM16_SCALE = np.float64(32_768.0)

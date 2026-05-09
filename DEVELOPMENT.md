@@ -1205,6 +1205,8 @@ Acceptance tests:
 
 #### Feature 5.4.3: mix combiner
 
+Status: implemented.
+
 Implement the mix combiner.
 
 Acceptance tests:

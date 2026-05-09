@@ -1,0 +1,20 @@
+# Representative mix-combiner golden cases. Auralis mirrors SoX-ng's default
+# mix balancing by scaling each input by 1 / input_count before summing.
+
+[id.mix_mono_mismatched_lengths]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+combine = "mix"
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.mix_stereo_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+combine = "mix"
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

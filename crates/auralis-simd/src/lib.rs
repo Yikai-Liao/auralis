@@ -7,8 +7,10 @@
 //!
 //! Gain kernels accept a linear amplitude multiplier. DC shift kernels accept a
 //! normalized full-scale offset. Fade kernels apply linear envelope
-//! multiplication over frame-indexed channel segments. Higher-level DSP APIs
-//! validate effect configuration before dispatching here.
+//! multiplication over frame-indexed channel segments. Mix kernels combine
+//! same-channel input slices with a caller-provided balancing scale and treat
+//! short inputs as trailing silence. Higher-level DSP APIs validate effect
+//! configuration before dispatching here.
 //!
 //! # Examples
 //!
@@ -241,6 +243,40 @@ impl fmt::Display for SampleConversionError {
 }
 
 impl std::error::Error for SampleConversionError {}
+
+/// Errors produced by sample mixing kernels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MixError {
+    /// One input slice was longer than the output slice it would mix into.
+    InputLongerThanOutput {
+        /// Zero-based input slice index.
+        input_index: usize,
+
+        /// Number of samples in the input slice.
+        input_len: usize,
+
+        /// Number of samples in the output slice.
+        output_len: usize,
+    },
+}
+
+impl fmt::Display for MixError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputLongerThanOutput {
+                input_index,
+                input_len,
+                output_len,
+            } => write!(
+                formatter,
+                "mix input {input_index} length {input_len} exceeds output length {output_len}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MixError {}
 
 /// Compile-time backend contract for sample-processing kernels.
 ///
@@ -589,6 +625,66 @@ pub fn fade_f32_in_place_with_backend(
     }
 }
 
+/// Mixes input sample slices into `output` using the scalar reference backend.
+///
+/// `output` is reset to silence before accumulation. For each input sample at
+/// an output index, the kernel adds `sample * scale`; when an input is shorter
+/// than `output`, its missing tail is treated as silence. The operation is
+/// deterministic, accepts empty input and output slices, and does not clip,
+/// normalize, or validate sample values. NaN and infinity inputs retain
+/// ordinary floating-point multiplication and addition semantics.
+///
+/// # Errors
+///
+/// Returns [`MixError::InputLongerThanOutput`] when an input slice is longer
+/// than `output`.
+///
+/// # Examples
+///
+/// ```
+/// let first = [1.0, -1.0, 0.5];
+/// let second = [0.0, 0.5];
+/// let mut output = [9.0; 3];
+///
+/// auralis_simd::mix_f32_scalar(&[&first, &second], &mut output, 0.5)?;
+///
+/// assert_eq!(output, [0.5, -0.25, 0.25]);
+/// # Ok::<(), auralis_simd::MixError>(())
+/// ```
+pub fn mix_f32_scalar(inputs: &[&[f32]], output: &mut [f32], scale: f32) -> Result<(), MixError> {
+    validate_mix_lengths(inputs, output.len())?;
+    mix_f32_scalar_unchecked(inputs, output, scale);
+    Ok(())
+}
+
+/// Mixes input sample slices into `output` using the backend recorded by `selection`.
+///
+/// Callers that need deterministic tests can pass the result of
+/// [`select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`]. When a SIMD request falls back to scalar, this
+/// function follows the selected backend recorded in the selection metadata.
+/// Numerical behavior is identical to [`mix_f32_scalar`].
+///
+/// # Errors
+///
+/// Returns [`MixError::InputLongerThanOutput`] when an input slice is longer
+/// than `output`.
+pub fn mix_f32_with_backend(
+    selection: BackendSelection,
+    inputs: &[&[f32]],
+    output: &mut [f32],
+    scale: f32,
+) -> Result<(), MixError> {
+    validate_mix_lengths(inputs, output.len())?;
+
+    match selection.selected_kind() {
+        BackendKind::Scalar => mix_f32_scalar_unchecked(inputs, output, scale),
+        BackendKind::Simd => mix_f32_selected_simd(inputs, output, scale),
+    }
+
+    Ok(())
+}
+
 const fn scalar_descriptor() -> BackendDescriptor {
     BackendDescriptor::new(BackendKind::Scalar, BackendKind::Scalar.as_str(), true)
 }
@@ -679,6 +775,20 @@ fn validate_finite_samples(input: &[f32]) -> Result<(), SampleConversionError> {
     Ok(())
 }
 
+fn validate_mix_lengths(inputs: &[&[f32]], output_len: usize) -> Result<(), MixError> {
+    for (input_index, input) in inputs.iter().enumerate() {
+        if input.len() > output_len {
+            return Err(MixError::InputLongerThanOutput {
+                input_index,
+                input_len: input.len(),
+                output_len,
+            });
+        }
+    }
+
+    Ok(())
+}
+
 #[inline]
 fn i16_to_f32_scalar_unchecked(input: &[i16], output: &mut [f32]) {
     for (&input, output) in input.iter().zip(output) {
@@ -738,6 +848,17 @@ fn fade_f32_scalar_unchecked(
             return;
         };
         *sample *= fade_coefficient(frame_index, total_frames, fade_in, fade_out);
+    }
+}
+
+#[inline]
+fn mix_f32_scalar_unchecked(inputs: &[&[f32]], output: &mut [f32], scale: f32) {
+    output.fill(0.0);
+
+    for input in inputs {
+        for (output, &input) in output.iter_mut().zip(*input) {
+            *output += input * scale;
+        }
     }
 }
 
@@ -810,6 +931,11 @@ fn fade_f32_selected_simd(
     fade_out: u64,
 ) {
     fade_f32_scalar_unchecked(samples, total_frames, start_frame, fade_in, fade_out);
+}
+
+#[cfg(not(feature = "simd"))]
+fn mix_f32_selected_simd(inputs: &[&[f32]], output: &mut [f32], scale: f32) {
+    mix_f32_scalar_unchecked(inputs, output, scale);
 }
 
 #[cfg(feature = "simd")]
@@ -1119,6 +1245,64 @@ fn fade_f32_selected_simd(
     .dispatch();
 }
 
+#[cfg(feature = "simd")]
+fn mix_f32_selected_simd(inputs: &[&[f32]], output: &mut [f32], scale: f32) {
+    use rten_simd::{Isa, SimdOp, ops::NumOps};
+
+    struct Mix<'inputs, 'samples, 'output> {
+        inputs: &'inputs [&'samples [f32]],
+        output: &'output mut [f32],
+        scale: f32,
+    }
+
+    impl SimdOp for Mix<'_, '_, '_> {
+        type Output = ();
+
+        #[expect(
+            clippy::inline_always,
+            reason = "rten-simd recommends inlining eval so target-feature intrinsics compile into the dispatched kernel body"
+        )]
+        #[inline(always)]
+        fn eval<I: Isa>(self, isa: I) -> Self::Output {
+            let f32_ops = isa.f32();
+            let scale = f32_ops.splat(self.scale);
+            let vector_len = f32_ops.len();
+
+            self.output.fill(0.0);
+
+            for input in self.inputs {
+                let mut input_chunks = input.chunks_exact(vector_len);
+                let mut output_chunks = self.output[..input.len()].chunks_exact_mut(vector_len);
+
+                for (input_chunk, output_chunk) in input_chunks.by_ref().zip(output_chunks.by_ref())
+                {
+                    let mixed = f32_ops.add(
+                        f32_ops.load(output_chunk),
+                        f32_ops.mul(f32_ops.load(input_chunk), scale),
+                    );
+
+                    f32_ops.store(mixed, output_chunk);
+                }
+
+                for (output, &input) in output_chunks
+                    .into_remainder()
+                    .iter_mut()
+                    .zip(input_chunks.remainder())
+                {
+                    *output += input * self.scale;
+                }
+            }
+        }
+    }
+
+    Mix {
+        inputs,
+        output,
+        scale,
+    }
+    .dispatch();
+}
+
 mod private {
     use super::ScalarBackend;
 
@@ -1135,12 +1319,13 @@ mod tests {
     use core::any::type_name;
 
     use super::{
-        Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection,
+        Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection, MixError,
         SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor,
         dc_shift_f32_in_place_scalar, dc_shift_f32_in_place_with_backend, f32_to_i16_scalar,
         f32_to_i16_with_backend, fade_f32_in_place_scalar, fade_f32_in_place_with_backend,
         gain_f32_in_place_scalar, gain_f32_in_place_with_backend, i16_to_f32_scalar,
-        i16_to_f32_with_backend, select_backend, select_backend_with_status, select_named_backend,
+        i16_to_f32_with_backend, mix_f32_scalar, mix_f32_with_backend, select_backend,
+        select_backend_with_status, select_named_backend,
     };
 
     #[test]
@@ -1566,6 +1751,71 @@ mod tests {
         assert_semantically_same_samples(&simd, &scalar);
     }
 
+    #[test]
+    fn scalar_mix_f32_matches_known_values_exactly() {
+        let first = [1.0, -1.0, 0.5];
+        let second = [0.0, 0.5];
+        let mut output = [9.0; 3];
+
+        mix_f32_scalar(&[&first, &second], &mut output, 0.5).unwrap();
+
+        assert_sample_bits_eq(&output, &[0.5, -0.25, 0.25]);
+    }
+
+    #[test]
+    fn mix_f32_rejects_input_longer_than_output() {
+        let first = [0.0, 0.25, 0.5];
+        let mut output = [0.0; 2];
+
+        let error = mix_f32_scalar(&[&first], &mut output, 1.0).unwrap_err();
+
+        assert_eq!(
+            error,
+            MixError::InputLongerThanOutput {
+                input_index: 0,
+                input_len: 3,
+                output_len: 2,
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "mix input 0 length 3 exceeds output length 2"
+        );
+        assert_sample_bits_eq(&output, &[0.0, 0.0]);
+    }
+
+    #[test]
+    fn mix_f32_handles_empty_one_sample_odd_and_tail_lengths() {
+        for len in [0, 1, 3, 17, 33, 65] {
+            let first = patterned_f32(len);
+            let second = patterned_f32(len.saturating_sub(1));
+
+            assert_scalar_and_simd_mix_match(&[&first, &second], len, 0.5);
+        }
+    }
+
+    #[test]
+    fn mix_f32_random_finite_values_match_scalar_under_requested_simd() {
+        let mut first = seeded_f32(0x2c1b_e9f7_0238_a551, 4099);
+        let second = seeded_f32(0x47ad_0d99_8f31_6c21, 4077);
+        let third = seeded_f32(0xa5a5_71c3_91e4_f00d, 123);
+        first.extend([-1.0, -0.999_984_74, -0.0, 0.0, 0.999_984_74, 1.0]);
+
+        for scale in [0.0, 0.25, 0.5, 1.0] {
+            assert_scalar_and_simd_mix_match(&[&first, &second, &third], first.len(), scale);
+        }
+    }
+
+    #[test]
+    fn mix_f32_non_finite_values_follow_documented_behavior() {
+        let first = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0];
+        let second = [1.0, -1.0, 0.0];
+        let scalar = mix_with_backend(BackendKind::Scalar, &[&first, &second], 4, 0.5);
+        let simd = mix_with_backend(BackendKind::Simd, &[&first, &second], 4, 0.5);
+
+        assert_semantically_same_samples(&simd, &scalar);
+    }
+
     #[cfg(all(
         feature = "simd",
         any(
@@ -1596,6 +1846,7 @@ mod tests {
         assert_public_type_name::<BackendFallbackReason>();
         assert_public_type_name::<BackendKind>();
         assert_public_type_name::<BackendSelection>();
+        assert_public_type_name::<MixError>();
         assert_public_type_name::<SampleConversionError>();
         assert_public_type_name::<ScalarBackend>();
 
@@ -1695,6 +1946,13 @@ mod tests {
         assert_sample_bits_eq(&simd, &scalar);
     }
 
+    fn assert_scalar_and_simd_mix_match(inputs: &[&[f32]], output_len: usize, scale: f32) {
+        let scalar = mix_with_backend(BackendKind::Scalar, inputs, output_len, scale);
+        let simd = mix_with_backend(BackendKind::Simd, inputs, output_len, scale);
+
+        assert_sample_bits_eq(&simd, &scalar);
+    }
+
     fn convert_with_backend(kind: BackendKind, input: &[i16]) -> Vec<f32> {
         let selection = select_backend(kind);
         let mut output = vec![0.0; input.len()];
@@ -1752,6 +2010,20 @@ mod tests {
         );
 
         samples
+    }
+
+    fn mix_with_backend(
+        kind: BackendKind,
+        inputs: &[&[f32]],
+        output_len: usize,
+        scale: f32,
+    ) -> Vec<f32> {
+        let selection = select_backend(kind);
+        let mut output = vec![42.0; output_len];
+
+        mix_f32_with_backend(selection, inputs, &mut output, scale).unwrap();
+
+        output
     }
 
     fn reference_conversion(input: &[i16]) -> Vec<f32> {

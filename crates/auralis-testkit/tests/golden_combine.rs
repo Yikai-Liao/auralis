@@ -4,6 +4,7 @@ use auralis_testkit::golden::GoldenManifest;
 
 const CONCAT_MANIFEST: &str = include_str!("../../../tests/golden/concat.toml");
 const SEQUENCE_MANIFEST: &str = include_str!("../../../tests/golden/sequence.toml");
+const MIX_MANIFEST: &str = include_str!("../../../tests/golden/mix.toml");
 
 #[test]
 fn concat_golden_manifest_records_representative_cases() {
@@ -83,5 +84,41 @@ fn sequence_golden_manifest_renders_multi_input_commands() {
             "out.wav",
         ),
         "sox_ng -R -D --combine sequence front.wav tail.wav out.wav reverse"
+    );
+}
+
+#[test]
+fn mix_golden_manifest_records_representative_cases() {
+    let manifest = GoldenManifest::parse_toml(MIX_MANIFEST).unwrap();
+    let ids = manifest.iter().map(|(id, _)| id).collect::<Vec<_>>();
+
+    assert_eq!(
+        ids,
+        ["mix_mono_mismatched_lengths", "mix_stereo_reverse_chain"]
+    );
+}
+
+#[test]
+fn mix_golden_manifest_renders_multi_input_commands() {
+    let manifest = GoldenManifest::parse_toml(MIX_MANIFEST).unwrap();
+    let mono = manifest.get("mix_mono_mismatched_lengths").unwrap();
+    let stereo = manifest.get("mix_stereo_reverse_chain").unwrap();
+
+    assert_eq!(mono.combine_method(), Some("mix"));
+    assert_eq!(
+        mono.render_auralis_command_line_with_inputs(
+            "auralis",
+            ["short.wav", "long.wav"],
+            "out.wav",
+        ),
+        "auralis run short.wav out.wav --combine mix --input long.wav"
+    );
+    assert_eq!(
+        stereo.render_sox_ng_command_line_with_inputs(
+            "sox_ng",
+            ["front.wav", "tail.wav"],
+            "out.wav",
+        ),
+        "sox_ng -R -D --combine mix front.wav tail.wav out.wav reverse"
     );
 }
