@@ -1235,6 +1235,8 @@ Acceptance tests:
 
 #### Feature 5.4.5: merge combiner
 
+Status: implemented.
+
 Implement the merge combiner.
 
 Acceptance tests:

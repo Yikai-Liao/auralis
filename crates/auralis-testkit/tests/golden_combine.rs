@@ -6,6 +6,7 @@ const CONCAT_MANIFEST: &str = include_str!("../../../tests/golden/concat.toml");
 const SEQUENCE_MANIFEST: &str = include_str!("../../../tests/golden/sequence.toml");
 const MIX_MANIFEST: &str = include_str!("../../../tests/golden/mix.toml");
 const MIX_POWER_MANIFEST: &str = include_str!("../../../tests/golden/mix_power.toml");
+const MERGE_MANIFEST: &str = include_str!("../../../tests/golden/merge.toml");
 
 #[test]
 fn concat_golden_manifest_records_representative_cases() {
@@ -160,5 +161,46 @@ fn mix_power_golden_manifest_renders_multi_input_commands() {
             "out.wav",
         ),
         "sox_ng -R -D --combine mix-power front.wav tail.wav out.wav reverse"
+    );
+}
+
+#[test]
+fn merge_golden_manifest_records_representative_cases() {
+    let manifest = GoldenManifest::parse_toml(MERGE_MANIFEST).unwrap();
+    let ids = manifest.iter().map(|(id, _)| id).collect::<Vec<_>>();
+
+    assert_eq!(
+        ids,
+        [
+            "merge_mono_to_stereo_mismatched_lengths",
+            "merge_stereo_channels_reverse_chain"
+        ]
+    );
+}
+
+#[test]
+fn merge_golden_manifest_renders_multi_input_commands() {
+    let manifest = GoldenManifest::parse_toml(MERGE_MANIFEST).unwrap();
+    let mono = manifest
+        .get("merge_mono_to_stereo_mismatched_lengths")
+        .unwrap();
+    let stereo = manifest.get("merge_stereo_channels_reverse_chain").unwrap();
+
+    assert_eq!(mono.combine_method(), Some("merge"));
+    assert_eq!(
+        mono.render_auralis_command_line_with_inputs(
+            "auralis",
+            ["short.wav", "long.wav"],
+            "out.wav",
+        ),
+        "auralis run short.wav out.wav --combine merge --input long.wav"
+    );
+    assert_eq!(
+        stereo.render_sox_ng_command_line_with_inputs(
+            "sox_ng",
+            ["front.wav", "tail.wav"],
+            "out.wav",
+        ),
+        "sox_ng -R -D --combine merge front.wav tail.wav out.wav reverse"
     );
 }

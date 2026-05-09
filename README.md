@@ -58,7 +58,7 @@ ordered pipeline as positional CLI effect chains. Positional chains and effects
 files preserve explicit `:` chain boundaries for deterministic rendering and
 diagnostics, while unsupported `newfile` and `restart` boundary controls return
 stable not-yet-implemented errors. The high-level facade and CLI also support
-SoX-ng-style concatenate, sequence, mix, and mix-power input combiners. In
+SoX-ng-style concatenate, sequence, mix, mix-power, and merge input combiners. In
 `auralis run first.wav out.wav --combine concatenate --input second.wav`,
 decoded inputs are appended before effects run and must have matching sample
 rates and channel counts. `--combine sequence` uses the same serial playback
@@ -69,7 +69,10 @@ the longest input length and largest channel count, treats missing frames or
 channels as silence, and leaves any out-of-range mixed samples to be clipped by
 the output encoder. `--combine mix-power` uses the same output-shape and
 silence rules but scales each input by `1 / sqrt(input_count)` for equal-power
-mixing. The SIMD crate defines
+mixing. `--combine merge` creates one multichannel output containing every
+channel from every input in caller order, uses the longest input length, and
+fills shorter input tails with silence. Merge is a structural copy, so SIMD is
+not applicable. The SIMD crate defines
 the Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -292,9 +295,13 @@ Provides the high-level library facade:
 - `AudioFile::open_wavs_concatenated`
 - `AudioFile::open_wavs_sequenced`
 - `AudioFile::open_wavs_mixed`
+- `AudioFile::open_wavs_mix_powered`
+- `AudioFile::open_wavs_merged`
 - `concatenate_audio_buffers`
 - `sequence_audio_buffers`
 - `mix_audio_buffers`
+- `mix_power_audio_buffers`
+- `merge_audio_buffers`
 - `AudioFile::into_pipeline`
 - `Pipeline::gain_db`
 - `Pipeline::dc_shift`
@@ -530,6 +537,7 @@ auralis run first.wav output.wav --combine concatenate --input second.wav revers
 auralis run first.wav output.wav --combine sequence --input second.wav reverse
 auralis run first.wav output.wav --combine mix --input second.wav reverse
 auralis run first.wav output.wav --combine mix-power --input second.wav reverse
+auralis run first.wav output.wav --combine merge --input second.wav reverse
 auralis run pipeline.toml
 auralis completions zsh
 ```
@@ -562,8 +570,13 @@ output shape and silence behavior but uses SoX-ng-style equal-power balancing
 with `1 / sqrt(input_count)`. This can leave summed samples outside
 `[-1.0, 1.0]` more often than `mix`; the in-memory combiner does not clip them,
 and PCM16 WAV writing clips out-of-range samples using the normal encoder
-rules. Future combine methods such as merge and multiply remain unimplemented
-until their own DEVELOPMENT.md features.
+rules. `merge` is also parallel, but structural: it requires matching sample
+rates, emits the longest input length, and sets the output channel count to the
+sum of every input channel count. Channels are ordered by input, so two mono
+files become a stereo output, and shorter inputs contribute silent tail frames.
+Merge has no arithmetic kernel, so SIMD is documented as not applicable. Future
+combine methods such as multiply remain unimplemented until their own
+DEVELOPMENT.md features.
 
 Selected crates:
 
@@ -610,10 +623,10 @@ displays.
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
 for a structural editing chain, a level-processing chain, and the currently
 implemented fade/gain filter-style chain. `tests/golden/concat.toml`,
-`tests/golden/sequence.toml`, `tests/golden/mix.toml`, and
-`tests/golden/mix_power.toml` record combiner coverage for mismatched mono
-input lengths and stereo combine-before-reverse chains. The Python golden
-runners generate the
+`tests/golden/sequence.toml`, `tests/golden/mix.toml`,
+`tests/golden/mix_power.toml`, and `tests/golden/merge.toml` record combiner
+coverage for mismatched mono input lengths and stereo combine-before-reverse
+chains. The Python golden runners generate the
 deterministic PCM16 fixtures, execute both command lines, compare decoded
 sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
 report when output drifts outside its manifest tolerance.

@@ -1,0 +1,21 @@
+# Representative merge-combiner golden cases. Merge is a structural channel
+# combiner: output channels contain every input channel in caller order and
+# shorter inputs contribute silent tail frames.
+
+[id.merge_mono_to_stereo_mismatched_lengths]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+combine = "merge"
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.merge_stereo_channels_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+combine = "merge"
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

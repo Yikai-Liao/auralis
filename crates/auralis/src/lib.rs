@@ -103,6 +103,9 @@ pub enum CombineMethod {
 
     /// Mix corresponding channels with SoX-ng-style equal-power input balancing.
     MixPower,
+
+    /// Merge all channels from all inputs into one multichannel output.
+    Merge,
 }
 
 impl CombineMethod {
@@ -114,6 +117,7 @@ impl CombineMethod {
             Self::Sequence => "sequence",
             Self::Mix => "mix",
             Self::MixPower => "mix-power",
+            Self::Merge => "merge",
         }
     }
 
@@ -125,6 +129,7 @@ impl CombineMethod {
             "sequence" => Some(Self::Sequence),
             "mix" => Some(Self::Mix),
             "mix-power" => Some(Self::MixPower),
+            "merge" => Some(Self::Merge),
             _ => None,
         }
     }
@@ -240,6 +245,10 @@ pub enum InputCombineError {
     /// The combined frame count cannot be represented by Auralis.
     #[error("combined frame count cannot be represented")]
     FrameCountOverflow,
+
+    /// The combined channel count cannot be represented by Auralis.
+    #[error("combined channel count cannot be represented")]
+    ChannelCountOverflow,
 
     /// The combined planar buffer shape was rejected by the core buffer model.
     #[error(transparent)]
@@ -391,6 +400,65 @@ pub fn mix_power_audio_buffers_with_backend(
     parallel_mix_audio_buffers_with_backend(inputs, requested_backend, mix_power_balance_scale)
 }
 
+/// Merges already-decoded planar audio buffers using SoX-ng `merge` semantics.
+///
+/// The output frame count is the longest input and the output channel count is
+/// the sum of all input channel counts. Output channels are ordered by input:
+/// every channel from input 0, then every channel from input 1, and so on.
+/// Missing tail frames from shorter inputs are silence. Inputs must share
+/// sample rate and internal sample format; channel counts may differ.
+///
+/// Merge is a deterministic structural copy and does not select a SIMD kernel.
+///
+/// # Errors
+///
+/// Returns [`InputCombineError::EmptyInputList`] for no inputs, a mismatch
+/// variant when an input's sample rate or sample format is incompatible with
+/// the first input, or an overflow/shape error if the merged buffer cannot be
+/// represented.
+pub fn merge_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    let Some(first) = inputs.first() else {
+        return Err(InputCombineError::EmptyInputList);
+    };
+
+    let spec = first.spec();
+    let mut max_frames = first.frames();
+    let mut total_channels = 0_usize;
+    for (input_index, input) in inputs.iter().enumerate() {
+        validate_merge_input(input_index, spec, input)?;
+        if input.frames() > max_frames {
+            max_frames = input.frames();
+        }
+        total_channels = total_channels
+            .checked_add(input.channels().as_usize())
+            .ok_or(InputCombineError::ChannelCountOverflow)?;
+    }
+
+    let output_channels = u16::try_from(total_channels)
+        .map_err(|_| InputCombineError::ChannelCountOverflow)
+        .and_then(|channels| ChannelCount::new(channels).map_err(InputCombineError::from))?;
+    let output_spec = AudioSpec::new(spec.sample_rate(), output_channels, spec.sample_format());
+    let mut output = AudioBuffer::zeroed(output_spec, max_frames)?;
+
+    let mut output_channel_index = 0_usize;
+    for input in inputs {
+        for input_channel_index in 0..input.channels().as_usize() {
+            let source = input
+                .channel(input_channel_index)
+                .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+            let output_channel = output
+                .channel_mut(output_channel_index)
+                .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+            output_channel[..source.len()].copy_from_slice(source);
+            output_channel_index += 1;
+        }
+    }
+
+    Ok(output)
+}
+
 fn parallel_mix_audio_buffers_with_backend(
     inputs: &[AudioBuffer],
     requested_backend: BackendKind,
@@ -510,6 +578,31 @@ fn validate_concatenate_input(
 }
 
 fn validate_mix_input(
+    input_index: usize,
+    expected: AudioSpec,
+    input: &AudioBuffer,
+) -> std::result::Result<(), InputCombineError> {
+    let actual = input.spec();
+
+    if actual.sample_rate() != expected.sample_rate() {
+        return Err(InputCombineError::MismatchedSampleRate {
+            input_index,
+            expected: expected.sample_rate(),
+            actual: actual.sample_rate(),
+        });
+    }
+    if actual.sample_format() != expected.sample_format() {
+        return Err(InputCombineError::MismatchedSampleFormat {
+            input_index,
+            expected: expected.sample_format(),
+            actual: actual.sample_format(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_merge_input(
     input_index: usize,
     expected: AudioSpec,
     input: &AudioBuffer,
@@ -842,6 +935,58 @@ impl AudioFile {
         Self::from_audio_buffers_mix_powered_with_backend(&inputs, requested_backend)
     }
 
+    /// Opens multiple PCM16 WAV files and merges all input channels.
+    ///
+    /// This is the library counterpart to `auralis run --combine merge`. Each
+    /// input is decoded into planar `f32`; output channels contain all channels
+    /// from the first input, then all channels from each later input. The output
+    /// length is the longest input; missing tail frames are silence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the merged buffer cannot be
+    /// represented.
+    pub fn open_wavs_merged<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        Self::open_wavs_merged_with_backend(paths, BackendKind::Scalar)
+    }
+
+    /// Opens multiple PCM16 WAV files and merges all input channels with a requested backend.
+    ///
+    /// `requested_backend` controls decode conversion, later backend-aware
+    /// effects, and output encoding after [`Self::into_pipeline`]. Merge itself
+    /// is a structural copy after validation and does not select a SIMD kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the merged buffer cannot be
+    /// represented.
+    pub fn open_wavs_merged_with_backend<I, P>(
+        paths: I,
+        requested_backend: BackendKind,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut inputs = Vec::new();
+        for path in paths {
+            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+                path,
+                requested_backend,
+            )?);
+        }
+
+        Self::from_audio_buffers_merged_with_backend(&inputs, requested_backend)
+    }
+
     /// Wraps an existing audio buffer in the high-level file type.
     ///
     /// This is primarily useful for tests and applications that decoded audio
@@ -995,6 +1140,42 @@ impl AudioFile {
     ) -> Result<Self> {
         Ok(Self {
             audio: mix_power_audio_buffers_with_backend(inputs, requested_backend)?,
+            requested_backend,
+        })
+    }
+
+    /// Merges existing audio buffers into the high-level file type.
+    ///
+    /// Inputs are combined before the returned value enters the effect
+    /// pipeline. Output channels contain every channel from each input in
+    /// caller order. The output length is the longest input; shorter inputs are
+    /// padded with silent tail frames.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the merged buffer cannot be
+    /// represented.
+    pub fn from_audio_buffers_merged(inputs: &[AudioBuffer]) -> Result<Self> {
+        Self::from_audio_buffers_merged_with_backend(inputs, BackendKind::Scalar)
+    }
+
+    /// Merges existing audio buffers with a requested processing backend.
+    ///
+    /// The backend is recorded for later pipeline stages. Merge itself is a
+    /// deterministic structural copy and does not select a SIMD kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the merged buffer cannot be
+    /// represented.
+    pub fn from_audio_buffers_merged_with_backend(
+        inputs: &[AudioBuffer],
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
+        Ok(Self {
+            audio: merge_audio_buffers(inputs)?,
             requested_backend,
         })
     }
@@ -1306,8 +1487,9 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 mod tests {
     use super::{
         AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
-        concatenate_audio_buffers, mix_audio_buffers, mix_audio_buffers_with_backend,
-        mix_power_audio_buffers, mix_power_audio_buffers_with_backend, sequence_audio_buffers,
+        concatenate_audio_buffers, merge_audio_buffers, mix_audio_buffers,
+        mix_audio_buffers_with_backend, mix_power_audio_buffers,
+        mix_power_audio_buffers_with_backend, sequence_audio_buffers,
     };
     use std::{
         fs,
@@ -2154,6 +2336,130 @@ mod tests {
         assert_samples_close(
             decoded.as_planar_f32(),
             &[scale, -0.5 * scale, -0.25 * scale],
+        );
+        fs::remove_dir_all(tempdir).unwrap();
+    }
+
+    #[test]
+    fn merge_audio_buffers_turns_two_mono_inputs_into_stereo() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 0.0]);
+
+        let actual = merge_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[0.25, -0.5, 0.75, 0.0]);
+    }
+
+    #[test]
+    fn merge_audio_buffers_preserves_multichannel_input_order() {
+        let stereo = stereo_audio_buffer(vec![1.0, 2.0, -1.0, -2.0]);
+        let mono = audio_buffer(vec![0.5, -0.5]);
+
+        let actual = merge_audio_buffers(&[stereo, mono]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(3).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[1.0, 2.0, -1.0, -2.0, 0.5, -0.5]);
+    }
+
+    #[test]
+    fn merge_audio_buffers_treats_mismatched_lengths_as_trailing_silence() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 0.0, -0.25]);
+
+        let actual = merge_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[0.25, -0.5, 0.0, 0.75, 0.0, -0.25]);
+    }
+
+    #[test]
+    fn merge_audio_buffers_rejects_mismatched_sample_rate() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 44_100, 1, SampleFormat::Float32);
+
+        let error = merge_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleRate {
+                input_index: 1,
+                expected: SampleRate::new(48_000).unwrap(),
+                actual: SampleRate::new(44_100).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn merge_audio_buffers_rejects_mismatched_sample_format() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 48_000, 1, SampleFormat::Pcm16);
+
+        let error = merge_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleFormat {
+                input_index: 1,
+                expected: SampleFormat::Float32,
+                actual: SampleFormat::Pcm16,
+            }
+        );
+    }
+
+    #[test]
+    fn merged_audio_enters_effect_pipeline_before_effects() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 0.0, -0.25]);
+
+        let actual = AudioFile::from_audio_buffers_merged(&[first, second])
+            .unwrap()
+            .into_pipeline()
+            .gain_db(6.0)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        let multiplier = 10.0_f32.powf(6.0 / 20.0);
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[
+                0.0,
+                -0.5 * multiplier,
+                0.25 * multiplier,
+                -0.25 * multiplier,
+                0.0,
+                0.75 * multiplier,
+            ],
+        );
+    }
+
+    #[test]
+    fn open_wavs_merged_round_trips_through_file_boundary() {
+        let tempdir = temp_dir();
+        fs::create_dir(&tempdir).unwrap();
+        let first = tempdir.join("first.wav");
+        let second = tempdir.join("second.wav");
+        let output = tempdir.join("output.wav");
+
+        auralis_wav::encode_pcm16_path(&first, &audio_buffer(vec![0.25, -0.5])).unwrap();
+        auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75, 0.0, -0.25])).unwrap();
+
+        AudioFile::open_wavs_merged([&first, &second])
+            .unwrap()
+            .into_pipeline()
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+        assert_eq!(decoded.frames(), FrameCount::new(3));
+        assert_eq!(decoded.channels(), ChannelCount::new(2).unwrap());
+        assert_samples_close(
+            decoded.as_planar_f32(),
+            &[0.25, -0.5, 0.0, 0.75, 0.0, -0.25],
         );
         fs::remove_dir_all(tempdir).unwrap();
     }
