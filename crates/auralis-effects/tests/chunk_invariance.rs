@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    AllPass, Biquad, BiquadCoefficients, BiquadState, BiquadWidth, Contrast, DcShift, EffectChain,
-    EffectCommand, Fade, Gain, Saturation, SaturationType, Tremolo, Vol,
+    AllPass, Band, Biquad, BiquadCoefficients, BiquadState, BiquadWidth, Contrast, DcShift,
+    EffectChain, EffectCommand, Fade, Gain, Saturation, SaturationType, Tremolo, Vol,
 };
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
@@ -162,6 +162,25 @@ fn allpass_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
 }
 
 #[test]
+fn band_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
+    let band =
+        Band::unpitched(1_000.0, Some(BiquadWidth::q(2.0))).expect("fixture band design is valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        band.process_buffer(&mut whole)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        process_band_by_channel_chunks(&mut chunked, band, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -222,6 +241,9 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::AllPass(all_pass) => {
                 process_allpass_by_channel_chunks(audio, *all_pass, schedule);
             }
+            EffectCommand::Band(band) => {
+                process_band_by_channel_chunks(audio, *band, schedule);
+            }
             EffectCommand::Biquad(biquad) => {
                 process_biquad_by_channel_chunks(audio, biquad.coefficients(), schedule);
             }
@@ -279,6 +301,13 @@ fn process_allpass_by_channel_chunks(
     schedule: &ChunkSchedule,
 ) {
     let coefficients = all_pass
+        .coefficients(audio.spec().sample_rate())
+        .expect("fixture sample rate keeps frequency below Nyquist");
+    process_biquad_by_channel_chunks(audio, coefficients, schedule);
+}
+
+fn process_band_by_channel_chunks(audio: &mut AudioBuffer, band: Band, schedule: &ChunkSchedule) {
+    let coefficients = band
         .coefficients(audio.spec().sample_rate())
         .expect("fixture sample rate keeps frequency below Nyquist");
     process_biquad_by_channel_chunks(audio, coefficients, schedule);

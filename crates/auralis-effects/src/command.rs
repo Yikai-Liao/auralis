@@ -39,6 +39,7 @@ use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
 use crate::command_allpass::{parse_allpass, render_allpass};
+use crate::command_band::{parse_band, render_band};
 use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
@@ -60,7 +61,7 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    AllPass, Biquad, Centercut, Channels, Contrast, DcShift, EffectError, EffectKind,
+    AllPass, Band, Biquad, Centercut, Channels, Contrast, DcShift, EffectError, EffectKind,
     EffectNameError, EffectRegistry, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, Repeat,
     Reverse, Saturation, SoftVol, Swap, Tremolo, Trim, Vol,
 };
@@ -80,6 +81,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 pub enum EffectCommand {
     /// SoX-ng-style all-pass filter family.
     AllPass(AllPass),
+
+    /// SoX-ng-style resonator band-pass filter.
+    Band(Band),
 
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad(Biquad),
@@ -157,6 +161,7 @@ impl EffectCommand {
 
         match descriptor.kind() {
             EffectKind::AllPass => parse_allpass(effect, args),
+            EffectKind::Band => parse_band(effect, args),
             EffectKind::Biquad => parse_biquad(effect, args),
             EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
@@ -185,6 +190,7 @@ impl EffectCommand {
     pub const fn kind(&self) -> EffectKind {
         match self {
             Self::AllPass(_) => EffectKind::AllPass,
+            Self::Band(_) => EffectKind::Band,
             Self::Biquad(_) => EffectKind::Biquad,
             Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
@@ -219,6 +225,7 @@ impl EffectCommand {
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
             Self::AllPass(all_pass) => render_allpass(*all_pass),
+            Self::Band(band) => render_band(*band),
             Self::Biquad(biquad) => render_biquad(*biquad),
             Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
@@ -768,11 +775,11 @@ mod tests {
 
     #[test]
     fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
-        let unsupported = parse_effect_command(&["band"]).unwrap_err();
+        let unsupported = parse_effect_command(&["bandpass"]).unwrap_err();
         assert!(
             unsupported
                 .to_string()
-                .contains("known SoX-ng effect `band`")
+                .contains("known SoX-ng effect `bandpass`")
         );
 
         let unknown = parse_effect_command(&["gian"]).unwrap_err();

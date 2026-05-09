@@ -24,6 +24,7 @@
 //! ```
 
 mod allpass;
+mod band;
 mod biquad;
 mod biquad_design;
 mod centercut;
@@ -33,12 +34,14 @@ mod chain_gain;
 mod channels;
 mod command;
 mod command_allpass;
+mod command_band;
 mod command_biquad;
 mod command_centercut;
 mod command_channels;
 mod command_contrast;
 mod command_dcshift;
 mod command_fade;
+mod command_filter;
 mod command_gain;
 mod command_norm;
 mod command_oops;
@@ -77,6 +80,7 @@ mod trim;
 mod vol;
 
 pub use allpass::{AllPass, AllPassMode};
+pub use band::{Band, BandMode};
 pub use biquad::{Biquad, BiquadCoefficients, BiquadState};
 pub use biquad_design::BiquadWidth;
 pub use centercut::Centercut;

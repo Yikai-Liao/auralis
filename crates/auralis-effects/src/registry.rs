@@ -27,6 +27,9 @@ pub enum EffectKind {
     /// SoX-ng-style all-pass filter family.
     AllPass,
 
+    /// SoX-ng-style resonator band-pass filter.
+    Band,
+
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad,
 
@@ -177,6 +180,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "AllPass",
         "allpass [-1|-2] frequency width",
         "apply a phase-shifting all-pass filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Band,
+        "band",
+        &[],
+        "Band",
+        "band [-n] frequency [width]",
+        "apply a resonator band-pass filter",
     ),
     EffectDescriptor::new(
         EffectKind::Biquad,
@@ -659,6 +670,7 @@ mod tests {
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
             ("allpass", EffectKind::AllPass),
+            ("band", EffectKind::Band),
             ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
@@ -730,18 +742,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("band").unwrap_err();
+        let error = EffectRegistry::resolve("bandpass").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "band".to_owned(),
+                name: "bandpass".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `band`")
+                .contains("missing SoX-ng coverage entry for `bandpass`")
         );
     }
 

@@ -24,6 +24,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_band_mono_default]
+input = "effects/band_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["band", "1000"]
+sox_ng = ["band", "1000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_band_stereo_unpitched]
+input = "effects/band_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["band", "-n", "1000", "2q"]
+sox_ng = ["band", "-n", "1000", "2q"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"

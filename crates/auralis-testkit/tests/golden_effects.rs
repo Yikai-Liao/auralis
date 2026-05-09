@@ -14,6 +14,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
         [
             "effect_allpass_mono_rbj",
             "effect_allpass_stereo_one_pole",
+            "effect_band_mono_default",
+            "effect_band_stereo_unpitched",
             "effect_biquad_mono_one_pole",
             "effect_biquad_stereo_one_pole",
             "effect_centercut_stereo_default",
@@ -84,6 +86,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
 
     for effect in [
         "allpass",
+        "band",
         "biquad",
         "gain",
         "centercut",

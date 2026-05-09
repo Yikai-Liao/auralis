@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    AllPass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels, Contrast, DcShift, Fade,
-    Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse,
+    AllPass, Band, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels, Contrast, DcShift,
+    Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse,
     Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
@@ -254,6 +254,13 @@ proptest! {
             .process_buffer(&mut all_passed)
             .expect("fixture sample rate keeps frequency below Nyquist");
         prop_assert_all_finite(&all_passed)?;
+
+        let mut band_passed = source.clone();
+        Band::new(1_000.0, Some(BiquadWidth::q(2.0)))
+            .expect("fixture band design is valid")
+            .process_buffer(&mut band_passed)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        prop_assert_all_finite(&band_passed)?;
 
         let mut normalized = source.clone();
         Norm::new(Decibels::new(db).expect("generated dB is finite"))

@@ -572,6 +572,22 @@ Implementation notes:
 
 ### Feature 6.4.5: `band`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Band` effect matching SoX-ng's historical resonator
+  `band [-n] frequency [width]` command family.
+- Width defaults to `frequency / 2` and accepts hertz, kilohertz, Q, and octave
+  units; `-n` selects SoX-ng's alternate unpitched/noise scaling.
+- Processing delegates to the scalar stateful biquad primitive with independent
+  per-channel state, so chunked processing is exact when callers preserve
+  `BiquadState` per channel.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for the
+  default and `-n` forms.
+
 ### Feature 6.4.6: `bandpass`
 
 ### Feature 6.4.7: `bandreject`
