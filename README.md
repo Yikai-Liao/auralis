@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Norm`,
-`Contrast`, `SoftVol`, `Tremolo`, `Overdrive`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Tremolo`, `Overdrive`, `Saturation`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
-gain, norm, contrast, softvol, tremolo, overdrive, dcshift, trim, pad, reverse,
-fade, and vol, and the CLI gain/norm/contrast/softvol/tremolo/overdrive/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+gain, norm, contrast, softvol, tremolo, overdrive, saturation, dcshift, trim, pad, reverse,
+fade, and vol, and the CLI gain/norm/contrast/softvol/tremolo/overdrive/saturation/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -51,8 +51,10 @@ positioned normalization command distinct from final output `--norm`, and
 SoX-ng-style `contrast [amount]` phase contrast enhancement, `softvol`
 clipping-avoidant volume control with optional recovery and headroom, and
 `tremolo speed [depth]` sinusoidal amplitude modulation, and
-`overdrive [gain [color]]` cubic soft-clipping distortion.
-`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 tremolo 5 overdrive 12 25 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+`overdrive [gain [color]]` cubic soft-clipping distortion, and
+`saturation [type [blend [offset [drive|color|threshold]]]]` nonlinear
+saturation.
+`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -454,16 +456,17 @@ Contains typed effect processors built from DSP primitives:
 - `Vol`
 - `Tremolo`
 - `Overdrive`
+- `Saturation`
 - later: `Remix`
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, `saturation`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, `contrast`, `softvol`, `tremolo`, and `overdrive` resolve to typed descriptors; aliases such
+`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -495,6 +498,10 @@ The implemented `overdrive` command accepts optional `gain` and `color`
 arguments in SoX-ng's `0..=100` range, applies cubic soft clipping plus the
 channel-local stateful high-pass output blend, and preserves SoX-ng's
 null-effect behavior for `overdrive 0`.
+The implemented `saturation` command accepts `tanh`, `sqrt`, and `diode`
+families with `blend`, `offset`, and family-specific `drive`, `color`, or
+`threshold` parameters, then recenters and gain-compensates the wet path before
+mixing it with the dry input.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -784,7 +791,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `tremolo`, and `overdrive`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -796,7 +803,8 @@ default and target-level normalization; `contrast` coverage includes default
 and explicit-amount forms; `softvol` coverage includes fixed volume plus
 recovery/headroom forms; `tremolo` coverage includes default-depth mono and
 explicit-depth stereo modulation forms; `overdrive` coverage includes default
-mono and explicit-argument stereo distortion forms.
+mono and explicit-argument stereo distortion forms; `saturation` coverage
+includes default tanh mono and explicit sqrt stereo distortion forms.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.
@@ -1020,6 +1028,8 @@ Examples:
 - `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `overdrive`: SoX-ng's cubic soft-clipping drive with `color / 200` bias and
   a stateful high-pass output blend
+- `saturation`: SoX-ng's tanh, sqrt, or diode nonlinear transfer, wet/dry
+  blend, asymmetric offset, and safety gain compensation
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
   does not clip unless SoX-ng's optional limiter gain is configured, while
   PCM16 WAV output clips plain shifted samples to the representable range
@@ -1056,6 +1066,7 @@ Examples:
   stays finite
 - `tremolo 0` is identity and finite bounded input stays finite
 - `overdrive` preserves finite bounded input as finite output
+- `saturation` preserves finite bounded input as finite output
 - `gain +6 dB` followed by `gain -6 dB` approximately returns the original signal within tolerance
 
 ### L5: chunk invariance

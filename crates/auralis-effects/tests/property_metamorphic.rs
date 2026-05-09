@@ -4,7 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
+    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Reverse, Saturation, SaturationType,
+    SoftVol, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -239,6 +240,12 @@ proptest! {
             .expect("generated overdrive settings are valid")
             .process_buffer(&mut overdriven);
         prop_assert_all_finite(&overdriven)?;
+
+        let mut saturated = source.clone();
+        Saturation::new(SaturationType::Sqrt, 0.75, 0.1, 0.25)
+            .expect("generated saturation settings are valid")
+            .process_buffer(&mut saturated);
+        prop_assert_all_finite(&saturated)?;
 
         let mut faded = source.clone();
         let fade_in = FrameCount::new(u64::try_from(audio.frames / 2).expect("frame strategy fits u64"));

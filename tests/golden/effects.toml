@@ -343,6 +343,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_saturation_mono_default]
+input = "effects/saturation_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["saturation"]
+sox_ng = ["saturation"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
+[id.effect_saturation_stereo_sqrt]
+input = "effects/saturation_stereo_sqrt.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["saturation", "sqrt", "0.75", "0.1", "0.25"]
+sox_ng = ["saturation", "sqrt", "0.75", "0.1", "0.25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
 [id.effect_softvol_mono_gain_1_5]
 input = "effects/softvol_mono.wav"
 corpus_id = "l0/step_mono_16"

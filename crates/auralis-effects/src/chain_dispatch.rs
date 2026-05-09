@@ -56,6 +56,10 @@ pub(crate) fn apply_command(
             reverse.process_buffer(audio);
             Ok(())
         }
+        EffectCommand::Saturation(saturation) => {
+            saturation.process_buffer(audio);
+            Ok(())
+        }
         EffectCommand::SoftVol(softvol) => {
             softvol.process_buffer(audio);
             Ok(())
@@ -90,6 +94,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
+        EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::SoftVol | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }

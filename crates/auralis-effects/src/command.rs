@@ -39,18 +39,21 @@ use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
 use crate::command_contrast::{parse_contrast, render_contrast};
+use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
 use crate::command_pad::{parse_pad, render_pad};
+use crate::command_reverse::parse_reverse;
+use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
-    Overdrive, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
+    Overdrive, Pad, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -90,6 +93,9 @@ pub enum EffectCommand {
     /// Frame-order reversal within each channel.
     Reverse(Reverse),
 
+    /// SoX-ng-style saturation distortion.
+    Saturation(Saturation),
+
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
 
@@ -125,6 +131,7 @@ impl EffectCommand {
             EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
+            EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
@@ -144,6 +151,7 @@ impl EffectCommand {
             Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
+            Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
@@ -162,19 +170,14 @@ impl EffectCommand {
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
             Self::Contrast(contrast) => render_contrast(*contrast),
-            Self::DcShift(dc_shift) => {
-                let mut tokens = vec!["dcshift".to_owned(), render_f32(dc_shift.shift)];
-                if let Some(limiter_gain) = dc_shift.limiter_gain {
-                    tokens.push(render_f32(limiter_gain));
-                }
-                tokens
-            }
+            Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
             Self::Norm(norm) => render_norm(*norm),
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
+            Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),
@@ -323,38 +326,6 @@ pub enum EffectCommandParseError {
     },
 }
 
-fn parse_dc_shift(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let shift = required_arg(effect, args, "shift")?;
-    let shift = parse_f32(effect, "shift", shift)?;
-    let limiter_gain = args
-        .get(1)
-        .map(|value| parse_f32(effect, "limiter-gain", value))
-        .transpose()?;
-    reject_extra_arguments(effect, args.get(2..).unwrap_or_default())?;
-
-    let dc_shift = match limiter_gain {
-        Some(limiter_gain) => DcShift::with_limiter_gain(shift, limiter_gain),
-        None => DcShift::new(shift),
-    };
-    dc_shift.map(EffectCommand::DcShift).map_err(|source| {
-        EffectCommandParseError::InvalidEffectConfig {
-            effect,
-            argument: if limiter_gain.is_some() {
-                "limiter-gain"
-            } else {
-                "shift"
-            },
-            source,
-        }
-    })
-}
-
-fn parse_reverse(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    reject_extra_arguments(effect, args)?;
-
-    Ok(EffectCommand::Reverse(Reverse::new()))
-}
-
 pub(super) fn required_arg<'args>(
     effect: &'static str,
     args: &'args [&'args str],
@@ -484,7 +455,7 @@ mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
         Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
-        Reverse, SoftVol, Tremolo, Trim, TrimPosition,
+        Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
@@ -532,6 +503,12 @@ mod tests {
                 EffectCommand::Tremolo(Tremolo::new(5.0, 75.0).unwrap()),
             ),
             (
+                &["saturation", "sqrt", "0.75", "0.1", "0.25"][..],
+                EffectCommand::Saturation(
+                    Saturation::new(SaturationType::Sqrt, 0.75, 0.1, 0.25).unwrap(),
+                ),
+            ),
+            (
                 &["fade", "t", "4", "2"][..],
                 EffectCommand::Fade(Fade::with_stop_position(
                     FadeCurve::Linear,
@@ -577,6 +554,10 @@ mod tests {
         assert_eq!(
             parse_effect_command(&["softvol"]).unwrap(),
             EffectCommand::SoftVol(SoftVol::default())
+        );
+        assert_eq!(
+            parse_effect_command(&["saturation"]).unwrap(),
+            EffectCommand::Saturation(Saturation::default())
         );
         assert_eq!(
             parse_effect_command(&["fade", "3"]).unwrap(),
@@ -943,6 +924,11 @@ mod tests {
                 &["dc-shift", "5e-1", "5e-2"][..],
                 &["dcshift", "0.5", "0.05"][..],
                 &["dcshift", "0.5", "0.05"][..],
+            ),
+            (
+                &["saturation"][..],
+                &["saturation", "tanh", "1", "0", "1"][..],
+                &["saturation", "tanh", "1", "0", "1"][..],
             ),
             (&["pad"][..], &["pad", "0", "0"][..], &["pad", "0", "0"][..]),
             (

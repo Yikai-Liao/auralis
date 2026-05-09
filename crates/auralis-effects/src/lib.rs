@@ -28,11 +28,14 @@ mod chain_dispatch;
 mod chain_gain;
 mod command;
 mod command_contrast;
+mod command_dcshift;
 mod command_fade;
 mod command_gain;
 mod command_norm;
 mod command_overdrive;
 mod command_pad;
+mod command_reverse;
+mod command_saturation;
 mod command_softvol;
 mod command_tremolo;
 mod command_trim;
@@ -48,6 +51,7 @@ mod overdrive;
 mod pad;
 mod registry;
 mod reverse;
+mod saturation;
 mod softvol;
 #[cfg(test)]
 mod test_support;
@@ -77,6 +81,7 @@ pub use registry::{
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
 pub use reverse::Reverse;
+pub use saturation::{Saturation, SaturationType};
 pub use softvol::SoftVol;
 pub use tremolo::Tremolo;
 pub use trim::{Trim, TrimPosition};

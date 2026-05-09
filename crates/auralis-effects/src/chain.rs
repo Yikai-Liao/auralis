@@ -768,6 +768,7 @@ mod tests {
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Reverse(_)
+                | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_) => {

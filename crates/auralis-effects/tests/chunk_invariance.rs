@@ -3,7 +3,10 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Tremolo, Vol};
+use auralis_effects::{
+    Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Saturation, SaturationType, Tremolo,
+    Vol,
+};
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
 #[test]
@@ -83,6 +86,26 @@ fn contrast_matches_whole_buffer_for_l5_chunk_matrix() {
 }
 
 #[test]
+fn saturation_matches_whole_buffer_for_l5_chunk_matrix() {
+    let saturation = Saturation::new(SaturationType::Sqrt, 0.75, 0.1, 0.25)
+        .expect("fixture saturation settings are valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(source.as_planar_f32().len());
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        saturation.process_buffer(&mut whole);
+        process_chunks_mut(chunked.as_planar_f32_mut(), schedule, |chunk, _offset| {
+            saturation.process_samples(chunk);
+        });
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn tremolo_matches_whole_buffer_for_l5_chunk_matrix() {
     let tremolo = Tremolo::new(7.0, 75.0).expect("fixture tremolo settings are valid");
     let source = stereo_source(1_105);
@@ -124,6 +147,10 @@ fn streaming_safe_chain_matches_whole_buffer_for_l5_chunk_matrix() {
         EffectCommand::Fade(Fade::new(FrameCount::new(257), FrameCount::new(383))),
         EffectCommand::Tremolo(
             Tremolo::new(7.0, 75.0).expect("fixture tremolo settings are valid"),
+        ),
+        EffectCommand::Saturation(
+            Saturation::new(SaturationType::Sqrt, 0.75, 0.1, 0.25)
+                .expect("fixture saturation settings are valid"),
         ),
     ]);
     let source = stereo_source(1_105);
@@ -170,6 +197,11 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::Contrast(contrast) => {
                 process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
                     contrast.process_samples(chunk);
+                });
+            }
+            EffectCommand::Saturation(saturation) => {
+                process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
+                    saturation.process_samples(chunk);
                 });
             }
             EffectCommand::Tremolo(tremolo) => {

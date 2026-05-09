@@ -77,6 +77,12 @@ pub enum EffectError {
     #[error("overdrive gain and color must be finite and in the range 0..=100")]
     InvalidOverdrive,
 
+    /// A `saturation` value was not finite or outside SoX-ng's supported range.
+    #[error(
+        "saturation blend and offset must be finite in 0..=1, tanh drive must be finite and >= 1, and sqrt color or diode threshold must be finite in 0..=1"
+    )]
+    InvalidSaturation,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

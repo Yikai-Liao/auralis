@@ -306,7 +306,26 @@ Implementation notes:
 
 ### Feature 6.2.7: `saturation`
 
+Status: implemented.
+
 Implement saturation with documented transfer function and golden coverage.
+
+Implementation notes:
+
+- Added a typed `Saturation` effect covering SoX-ng's `tanh`, `sqrt`, and
+  `diode` transfer families with `blend`, `offset`, and type-specific
+  `drive`/`color`/`threshold` parameters.
+- Processing recenters the wet transfer around zero input, applies SoX-ng's
+  safety output-gain compensation, mixes wet and dry paths, and clips to the
+  normalized sample range inside the effect.
+- The effect command parser accepts `saturation [type [blend [offset
+  [drive|color|threshold]]]]`, renders explicit defaults, and rejects invalid
+  ranges with typed errors.
+- Golden coverage includes standalone mono default `tanh` and stereo explicit
+  `sqrt` cases against SoX-ng, with L4 finite-output coverage, L5
+  chunk-invariance coverage, and an L7 fuzz seed for saturation command
+  parsing. L6 SIMD is not applicable because this is a scalar nonlinear
+  transform.
 
 ### Feature 6.2.8: `repeat`
 

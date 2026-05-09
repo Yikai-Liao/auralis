@@ -48,6 +48,9 @@ pub enum EffectKind {
     /// Frame-order reversal within each channel.
     Reverse,
 
+    /// SoX-ng-style saturation distortion.
+    Saturation,
+
     /// SoX-ng-style soft volume control.
     SoftVol,
 
@@ -206,6 +209,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Reverse",
         "reverse",
         "reverse frame order within each channel",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Saturation,
+        "saturation",
+        &[],
+        "Saturation",
+        "saturation [type [blend [offset [drive|color|threshold]]]]",
+        "apply nonlinear saturation distortion",
     ),
     EffectDescriptor::new(
         EffectKind::SoftVol,
@@ -559,6 +570,7 @@ mod tests {
     #[test]
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
+            ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
@@ -566,6 +578,7 @@ mod tests {
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
+            ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),
             ("tremolo", EffectKind::Tremolo),
             ("trim", EffectKind::Trim),

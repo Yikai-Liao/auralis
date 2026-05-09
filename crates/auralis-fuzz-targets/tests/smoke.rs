@@ -36,6 +36,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"norm -6",
         b"contrast 25",
         b"overdrive 12 25",
+        b"saturation sqrt 0.75 0.1 0.25",
         b"tremolo 5 75",
         b"vol 2 amplitude 0.05",
         b"vol -0.25 power",
