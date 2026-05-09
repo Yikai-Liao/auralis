@@ -7,3 +7,8 @@ dependencies = [
     "pytest",
     "scipy",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "golden: tests that compare Auralis output with an external reference implementation",
+]

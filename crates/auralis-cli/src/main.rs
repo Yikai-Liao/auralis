@@ -6,7 +6,7 @@ use std::{
     process::ExitCode,
 };
 
-use auralis_wav::{WavError, decode_pcm16_path, encode_pcm16_path};
+use auralis_wav::{WavError, decode_pcm16_path};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -24,13 +24,17 @@ enum Command {
         input: PathBuf,
     },
 
-    /// Decode and re-encode a PCM16 WAV file without applying effects.
+    /// Decode, process, and re-encode a PCM16 WAV file.
     Run {
         /// PCM16 WAV input file to read.
         input: PathBuf,
 
         /// PCM16 WAV output file to create.
         output: PathBuf,
+
+        /// Constant gain to apply, in decibels.
+        #[arg(long, value_name = "DB", allow_hyphen_values = true)]
+        gain_db: Option<f64>,
     },
 }
 
@@ -47,7 +51,11 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Inspect { input } => inspect(&input),
-        Command::Run { input, output } => run_copy_pipeline(&input, &output),
+        Command::Run {
+            input,
+            output,
+            gain_db,
+        } => run_pipeline(&input, &output, gain_db),
     }
 }
 
@@ -68,11 +76,17 @@ fn inspect(input: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn run_copy_pipeline(input: &Path, output: &Path) -> Result<(), CliError> {
+fn run_pipeline(input: &Path, output: &Path, gain_db: Option<f64>) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
-    let audio = decode_pcm16_path(input)?;
-    encode_pcm16_path(output, &audio)?;
+    let pipeline = auralis::AudioFile::open_wav(input)?.into_pipeline();
+    let pipeline = if let Some(gain_db) = gain_db {
+        pipeline.gain_db(gain_db)
+    } else {
+        pipeline
+    };
+
+    pipeline.write_wav(output)?;
 
     Ok(())
 }
@@ -99,6 +113,7 @@ fn format_duration_seconds(frames: u64, sample_rate: u32) -> String {
 
 #[derive(Debug)]
 enum CliError {
+    Auralis(auralis::Error),
     Wav(WavError),
     UnsupportedFormat { path: PathBuf, role: PathRole },
 }
@@ -121,6 +136,7 @@ impl std::fmt::Display for PathRole {
 impl std::fmt::Display for CliError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Auralis(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::UnsupportedFormat { path, role } => {
                 write!(
@@ -130,6 +146,12 @@ impl std::fmt::Display for CliError {
                 )
             }
         }
+    }
+}
+
+impl From<auralis::Error> for CliError {
+    fn from(error: auralis::Error) -> Self {
+        Self::Auralis(error)
     }
 }
 

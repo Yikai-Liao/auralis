@@ -549,6 +549,8 @@ Do not add more effects yet.
 
 ### Feature 2.4: CLI `gain`
 
+Status: implemented.
+
 Implement:
 
 ```bash

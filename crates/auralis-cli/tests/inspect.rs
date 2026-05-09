@@ -7,6 +7,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use auralis::AudioFile;
+
 #[test]
 fn inspect_reports_pcm16_wav_fields() {
     let path = temp_path("auralis-cli-inspect", "wav");
@@ -148,6 +150,86 @@ fn run_copies_stereo_wav_samples_and_metadata() {
     let stdout = stdout(&inspect_output);
     assert!(stdout.contains("channels: 2"));
     assert!(stdout.contains("duration_frames: 3"));
+}
+
+#[test]
+fn run_gain_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-run-gain-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-gain-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-gain-library-output", "wav");
+    write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .gain_db(-6.0)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--gain-db",
+            "-6",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
+fn run_invalid_gain_argument_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
+    let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--gain-db",
+            "NaN",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: decibels must be finite"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_help_documents_gain_units() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", "--help"])
+        .output()
+        .unwrap();
+
+    assert!(command_output.status.success());
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("--gain-db <DB>"), "{stdout}");
+    assert!(
+        stdout.contains("Constant gain to apply, in decibels"),
+        "{stdout}"
+    );
 }
 
 #[test]

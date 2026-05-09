@@ -66,6 +66,7 @@ dependencies = [
 name = "auralis-cli"
 version = "0.0.0"
 dependencies = [
+ "auralis",
  "auralis-wav",
  "clap",
 ]
