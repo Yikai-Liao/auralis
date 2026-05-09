@@ -103,8 +103,10 @@ re-exports stable, and `auralis-simd` now keeps backend metadata, selection,
 conversion, arithmetic kernels, and focused conformance tests in separate
 modules. `auralis-effects` has also been split into per-effect implementation
 modules with focused unit tests while preserving the existing public effect
-types and command/chain behavior; the remaining oversized crate roots are
-tracked by the same 5.6 development plan.
+types and command/chain behavior. `auralis-wav` now keeps PCM16 reader,
+writer, format validation, sample-conversion glue, and focused integration
+tests in separate ownership modules; the remaining oversized files are tracked
+by the same 5.6 development plan.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -374,6 +376,15 @@ Only WAV is implemented initially.
 ### `auralis-wav`
 
 Implements WAV reading and writing.
+
+The crate root is a small facade over focused modules:
+
+- `reader`: PCM16 stream/path decode helpers and `Pcm16WavReader`;
+- `writer`: PCM16 stream/path encode helpers and `Pcm16WavWriter`;
+- `format`: WAV sample encoding, PCM16 validation, hound spec construction,
+  frame counts, and malformed-input mapping;
+- `sample_conversion`: backend-dispatched PCM16/`f32` conversion glue;
+- `error`: typed `WavError`, result alias, and codec-error conversion.
 
 Initial WAV scope:
 

@@ -207,6 +207,17 @@ should remain unchanged except for import paths.
 
 ### `crates/auralis-wav`
 
+Feature 5.6.5 completed this split. At completion, the largest resulting
+`crates/auralis-wav` Rust files were:
+
+| Lines | File |
+|---:|---|
+| 224 | `crates/auralis-wav/src/writer.rs` |
+| 195 | `crates/auralis-wav/src/reader.rs` |
+| 164 | `crates/auralis-wav/tests/support/mod.rs` |
+| 139 | `crates/auralis-wav/tests/encode.rs` |
+| 123 | `crates/auralis-wav/tests/decode.rs` |
+
 Target shape:
 
 - `src/lib.rs`: crate docs, module declarations, public re-exports, and the

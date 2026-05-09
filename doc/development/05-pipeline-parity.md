@@ -378,7 +378,7 @@ Implementation notes:
 
 ### Feature 5.6.5: split `crates/auralis-wav/src/lib.rs`
 
-Status: planned.
+Status: implemented.
 
 Split WAV reader, writer, format validation, backend hooks, and tests.
 
@@ -398,6 +398,19 @@ Acceptance tests:
 - scalar/SIMD WAV conformance tests still pass;
 - SoX-ng WAV reference tests still pass;
 - no resulting Rust source file exceeds 1,000 lines.
+
+Implementation notes:
+
+- `crates/auralis-wav/src/lib.rs` is now a crate-root facade with module
+  declarations, public re-exports, and the result alias.
+- Runtime behavior moved into `error`, `format`, `reader`, `writer`, and
+  `sample_conversion` modules without changing exported type or function
+  names.
+- The previous monolithic unit-test module moved into focused integration tests
+  under `crates/auralis-wav/tests/`, with shared WAV byte, temp-path, and
+  assertion helpers in `tests/support/`.
+- After the split, the largest `auralis-wav` Rust source file is
+  `src/writer.rs` at 224 lines.
 
 ### Feature 5.6.6: enforce the no-thousand-line-file policy
 
