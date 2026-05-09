@@ -23,6 +23,17 @@ pub enum EffectError {
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,
 
+    /// A `gain -r` command did not have prior reclaimable headroom metadata.
+    #[error("gain -r requires prior gain -h headroom below full scale")]
+    MissingGainHeadroom,
+
+    /// A `gain -r` scan encountered a non-finite sample.
+    #[error("gain -r encountered non-finite sample at flattened sample {sample_index}")]
+    NonFiniteGainSample {
+        /// Zero-based flattened sample index in planar channel order.
+        sample_index: usize,
+    },
+
     /// A buffer with an invalid shape was produced while applying an effect.
     #[error(transparent)]
     Core(#[from] auralis_core::AuralisError),

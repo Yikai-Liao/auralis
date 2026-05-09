@@ -2,15 +2,19 @@ use auralis_core::{AudioBuffer, Decibels};
 use auralis_dsp::{gain_in_place, gain_in_place_with_backend};
 use auralis_simd::{BackendKind, select_backend};
 
-/// Constant-gain effect processor.
+/// Gain effect processor.
 ///
 /// `Gain` multiplies every sample by `10^(db / 20)` using the scalar
 /// [`auralis_dsp::gain_in_place`] reference kernel by default. Explicit backend
 /// methods can request SIMD through Auralis' backend selection layer while
-/// preserving the same numerical behavior and scalar fallback rules. The
-/// processor does not clip, normalize, allocate, or inspect channel boundaries,
-/// so processing a whole buffer and processing the same samples in chunks
-/// produce identical results.
+/// preserving the same numerical behavior and scalar fallback rules.
+///
+/// Plain gain does not clip, normalize, allocate, or inspect channel
+/// boundaries, so processing a whole buffer and processing the same samples in
+/// chunks produce identical results. SoX-ng headroom options are represented by
+/// [`GainHeadroom`]; direct sample processing still applies only the configured
+/// fixed gain, while [`crate::EffectChain`] uses the headroom mode to implement
+/// `gain -h` and `gain -r` command semantics.
 ///
 /// # Examples
 ///
@@ -40,13 +44,81 @@ use auralis_simd::{BackendKind, select_backend};
 pub struct Gain {
     /// Gain amount in decibels.
     pub db: Decibels,
+
+    /// SoX-ng headroom/reclaim mode for command-chain execution.
+    pub headroom: GainHeadroom,
+}
+
+/// SoX-ng `gain` headroom/reclaim mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum GainHeadroom {
+    /// Plain fixed gain with no headroom metadata.
+    None,
+
+    /// `gain -h`: reserve the fixed gain as reclaimable headroom.
+    Reserve,
+
+    /// `gain -r`: reclaim prior headroom as much as possible without clipping.
+    Reclaim,
+
+    /// `gain -rh` or `gain -hr`: reclaim prior headroom and reserve new headroom.
+    ReclaimAndReserve,
 }
 
 impl Gain {
     /// Creates a gain processor from a validated decibel value.
     #[must_use]
     pub const fn new(db: Decibels) -> Self {
-        Self { db }
+        Self {
+            db,
+            headroom: GainHeadroom::None,
+        }
+    }
+
+    /// Creates a `gain -h` processor that reserves fixed-gain headroom.
+    #[must_use]
+    pub const fn reserve_headroom(db: Decibels) -> Self {
+        Self {
+            db,
+            headroom: GainHeadroom::Reserve,
+        }
+    }
+
+    /// Creates a `gain -r` processor that reclaims previously reserved headroom.
+    #[must_use]
+    pub const fn reclaim_headroom(db: Decibels) -> Self {
+        Self {
+            db,
+            headroom: GainHeadroom::Reclaim,
+        }
+    }
+
+    /// Creates a `gain -rh` processor.
+    #[must_use]
+    pub const fn reclaim_and_reserve_headroom(db: Decibels) -> Self {
+        Self {
+            db,
+            headroom: GainHeadroom::ReclaimAndReserve,
+        }
+    }
+
+    /// Returns true when this command should reserve headroom metadata.
+    #[must_use]
+    pub const fn reserves_headroom(self) -> bool {
+        matches!(
+            self.headroom,
+            GainHeadroom::Reserve | GainHeadroom::ReclaimAndReserve
+        )
+    }
+
+    /// Returns true when this command should reclaim prior headroom metadata.
+    #[must_use]
+    pub const fn reclaims_headroom(self) -> bool {
+        matches!(
+            self.headroom,
+            GainHeadroom::Reclaim | GainHeadroom::ReclaimAndReserve
+        )
     }
 
     /// Applies gain to all samples in an audio buffer.
@@ -139,5 +211,19 @@ mod tests {
         Gain::new(db(12.0)).process_buffer(&mut audio);
 
         assert!(audio.as_planar_f32().is_empty());
+    }
+
+    #[test]
+    fn headroom_constructors_preserve_fixed_gain_processing() {
+        let source = vec![0.25, -0.5, 1.0];
+        let mut plain = audio_buffer(source.clone());
+        let mut headroom = audio_buffer(source);
+
+        Gain::new(db(-6.0)).process_buffer(&mut plain);
+        Gain::reserve_headroom(db(-6.0)).process_buffer(&mut headroom);
+
+        assert!(Gain::reserve_headroom(db(-6.0)).reserves_headroom());
+        assert!(Gain::reclaim_headroom(db(0.0)).reclaims_headroom());
+        assert_samples_close(plain.as_planar_f32(), headroom.as_planar_f32());
     }
 }

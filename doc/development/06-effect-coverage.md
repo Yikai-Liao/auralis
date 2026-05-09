@@ -9,6 +9,8 @@ where applicable, and update the SoX-ng coverage entry.
 
 ### Feature 6.1.1: `gain` headroom and reclaim options
 
+Status: implemented.
+
 Implement `gain -h` and `gain -r`.
 
 Acceptance tests:
@@ -17,6 +19,21 @@ Acceptance tests:
 - option interactions tested where SoX-ng documents combinations;
 - scalar-vs-SIMD tests for gain kernels;
 - SoX-ng golden comparisons.
+
+Implementation notes:
+
+- `Gain` now carries an explicit SoX-ng headroom mode while preserving plain
+  fixed-gain processing for direct typed API calls.
+- The effect command parser accepts `gain -h`, `gain -r`, and combined
+  `gain -rh`/`gain -hr` option forms with an optional fixed gain value, while
+  normalization, limiter, and channel-balancing gain options remain scheduled
+  for later 6.1 features.
+- `EffectChain` tracks reclaimable headroom metadata between commands:
+  `gain -h DB` applies the fixed gain and records the reserved multiplier, and
+  a later `gain -r` scans the current buffer and restores only as much as can
+  fit below full scale.
+- Golden coverage includes a standalone `gain -h` case and a positional
+  `gain -h ... gain -r` chain case against SoX-ng.
 
 ### Feature 6.1.2: `gain` normalize and limiter options
 

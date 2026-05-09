@@ -16,6 +16,7 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_dcshift_stereo_negative",
             "effect_fade_mono_linear_in",
             "effect_fade_stereo_linear_in",
+            "effect_gain_headroom_mono_minus_6",
             "effect_gain_mono_minus_3",
             "effect_gain_stereo_minus_6",
             "effect_pad_mono_both_sides",

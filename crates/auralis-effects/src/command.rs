@@ -31,8 +31,8 @@ use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
 use crate::{
-    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Pad, Reverse,
-    Trim,
+    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, GainHeadroom,
+    Pad, Reverse, Trim,
 };
 
 /// Crate-local result type for command parsing.
@@ -123,7 +123,7 @@ impl EffectCommand {
                 fade.fade_in.as_u64().to_string(),
                 fade.fade_out.as_u64().to_string(),
             ],
-            Self::Gain(gain) => vec!["gain".to_owned(), render_f64(gain.db.as_f64())],
+            Self::Gain(gain) => render_gain(gain),
             Self::Pad(pad) => vec![
                 "pad".to_owned(),
                 pad.start.as_u64().to_string(),
@@ -270,7 +270,19 @@ pub enum EffectCommandParseError {
 }
 
 fn parse_gain(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let db = match args {
+    let mut reserve_headroom = false;
+    let mut reclaim_headroom = false;
+    let mut value_args = args;
+
+    while let Some((option, rest)) = value_args.split_first() {
+        if !is_option_like(option) {
+            break;
+        }
+        parse_gain_options(effect, option, &mut reserve_headroom, &mut reclaim_headroom)?;
+        value_args = rest;
+    }
+
+    let db = match value_args {
         [] => Decibels::new(0.0).map_err(|source| EffectCommandParseError::InvalidCoreValue {
             effect,
             argument: "gain-dB",
@@ -283,7 +295,44 @@ fn parse_gain(effect: &'static str, args: &[&str]) -> CommandResult<EffectComman
         }
     };
 
-    Ok(EffectCommand::Gain(Gain::new(db)))
+    let gain = match (reclaim_headroom, reserve_headroom) {
+        (false, false) => Gain::new(db),
+        (false, true) => Gain::reserve_headroom(db),
+        (true, false) => Gain::reclaim_headroom(db),
+        (true, true) => Gain::reclaim_and_reserve_headroom(db),
+    };
+
+    Ok(EffectCommand::Gain(gain))
+}
+
+fn parse_gain_options(
+    effect: &'static str,
+    option: &str,
+    reserve_headroom: &mut bool,
+    reclaim_headroom: &mut bool,
+) -> CommandResult<()> {
+    let mut chars = option.strip_prefix('-').unwrap_or_default().chars();
+    let Some(first) = chars.next() else {
+        return Err(EffectCommandParseError::UnsupportedOption {
+            effect,
+            option: option.to_owned(),
+        });
+    };
+
+    for option_char in std::iter::once(first).chain(chars) {
+        match option_char {
+            'h' => *reserve_headroom = true,
+            'r' => *reclaim_headroom = true,
+            unsupported => {
+                return Err(EffectCommandParseError::UnsupportedOption {
+                    effect,
+                    option: format!("-{unsupported}"),
+                });
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn parse_dc_shift(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
@@ -491,6 +540,18 @@ fn render_f32(value: f32) -> String {
     }
 }
 
+fn render_gain(gain: Gain) -> Vec<String> {
+    let mut tokens = vec!["gain".to_owned()];
+    match gain.headroom {
+        GainHeadroom::None => {}
+        GainHeadroom::Reserve => tokens.push("-h".to_owned()),
+        GainHeadroom::Reclaim => tokens.push("-r".to_owned()),
+        GainHeadroom::ReclaimAndReserve => tokens.push("-rh".to_owned()),
+    }
+    tokens.push(render_f64(gain.db.as_f64()));
+    tokens
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
@@ -597,6 +658,24 @@ mod tests {
     }
 
     #[test]
+    fn parses_gain_headroom_and_reclaim_options() {
+        assert_eq!(
+            parse_effect_command(&["gain", "-h", "-6"]).unwrap(),
+            EffectCommand::Gain(Gain::reserve_headroom(Decibels::new(-6.0).unwrap()))
+        );
+        assert_eq!(
+            parse_effect_command(&["gain", "-r"]).unwrap(),
+            EffectCommand::Gain(Gain::reclaim_headroom(Decibels::new(0.0).unwrap()))
+        );
+        assert_eq!(
+            parse_effect_command(&["gain", "-rh", "-3"])
+                .unwrap()
+                .render_tokens(),
+            ["gain", "-rh", "-3"]
+        );
+    }
+
+    #[test]
     fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
         let unsupported = parse_effect_command(&["allpass"]).unwrap_err();
         assert!(
@@ -696,6 +775,11 @@ mod tests {
     fn equivalent_commands_render_to_identical_canonical_tokens() {
         let equivalent_commands = [
             (&["gain"][..], &["gain", "0.0"][..], &["gain", "0"][..]),
+            (
+                &["gain", "-h"][..],
+                &["gain", "-h", "0"][..],
+                &["gain", "-h", "0"][..],
+            ),
             (
                 &["gain-db", "1e0"][..],
                 &["gain", "1"][..],

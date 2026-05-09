@@ -19,6 +19,15 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.chain_gain_headroom_reclaim]
+input = "chains/stereo_multitone.wav"
+corpus_id = "chains/stereo_multitone"
+auralis = ["gain", "-h", "-6", "gain", "-r"]
+sox_ng = ["gain", "-h", "-6", "gain", "-r"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.chain_filter_fade_gain]
 input = "chains/stereo_ramp_tone.wav"
 corpus_id = "chains/stereo_ramp_tone"

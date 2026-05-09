@@ -39,12 +39,16 @@ to typed descriptors, parsed command tokens become typed effect configs, and
 unknown names or unsupported SoX-ng options return stable diagnostics. Parsed
 commands can be grouped into an in-memory `EffectChain` and executed in order
 with indexed command-context errors and forced scalar/SIMD backend selection.
-`auralis run <input.wav> <output.wav> gain -3 dcshift 0.125 reverse` exposes
-the same typed chain model at the CLI, preserving positional user order while
-the earlier single-effect flags remain available for compatibility. The golden
+The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata:
+`gain -h DB` applies the fixed attenuation and records reclaimable headroom,
+and a later `gain -r` restores as much as possible without clipping. `auralis
+run <input.wav> <output.wav> gain -3 dcshift 0.125 reverse` exposes the same
+typed chain model at the CLI, preserving positional user order while the
+earlier single-effect flags remain available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
 plus a `tests/golden/chains.toml` manifest for representative editing, level,
-and fade/gain filter-style positional chains against SoX-ng.
+gain headroom/reclaim, and fade/gain filter-style positional chains against
+SoX-ng.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -452,8 +456,10 @@ coverage return a stable missing-coverage diagnostic. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "l",
 "24000", "24000"]` parse into typed `EffectCommand` variants. The parser
 currently accepts the frame-count subset implemented by Auralis and rejects
-future SoX-ng options such as gain normalization, non-linear fade curves, and
-dcshift limiter gain with effect- and option-specific diagnostics.
+future SoX-ng options such as gain normalization, gain limiting, non-linear
+fade curves, and dcshift limiter gain with effect- and option-specific
+diagnostics. The implemented `gain` command forms include plain fixed gain,
+`gain -h`, `gain -r`, and combined `gain -rh`/`gain -hr` headroom reclaim.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -732,17 +738,19 @@ auto-insert its `channels` effect from the output option. A case may also set
 automatic `rate` insertion from an output sample-rate option.
 
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
-for a structural editing chain, a level-processing chain, and the currently
-implemented fade/gain filter-style chain. `tests/golden/concat.toml`,
+for a structural editing chain, a level-processing chain, gain
+headroom/reclaim, and the currently implemented fade/gain filter-style chain.
+`tests/golden/concat.toml`,
 `tests/golden/sequence.toml`, `tests/golden/mix.toml`,
 `tests/golden/mix_power.toml`, `tests/golden/merge.toml`, and
 `tests/golden/multiply.toml` record combiner coverage for mismatched mono input
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`, and
-linear `fade`. Those standalone effect cases isolate effect behavior: output
-rate/channel conversion is absent, guard and norm are absent, and SoX-ng
-automatic dithering is disabled by the runner's `-D` flag.
+linear `fade`, including a standalone `gain -h` case for headroom attenuation.
+Those standalone effect cases isolate effect behavior: output rate/channel
+conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
+is disabled by the runner's `-D` flag.
 `tests/golden/auto_channels.toml` records output-channel policy coverage where
 SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
 records output-rate policy coverage where SoX-ng auto-inserts `rate`

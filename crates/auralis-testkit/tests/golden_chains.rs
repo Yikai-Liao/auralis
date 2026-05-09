@@ -14,6 +14,7 @@ fn chain_golden_manifest_records_representative_chain_cases() {
         [
             "chain_editing_trim_reverse_pad",
             "chain_filter_fade_gain",
+            "chain_gain_headroom_reclaim",
             "chain_level_gain_dcshift_gain"
         ]
     );

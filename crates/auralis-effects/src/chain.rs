@@ -41,7 +41,9 @@ use thiserror::Error;
 
 use crate::{
     EffectCommand, EffectCommandParseError, EffectError, EffectKind, EffectNameError,
-    EffectRegistry, parse_effect_command,
+    EffectRegistry,
+    chain_gain::{GainHeadroomState, apply_gain_command},
+    parse_effect_command,
 };
 
 pub(crate) const CHAIN_BOUNDARY_TOKEN: &str = ":";
@@ -203,15 +205,16 @@ impl EffectChain {
         audio: &mut AudioBuffer,
         requested_backend: BackendKind,
     ) -> ChainResult<()> {
+        let mut gain_headroom = GainHeadroomState::default();
         for (index, &command) in self.commands.iter().enumerate() {
-            apply_command(command, audio, requested_backend).map_err(|(argument, source)| {
-                EffectChainError::CommandFailed {
+            apply_command(command, audio, requested_backend, &mut gain_headroom).map_err(
+                |(argument, source)| EffectChainError::CommandFailed {
                     index,
                     command,
                     argument,
                     source,
-                }
-            })?;
+                },
+            )?;
         }
 
         Ok(())
@@ -381,6 +384,7 @@ fn apply_command(
     command: EffectCommand,
     audio: &mut AudioBuffer,
     requested_backend: BackendKind,
+    gain_headroom: &mut GainHeadroomState,
 ) -> std::result::Result<(), (&'static str, EffectError)> {
     match command {
         EffectCommand::DcShift(dc_shift) => {
@@ -392,7 +396,7 @@ fn apply_command(
             Ok(())
         }
         EffectCommand::Gain(gain) => {
-            gain.process_buffer_with_backend(audio, requested_backend);
+            apply_gain_command(gain, audio, requested_backend, gain_headroom)?;
             Ok(())
         }
         EffectCommand::Pad(pad) => {
@@ -422,11 +426,22 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::DcShift => required_arg_end(tokens, args_start, 1),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
-        EffectKind::Gain => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Pad => optional_arg_end(tokens, args_start, 2),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => required_arg_end(tokens, args_start, 2),
     }
+}
+
+fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) && is_option_like(tokens[end]) {
+        end += 1;
+    }
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+    include_unexpected_argument(tokens, end)
 }
 
 fn required_arg_end(tokens: &[&str], args_start: usize, required: usize) -> usize {
@@ -492,6 +507,10 @@ fn is_command_boundary(token: &str) -> bool {
     is_chain_boundary_token(token)
         || is_unsupported_boundary_control(token)
         || is_effect_boundary(token)
+}
+
+fn is_option_like(value: &str) -> bool {
+    value.starts_with('-') && value.parse::<f64>().is_err()
 }
 
 pub(crate) fn is_chain_boundary_token(token: &str) -> bool {

@@ -24,6 +24,17 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_gain_headroom_mono_minus_6]
+input = "effects/gain_headroom_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-h", "-6"]
+sox_ng = ["gain", "-h", "-6"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_dcshift_mono_positive]
 input = "effects/dcshift_mono.wav"
 corpus_id = "l0/step_mono_16"
