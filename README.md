@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Norm`,
-`Contrast`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`, and `Vol` effect
+`Contrast`, `SoftVol`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`, and `Vol` effect
 processors, the high-level library chain API for applying gain, norm, contrast,
-dcshift, trim, pad, reverse, fade, and vol, and the CLI
-gain/norm/contrast/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+softvol, dcshift, trim, pad, reverse, fade, and vol, and the CLI
+gain/norm/contrast/softvol/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -48,8 +48,9 @@ records reclaimable headroom, and a later `gain -r` restores as much as
 possible without clipping. The chain path also supports SoX-ng-style `vol`
 amplitude, power, dB, and limiter-gain forms, effect-level `norm [level]` as a
 positioned normalization command distinct from final output `--norm`, and
-SoX-ng-style `contrast [amount]` phase contrast enhancement.
-`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+SoX-ng-style `contrast [amount]` phase contrast enhancement, plus `softvol`
+clipping-avoidant volume control with optional recovery and headroom.
+`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -454,12 +455,12 @@ Contains typed effect processors built from DSP primitives:
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `norm`, `contrast`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `norm`, `contrast`, `softvol`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, and `contrast` resolve to typed descriptors; aliases such
-as `dc-shift`, `gain-db`, `volume`, and `normalize` resolve to their canonical names; unknown names
+`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, `contrast`, and `softvol` resolve to typed descriptors; aliases such
+as `dc-shift`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
@@ -481,6 +482,9 @@ The implemented `norm` command accepts an optional dBFS level and performs
 SoX-ng-style whole-buffer peak normalization at its chain position, separate
 from Auralis' final output `--norm` policy. The implemented `contrast` command
 accepts an optional amount in SoX-ng's `0..=100` range and defaults to `75`.
+The implemented `softvol` command accepts `volume`, `double-time`, and
+`headroom` arguments, lowers its current multiplier before any frame that would
+clip, and optionally recovers upward according to the input sample rate.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -770,7 +774,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, and `contrast`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, and `softvol`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -779,7 +783,8 @@ fade-in cases for the SoX-ng `q`, `h`, `l`, `t`, and `p` curve families plus
 linear fade-out-at-end and explicit stop-position fade-out cases. `vol` coverage
 includes amplitude, dB, power, and limiter-gain forms; `norm` coverage includes
 default and target-level normalization; `contrast` coverage includes default
-and explicit-amount forms.
+and explicit-amount forms; `softvol` coverage includes fixed volume plus
+recovery/headroom forms.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.
@@ -998,6 +1003,8 @@ Examples:
 - `vol`: amplitude, power, or dB scaling with immediate effect-level clipping
   and optional SoX-ng limiter-gain shaping
 - `contrast`: SoX-ng phase contrast enhancement with an optional amount
+- `softvol`: per-frame soft volume control that lowers the current multiplier
+  before clipping and can recover upward over a configured doubling time
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
   does not clip unless SoX-ng's optional limiter gain is configured, while
   PCM16 WAV output clips plain shifted samples to the representable range
@@ -1030,6 +1037,8 @@ Examples:
 - `vol 1` is identity
 - `norm` preserves silence and finite bounded input stays finite
 - `contrast` preserves finite bounded input as finite output
+- `softvol` default settings preserve bounded input and configured recovery
+  stays finite
 - `gain +6 dB` followed by `gain -6 dB` approximately returns the original signal within tolerance
 
 ### L5: chunk invariance

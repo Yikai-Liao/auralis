@@ -112,6 +112,21 @@ l6 = { status = "not_applicable", reason = "Reverse is a structural reorder and 
 l7 = { status = "covered", reason = "Effect command fuzzing covers reverse parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
 
 [[subject]]
+id = "effect.softvol"
+kind = "effect"
+name = "softvol"
+summary = "SoX-ng-style soft volume control with clipping avoidance, optional recovery, and headroom."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover fixed soft volume, recovery, and headroom command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check frame-peak limiter decisions, recovery-rate math, headroom, stereo frame coupling, command parsing, and invalid values.", tests = ["crates/auralis-effects/src/softvol.rs", "crates/auralis-effects/src/command_softvol.rs", "crates/auralis-effects/tests/softvol.rs"] }
+l4 = { status = "covered", reason = "Property tests include default identity and finite-output coverage for softvol.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "Stateful unit coverage compares whole-buffer softvol processing with chunked frame-by-frame processing using the same runtime state.", tests = ["crates/auralis-effects/src/softvol.rs"] }
+l6 = { status = "not_applicable", reason = "Softvol changes a shared per-frame multiplier based on cross-channel peaks and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers softvol argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/softvol"] }
+
+[[subject]]
 id = "effect.trim"
 kind = "effect"
 name = "trim"

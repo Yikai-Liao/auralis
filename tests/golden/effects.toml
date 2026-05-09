@@ -321,6 +321,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_softvol_mono_gain_1_5]
+input = "effects/softvol_mono.wav"
+corpus_id = "l0/step_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["softvol", "1.5"]
+sox_ng = ["softvol", "1.5"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_softvol_stereo_recovery_headroom]
+input = "effects/softvol_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["softvol", "2", "10", "0.1"]
+sox_ng = ["softvol", "2", "10", "0.1"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_fade_mono_linear_in]
 input = "effects/fade_mono.wav"
 corpus_id = "l0/sine_mono_32"

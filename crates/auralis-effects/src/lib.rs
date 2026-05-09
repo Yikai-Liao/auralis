@@ -24,6 +24,7 @@
 //! ```
 
 mod chain;
+mod chain_dispatch;
 mod chain_gain;
 mod command;
 mod command_contrast;
@@ -31,6 +32,7 @@ mod command_fade;
 mod command_gain;
 mod command_norm;
 mod command_pad;
+mod command_softvol;
 mod command_trim;
 mod command_vol;
 mod contrast;
@@ -43,6 +45,7 @@ mod norm;
 mod pad;
 mod registry;
 mod reverse;
+mod softvol;
 #[cfg(test)]
 mod test_support;
 mod trim;
@@ -69,5 +72,6 @@ pub use registry::{
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
 pub use reverse::Reverse;
+pub use softvol::SoftVol;
 pub use trim::{Trim, TrimPosition};
 pub use vol::{Vol, VolGainType};

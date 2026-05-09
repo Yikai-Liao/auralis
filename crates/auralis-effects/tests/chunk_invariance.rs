@@ -155,6 +155,7 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::Norm(_)
             | EffectCommand::Pad(_)
             | EffectCommand::Reverse(_)
+            | EffectCommand::SoftVol(_)
             | EffectCommand::Trim(_) => {
                 panic!("L5 streaming-safe chain fixture contained a non-streaming command")
             }

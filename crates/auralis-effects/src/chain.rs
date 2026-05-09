@@ -40,9 +40,9 @@ use auralis_simd::BackendKind;
 use thiserror::Error;
 
 use crate::{
-    EffectCommand, EffectCommandParseError, EffectError, EffectKind, EffectNameError,
-    EffectRegistry,
-    chain_gain::{GainHeadroomState, apply_gain_command},
+    EffectCommand, EffectCommandParseError, EffectError, EffectNameError, EffectRegistry,
+    chain_dispatch::{apply_command, command_end},
+    chain_gain::GainHeadroomState,
     parse_effect_command,
 };
 
@@ -380,165 +380,6 @@ pub enum EffectChainParseError {
     },
 }
 
-fn apply_command(
-    command: &EffectCommand,
-    audio: &mut AudioBuffer,
-    requested_backend: BackendKind,
-    gain_headroom: &mut GainHeadroomState,
-) -> std::result::Result<(), (&'static str, EffectError)> {
-    match command {
-        EffectCommand::Contrast(contrast) => {
-            contrast.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::DcShift(dc_shift) => {
-            dc_shift.process_buffer_with_backend(audio, requested_backend);
-            Ok(())
-        }
-        EffectCommand::Fade(fade) => {
-            if fade.stop_position.is_some() {
-                let faded = fade
-                    .process_buffer_to_output(audio, requested_backend)
-                    .map_err(|source| ("frame-count", source))?;
-                *audio = faded;
-            } else {
-                fade.process_buffer_with_backend(audio, requested_backend);
-            }
-            Ok(())
-        }
-        EffectCommand::Gain(gain) => {
-            apply_gain_command(*gain, audio, requested_backend, gain_headroom)?;
-            Ok(())
-        }
-        EffectCommand::Norm(norm) => norm
-            .process_buffer_with_backend(audio, requested_backend)
-            .map_err(|source| ("level", source)),
-        EffectCommand::Pad(pad) => {
-            let padded = pad
-                .process_buffer(audio)
-                .map_err(|source| ("frame-count", source))?;
-            *audio = padded;
-            Ok(())
-        }
-        EffectCommand::Reverse(reverse) => {
-            reverse.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::Trim(trim) => {
-            let trimmed = trim
-                .process_buffer(audio)
-                .map_err(|source| ("frame-range", source))?;
-            *audio = trimmed;
-            Ok(())
-        }
-        EffectCommand::Vol(vol) => {
-            vol.process_buffer_with_backend(audio, requested_backend);
-            Ok(())
-        }
-    }
-}
-
-pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usize) -> usize {
-    let args_start = command_start + 1;
-
-    match kind {
-        EffectKind::Fade => fade_arg_end(tokens, args_start),
-        EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Contrast | EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
-        EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
-        EffectKind::Pad => pad_arg_end(tokens, args_start),
-        EffectKind::Reverse => no_arg_end(tokens, args_start),
-        EffectKind::Trim => trim_arg_end(tokens, args_start),
-        EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
-    }
-}
-
-fn trim_arg_end(tokens: &[&str], args_start: usize) -> usize {
-    let mut end = args_start;
-    while end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end += 1;
-    }
-    end
-}
-
-fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {
-    let mut end = args_start;
-    while end < tokens.len() && !is_command_boundary(tokens[end]) && is_option_like(tokens[end]) {
-        end += 1;
-    }
-    if end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end += 1;
-    }
-    include_unexpected_argument(tokens, end)
-}
-
-fn optional_arg_end(tokens: &[&str], args_start: usize, max: usize) -> usize {
-    let mut end = args_start;
-    let mut consumed = 0;
-
-    while consumed < max && end < tokens.len() && !is_command_boundary(tokens[end]) {
-        consumed += 1;
-        end += 1;
-    }
-
-    include_unexpected_argument(tokens, end)
-}
-
-fn pad_arg_end(tokens: &[&str], args_start: usize) -> usize {
-    let mut end = args_start;
-
-    while end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end += 1;
-    }
-
-    end
-}
-
-fn no_arg_end(tokens: &[&str], args_start: usize) -> usize {
-    include_unexpected_argument(tokens, args_start)
-}
-
-fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
-    let mut end = args_start;
-
-    if matches!(tokens.get(end).copied(), Some("l" | "q" | "h" | "t" | "p")) {
-        end += 1;
-    }
-
-    if end >= tokens.len() || is_command_boundary(tokens[end]) {
-        return end;
-    }
-    end += 1;
-
-    if end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end += 1;
-    }
-
-    if end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end += 1;
-    }
-
-    include_unexpected_argument(tokens, end)
-}
-
-fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {
-    if end < tokens.len() && !is_command_boundary(tokens[end]) {
-        end + 1
-    } else {
-        end
-    }
-}
-
-fn is_command_boundary(token: &str) -> bool {
-    is_chain_boundary_token(token)
-        || is_unsupported_boundary_control(token)
-        || is_effect_boundary(token)
-}
-
-fn is_option_like(value: &str) -> bool {
-    value.starts_with('-') && value.parse::<f64>().is_err()
-}
-
 pub(crate) fn is_chain_boundary_token(token: &str) -> bool {
     token == CHAIN_BOUNDARY_TOKEN
 }
@@ -547,7 +388,7 @@ pub(crate) fn is_unsupported_boundary_control(token: &str) -> bool {
     UNSUPPORTED_BOUNDARY_CONTROLS.contains(&token)
 }
 
-fn is_effect_boundary(token: &str) -> bool {
+pub(crate) fn is_effect_boundary(token: &str) -> bool {
     match EffectRegistry::resolve(token) {
         Ok(_) | Err(EffectNameError::UnsupportedSoxNgEffect { .. }) => true,
         Err(EffectNameError::EmptyName | EffectNameError::UnknownEffect { .. }) => false,
@@ -560,7 +401,7 @@ mod tests {
         EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError,
         parse_effect_chain,
     };
-    use crate::{DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, Trim};
+    use crate::{DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, SoftVol, Trim};
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
     };
@@ -718,6 +559,20 @@ mod tests {
                 vec!["pad", "0", "0"],
                 vec!["reverse"],
             ]
+        );
+    }
+
+    #[test]
+    fn chain_token_parser_handles_softvol_defaults_and_arguments() {
+        let chain = parse_effect_chain(&["softvol", "2", "10", "0.1", "reverse"]).unwrap();
+
+        assert_eq!(
+            chain.commands()[0],
+            EffectCommand::SoftVol(SoftVol::new(2.0, 10.0, 0.1).unwrap())
+        );
+        assert_eq!(
+            chain.render_tokens(),
+            ["softvol", "2", "10", "0.1", "reverse"]
         );
     }
 
@@ -912,6 +767,7 @@ mod tests {
                 | EffectCommand::Norm(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Reverse(_)
+                | EffectCommand::SoftVol(_)
                 | EffectCommand::Trim(_) => {
                     panic!("test helper only supports streaming-safe commands")
                 }

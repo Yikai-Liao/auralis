@@ -43,11 +43,12 @@ use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_pad::{parse_pad, render_pad};
+use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
-    Pad, Reverse, Trim, Vol,
+    Pad, Reverse, SoftVol, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -84,6 +85,9 @@ pub enum EffectCommand {
     /// Frame-order reversal within each channel.
     Reverse(Reverse),
 
+    /// SoX-ng-style soft volume control.
+    SoftVol(SoftVol),
+
     /// End-exclusive frame range selection.
     Trim(Trim),
 
@@ -112,6 +116,7 @@ impl EffectCommand {
             EffectKind::Norm => parse_norm(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
+            EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
             EffectKind::Vol => parse_vol(effect, args),
         }
@@ -128,6 +133,7 @@ impl EffectCommand {
             Self::Norm(_) => EffectKind::Norm,
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
+            Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Trim(_) => EffectKind::Trim,
             Self::Vol(_) => EffectKind::Vol,
         }
@@ -156,6 +162,7 @@ impl EffectCommand {
             Self::Norm(norm) => render_norm(*norm),
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
+            Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Trim(trim) => render_trim(trim),
             Self::Vol(vol) => render_vol(*vol),
         }
@@ -438,7 +445,7 @@ fn reject_option_like_argument(effect: &'static str, value: &str) -> CommandResu
     }
 }
 
-pub(super) fn is_option_like(value: &str) -> bool {
+pub(crate) fn is_option_like(value: &str) -> bool {
     value.starts_with('-') && value.parse::<f64>().is_err()
 }
 
@@ -463,7 +470,7 @@ mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
         Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
-        Reverse, Trim, TrimPosition,
+        Reverse, SoftVol, Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
@@ -502,6 +509,10 @@ mod tests {
                 ),
             ),
             (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
+            (
+                &["softvol", "2", "10", "0.1"][..],
+                EffectCommand::SoftVol(SoftVol::new(2.0, 10.0, 0.1).unwrap()),
+            ),
             (
                 &["fade", "t", "4", "2"][..],
                 EffectCommand::Fade(Fade::with_stop_position(
@@ -544,6 +555,10 @@ mod tests {
         assert_eq!(
             parse_effect_command(&["pad"]).unwrap(),
             EffectCommand::Pad(Pad::new(FrameCount::new(0), FrameCount::new(0)))
+        );
+        assert_eq!(
+            parse_effect_command(&["softvol"]).unwrap(),
+            EffectCommand::SoftVol(SoftVol::default())
         );
         assert_eq!(
             parse_effect_command(&["fade", "3"]).unwrap(),

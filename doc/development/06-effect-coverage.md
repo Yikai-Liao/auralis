@@ -244,8 +244,26 @@ Implementation notes:
 
 ### Feature 6.2.4: `softvol`
 
+Status: implemented.
+
 Implement soft volume scaling if SoX-ng semantics are well-defined enough for
 golden coverage.
+
+Implementation notes:
+
+- Added a typed `SoftVol` effect with initial volume, double-time recovery, and
+  headroom settings matching SoX-ng's `softvol [volume [double-time
+  [headroom]]]` command shape.
+- Processing scans each frame across channels, lowers the current multiplier
+  before output when that frame would exceed the headroom-adjusted maximum, and
+  optionally recovers upward after each frame according to the configured
+  doubling time and input sample rate.
+- The effect command parser accepts default, partial, and full softvol argument
+  lists, renders explicit defaults, and rejects negative or non-finite values
+  with a typed error.
+- Golden coverage includes standalone mono fixed-volume and stereo
+  recovery/headroom cases against SoX-ng, with L4 finite-output coverage, L5
+  stateful chunk coverage, and an L7 fuzz seed for softvol command parsing.
 
 ### Feature 6.2.5: `tremolo`
 

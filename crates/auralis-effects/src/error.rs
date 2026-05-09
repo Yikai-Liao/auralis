@@ -63,6 +63,10 @@ pub enum EffectError {
     #[error("contrast amount must be finite and in the range 0..=100")]
     InvalidContrastAmount,
 
+    /// A `softvol` value was not finite or outside SoX-ng's supported range.
+    #[error("softvol volume, double-time, and headroom must be finite and non-negative")]
+    InvalidSoftVol,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

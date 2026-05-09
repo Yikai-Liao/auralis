@@ -45,6 +45,9 @@ pub enum EffectKind {
     /// Frame-order reversal within each channel.
     Reverse,
 
+    /// SoX-ng-style soft volume control.
+    SoftVol,
+
     /// End-exclusive frame range selection.
     Trim,
 
@@ -189,6 +192,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Reverse",
         "reverse",
         "reverse frame order within each channel",
+    ),
+    EffectDescriptor::new(
+        EffectKind::SoftVol,
+        "softvol",
+        &["soft-volume", "soft_volume"],
+        "SoftVol",
+        "softvol [volume [double-time [headroom]]]",
+        "apply soft volume scaling that avoids clipping",
     ),
     EffectDescriptor::new(
         EffectKind::Trim,
@@ -532,6 +543,7 @@ mod tests {
             ("norm", EffectKind::Norm),
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
+            ("softvol", EffectKind::SoftVol),
             ("trim", EffectKind::Trim),
             ("vol", EffectKind::Vol),
         ];
@@ -553,6 +565,8 @@ mod tests {
             ("gain_db", "gain", EffectKind::Gain),
             ("normalize", "norm", EffectKind::Norm),
             ("normalise", "norm", EffectKind::Norm),
+            ("soft-volume", "softvol", EffectKind::SoftVol),
+            ("soft_volume", "softvol", EffectKind::SoftVol),
             ("volume", "vol", EffectKind::Vol),
         ];
 

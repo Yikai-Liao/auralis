@@ -35,7 +35,8 @@ use thiserror::Error;
 
 use crate::{
     EffectChain, EffectChainBoundary, EffectCommandParseError, EffectRegistry,
-    chain::{command_end, is_chain_boundary_token, is_unsupported_boundary_control},
+    chain::{is_chain_boundary_token, is_unsupported_boundary_control},
+    chain_dispatch::command_end,
     parse_effect_command,
 };
 
