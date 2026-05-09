@@ -67,7 +67,9 @@ SoX-ng.
 The biquad support now exposes both the reusable scalar primitive and the
 SoX-ng-style `biquad b0 b1 b2 a0 a1 a2` command. Raw command coefficients are
 normalized by `a0`, invalid coefficient sets are rejected before processing,
-and filtering preserves independent per-channel state.
+and filtering preserves independent per-channel state. The primitive also
+provides RBJ coefficient helpers and SoX-ng-compatible width units for future
+all-pass, band, shelf, and EQ-style filter effects.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -440,7 +442,7 @@ Contains scalar DSP primitives and reference implementations:
 - fades
 - channel mixing
 - FIR primitives
-- biquad primitives
+- biquad primitives, including RBJ coefficient helpers
 - resampler primitives, added later
 - metrics used by tests where appropriate
 

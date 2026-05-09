@@ -22,6 +22,21 @@ l6 = { status = "not_applicable", reason = "The initial primitive is scalar-only
 l7 = { status = "not_applicable", reason = "No parser or serialized command surface exists for the primitive in Feature 6.4.1.", tests = [] }
 
 [[subject]]
+id = "primitive.rbj_biquad_coefficients"
+kind = "primitive"
+name = "rbj-biquad-coefficients"
+summary = "Reusable RBJ cookbook coefficient helpers for future SoX-ng-style tone and filter effects."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "The helpers derive coefficients from scalar design parameters and do not consume deterministic corpus IDs directly.", tests = [] }
+l1 = { status = "not_applicable", reason = "The helpers produce coefficients for decoded-sample processors; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "not_applicable", reason = "Feature 6.4.3 intentionally does not expose new SoX-ng command surfaces; golden coverage belongs to the later concrete filter effects.", tests = [] }
+l3 = { status = "covered", reason = "Analytical tests cover low-pass, high-pass, band-pass, band-reject/notch, all-pass, peaking EQ, shelf filters, width-unit handling, and invalid design inputs.", tests = ["crates/auralis-effects/src/biquad_design.rs"] }
+l4 = { status = "not_applicable", reason = "The helpers are deterministic closed-form coefficient calculations rather than sample processors with metamorphic input behavior.", tests = [] }
+l5 = { status = "not_applicable", reason = "Coefficient construction is not chunked audio processing; chunk invariance is covered by processors that consume the coefficients.", tests = [] }
+l6 = { status = "not_applicable", reason = "The helpers are scalar coefficient calculations and do not have backend-dispatched sample kernels.", tests = [] }
+l7 = { status = "not_applicable", reason = "No parser or serialized command surface exists for the helpers in Feature 6.4.3.", tests = [] }
+
+[[subject]]
 id = "effect.biquad"
 kind = "effect"
 name = "biquad"

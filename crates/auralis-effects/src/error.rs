@@ -39,6 +39,12 @@ pub enum EffectError {
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,
 
+    /// A biquad coefficient helper received an invalid design parameter.
+    #[error(
+        "biquad design parameters must be finite, positive, and below Nyquist where applicable"
+    )]
+    InvalidBiquadDesign,
+
     /// A remix command used an invalid basic routing specification.
     #[error("remix output specifications must contain channel numbers, ranges, or a standalone 0")]
     InvalidRemixRouting,

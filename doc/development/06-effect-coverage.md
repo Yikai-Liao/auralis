@@ -531,6 +531,25 @@ Implementation notes:
 
 Add reusable coefficient helpers for tone filters.
 
+Status: implemented.
+
+Implementation notes:
+
+- `BiquadCoefficients` now exposes RBJ cookbook helpers from a focused
+  `biquad_design` module for low-pass,
+  high-pass, constant-skirt and constant-peak band-pass, band-reject/notch,
+  two-pole all-pass, peaking EQ, low shelf, and high shelf filters.
+- `BiquadWidth` models SoX-ng-compatible width units for future command
+  surfaces: quality factor, octave bandwidth, hertz bandwidth, kilohertz
+  bandwidth, and shelf slope.
+- Helper validation rejects non-finite sample rates, frequencies, widths, and
+  gains; frequencies at or above Nyquist; non-positive widths; and shelf slope
+  values outside SoX-ng's `0 < slope <= 1` range.
+- Coverage includes analytical coefficient checks for every helper family,
+  width-unit equivalence coverage, and invalid-design rejection tests. No
+  SoX-ng golden command surface is added in this feature because subsequent
+  6.4.x effects own the user-facing commands.
+
 ### Feature 6.4.4: `allpass`
 
 ### Feature 6.4.5: `band`

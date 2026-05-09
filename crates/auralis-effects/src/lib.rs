@@ -24,6 +24,7 @@
 //! ```
 
 mod biquad;
+mod biquad_design;
 mod centercut;
 mod chain;
 mod chain_dispatch;
@@ -74,6 +75,7 @@ mod trim;
 mod vol;
 
 pub use biquad::{Biquad, BiquadCoefficients, BiquadState};
+pub use biquad_design::BiquadWidth;
 pub use centercut::Centercut;
 pub use chain::{
     ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,
