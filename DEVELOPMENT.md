@@ -646,6 +646,8 @@ Acceptance tests:
 
 ### Feature 2.9: `fade`
 
+Status: implemented.
+
 Implement simple linear fade-in and fade-out.
 
 Acceptance tests:

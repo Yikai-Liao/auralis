@@ -14,6 +14,7 @@
 //!     .into_pipeline()
 //!     .gain_db(-3.0)
 //!     .dc_shift(0.125)
+//!     .fade_frames(1_000, 2_000)
 //!     .reverse()
 //!     .pad_frames(0, 48_000)
 //!     .write_wav("output.wav")?;
@@ -25,7 +26,7 @@ use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 
-use auralis_effects::{DcShift, Gain, Pad, Reverse, Trim};
+use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 use thiserror::Error;
 
 /// Crate-local result type using [`Error`].
@@ -252,6 +253,25 @@ impl Pipeline {
         self
     }
 
+    /// Applies linear fade-in and fade-out envelopes measured in frames.
+    ///
+    /// `fade_in` ramps the start from silence toward unity, and `fade_out`
+    /// ramps the end from unity toward silence. A fade length of `4` uses
+    /// coefficients `[0.0, 0.25, 0.5, 0.75]` for fade-in and
+    /// `[0.75, 0.5, 0.25, 0.0]` for fade-out. If the fade regions overlap,
+    /// their coefficients are multiplied. Passing `0` for either side leaves
+    /// that side unchanged.
+    #[must_use]
+    pub fn fade_frames(mut self, fade_in: u64, fade_out: u64) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        Fade::new(FrameCount::new(fade_in), FrameCount::new(fade_out)).process_buffer(audio);
+
+        self
+    }
+
     /// Reverses the frame order within each channel.
     ///
     /// This transform is deterministic, in-place, and non-allocating. It is
@@ -402,6 +422,23 @@ mod tests {
         assert_eq!(
             actual.as_planar_f32(),
             &[0.0, 0.25, 0.5, 0.0, 0.0, -0.25, -0.5, 0.0]
+        );
+    }
+
+    #[test]
+    fn chain_fade_frames_preserves_stereo_frame_grouping() {
+        let source = stereo_audio_buffer(vec![1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0]);
+
+        let actual = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .fade_frames(2, 2)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(4));
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[0.0, 0.5, 0.5, 0.0, -0.0, -0.5, -0.5, -0.0],
         );
     }
 

@@ -429,6 +429,53 @@ fn run_reverse_output_matches_library_pipeline() {
 }
 
 #[test]
+fn run_fade_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-run-fade-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-fade-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-fade-frame-library-output", "wav");
+    write_pcm16_wav(
+        &input,
+        2,
+        &[-10000, 10000, -20000, 20000, -30000, 30000, -4000, 4000],
+    );
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .fade_frames(2, 2)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--fade-in-frame",
+            "2",
+            "--fade-out-frame",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+    assert_eq!(
+        read_pcm16_wav(&cli_output),
+        (2, vec![0, 0, -10000, 10000, -15000, 15000, 0, 0])
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
 fn run_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
@@ -566,6 +613,8 @@ fn run_help_documents_gain_and_trim_units() {
     assert!(stdout.contains("--trim-end-seconds <SECONDS>"), "{stdout}");
     assert!(stdout.contains("--pad-start-frame <FRAMES>"), "{stdout}");
     assert!(stdout.contains("--pad-end-frame <FRAMES>"), "{stdout}");
+    assert!(stdout.contains("--fade-in-frame <FRAMES>"), "{stdout}");
+    assert!(stdout.contains("--fade-out-frame <FRAMES>"), "{stdout}");
     assert!(stdout.contains("--reverse"), "{stdout}");
     assert!(
         stdout.contains("Reverse frame order within each channel"),

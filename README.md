@@ -27,11 +27,12 @@ implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
 pipeline and can apply constant gain with `--gain-db <DB>`, an end-exclusive
 trim with frame or seconds ranges, zero padding with frame counts, frame-level
-reversal with `--reverse`, or constant DC offset with `--dc-shift <SHIFT>`.
-The scalar `gain` and `dcshift` DSP kernels, the typed `Gain`, `DcShift`,
-`Trim`, `Pad`, and `Reverse` effect processors, the high-level library chain
-API for applying gain, dcshift, trim, pad, and reverse, and the CLI
-gain/dcshift/trim/pad/reverse transforms are implemented. Other effect
+reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
+linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
+The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `DcShift`,
+`Trim`, `Pad`, `Reverse`, and `Fade` effect processors, the high-level library
+chain API for applying gain, dcshift, trim, pad, reverse, and fade, and the CLI
+gain/dcshift/trim/pad/reverse/fade transforms are implemented. Other effect
 transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -80,8 +81,8 @@ fn main() -> auralis::Result<()> {
         .into_pipeline()
         .gain_db(-3.0)
         .dc_shift(0.125)
-        .trim_seconds(0.0..10.0)
-        .fade_out_seconds(0.25)
+        .trim_seconds(0.0, 10.0)
+        .fade_frames(0, 12_000)
         .write_wav("output.wav")?;
 
     Ok(())
@@ -249,6 +250,7 @@ Provides the high-level library facade:
 - `Pipeline::trim_frames`
 - `Pipeline::trim_seconds`
 - `Pipeline::pad_frames`
+- `Pipeline::fade_frames`
 - `Pipeline::reverse`
 - `Pipeline::write_wav`
 
@@ -374,6 +376,7 @@ auralis run input.wav output.wav --dc-shift 0.125
 auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
 auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
+auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --reverse
 auralis run pipeline.toml
 auralis completions zsh
