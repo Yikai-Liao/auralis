@@ -95,6 +95,58 @@ Minimum documentation:
 - examples
 - numerical behavior if relevant
 
+### Third-party dependency boundaries
+
+Auralis dependency choices are split into three groups:
+
+- add now: `clap`, `clap_complete`, `clap_mangen`, `thiserror`, `miette`,
+  `anyhow`, `serde`, `toml`, `serde_json`, `hound`, `tracing`,
+  `tracing-subscriber`, and the first test/bench tools
+- selected but optional or later: `rten-simd`, `realfft`, `rustfft`, `rayon`,
+  `bytemuck`, `smallvec`, `pyo3`, `maturin`, and `numpy`
+- do not introduce now: `rubato`, `symphonia`, `ndarray` in core public APIs,
+  `serde_yaml`, and `tokio`
+
+The rule is strict: public APIs do not depend on concrete implementation
+crates. Third-party crates belong at boundary layers, test layers, CLI layers,
+or replaceable backend layers.
+
+Per-crate rules:
+
+| Crate | Allowed dependencies now | Must not expose or depend on |
+|---|---|---|
+| `auralis-core` | `thiserror`; optional `serde` only when serialization is a feature | `hound`, `clap`, `rten-simd`, `pyo3`, `ndarray`, `rayon` |
+| `auralis-codec` / `auralis-wav` | `thiserror`, `hound` where WAV is implemented | `hound` types in public core APIs |
+| `auralis-dsp` | `thiserror`; later optional `rten-simd` and `bytemuck` | backend crate names in public effect APIs |
+| `auralis-effects` | `thiserror`, `serde` | CLI parser or codec implementation types |
+| `auralis-pipeline` | `thiserror`, `serde`, `tracing` | CLI diagnostics or concrete codec internals |
+| `auralis-cli` | `clap`, `clap_complete`, `miette`, `tracing`, `tracing-subscriber`, `serde`, `toml`; `clap_mangen` for generated docs | library APIs returning `anyhow::Result<T>` |
+| CLI integration tests | `assert_cmd`, `predicates`, `tempfile`, `insta` | test dependencies becoming runtime dependencies |
+| `auralis-testkit` | `approx`, `proptest`, `tempfile`, `serde`, `serde_json`, `criterion`; later `realfft`, `rustfft` | dependencies leaking back into production API requirements |
+
+Error handling rules:
+
+- library crates expose typed errors with `thiserror`
+- CLI converts errors into `miette` diagnostics
+- `anyhow` is limited to binaries, tests, examples, and short-lived glue code
+- no library public API returns `anyhow::Result<T>`
+
+Format and configuration rules:
+
+- pipeline manifests use TOML through `serde` and `toml`
+- machine-readable test reports use JSON through `serde_json`
+- do not add YAML support
+- WAV uses `hound` behind Auralis codec traits; tests compare decoded PCM unless
+  the test is explicitly about container serialization
+
+Optimization rules:
+
+- scalar DSP is the reference implementation
+- SIMD starts only after scalar tests, chunk invariance, and scalar-vs-SIMD
+  differential tests exist
+- Rayon, bytemuck, and smallvec are optional optimizations, not default design
+  assumptions
+
 ---
 
 ## Required commands before every commit
@@ -385,7 +437,7 @@ Do not implement transform CLI yet.
 Implement:
 
 ```bash
-auralis -i input.wav -o output.wav copy
+auralis run input.wav output.wav
 ```
 
 This must decode through internal planar `f32` and re-encode, not simply copy bytes.
@@ -476,7 +528,7 @@ Do not add more effects yet.
 Implement:
 
 ```bash
-auralis -i input.wav -o output.wav gain -3
+auralis run input.wav output.wav --gain-db -3
 ```
 
 Acceptance tests:
@@ -935,6 +987,10 @@ Only add SIMD when all are true:
 6. backend selection can be controlled in tests.
 
 Do not add SIMD because it looks elegant.
+
+`rten-simd` is the selected portable SIMD direction, but it remains optional and
+must be hidden behind Auralis-owned backend traits. Do not expose `rten-simd`
+types from public library APIs.
 
 ---
 

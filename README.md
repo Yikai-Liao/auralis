@@ -73,11 +73,14 @@ fn main() -> auralis::Result<()> {
 }
 ```
 
-The command-line equivalent should be composable:
+The first command-line equivalent should be simple and scriptable:
 
 ```bash
-auralis -i input.wav -o output.wav gain -3 trim 0 10 fade-out 0.25
+auralis run input.wav output.wav --gain-db -3
 ```
+
+After the Rust pipeline API is stable, Auralis can add a positional effect-chain
+form such as `auralis input.wav output.wav gain -3 trim 0.5 10.0`.
 
 A structured pipeline form should also exist for reproducible batch workflows:
 
@@ -291,12 +294,13 @@ Effect implementations should be block-based and streaming-aware from the beginn
 
 ### `auralis-simd`
 
-Contains optional SIMD acceleration.
+Contains optional SIMD acceleration. This is a backend layer, not part of the
+public API.
 
-Primary selected SIMD abstraction:
+Selected future SIMD abstraction:
 
 ```toml
-rten-simd = "0.24"
+rten-simd = { version = "0.24", optional = true }
 ```
 
 Reasons:
@@ -319,6 +323,8 @@ Initial SIMD targets:
 - later: FIR and polyphase resampling inner loops
 
 Do not prioritize SIMD for state-machine-heavy or recursive algorithms at first.
+Do not implement SIMD before scalar correctness tests and differential tests
+exist.
 
 ### `auralis-cli`
 
@@ -329,13 +335,19 @@ Initial CLI goals:
 ```bash
 auralis --version
 auralis inspect input.wav
-auralis -i input.wav -o output.wav copy
-auralis -i input.wav -o output.wav gain -3
-auralis -i input.wav -o output.wav trim 0 10
+auralis run input.wav output.wav --gain-db -3
 auralis run pipeline.toml
+auralis completions zsh
 ```
 
-Candidate crate: `clap` with derive support.
+Do not start with a complex SoX/FFmpeg-style positional effect chain. Add that
+only after the Rust pipeline API is stable.
+
+Selected crates:
+
+- `clap` for the parser.
+- `clap_complete` for shell completions.
+- `clap_mangen` for generated man pages.
 
 ### `auralis-testkit`
 
@@ -367,19 +379,83 @@ Do not introduce Python bindings during the initial WAV and core DSP milestones.
 
 ## Foundation library choices
 
-| Area | Choice | Status | Reason |
-|---|---|---:|---|
-| Language | Rust | primary | Safety, typed APIs, testing, batch orchestration |
-| CLI | `clap` | initial | Mature Rust CLI parser |
-| Errors | `thiserror` for library, `anyhow` for CLI/tests | initial | Explicit library errors, ergonomic binary errors |
-| Serialization | `serde`, `toml` | initial | Structured pipeline manifests |
-| WAV | `hound` behind wrapper | initial | Simple WAV reader/writer; implementation detail only |
-| SIMD | `rten-simd` | selected | Stable Rust, portable SIMD, runtime dispatch |
-| Testing | Rust tests + Python pytest | selected | Rust for unit tests, Python for numerical/oracle tests |
-| Python environment | `uv` | selected | Python tool/project management and reproducible test env |
-| Property tests | `proptest` | selected | Randomized invariant checks |
-| Benchmarks | `criterion` | selected | Statistical Rust microbenchmarks |
-| Python bindings | `pyo3` + `maturin` | future | Native Python package after Rust API stabilizes |
+Core rule:
+
+> Public APIs do not depend on concrete implementation crates. Third-party
+> crates belong at boundary layers, test layers, CLI layers, or replaceable
+> backend layers.
+
+Users of `auralis-core` should not see names such as `hound`, `clap`,
+`rten-simd`, `rubato`, `pyo3`, or `ndarray` in public API types.
+
+### Add in the first workspace pass
+
+| Area | Choice | Boundary |
+|---|---|---|
+| CLI | `clap`, `clap_complete`, `clap_mangen` | `auralis-cli`; generated help/completions/man pages from one definition |
+| Errors | `thiserror`, `miette`, small amounts of `anyhow` | `thiserror` for typed library errors; `miette` and `anyhow` stay in binaries, tests, and glue |
+| Config and reports | `serde`, `toml`, `serde_json` | pipeline manifests are TOML; machine-readable reports are JSON |
+| WAV | `hound` | wrapped inside the WAV codec crate; never exposed by `auralis-core` |
+| Observability | `tracing`, `tracing-subscriber` | libraries emit structured events; CLI initializes subscribers |
+| Float assertions | `approx` | dev/test only |
+| Property tests | `proptest` | dev/test only |
+| CLI tests | `assert_cmd`, `predicates`, `tempfile` | dev/test only |
+| Snapshots | `insta` with `serde` | dev/test only; for help, diagnostics, manifests, and reports |
+| Benchmarks | `criterion` | dev/bench only |
+
+Library APIs must return typed errors, not `anyhow::Result<T>`. `miette` is for
+diagnostic presentation at the CLI boundary. `hound` handles initial WAV I/O,
+but Auralis tests compare decoded PCM and metadata rather than whole WAV bytes
+unless a test is specifically about serialization.
+
+### Selected direction, but optional or later
+
+| Area | Choice | Rule |
+|---|---|---|
+| SIMD | `rten-simd` behind `simd` | optional backend only; scalar remains the reference |
+| Frequency-domain tests | `realfft`, `rustfft` | add to testkit/dev dependencies when spectral tests begin |
+| Batch parallelism | `rayon` behind `parallel` | for many files, test cases, stems, or render jobs; not the initial single-stream effect chain |
+| Byte casting | `bytemuck` behind `pod` | only after normal parsing is correct and profiling justifies it |
+| Small allocation optimization | `smallvec` behind `smallvec` | only for proven small-vector pressure |
+| Python package | `pyo3`, `maturin`, `numpy` | future `auralis-py`; keep Rust API and buffer model ready |
+
+### Do not introduce now
+
+| Crate | Decision |
+|---|---|
+| `rubato` | Do not make it the core resampler. Later it may be a reference or benchmark target against Auralis scalar rate and SoX-ng golden tests. |
+| `symphonia` | Do not add until the WAV-only milestone is stable and multi-format decoding is actually in scope. |
+| `ndarray` | Do not use in `auralis-core` public APIs. Keep the core buffer as planar `Vec<f32>` and convert at Python/test boundaries later. |
+| `serde_yaml` | Do not use. Configuration is TOML; machine reports are JSON. |
+| `tokio` | Do not use in the initial offline CPU-bound DSP phase. Use synchronous file I/O and add batch parallelism later via Rayon if needed. |
+
+Minimal first-pass workspace dependencies:
+
+```toml
+[workspace.dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+serde_json = "1"
+hound = "3"
+clap = { version = "4", features = ["derive", "wrap_help"] }
+clap_complete = "4"
+clap_mangen = "0.3"
+miette = { version = "7", features = ["fancy"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Shared dev/test/bench dependency versions. Individual crates reference these
+# from their own [dev-dependencies] with `workspace = true`.
+approx = "0.5"
+proptest = "1"
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+insta = { version = "1", features = ["serde"] }
+criterion = "0.8"
+```
 
 ---
 
