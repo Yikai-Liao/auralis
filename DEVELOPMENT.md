@@ -808,6 +808,8 @@ Acceptance tests:
 
 #### Feature 4.1.2: deterministic backend selection
 
+Status: implemented.
+
 Implement named backends:
 
 - `scalar`

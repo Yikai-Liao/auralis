@@ -39,8 +39,9 @@ shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
 tests. The Rust testkit also parses TOML golden manifests and renders stable
 Auralis and SoX-ng command vectors for reproducible comparison reports. The
 SIMD crate defines the Auralis-owned backend trait skeleton with a scalar
-reference backend and an optional `rten-simd`-backed placeholder marker. Other
-effect transform CLI options are still intentionally unimplemented.
+reference backend, deterministic `scalar` / `simd` backend selection, and an
+optional `rten-simd`-backed placeholder marker. Other effect transform CLI
+options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -338,8 +339,19 @@ Effect implementations should be block-based and streaming-aware from the beginn
 
 Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
-the scalar reference backend marker, and a feature-gated placeholder SIMD
-backend marker.
+deterministic named backend selection, the scalar reference backend marker, and
+a feature-gated placeholder SIMD backend marker.
+
+Backend names are stable lowercase strings:
+
+- `scalar`
+- `simd`
+
+Requesting `scalar` always selects the scalar reference backend. Requesting
+`simd` selects SIMD only when the `simd` Cargo feature is enabled and the active
+target supports Auralis' SIMD backend. Otherwise selection falls back to
+`scalar` and reports whether the fallback happened because the feature is
+disabled or because the target is unsupported.
 
 Selected future SIMD abstraction:
 
