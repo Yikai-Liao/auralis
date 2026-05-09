@@ -590,6 +590,22 @@ Implementation notes:
 
 ### Feature 6.4.6: `bandpass`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `BandPass` effect matching SoX-ng's RBJ `bandpass [-c]
+  frequency width` command family.
+- The default form uses constant 0 dB peak gain, while `-c` selects
+  constant-skirt gain. Width accepts hertz, kilohertz, Q, and octave suffixes.
+- Processing delegates to the scalar stateful biquad primitive with independent
+  per-channel state, so chunked processing is exact when callers preserve
+  `BiquadState` per channel.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for the
+  default and `-c` forms.
+
 ### Feature 6.4.7: `bandreject`
 
 ### Feature 6.4.8: `bass`

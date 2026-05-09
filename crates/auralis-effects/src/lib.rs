@@ -25,6 +25,7 @@
 
 mod allpass;
 mod band;
+mod bandpass;
 mod biquad;
 mod biquad_design;
 mod centercut;
@@ -35,6 +36,7 @@ mod channels;
 mod command;
 mod command_allpass;
 mod command_band;
+mod command_bandpass;
 mod command_biquad;
 mod command_centercut;
 mod command_channels;
@@ -81,6 +83,7 @@ mod vol;
 
 pub use allpass::{AllPass, AllPassMode};
 pub use band::{Band, BandMode};
+pub use bandpass::{BandPass, BandPassMode};
 pub use biquad::{Biquad, BiquadCoefficients, BiquadState};
 pub use biquad_design::BiquadWidth;
 pub use centercut::Centercut;

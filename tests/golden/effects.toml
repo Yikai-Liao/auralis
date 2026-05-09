@@ -46,6 +46,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_bandpass_mono_default]
+input = "effects/bandpass_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["bandpass", "1000", "0.707q"]
+sox_ng = ["bandpass", "1000", "0.707q"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_bandpass_stereo_constant_skirt]
+input = "effects/bandpass_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["bandpass", "-c", "1000", "2q"]
+sox_ng = ["bandpass", "-c", "1000", "2q"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"

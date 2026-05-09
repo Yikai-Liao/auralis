@@ -773,6 +773,7 @@ mod tests {
                 }
                 EffectCommand::AllPass(_)
                 | EffectCommand::Band(_)
+                | EffectCommand::BandPass(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)
