@@ -29,7 +29,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
 
     assert_eq!(
         editing.auralis_args(),
-        ["trim", "2", "9", "reverse", "pad", "1", "2"]
+        ["trim", "2", "7", "reverse", "pad", "1", "2"]
     );
     assert_eq!(
         editing.sox_ng_args(),

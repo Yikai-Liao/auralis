@@ -25,8 +25,8 @@ place for WAV-only scope and explicit unsupported-format reporting. PCM16 WAV
 decoding into planar `f32` buffers and encoding back to PCM16 WAV are
 implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
-pipeline and can apply constant gain with `--gain-db <DB>`, an end-exclusive
-trim with frame or seconds ranges, zero padding with frame counts and insertion
+pipeline and can apply constant gain with `--gain-db <DB>`, SoX-ng-style
+multi-range trim positions, zero padding with frame counts and insertion
 positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
@@ -456,7 +456,7 @@ upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
 as `dc-shift` and `gain-db` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
-as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "t",
+as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
 "24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
 accepts the frame-count subset implemented by Auralis and supports SoX-ng fade
 curve tokens `q`, `h`, `l`, `t`, and `p`, stop-position fade-out semantics,
@@ -593,6 +593,7 @@ auralis run input.wav output.wav --dc-shift 0.125
 auralis run input.wav output.wav --backend simd --dc-shift 0.125
 auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
+auralis run input.wav output.wav trim 48000 24000 -12000
 auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
 auralis run input.wav output.wav pad 24000@12000
 auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
@@ -759,7 +760,8 @@ lengths and stereo combine-before-reverse chains.
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`, and
 `fade`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
-`gain -B`, and `gain -b` cases for channel equalization and balancing, and
+`gain -B`, and `gain -b` cases for channel equalization and balancing,
+multi-range `trim` cases with absolute and end-relative positions, and
 positioned `pad LENGTH@POSITION` cases for mid-stream silence insertion, plus
 fade-in cases for the SoX-ng `q`, `h`, `l`, `t`, and `p` curve families plus
 linear fade-out-at-end and explicit stop-position fade-out cases.

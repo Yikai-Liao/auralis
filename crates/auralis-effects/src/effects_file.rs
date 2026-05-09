@@ -594,23 +594,23 @@ mod tests {
 
     #[test]
     fn command_parse_failures_report_command_start_line_and_column() {
-        let error = parse_effects_file_str("gain -3 trim 1").unwrap_err();
+        let error = parse_effects_file_str("gain -3 trim reverse").unwrap_err();
 
         assert_eq!(
             error,
             EffectsFileParseError::CommandParseFailed {
                 line: 1,
                 column: 9,
-                command: "trim 1".to_owned(),
+                command: "trim".to_owned(),
                 source: EffectCommandParseError::MissingArgument {
                     effect: "trim",
-                    argument: "end-frame",
+                    argument: "position",
                 },
             }
         );
         assert_eq!(
             error.to_string(),
-            "effects file line 1, column 9: command `trim 1` failed to parse: effect `trim` requires argument `end-frame`"
+            "effects file line 1, column 9: command `trim` failed to parse: effect `trim` requires argument `position`"
         );
     }
 

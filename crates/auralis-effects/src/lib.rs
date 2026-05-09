@@ -28,6 +28,7 @@ mod chain_gain;
 mod command;
 mod command_gain;
 mod command_pad;
+mod command_trim;
 mod dcshift;
 mod effects_file;
 mod error;
@@ -59,4 +60,4 @@ pub use registry::{
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
 pub use reverse::Reverse;
-pub use trim::Trim;
+pub use trim::{Trim, TrimPosition};

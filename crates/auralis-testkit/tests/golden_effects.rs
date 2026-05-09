@@ -38,6 +38,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_reverse_mono_odd_length",
             "effect_reverse_stereo",
             "effect_trim_mono_middle",
+            "effect_trim_mono_multiple_ranges",
+            "effect_trim_stereo_absolute_resume",
             "effect_trim_stereo_middle"
         ]
     );

@@ -4,7 +4,7 @@
 [id.chain_editing_trim_reverse_pad]
 input = "chains/stereo_steps.wav"
 corpus_id = "chains/stereo_steps"
-auralis = ["trim", "2", "9", "reverse", "pad", "1", "2"]
+auralis = ["trim", "2", "7", "reverse", "pad", "1", "2"]
 sox_ng = ["trim", "2s", "7s", "reverse", "pad", "1s", "2s"]
 max_abs = 0.0
 rms = 0.0

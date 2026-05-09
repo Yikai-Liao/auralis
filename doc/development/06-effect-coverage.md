@@ -163,7 +163,22 @@ Implementation notes:
 
 ### Feature 6.1.8: `trim` multiple and relative positions
 
+Status: implemented.
+
 Support multiple trim ranges and relative-position forms.
+
+Implementation notes:
+
+- `Trim` now stores SoX-ng-style positions that alternate between discarding
+  and copying audio, while `Trim::new(start, end)` preserves the existing
+  single-range typed API.
+- The command parser accepts open-ended `trim START`, relative length
+  positions, absolute `=POSITION` resumes, end-relative `-POSITION`, and `-0`
+  end-of-input forms.
+- Standalone golden coverage includes multi-range mono trimming and an
+  absolute-resume stereo case against SoX-ng. The existing middle-range
+  goldens now use SoX-ng's start-plus-length command form on both Auralis and
+  SoX-ng sides.
 
 ## Milestone 6.2: volume, level, and simple modulation effects
 

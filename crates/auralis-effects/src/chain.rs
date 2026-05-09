@@ -436,8 +436,16 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
-        EffectKind::Trim => required_arg_end(tokens, args_start, 2),
+        EffectKind::Trim => trim_arg_end(tokens, args_start),
     }
+}
+
+fn trim_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+    end
 }
 
 fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {
@@ -449,22 +457,6 @@ fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {
         end += 1;
     }
     include_unexpected_argument(tokens, end)
-}
-
-fn required_arg_end(tokens: &[&str], args_start: usize, required: usize) -> usize {
-    let mut end = args_start;
-    let mut consumed = 0;
-
-    while consumed < required && end < tokens.len() && !is_command_boundary(tokens[end]) {
-        consumed += 1;
-        end += 1;
-    }
-
-    if consumed < required {
-        end
-    } else {
-        include_unexpected_argument(tokens, end)
-    }
 }
 
 fn optional_arg_end(tokens: &[&str], args_start: usize, max: usize) -> usize {
@@ -718,22 +710,22 @@ mod tests {
 
     #[test]
     fn chain_token_parser_reports_failing_command_and_argument() {
-        let error = parse_effect_chain(&["gain", "-3", "trim", "1", "reverse"]).unwrap_err();
+        let error = parse_effect_chain(&["gain", "-3", "trim", "reverse"]).unwrap_err();
 
         assert_eq!(
             error,
             EffectChainParseError::CommandParseFailed {
                 index: 1,
-                command: "trim 1".to_owned(),
+                command: "trim".to_owned(),
                 source: crate::EffectCommandParseError::MissingArgument {
                     effect: "trim",
-                    argument: "end-frame",
+                    argument: "position",
                 },
             }
         );
         assert_eq!(
             error.to_string(),
-            "effect chain command 1 (`trim 1`) failed to parse: effect `trim` requires argument `end-frame`"
+            "effect chain command 1 (`trim`) failed to parse: effect `trim` requires argument `position`"
         );
     }
 

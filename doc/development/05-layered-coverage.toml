@@ -85,16 +85,16 @@ l7 = { status = "covered", reason = "Effect command fuzzing covers reverse parsi
 id = "effect.trim"
 kind = "effect"
 name = "trim"
-summary = "End-exclusive decoded frame range selection."
+summary = "SoX-ng-style decoded frame range selection."
 [subject.layers]
 l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
-l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented frame and seconds trim forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
-l3 = { status = "covered", reason = "Analytical unit tests check exact retained ranges, empty ranges, and invalid bounds.", tests = ["crates/auralis-effects/src/trim.rs"] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover start-plus-length, multi-range, absolute-resume, and end-relative trim forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check exact retained ranges, open-ended ranges, multi-range concatenation, end-relative positions, empty ranges, and invalid bounds.", tests = ["crates/auralis-effects/src/trim.rs"] }
 l4 = { status = "covered", reason = "Property tests cover full-range identity and finite-output behavior for trim.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
 l5 = { status = "not_applicable", reason = "The current trim API returns a new whole-buffer range and has no streaming processor to chunk.", tests = [] }
 l6 = { status = "not_applicable", reason = "Trim is a structural slice and currently has no data-parallel SIMD kernel.", tests = [] }
-l7 = { status = "covered", reason = "Effect command fuzzing covers trim argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers trim argument parsing through the shared command parser and a multi-position seed.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/trim_multi"] }
 
 [[subject]]
 id = "pipeline.effect_chain"

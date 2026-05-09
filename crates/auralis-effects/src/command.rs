@@ -40,6 +40,7 @@ use thiserror::Error;
 
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_pad::{parse_pad, render_pad};
+use crate::command_trim::{parse_trim, render_trim};
 use crate::{
     DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Pad,
     Reverse, Trim,
@@ -134,11 +135,7 @@ impl EffectCommand {
             Self::Gain(gain) => render_gain(*gain),
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
-            Self::Trim(trim) => vec![
-                "trim".to_owned(),
-                trim.start.as_u64().to_string(),
-                trim.end.as_u64().to_string(),
-            ],
+            Self::Trim(trim) => render_trim(trim),
         }
     }
 }
@@ -307,29 +304,6 @@ fn parse_dc_shift(effect: &'static str, args: &[&str]) -> CommandResult<EffectCo
             source,
         }
     })
-}
-
-fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let start = required_arg(effect, args, "start-frame")?;
-    let end = args
-        .get(1)
-        .copied()
-        .ok_or(EffectCommandParseError::MissingArgument {
-            effect,
-            argument: "end-frame",
-        })?;
-    reject_extra_arguments(effect, &args[2..])?;
-
-    let start = parse_frame_count(effect, "start-frame", start)?;
-    let end = parse_frame_count(effect, "end-frame", end)?;
-
-    Trim::new(start, end)
-        .map(EffectCommand::Trim)
-        .map_err(|source| EffectCommandParseError::InvalidEffectConfig {
-            effect,
-            argument: "frame-range",
-            source,
-        })
 }
 
 fn parse_reverse(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
@@ -513,7 +487,7 @@ mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
         DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad, Reverse,
-        Trim,
+        Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
@@ -529,7 +503,7 @@ mod tests {
                 EffectCommand::DcShift(DcShift::new(0.25).unwrap()),
             ),
             (
-                &["trim", "1", "3"][..],
+                &["trim", "1", "2"][..],
                 EffectCommand::Trim(Trim::new(FrameCount::new(1), FrameCount::new(3)).unwrap()),
             ),
             (
@@ -838,17 +812,46 @@ mod tests {
     }
 
     #[test]
+    fn parses_sox_ng_trim_positions() {
+        assert_eq!(
+            parse_effect_command(&["trim", "2"]).unwrap(),
+            EffectCommand::Trim(
+                Trim::with_positions([TrimPosition::absolute(FrameCount::new(2))]).unwrap()
+            )
+        );
+        assert_eq!(
+            parse_effect_command(&["trim", "2", "4", "=10", "-2", "-0"]).unwrap(),
+            EffectCommand::Trim(
+                Trim::with_positions([
+                    TrimPosition::absolute(FrameCount::new(2)),
+                    TrimPosition::relative(FrameCount::new(4)),
+                    TrimPosition::absolute(FrameCount::new(10)),
+                    TrimPosition::before_end(FrameCount::new(2)),
+                    TrimPosition::End,
+                ])
+                .unwrap()
+            )
+        );
+        assert_eq!(
+            parse_effect_command(&["trim", "2s", "+4s", "=10s", "-2s", "-0"])
+                .unwrap()
+                .render_tokens(),
+            ["trim", "2", "4", "=10", "-2", "-0"]
+        );
+    }
+
+    #[test]
     fn invalid_numeric_values_are_rejected_before_effect_construction() {
-        let error = parse_effect_command(&["trim", "-1", "2"]).unwrap_err();
+        let error = parse_effect_command(&["trim", "not-a-frame", "2"]).unwrap_err();
 
         assert!(matches!(
             error,
             EffectCommandParseError::InvalidFrameCount {
                 effect: "trim",
-                argument: "start-frame",
+                argument: "position",
                 value,
                 ..
-            } if value == "-1"
+            } if value == "not-a-frame"
         ));
 
         let error = parse_effect_command(&["gain", "not-a-number"]).unwrap_err();
@@ -939,8 +942,8 @@ mod tests {
     fn command_rendering_uses_canonical_names_and_explicit_arguments() {
         let commands = [
             (
-                parse_effect_command(&["trim", "12", "34"]).unwrap(),
-                &["trim", "12", "34"][..],
+                parse_effect_command(&["trim", "12", "22"]).unwrap(),
+                &["trim", "12", "22"][..],
             ),
             (
                 parse_effect_command(&["reverse"]).unwrap(),

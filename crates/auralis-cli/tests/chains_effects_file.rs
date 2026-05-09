@@ -396,7 +396,6 @@ fn run_invalid_positional_chain_reports_failing_effect_and_argument() {
             "gain",
             "-3",
             "trim",
-            "1",
             "reverse",
         ])
         .output()
@@ -407,11 +406,11 @@ fn run_invalid_positional_chain_reports_failing_effect_and_argument() {
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("effect chain command 1 (`trim 1`) failed to parse"),
+        stderr.contains("effect chain command 1 (`trim`) failed to parse"),
         "{stderr}"
     );
     assert!(
-        stderr.contains("effect `trim` requires argument `end-frame`"),
+        stderr.contains("effect `trim` requires argument `position`"),
         "{stderr}"
     );
 }
