@@ -17,8 +17,16 @@
 //! assert_eq!(gain.render_tokens(), ["gain", "-3"]);
 //!
 //! let fade = EffectCommand::parse("fade", &["t", "10", "20"])?;
-//! assert_eq!(fade, EffectCommand::Fade(Fade::new(FrameCount::new(10), FrameCount::new(20))));
-//! assert_eq!(fade.render_tokens(), ["fade", "t", "10", "20"]);
+//! assert_eq!(
+//!     fade,
+//!     EffectCommand::Fade(Fade::with_stop_position(
+//!         auralis_effects::FadeCurve::Linear,
+//!         FrameCount::new(10),
+//!         FrameCount::new(20),
+//!         FrameCount::new(10),
+//!     ))
+//! );
+//! assert_eq!(fade.render_tokens(), ["fade", "t", "10", "20", "10"]);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -52,7 +60,7 @@ pub enum EffectCommand {
     /// Constant normalized full-scale offset.
     DcShift(DcShift),
 
-    /// Linear fade-in and fade-out frame counts.
+    /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
     Fade(Fade),
 
     /// Constant gain in decibels.
@@ -117,12 +125,7 @@ impl EffectCommand {
             Self::DcShift(dc_shift) => {
                 vec!["dcshift".to_owned(), render_f32(dc_shift.shift)]
             }
-            Self::Fade(fade) => vec![
-                "fade".to_owned(),
-                fade.curve.token().to_owned(),
-                fade.fade_in.as_u64().to_string(),
-                fade.fade_out.as_u64().to_string(),
-            ],
+            Self::Fade(fade) => render_fade(fade),
             Self::Gain(gain) => render_gain(gain),
             Self::Pad(pad) => vec![
                 "pad".to_owned(),
@@ -353,15 +356,50 @@ fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<EffectComman
 
     let fade_in = required_arg(effect, args, "fade-in-frame")?;
     let fade_in = parse_frame_count(effect, "fade-in-frame", fade_in)?;
-    let fade_out = match args.get(1).copied() {
-        Some(fade_out) => parse_frame_count(effect, "fade-out-frame", fade_out)?,
-        None => FrameCount::new(0),
+    let fade = if let Some(stop_position) = args.get(1).copied() {
+        let stop_position = parse_fade_stop_position(effect, stop_position)?;
+        let fade_out = match args.get(2).copied() {
+            Some(fade_out) => parse_frame_count(effect, "fade-out-frame", fade_out)?,
+            None => fade_in,
+        };
+        reject_extra_arguments(effect, args.get(3..).unwrap_or_default())?;
+        Fade::with_stop_position(curve, fade_in, stop_position, fade_out)
+    } else {
+        reject_extra_arguments(effect, args.get(1..).unwrap_or_default())?;
+        Fade::with_curve(curve, fade_in, FrameCount::new(0))
     };
-    reject_extra_arguments(effect, args.get(2..).unwrap_or_default())?;
 
-    Ok(EffectCommand::Fade(Fade::with_curve(
-        curve, fade_in, fade_out,
-    )))
+    Ok(EffectCommand::Fade(fade))
+}
+
+fn render_fade(fade: Fade) -> Vec<String> {
+    let mut tokens = vec![
+        "fade".to_owned(),
+        fade.curve.token().to_owned(),
+        fade.fade_in.as_u64().to_string(),
+    ];
+
+    match fade.stop_position {
+        Some(stop_position) => {
+            tokens.push(stop_position.as_u64().to_string());
+            tokens.push(fade.fade_out.as_u64().to_string());
+        }
+        None if fade.fade_out.as_u64() != 0 => {
+            tokens.push("0".to_owned());
+            tokens.push(fade.fade_out.as_u64().to_string());
+        }
+        None => {}
+    }
+
+    tokens
+}
+
+fn parse_fade_stop_position(effect: &'static str, value: &str) -> CommandResult<FrameCount> {
+    if value == "-0" {
+        return Ok(FrameCount::new(0));
+    }
+
+    parse_frame_count(effect, "stop-position", value)
 }
 
 pub(super) fn required_arg<'args>(
@@ -508,7 +546,12 @@ mod tests {
             (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
             (
                 &["fade", "t", "4", "2"][..],
-                EffectCommand::Fade(Fade::new(FrameCount::new(4), FrameCount::new(2))),
+                EffectCommand::Fade(Fade::with_stop_position(
+                    FadeCurve::Linear,
+                    FrameCount::new(4),
+                    FrameCount::new(2),
+                    FrameCount::new(4),
+                )),
             ),
         ];
 
@@ -563,13 +606,45 @@ mod tests {
         for (token, curve) in expected {
             assert_eq!(
                 parse_effect_command(&["fade", token, "3", "2"]).unwrap(),
-                EffectCommand::Fade(Fade::with_curve(
+                EffectCommand::Fade(Fade::with_stop_position(
                     curve,
                     FrameCount::new(3),
                     FrameCount::new(2),
+                    FrameCount::new(3),
                 ))
             );
         }
+    }
+
+    #[test]
+    fn sox_ng_fade_stop_position_and_fade_out_length_parse_into_typed_config() {
+        assert_eq!(
+            parse_effect_command(&["fade", "t", "4", "0"]).unwrap(),
+            EffectCommand::Fade(Fade::with_stop_position(
+                FadeCurve::Linear,
+                FrameCount::new(4),
+                FrameCount::new(0),
+                FrameCount::new(4),
+            ))
+        );
+        assert_eq!(
+            parse_effect_command(&["fade", "t", "4", "12", "3"]).unwrap(),
+            EffectCommand::Fade(Fade::with_stop_position(
+                FadeCurve::Linear,
+                FrameCount::new(4),
+                FrameCount::new(12),
+                FrameCount::new(3),
+            ))
+        );
+        assert_eq!(
+            parse_effect_command(&["fade", "t", "4", "-0", "3"]).unwrap(),
+            EffectCommand::Fade(Fade::with_stop_position(
+                FadeCurve::Linear,
+                FrameCount::new(4),
+                FrameCount::new(0),
+                FrameCount::new(3),
+            ))
+        );
     }
 
     #[test]
@@ -796,8 +871,8 @@ mod tests {
             (&["pad"][..], &["pad", "0", "0"][..], &["pad", "0", "0"][..]),
             (
                 &["fade", "t", "3"][..],
-                &["fade", "t", "3", "0"][..],
-                &["fade", "t", "3", "0"][..],
+                &["fade", "t", "3"][..],
+                &["fade", "t", "3"][..],
             ),
         ];
 
@@ -822,7 +897,11 @@ mod tests {
             ),
             (
                 parse_effect_command(&["fade", "q", "4", "2"]).unwrap(),
-                &["fade", "q", "4", "2"][..],
+                &["fade", "q", "4", "2", "4"][..],
+            ),
+            (
+                parse_effect_command(&["fade", "q", "4", "0", "2"]).unwrap(),
+                &["fade", "q", "4", "0", "2"][..],
             ),
         ];
 

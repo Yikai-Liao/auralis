@@ -456,11 +456,12 @@ as `dc-shift` and `gain-db` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "t",
-"24000", "24000"]` parse into typed `EffectCommand` variants. The parser
-currently accepts the frame-count subset implemented by Auralis and supports
-SoX-ng fade curve tokens `q`, `h`, `l`, `t`, and `p`; future SoX-ng options
-such as dcshift limiter gain are rejected with effect- and option-specific
-diagnostics. The implemented `gain` command
+"24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
+accepts the frame-count subset implemented by Auralis and supports SoX-ng fade
+curve tokens `q`, `h`, `l`, `t`, and `p`, stop-position fade-out semantics,
+and fade-out lengths measured backward from the stop position; future SoX-ng
+options such as dcshift limiter gain are rejected with effect- and
+option-specific diagnostics. The implemented `gain` command
 forms include plain fixed gain, `gain -h`, `gain -r`, combined
 `gain -rh`/`gain -hr` headroom reclaim, peak normalization with `gain -n`, and
 the simple limiter with `gain -l`, plus channel peak equalization with
@@ -490,12 +491,12 @@ commands:
 # level and editing chain
 gain -3
 dcshift 0.125 : reverse
-fade t 24000 24000
+fade t 24000 0 24000
 ```
 
 Parsing this text with `parse_effects_file_str` or `parse_effects_file`
 produces the same typed `EffectChain` as the flat CLI-style token stream `gain
--3 dcshift 0.125 : reverse fade t 24000 24000`. The CLI accepts the same file
+-3 dcshift 0.125 : reverse fade t 24000 0 24000`. The CLI accepts the same file
 with `auralis run input.wav output.wav --effects-file chain.effects`; effects
 files are mutually exclusive with positional chain tokens and legacy effect
 flags because their relative order would otherwise be ambiguous. Empty boundary
@@ -596,7 +597,7 @@ auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out
 auralis run input.wav output.wav --reverse
 auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
 auralis run input.wav output.wav gain -3 : dcshift 0.125 reverse
-auralis run input.wav output.wav --backend simd gain -3 fade t 24000 24000
+auralis run input.wav output.wav --backend simd gain -3 fade t 24000 0 24000
 auralis run input.wav output.wav --effects-file chain.effects
 auralis run first.wav output.wav --combine concatenate --input second.wav reverse
 auralis run first.wav output.wav --combine sequence --input second.wav reverse
@@ -756,7 +757,8 @@ for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`, and
 `fade`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing, and
-fade-in cases for the SoX-ng `q`, `h`, `l`, `t`, and `p` curve families.
+fade-in cases for the SoX-ng `q`, `h`, `l`, `t`, and `p` curve families plus
+linear fade-out-at-end and explicit stop-position fade-out cases.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.

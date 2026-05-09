@@ -4,6 +4,8 @@ use auralis_core::{AudioBuffer, FrameCount};
 use auralis_dsp::{fade_in_place, fade_in_place_with_backend};
 use auralis_simd::{BackendKind, select_backend};
 
+use crate::{EffectError, Result};
+
 /// SoX-ng fade curve family.
 ///
 /// Curves map a normalized fade position in `[0.0, 1.0]` to a gain
@@ -76,6 +78,11 @@ impl FadeCurve {
 /// overlap, their coefficients are multiplied. Zero-length fades are identity
 /// transforms.
 ///
+/// Command parsing can also create a SoX-ng positional fade with an explicit
+/// stop position. That form truncates or pads the output to the stop frame and
+/// uses SoX-ng's fade-out indexing, where the final retained frame has a
+/// coefficient of `1 / fade-out-length` instead of zero.
+///
 /// # Examples
 ///
 /// ```
@@ -108,6 +115,13 @@ pub struct Fade {
     /// Frames over which to ramp from silence to unity at the start.
     pub fade_in: FrameCount,
 
+    /// Optional SoX-ng stop position for command-style fade-out processing.
+    ///
+    /// `None` preserves Auralis' direct API behavior. `Some(0)` means the end
+    /// of the input audio, matching SoX-ng's historical `0` stop-position
+    /// spelling.
+    pub stop_position: Option<FrameCount>,
+
     /// Frames over which to ramp from unity to silence at the end.
     pub fade_out: FrameCount,
 }
@@ -125,6 +139,27 @@ impl Fade {
         Self {
             curve,
             fade_in,
+            stop_position: None,
+            fade_out,
+        }
+    }
+
+    /// Creates a SoX-ng positional fade processor.
+    ///
+    /// `stop_position` is the output frame count after truncation or padding.
+    /// A value of zero means the input length. `fade_out` is measured backward
+    /// from the resolved stop position.
+    #[must_use]
+    pub const fn with_stop_position(
+        curve: FadeCurve,
+        fade_in: FrameCount,
+        stop_position: FrameCount,
+        fade_out: FrameCount,
+    ) -> Self {
+        Self {
+            curve,
+            fade_in,
+            stop_position: Some(stop_position),
             fade_out,
         }
     }
@@ -159,6 +194,63 @@ impl Fade {
                 );
             }
         }
+    }
+
+    /// Applies the fade and returns an output buffer.
+    ///
+    /// For ordinary direct fades, this clones the input and applies the same
+    /// in-place envelope as [`Self::process_buffer_with_backend`]. For
+    /// positional fades, this applies SoX-ng stop-position semantics, including
+    /// output truncation, zero padding when the stop is past the input length,
+    /// and SoX-ng's fade-out endpoint indexing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::FadeRegionsOverlap`] when a positional fade-out
+    /// starts before the fade-in has completed, allowing SoX-ng's one-frame
+    /// rounding grace. Returns [`EffectError::FadeLengthOverflow`] when the
+    /// requested output shape cannot be represented.
+    pub fn process_buffer_to_output(
+        self,
+        audio: &AudioBuffer,
+        requested_backend: BackendKind,
+    ) -> Result<AudioBuffer> {
+        let Some(stop_position) = self.stop_position else {
+            let mut output = audio.clone();
+            self.process_buffer_with_backend(&mut output, requested_backend);
+            return Ok(output);
+        };
+
+        let plan = self.positioned_plan(audio.frames().as_u64(), stop_position)?;
+        let output_frames = FrameCount::new(plan.output_frames);
+        let output_frames_usize =
+            usize::try_from(plan.output_frames).map_err(|_| EffectError::FadeLengthOverflow)?;
+        let input_frames_usize = usize::try_from(audio.frames().as_u64())
+            .map_err(|_| EffectError::FadeLengthOverflow)?;
+        let copied_frames = input_frames_usize.min(output_frames_usize);
+        let capacity = audio
+            .channels()
+            .as_usize()
+            .checked_mul(output_frames_usize)
+            .ok_or(EffectError::FadeLengthOverflow)?;
+        let mut data = Vec::with_capacity(capacity);
+
+        for channel_index in 0..audio.channels().as_usize() {
+            let channel = audio
+                .channel(channel_index)
+                .ok_or(EffectError::FadeLengthOverflow)?;
+            data.extend_from_slice(&channel[..copied_frames]);
+            data.resize(data.len() + output_frames_usize - copied_frames, 0.0);
+        }
+
+        let mut output = AudioBuffer::from_planar_f32(audio.spec(), output_frames, data)?;
+        for channel_index in 0..output.channels().as_usize() {
+            if let Some(channel) = output.channel_mut(channel_index) {
+                self.process_positioned_channel_segment(channel, plan, FrameCount::new(0));
+            }
+        }
+
+        Ok(output)
     }
 
     /// Applies the fade to a contiguous channel segment with a known frame
@@ -247,6 +339,75 @@ impl Fade {
 
         coefficient
     }
+
+    fn positioned_plan(
+        self,
+        input_frames: u64,
+        stop_position: FrameCount,
+    ) -> Result<PositionedFadePlan> {
+        let output_frames = if stop_position.as_u64() == 0 {
+            input_frames
+        } else {
+            stop_position.as_u64()
+        };
+        let fade_out_start = output_frames.saturating_sub(self.fade_out.as_u64());
+        let mut fade_in = self.fade_in.as_u64();
+
+        if fade_out_start != 0 && fade_in > fade_out_start {
+            fade_in = fade_in.saturating_sub(1);
+            if fade_in > fade_out_start {
+                return Err(EffectError::FadeRegionsOverlap);
+            }
+        }
+
+        Ok(PositionedFadePlan {
+            output_frames,
+            fade_in,
+            fade_out_start,
+        })
+    }
+
+    fn process_positioned_channel_segment(
+        self,
+        samples: &mut [f32],
+        plan: PositionedFadePlan,
+        start_frame: FrameCount,
+    ) {
+        for (offset, sample) in samples.iter_mut().enumerate() {
+            let Ok(offset) = u64::try_from(offset) else {
+                return;
+            };
+            let Some(frame_index) = start_frame.as_u64().checked_add(offset) else {
+                return;
+            };
+
+            *sample *= self.positioned_coefficient(frame_index, plan);
+        }
+    }
+
+    fn positioned_coefficient(self, frame_index: u64, plan: PositionedFadePlan) -> f32 {
+        if plan.fade_in != 0 && frame_index < plan.fade_in {
+            return self.curve.coefficient(frame_index, plan.fade_in);
+        }
+
+        if self.fade_out.as_u64() != 0
+            && frame_index < plan.output_frames
+            && frame_index >= plan.fade_out_start
+        {
+            let remaining = plan.output_frames - frame_index;
+            let range = plan.output_frames - plan.fade_out_start;
+            return self.curve.coefficient(remaining, range);
+        }
+
+        1.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PositionedFadePlan {
+    output_frames: u64,
+    fade_in: u64,
+    fade_out_start: u64,
 }
 
 fn ratio(numerator: u64, denominator: u64) -> f32 {
@@ -262,6 +423,7 @@ fn ratio(numerator: u64, denominator: u64) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{Fade, FadeCurve};
+    use crate::EffectError;
     use crate::test_support::{
         assert_sample_bits_eq, assert_samples_close, audio_buffer, stereo_audio_buffer,
     };
@@ -300,6 +462,74 @@ mod tests {
 
         assert_samples_close(fade_in.as_planar_f32(), &[0.0, 0.25, 0.5, 0.75, 1.0]);
         assert_samples_close(fade_out.as_planar_f32(), &[1.0, 0.75, 0.5, 0.25, 0.0]);
+    }
+
+    #[test]
+    fn positioned_fade_out_uses_sox_ng_stop_endpoint_indexing() {
+        let audio = audio_buffer(vec![1.0; 6]);
+
+        let faded = Fade::with_stop_position(
+            FadeCurve::Linear,
+            FrameCount::new(0),
+            FrameCount::new(0),
+            FrameCount::new(4),
+        )
+        .process_buffer_to_output(&audio, BackendKind::Scalar)
+        .unwrap();
+
+        assert_eq!(faded.frames(), FrameCount::new(6));
+        assert_samples_close(faded.as_planar_f32(), &[1.0, 1.0, 1.0, 0.75, 0.5, 0.25]);
+    }
+
+    #[test]
+    fn positioned_fade_truncates_or_pads_to_stop_position() {
+        let audio = stereo_audio_buffer(vec![1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0]);
+
+        let truncated = Fade::with_stop_position(
+            FadeCurve::Linear,
+            FrameCount::new(0),
+            FrameCount::new(3),
+            FrameCount::new(2),
+        )
+        .process_buffer_to_output(&audio, BackendKind::Scalar)
+        .unwrap();
+        let padded = Fade::with_stop_position(
+            FadeCurve::Linear,
+            FrameCount::new(0),
+            FrameCount::new(6),
+            FrameCount::new(2),
+        )
+        .process_buffer_to_output(&audio, BackendKind::Scalar)
+        .unwrap();
+
+        assert_eq!(truncated.frames(), FrameCount::new(3));
+        assert_samples_close(
+            truncated.as_planar_f32(),
+            &[1.0, 1.0, 0.5, -1.0, -1.0, -0.5],
+        );
+        assert_eq!(padded.frames(), FrameCount::new(6));
+        assert_samples_close(
+            padded.as_planar_f32(),
+            &[
+                1.0, 1.0, 1.0, 1.0, 0.0, 0.0, -1.0, -1.0, -1.0, -1.0, 0.0, 0.0,
+            ],
+        );
+    }
+
+    #[test]
+    fn positioned_fade_rejects_overlapping_fade_regions() {
+        let audio = audio_buffer(vec![1.0; 8]);
+
+        let error = Fade::with_stop_position(
+            FadeCurve::Linear,
+            FrameCount::new(6),
+            FrameCount::new(8),
+            FrameCount::new(4),
+        )
+        .process_buffer_to_output(&audio, BackendKind::Scalar)
+        .unwrap_err();
+
+        assert_eq!(error, EffectError::FadeRegionsOverlap);
     }
 
     #[test]

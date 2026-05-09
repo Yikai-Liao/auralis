@@ -25,12 +25,12 @@ l7 = { status = "covered", reason = "Effect command fuzzing covers dcshift argum
 id = "effect.fade"
 kind = "effect"
 name = "fade"
-summary = "SoX-ng q/h/l/t/p fade-in and fade-out envelope."
+summary = "SoX-ng q/h/l/t/p fade-in and positional fade-out envelope."
 [subject.layers]
 l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
-l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover q/h/l/t/p fade-in command curves.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
-l3 = { status = "covered", reason = "Analytical unit tests check linear and SoX-ng q/h/l/p curve coefficients plus chunk-position helper behavior.", tests = ["crates/auralis-effects/src/fade.rs"] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover q/h/l/t/p fade-in command curves plus fade-out-at-end and explicit stop-position cases.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check linear and SoX-ng q/h/l/p curve coefficients, SoX-ng positional fade-out indexing, truncation, padding, and chunk-position helper behavior.", tests = ["crates/auralis-effects/src/fade.rs"] }
 l4 = { status = "covered", reason = "Property tests include identity and finite-output coverage for fade.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
 l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers frame-position-aware fade processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
 l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for fade kernels and typed effect dispatch.", tests = ["crates/auralis-simd/src/fade_tests.rs", "crates/auralis-effects/src/fade.rs"] }

@@ -34,6 +34,14 @@ pub enum EffectError {
         sample_index: usize,
     },
 
+    /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
+    #[error("fade-out overlaps fade-in")]
+    FadeRegionsOverlap,
+
+    /// A positional fade would create a buffer shape that cannot be represented.
+    #[error("fade stop position exceeds representable audio buffer length")]
+    FadeLengthOverflow,
+
     /// A buffer with an invalid shape was produced while applying an effect.
     #[error(transparent)]
     Core(#[from] auralis_core::AuralisError),

@@ -392,7 +392,14 @@ fn apply_command(
             Ok(())
         }
         EffectCommand::Fade(fade) => {
-            fade.process_buffer_with_backend(audio, requested_backend);
+            if fade.stop_position.is_some() {
+                let faded = fade
+                    .process_buffer_to_output(audio, requested_backend)
+                    .map_err(|source| ("frame-count", source))?;
+                *audio = faded;
+            } else {
+                fade.process_buffer_with_backend(audio, requested_backend);
+            }
             Ok(())
         }
         EffectCommand::Gain(gain) => {
@@ -487,6 +494,10 @@ fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
         return end;
     }
     end += 1;
+
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
 
     if end < tokens.len() && !is_command_boundary(tokens[end]) {
         end += 1;
@@ -624,7 +635,7 @@ mod tests {
     #[test]
     fn parses_flat_tokens_into_user_ordered_effect_chain() {
         let chain = parse_effect_chain(&[
-            "gain", "-3", "dcshift", "0.125", "fade", "t", "2", "1", "reverse",
+            "gain", "-3", "dcshift", "0.125", "fade", "t", "2", "reverse",
         ])
         .unwrap();
 
@@ -638,7 +649,7 @@ mod tests {
             vec![
                 vec!["gain", "-3"],
                 vec!["dcshift", "0.125"],
-                vec!["fade", "t", "2", "1"],
+                vec!["fade", "t", "2"],
                 vec!["reverse"],
             ]
         );

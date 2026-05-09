@@ -17,9 +17,11 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_fade_mono_half_sine_in",
             "effect_fade_mono_inverted_parabola_in",
             "effect_fade_mono_linear_in",
+            "effect_fade_mono_linear_out_at_end",
             "effect_fade_mono_logarithmic_in",
             "effect_fade_mono_quarter_sine_in",
             "effect_fade_stereo_linear_in",
+            "effect_fade_stereo_linear_stop_position",
             "effect_gain_balance_no_clip_stereo_plus_6",
             "effect_gain_balance_stereo_plus_6",
             "effect_gain_equalize_stereo_minus_6",
@@ -60,7 +62,9 @@ fn effects_golden_manifest_renders_representative_commands() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
     let gain = manifest.get("effect_gain_mono_minus_3").unwrap();
     let trim = manifest.get("effect_trim_stereo_middle").unwrap();
-    let fade = manifest.get("effect_fade_stereo_linear_in").unwrap();
+    let fade = manifest
+        .get("effect_fade_stereo_linear_stop_position")
+        .unwrap();
 
     assert_eq!(
         gain.render_auralis_command_line("auralis", "in.wav", "out.wav"),
@@ -72,7 +76,7 @@ fn effects_golden_manifest_renders_representative_commands() {
     );
     assert_eq!(
         fade.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
-        "sox_ng -R -D in.wav out.wav fade t 4s"
+        "sox_ng -R -D in.wav out.wav fade t 0 24s 6s"
     );
 }
 

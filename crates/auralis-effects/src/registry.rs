@@ -27,7 +27,7 @@ pub enum EffectKind {
     /// Constant normalized full-scale offset.
     DcShift,
 
-    /// Linear fade-in and fade-out envelope.
+    /// SoX-ng-style fade-in and optional positional fade-out envelope.
     Fade,
 
     /// Constant gain in decibels.

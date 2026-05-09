@@ -1,5 +1,5 @@
-fade q 5 0
-fade h 5 0
-fade l 5 0
-fade t 5 0
-fade p 5 0
+fade q 5
+fade h 5
+fade l 5
+fade t 5 0 2
+fade p 5 12 3

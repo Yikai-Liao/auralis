@@ -105,7 +105,23 @@ Implementation notes:
 
 ### Feature 6.1.5: `fade` stop position and fade-out length
 
+Status: implemented.
+
 Complete SoX-ng positional fade semantics beyond the initial frame-count subset.
+
+Implementation notes:
+
+- `fade [type] fade-in-length` remains a fade-in-only command.
+- `fade [type] fade-in-length stop-position` now enables SoX-ng fade-out
+  processing and defaults the fade-out length to the fade-in length.
+- `fade [type] fade-in-length stop-position fade-out-length` supports explicit
+  fade-out length; `0` and `-0` stop positions mean the end of the input.
+- Command-style fades truncate at the stop position or pad silence when the
+  stop is past the input length, and use SoX-ng's fade-out endpoint indexing
+  where the final retained frame is attenuated by `1 / fade-out-length`.
+- Direct `Fade::new(fade_in, fade_out)` preserves Auralis' original in-place
+  end-fade behavior for typed API and legacy CLI flag callers.
+- Golden coverage includes fade-out-at-end and explicit stop-position cases.
 
 ### Feature 6.1.6: `dcshift` limiter gain
 
