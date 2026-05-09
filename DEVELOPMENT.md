@@ -115,6 +115,7 @@ Per-crate rules:
 
 | Crate | Allowed dependencies now | Must not expose or depend on |
 |---|---|---|
+| `auralis` | `thiserror`, internal Auralis crates | CLI parser types or concrete backend implementation types beyond facade boundaries |
 | `auralis-core` | `thiserror`; optional `serde` only when serialization is a feature | `hound`, `clap`, `rten-simd`, `pyo3`, `ndarray`, `rayon` |
 | `auralis-codec` / `auralis-wav` | `thiserror`, `hound` where WAV is implemented | `hound` types in public core APIs |
 | `auralis-dsp` | `thiserror`; later optional `rten-simd` and `bytemuck` | backend crate names in public effect APIs |
@@ -271,6 +272,7 @@ Create:
 Cargo.toml
 rust-toolchain.toml
 crates/auralis-core
+crates/auralis
 crates/auralis-codec
 crates/auralis-wav
 crates/auralis-dsp
@@ -523,6 +525,8 @@ Do not add CLI effect yet.
 ---
 
 ### Feature 2.3: library chain API for gain
+
+Status: implemented.
 
 Implement chainable call:
 

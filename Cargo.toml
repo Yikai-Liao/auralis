@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/auralis",
     "crates/auralis-cli",
     "crates/auralis-codec",
     "crates/auralis-core",

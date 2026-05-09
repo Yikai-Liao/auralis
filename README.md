@@ -25,9 +25,9 @@ place for WAV-only scope and explicit unsupported-format reporting. PCM16 WAV
 decoding into planar `f32` buffers and encoding back to PCM16 WAV are
 implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
-pipeline. The scalar `gain` DSP kernel is implemented; effect processors and
-the typed `Gain` effect processor are implemented. Effect transform CLI options
-are still intentionally unimplemented.
+pipeline. The scalar `gain` DSP kernel, the typed `Gain` effect processor, and
+the high-level library chain API for applying gain are implemented. Effect
+transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -196,6 +196,7 @@ auralis/
 ├── README.md
 ├── DEVELOPMENT.md
 ├── crates/
+│   ├── auralis/
 │   ├── auralis-core/
 │   ├── auralis-codec/
 │   ├── auralis-wav/
@@ -230,6 +231,18 @@ Defines the stable vocabulary of the project:
 - `Result<T>`
 
 This crate should have no dependency on CLI, WAV libraries, Python, or SIMD backends.
+
+### `auralis`
+
+Provides the high-level library facade:
+
+- `AudioFile::open_wav`
+- `AudioFile::into_pipeline`
+- `Pipeline::gain_db`
+- `Pipeline::write_wav`
+
+This crate wires together core buffers, WAV I/O, and typed effects while keeping
+the lower-level crates available for focused testing and specialized use.
 
 ### `auralis-codec`
 
