@@ -320,14 +320,17 @@ impl Pipeline {
     /// coefficients `[0.0, 0.25, 0.5, 0.75]` for fade-in and
     /// `[0.75, 0.5, 0.25, 0.0]` for fade-out. If the fade regions overlap,
     /// their coefficients are multiplied. Passing `0` for either side leaves
-    /// that side unchanged.
+    /// that side unchanged. Processing is deterministic, in-place,
+    /// non-allocating, and uses the requested backend for the backend-aware
+    /// `Fade` effect. Scalar remains the default.
     #[must_use]
     pub fn fade_frames(mut self, fade_in: u64, fade_out: u64) -> Self {
         let Ok(audio) = &mut self.audio else {
             return self;
         };
 
-        Fade::new(FrameCount::new(fade_in), FrameCount::new(fade_out)).process_buffer(audio);
+        Fade::new(FrameCount::new(fade_in), FrameCount::new(fade_out))
+            .process_buffer_with_backend(audio, self.requested_backend);
 
         self
     }
@@ -560,6 +563,43 @@ mod tests {
             actual.as_planar_f32(),
             &[0.0, 0.5, 0.5, 0.0, -0.0, -0.5, -0.5, -0.0],
         );
+    }
+
+    #[test]
+    fn chain_fade_frames_matches_under_forced_scalar_and_requested_simd() {
+        let source = stereo_audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+            1.0,
+            0.999_984_74,
+            0.5,
+            0.0,
+            -0.0,
+            -0.5,
+            -0.999_984_74,
+            -1.0,
+        ]);
+
+        let scalar = AudioFile::from_audio_buffer(source.clone())
+            .into_pipeline()
+            .with_backend(BackendKind::Scalar)
+            .fade_frames(5, 7)
+            .into_audio_buffer()
+            .unwrap();
+        let simd = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_backend(BackendKind::Simd)
+            .fade_frames(5, 7)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
     }
 
     #[test]

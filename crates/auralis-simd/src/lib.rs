@@ -6,8 +6,9 @@
 //! implementation crates such as `rten-simd` out of public API types.
 //!
 //! Gain kernels accept a linear amplitude multiplier. DC shift kernels accept a
-//! normalized full-scale offset. Higher-level DSP APIs validate effect
-//! configuration before dispatching here.
+//! normalized full-scale offset. Fade kernels apply linear envelope
+//! multiplication over frame-indexed channel segments. Higher-level DSP APIs
+//! validate effect configuration before dispatching here.
 //!
 //! # Examples
 //!
@@ -273,11 +274,10 @@ impl Backend for ScalarBackend {
     const AVAILABLE: bool = true;
 }
 
-/// Placeholder optimized backend compiled when the optional `simd` feature is enabled.
+/// Optimized backend marker compiled when the optional `simd` feature is enabled.
 ///
-/// This marker does not implement any kernels yet. It proves that the selected
-/// SIMD dependency can be built behind an Auralis-owned backend boundary before
-/// later features add concrete conversion and effect kernels.
+/// Concrete kernels are exposed through Auralis-owned free functions so
+/// `rten-simd` types remain private implementation details.
 #[cfg(feature = "simd")]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SimdBackend;
@@ -531,6 +531,64 @@ pub fn dc_shift_f32_in_place_with_backend(
     }
 }
 
+/// Applies a linear fade envelope to a channel segment using the scalar reference backend.
+///
+/// `total_frames` is the full channel length, `start_frame` is the frame index
+/// of `samples[0]`, and `fade_in` / `fade_out` are frame lengths. A fade-in
+/// length of `4` uses coefficients `[0.0, 0.25, 0.5, 0.75]`; a fade-out length
+/// of `4` applies `[0.75, 0.5, 0.25, 0.0]` to the final four frames. When the
+/// fade regions overlap, their coefficients are multiplied. Empty buffers and
+/// zero-length fades are accepted.
+///
+/// The operation is deterministic, in-place, non-allocating, and does not clip
+/// or validate samples. NaN and infinity inputs retain ordinary floating-point
+/// multiplication semantics.
+///
+/// # Examples
+///
+/// ```
+/// let mut samples = [1.0; 4];
+///
+/// auralis_simd::fade_f32_in_place_scalar(&mut samples, 4, 0, 2, 2);
+///
+/// assert_eq!(samples, [0.0, 0.5, 0.5, 0.0]);
+/// ```
+pub fn fade_f32_in_place_scalar(
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    fade_f32_scalar_unchecked(samples, total_frames, start_frame, fade_in, fade_out);
+}
+
+/// Applies a linear fade envelope to a channel segment using the backend
+/// recorded by `selection`.
+///
+/// Callers that need deterministic tests can pass the result of
+/// [`select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`]. When a SIMD request falls back to scalar, this
+/// function follows the selected backend recorded in the selection metadata.
+/// Numerical behavior is identical to [`fade_f32_in_place_scalar`].
+pub fn fade_f32_in_place_with_backend(
+    selection: BackendSelection,
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    match selection.selected_kind() {
+        BackendKind::Scalar => {
+            fade_f32_scalar_unchecked(samples, total_frames, start_frame, fade_in, fade_out);
+        }
+        BackendKind::Simd => {
+            fade_f32_selected_simd(samples, total_frames, start_frame, fade_in, fade_out);
+        }
+    }
+}
+
 const fn scalar_descriptor() -> BackendDescriptor {
     BackendDescriptor::new(BackendKind::Scalar, BackendKind::Scalar.as_str(), true)
 }
@@ -664,6 +722,52 @@ fn dc_shift_f32_scalar_unchecked(samples: &mut [f32], shift: f32) {
     }
 }
 
+#[inline]
+fn fade_f32_scalar_unchecked(
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    for (offset, sample) in samples.iter_mut().enumerate() {
+        let Ok(offset) = u64::try_from(offset) else {
+            return;
+        };
+        let Some(frame_index) = start_frame.checked_add(offset) else {
+            return;
+        };
+        *sample *= fade_coefficient(frame_index, total_frames, fade_in, fade_out);
+    }
+}
+
+fn fade_coefficient(frame_index: u64, total_frames: u64, fade_in: u64, fade_out: u64) -> f32 {
+    let mut coefficient = 1.0;
+
+    if fade_in != 0 && frame_index < fade_in {
+        coefficient *= ratio(frame_index, fade_in);
+    }
+
+    if fade_out != 0 && frame_index < total_frames {
+        let remaining = total_frames - frame_index - 1;
+        if remaining < fade_out {
+            coefficient *= ratio(remaining, fade_out);
+        }
+    }
+
+    coefficient
+}
+
+fn ratio(numerator: u64, denominator: u64) -> f32 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Fade coefficients are applied at the f32 sample boundary; exact integer precision above f32 mantissa range is not meaningful for audio buffers."
+    )]
+    {
+        numerator as f32 / denominator as f32
+    }
+}
+
 #[allow(
     clippy::cast_possible_truncation,
     reason = "the sample is rounded and clamped to the i16 range before casting"
@@ -695,6 +799,17 @@ fn gain_f32_selected_simd(samples: &mut [f32], multiplier: f32) {
 #[cfg(not(feature = "simd"))]
 fn dc_shift_f32_selected_simd(samples: &mut [f32], shift: f32) {
     dc_shift_f32_scalar_unchecked(samples, shift);
+}
+
+#[cfg(not(feature = "simd"))]
+fn fade_f32_selected_simd(
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    fade_f32_scalar_unchecked(samples, total_frames, start_frame, fade_in, fade_out);
 }
 
 #[cfg(feature = "simd")]
@@ -892,6 +1007,118 @@ fn dc_shift_f32_selected_simd(samples: &mut [f32], shift: f32) {
     ApplyDcShift { samples, shift }.dispatch();
 }
 
+#[cfg(feature = "simd")]
+fn fade_f32_selected_simd(
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    use rten_simd::{Isa, SimdOp, ops::NumOps};
+
+    const MAX_F32_VECTOR_LANES: usize = 16;
+
+    struct ApplyFade<'samples> {
+        samples: &'samples mut [f32],
+        total_frames: u64,
+        start_frame: u64,
+        fade_in: u64,
+        fade_out: u64,
+    }
+
+    impl SimdOp for ApplyFade<'_> {
+        type Output = ();
+
+        #[expect(
+            clippy::inline_always,
+            reason = "rten-simd recommends inlining eval so target-feature intrinsics compile into the dispatched kernel body"
+        )]
+        #[inline(always)]
+        fn eval<I: Isa>(self, isa: I) -> Self::Output {
+            let f32_ops = isa.f32();
+            let vector_len = f32_ops.len();
+
+            if vector_len == 0 || vector_len > MAX_F32_VECTOR_LANES {
+                fade_f32_scalar_unchecked(
+                    self.samples,
+                    self.total_frames,
+                    self.start_frame,
+                    self.fade_in,
+                    self.fade_out,
+                );
+                return;
+            }
+
+            let Ok(vector_len_u64) = u64::try_from(vector_len) else {
+                fade_f32_scalar_unchecked(
+                    self.samples,
+                    self.total_frames,
+                    self.start_frame,
+                    self.fade_in,
+                    self.fade_out,
+                );
+                return;
+            };
+            let last_lane = vector_len_u64 - 1;
+            let mut chunks = self.samples.chunks_exact_mut(vector_len);
+            let mut chunk_start_frame = self.start_frame;
+
+            for chunk in chunks.by_ref() {
+                if chunk_start_frame.checked_add(last_lane).is_none() {
+                    fade_f32_scalar_unchecked(
+                        chunk,
+                        self.total_frames,
+                        chunk_start_frame,
+                        self.fade_in,
+                        self.fade_out,
+                    );
+                    return;
+                }
+
+                let mut coefficients = [0.0; MAX_F32_VECTOR_LANES];
+                for (lane, coefficient) in coefficients[..vector_len].iter_mut().enumerate() {
+                    let Ok(lane) = u64::try_from(lane) else {
+                        return;
+                    };
+                    *coefficient = fade_coefficient(
+                        chunk_start_frame + lane,
+                        self.total_frames,
+                        self.fade_in,
+                        self.fade_out,
+                    );
+                }
+
+                let faded = f32_ops.mul(f32_ops.load(chunk), f32_ops.load(&coefficients));
+
+                f32_ops.store(faded, chunk);
+
+                let Some(next_start_frame) = chunk_start_frame.checked_add(vector_len_u64) else {
+                    return;
+                };
+                chunk_start_frame = next_start_frame;
+            }
+
+            fade_f32_scalar_unchecked(
+                chunks.into_remainder(),
+                self.total_frames,
+                chunk_start_frame,
+                self.fade_in,
+                self.fade_out,
+            );
+        }
+    }
+
+    ApplyFade {
+        samples,
+        total_frames,
+        start_frame,
+        fade_in,
+        fade_out,
+    }
+    .dispatch();
+}
+
 mod private {
     use super::ScalarBackend;
 
@@ -911,9 +1138,9 @@ mod tests {
         Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection,
         SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor,
         dc_shift_f32_in_place_scalar, dc_shift_f32_in_place_with_backend, f32_to_i16_scalar,
-        f32_to_i16_with_backend, gain_f32_in_place_scalar, gain_f32_in_place_with_backend,
-        i16_to_f32_scalar, i16_to_f32_with_backend, select_backend, select_backend_with_status,
-        select_named_backend,
+        f32_to_i16_with_backend, fade_f32_in_place_scalar, fade_f32_in_place_with_backend,
+        gain_f32_in_place_scalar, gain_f32_in_place_with_backend, i16_to_f32_scalar,
+        i16_to_f32_with_backend, select_backend, select_backend_with_status, select_named_backend,
     };
 
     #[test]
@@ -1278,6 +1505,67 @@ mod tests {
         }
     }
 
+    #[test]
+    fn scalar_fade_f32_matches_known_values_exactly() {
+        let mut samples = [1.0; 6];
+
+        fade_f32_in_place_scalar(&mut samples, 6, 0, 4, 3);
+
+        assert_sample_bits_eq(&samples, &[0.0, 0.25, 0.5, 0.5, 1.0_f32 / 3.0, 0.0]);
+    }
+
+    #[test]
+    fn fade_f32_handles_empty_one_sample_odd_and_tail_lengths() {
+        for len in [0, 1, 3, 7, 17, 33, 65] {
+            let input = patterned_f32(len);
+            let total_frames = u64::try_from(len).expect("test length should fit in u64");
+
+            assert_scalar_and_simd_fade_match(&input, total_frames, 0, 4, 4);
+        }
+    }
+
+    #[test]
+    fn fade_f32_deterministic_fixtures_match_scalar_under_requested_simd() {
+        let cases = [
+            (17, 0, 17, 8, 0),
+            (17, 0, 17, 0, 8),
+            (17, 0, 17, 8, 8),
+            (31, 3, 19, 11, 13),
+        ];
+
+        for (total_frames, start_frame, len, fade_in, fade_out) in cases {
+            let input = patterned_f32(len);
+
+            assert_scalar_and_simd_fade_match(&input, total_frames, start_frame, fade_in, fade_out);
+        }
+    }
+
+    #[test]
+    fn fade_f32_random_finite_values_match_scalar_under_requested_simd() {
+        let input = seeded_f32(0xc31f_202a_74d0_8e11, 4099);
+
+        for (fade_in, fade_out) in [(0, 4096), (4096, 0), (2048, 3072), (8192, 8192)] {
+            assert_scalar_and_simd_fade_match(&input, 4099, 0, fade_in, fade_out);
+        }
+    }
+
+    #[test]
+    fn fade_f32_non_finite_values_follow_documented_behavior() {
+        let input = [
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            -1.0,
+            -0.0,
+            0.0,
+            1.0,
+        ];
+        let scalar = fade_with_backend(BackendKind::Scalar, &input, 7, 0, 4, 4);
+        let simd = fade_with_backend(BackendKind::Simd, &input, 7, 0, 4, 4);
+
+        assert_semantically_same_samples(&simd, &scalar);
+    }
+
     #[cfg(all(
         feature = "simd",
         any(
@@ -1380,6 +1668,33 @@ mod tests {
         assert_sample_bits_eq(&simd, &scalar);
     }
 
+    fn assert_scalar_and_simd_fade_match(
+        input: &[f32],
+        total_frames: u64,
+        start_frame: u64,
+        fade_in: u64,
+        fade_out: u64,
+    ) {
+        let scalar = fade_with_backend(
+            BackendKind::Scalar,
+            input,
+            total_frames,
+            start_frame,
+            fade_in,
+            fade_out,
+        );
+        let simd = fade_with_backend(
+            BackendKind::Simd,
+            input,
+            total_frames,
+            start_frame,
+            fade_in,
+            fade_out,
+        );
+
+        assert_sample_bits_eq(&simd, &scalar);
+    }
+
     fn convert_with_backend(kind: BackendKind, input: &[i16]) -> Vec<f32> {
         let selection = select_backend(kind);
         let mut output = vec![0.0; input.len()];
@@ -1412,6 +1727,29 @@ mod tests {
         let mut samples = input.to_vec();
 
         dc_shift_f32_in_place_with_backend(selection, &mut samples, shift);
+
+        samples
+    }
+
+    fn fade_with_backend(
+        kind: BackendKind,
+        input: &[f32],
+        total_frames: u64,
+        start_frame: u64,
+        fade_in: u64,
+        fade_out: u64,
+    ) -> Vec<f32> {
+        let selection = select_backend(kind);
+        let mut samples = input.to_vec();
+
+        fade_f32_in_place_with_backend(
+            selection,
+            &mut samples,
+            total_frames,
+            start_frame,
+            fade_in,
+            fade_out,
+        );
 
         samples
     }

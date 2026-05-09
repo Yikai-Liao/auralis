@@ -22,7 +22,7 @@
 use auralis_core::Decibels;
 use auralis_simd::{
     BackendKind, BackendSelection, dc_shift_f32_in_place_with_backend,
-    gain_f32_in_place_with_backend, select_backend,
+    fade_f32_in_place_with_backend, gain_f32_in_place_with_backend, select_backend,
 };
 
 /// Applies constant gain to each sample in place.
@@ -125,49 +125,47 @@ pub fn fade_in_place(
     fade_in: u64,
     fade_out: u64,
 ) {
-    for (offset, sample) in samples.iter_mut().enumerate() {
-        let Ok(offset) = u64::try_from(offset) else {
-            return;
-        };
-        let Some(frame_index) = start_frame.checked_add(offset) else {
-            return;
-        };
-        *sample *= fade_coefficient(frame_index, total_frames, fade_in, fade_out);
-    }
+    fade_in_place_with_backend(
+        select_backend(BackendKind::Scalar),
+        samples,
+        total_frames,
+        start_frame,
+        fade_in,
+        fade_out,
+    );
 }
 
-fn fade_coefficient(frame_index: u64, total_frames: u64, fade_in: u64, fade_out: u64) -> f32 {
-    let mut coefficient = 1.0;
-
-    if fade_in != 0 && frame_index < fade_in {
-        coefficient *= ratio(frame_index, fade_in);
-    }
-
-    if fade_out != 0 && frame_index < total_frames {
-        let remaining = total_frames - frame_index - 1;
-        if remaining < fade_out {
-            coefficient *= ratio(remaining, fade_out);
-        }
-    }
-
-    coefficient
-}
-
-fn ratio(numerator: u64, denominator: u64) -> f32 {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "Fade coefficients are applied at the f32 sample boundary; exact integer precision above f32 mantissa range is not meaningful for audio buffers."
-    )]
-    {
-        numerator as f32 / denominator as f32
-    }
+/// Applies a linear fade envelope to a contiguous channel segment in place
+/// using the selected backend.
+///
+/// Parameters and numerical behavior match [`fade_in_place`]. Callers can pass
+/// [`auralis_simd::select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`] to force deterministic scalar-vs-SIMD conformance
+/// runs. Unsupported SIMD requests follow the fallback recorded in `selection`.
+#[inline]
+pub fn fade_in_place_with_backend(
+    selection: BackendSelection,
+    samples: &mut [f32],
+    total_frames: u64,
+    start_frame: u64,
+    fade_in: u64,
+    fade_out: u64,
+) {
+    fade_f32_in_place_with_backend(
+        selection,
+        samples,
+        total_frames,
+        start_frame,
+        fade_in,
+        fade_out,
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        dc_shift_in_place, dc_shift_in_place_with_backend, fade_in_place, gain_in_place,
-        gain_in_place_with_backend, linear_gain,
+        dc_shift_in_place, dc_shift_in_place_with_backend, fade_in_place,
+        fade_in_place_with_backend, gain_in_place, gain_in_place_with_backend, linear_gain,
     };
     use auralis_core::Decibels;
     use auralis_simd::{BackendKind, select_backend};
@@ -413,6 +411,37 @@ mod tests {
         assert_samples_close(&whole, &chunked);
     }
 
+    #[test]
+    fn fade_matches_under_forced_scalar_and_requested_simd() {
+        let source = [
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+        ];
+        let mut scalar = source;
+        let mut simd = source;
+
+        fade_in_place_with_backend(
+            select_backend(BackendKind::Scalar),
+            &mut scalar,
+            11,
+            0,
+            5,
+            7,
+        );
+        fade_in_place_with_backend(select_backend(BackendKind::Simd), &mut simd, 11, 0, 5, 7);
+
+        assert_semantically_same_samples(&simd, &scalar);
+    }
+
     fn db(value: f64) -> Decibels {
         Decibels::new(value).unwrap()
     }
@@ -434,6 +463,25 @@ mod tests {
                 expected.to_bits(),
                 "sample {index} differed: {actual} != {expected}"
             );
+        }
+    }
+
+    fn assert_semantically_same_samples(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            if expected.is_nan() {
+                assert!(
+                    actual.is_nan(),
+                    "sample {index} should be NaN, got {actual}"
+                );
+            } else {
+                assert_eq!(
+                    actual.to_bits(),
+                    expected.to_bits(),
+                    "sample {index} differed: {actual} != {expected}"
+                );
+            }
         }
     }
 

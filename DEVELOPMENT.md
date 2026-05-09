@@ -912,6 +912,8 @@ Acceptance tests:
 
 #### Feature 4.3.3: SIMD linear `fade` retrofit
 
+Status: implemented.
+
 Add backend-dispatched kernels for linear fade envelope multiplication.
 
 Acceptance tests:

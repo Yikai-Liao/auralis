@@ -22,8 +22,8 @@
 
 use auralis_core::{AudioBuffer, Decibels, FrameCount};
 use auralis_dsp::{
-    dc_shift_in_place, dc_shift_in_place_with_backend, fade_in_place, gain_in_place,
-    gain_in_place_with_backend,
+    dc_shift_in_place, dc_shift_in_place_with_backend, fade_in_place, fade_in_place_with_backend,
+    gain_in_place, gain_in_place_with_backend,
 };
 use auralis_simd::{BackendKind, select_backend};
 use thiserror::Error;
@@ -504,10 +504,29 @@ impl Fade {
     /// Processing is deterministic, non-allocating, and preserves channel
     /// grouping. Zero fade lengths are identity transforms.
     pub fn process_buffer(self, audio: &mut AudioBuffer) {
+        self.process_buffer_with_backend(audio, BackendKind::Scalar);
+    }
+
+    /// Applies the fade envelope in place using the requested backend.
+    ///
+    /// Processing has the same channel-preserving behavior as
+    /// [`Self::process_buffer`]. Requesting [`BackendKind::Simd`] uses the
+    /// backend-dispatched fade kernel when available and deterministic scalar
+    /// fallback otherwise.
+    pub fn process_buffer_with_backend(
+        self,
+        audio: &mut AudioBuffer,
+        requested_backend: BackendKind,
+    ) {
         let total_frames = audio.frames().as_u64();
         for channel_index in 0..audio.channels().as_usize() {
             if let Some(channel) = audio.channel_mut(channel_index) {
-                self.process_channel_segment(channel, total_frames, FrameCount::new(0));
+                self.process_channel_segment_with_backend(
+                    channel,
+                    total_frames,
+                    FrameCount::new(0),
+                    requested_backend,
+                );
             }
         }
     }
@@ -525,6 +544,27 @@ impl Fade {
         start_frame: FrameCount,
     ) {
         fade_in_place(
+            samples,
+            total_frames,
+            start_frame.as_u64(),
+            self.fade_in.as_u64(),
+            self.fade_out.as_u64(),
+        );
+    }
+
+    /// Applies the fade to a contiguous channel segment using the requested backend.
+    ///
+    /// Parameters and chunk-invariance behavior match
+    /// [`Self::process_channel_segment`].
+    pub fn process_channel_segment_with_backend(
+        self,
+        samples: &mut [f32],
+        total_frames: u64,
+        start_frame: FrameCount,
+        requested_backend: BackendKind,
+    ) {
+        fade_in_place_with_backend(
+            select_backend(requested_backend),
             samples,
             total_frames,
             start_frame.as_u64(),
@@ -911,6 +951,36 @@ mod tests {
         }
 
         assert_samples_close(whole.as_planar_f32(), &chunked);
+    }
+
+    #[test]
+    fn fade_effect_matches_under_forced_scalar_and_requested_simd() {
+        let source = stereo_audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+            1.0,
+            0.999_984_74,
+            0.5,
+            0.0,
+            -0.0,
+            -0.5,
+            -0.999_984_74,
+            -1.0,
+        ]);
+        let fade = Fade::new(FrameCount::new(5), FrameCount::new(7));
+        let mut scalar = source.clone();
+        let mut simd = source;
+
+        fade.process_buffer_with_backend(&mut scalar, BackendKind::Scalar);
+        fade.process_buffer_with_backend(&mut simd, BackendKind::Simd);
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
     }
 
     #[test]

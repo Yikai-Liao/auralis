@@ -602,6 +602,66 @@ fn run_fade_frames_output_matches_library_pipeline() {
 }
 
 #[test]
+fn run_fade_frames_output_matches_under_forced_scalar_and_requested_simd() {
+    let input = temp_path("auralis-cli-run-fade-frame-backend-input", "wav");
+    let scalar_output = temp_path("auralis-cli-run-fade-frame-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-run-fade-frame-simd-output", "wav");
+    write_pcm16_wav(
+        &input,
+        2,
+        &[
+            -32768, 32767, -32767, 32766, -16384, 16384, -1, 1, 0, 0, 1, -1, 16384, -16384, 32766,
+            -32767,
+        ],
+    );
+
+    let scalar_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            scalar_output.to_str().unwrap(),
+            "--backend",
+            "scalar",
+            "--fade-in-frame",
+            "5",
+            "--fade-out-frame",
+            "7",
+        ])
+        .output()
+        .unwrap();
+    let simd_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            simd_output.to_str().unwrap(),
+            "--backend",
+            "simd",
+            "--fade-in-frame",
+            "5",
+            "--fade-out-frame",
+            "7",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        scalar_command_output.status.success(),
+        "stderr: {}",
+        stderr(&scalar_command_output)
+    );
+    assert!(
+        simd_command_output.status.success(),
+        "stderr: {}",
+        stderr(&simd_command_output)
+    );
+    assert_eq!(read_pcm16_wav(&simd_output), read_pcm16_wav(&scalar_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(scalar_output).unwrap();
+    fs::remove_file(simd_output).unwrap();
+}
+
+#[test]
 fn run_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");

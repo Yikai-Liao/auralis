@@ -42,7 +42,8 @@ provides backend conformance helpers for exact and tolerance-based
 scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
 backend trait skeleton with a scalar reference backend, deterministic `scalar` /
 `simd` backend selection, scalar/SIMD PCM16/`f32` sample conversion in both
-directions, and backend-dispatched linear `gain_f32` and `dc_shift_f32` kernels.
+directions, and backend-dispatched linear `gain_f32`, `dc_shift_f32`, and
+`fade_f32` kernels.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -324,8 +325,9 @@ Contains scalar DSP primitives and reference implementations:
 - metrics used by tests where appropriate
 
 Scalar implementations are the source of truth for SIMD differential tests.
-`gain` and `dcshift` have explicit backend-dispatched entry points that keep
-scalar as the default and use the Auralis SIMD backend only when requested.
+`gain`, `dcshift`, and linear `fade` have explicit backend-dispatched entry
+points that keep scalar as the default and use the Auralis SIMD backend only
+when requested.
 
 ### `auralis-effects`
 
@@ -346,10 +348,11 @@ Effect implementations should be block-based and streaming-aware from the beginn
 Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
-PCM16/`f32` conversion kernels in both directions plus the linear `gain_f32`
-and `dc_shift_f32` kernels. The scalar kernels are the exact reference
-implementations; the SIMD kernels use `rten-simd` behind the `simd` feature and
-fall back through Auralis backend selection when SIMD is unavailable.
+PCM16/`f32` conversion kernels in both directions plus the linear `gain_f32`,
+`dc_shift_f32`, and `fade_f32` kernels. The scalar kernels are the exact
+reference implementations; the SIMD kernels use `rten-simd` behind the `simd`
+feature and fall back through Auralis backend selection when SIMD is
+unavailable.
 
 Backend names are stable lowercase strings:
 
@@ -383,6 +386,7 @@ Initial SIMD targets:
 
 - `gain_f32`
 - `dc_shift_f32`
+- `fade_f32`
 - `mix2_f32`
 - `clip_f32`
 - `i16_to_f32`
@@ -400,7 +404,10 @@ tests for deterministic fixtures, tails, near-clipping values, silence, NaN,
 and infinity behavior. `dc_shift_f32` accepts a normalized full-scale offset
 from the typed `dcshift` effect and is covered by scalar-vs-SIMD parity tests
 for deterministic fixtures, tail lengths, silence, denormals, near-clipping
-values, NaN, and infinity behavior.
+values, NaN, and infinity behavior. `fade_f32` applies linear fade-in and
+fade-out envelope multiplication over frame-indexed channel segments and is
+covered by scalar-vs-SIMD parity tests for fade-in, fade-out, combined fades,
+tail lengths, and full CLI output.
 
 Do not prioritize SIMD for state-machine-heavy or recursive algorithms at first.
 Do not implement SIMD before scalar correctness tests and differential tests
@@ -424,6 +431,7 @@ auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
 auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
 auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
+auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --reverse
 auralis run pipeline.toml
 auralis completions zsh
