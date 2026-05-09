@@ -14,9 +14,11 @@
 //!
 //! let gain = parse_effect_command(&["gain", "-3"])?;
 //! assert_eq!(gain, EffectCommand::Gain(Gain::new(Decibels::new(-3.0)?)));
+//! assert_eq!(gain.render_tokens(), ["gain", "-3"]);
 //!
 //! let fade = EffectCommand::parse("fade", &["l", "10", "20"])?;
 //! assert_eq!(fade, EffectCommand::Fade(Fade::new(FrameCount::new(10), FrameCount::new(20))));
+//! assert_eq!(fade.render_tokens(), ["fade", "l", "10", "20"]);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -96,6 +98,40 @@ impl EffectCommand {
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Trim(_) => EffectKind::Trim,
+        }
+    }
+
+    /// Renders this command as canonical SoX-ng-style tokens.
+    ///
+    /// Rendering uses canonical effect names, explicit default arguments, and
+    /// deterministic numeric formatting. It intentionally returns an argument
+    /// vector without shell quoting so callers can pass it directly to process
+    /// builders or use a display layer that applies stable quoting for failure
+    /// reports.
+    #[must_use]
+    pub fn render_tokens(self) -> Vec<String> {
+        match self {
+            Self::DcShift(dc_shift) => {
+                vec!["dcshift".to_owned(), render_f32(dc_shift.shift)]
+            }
+            Self::Fade(fade) => vec![
+                "fade".to_owned(),
+                "l".to_owned(),
+                fade.fade_in.as_u64().to_string(),
+                fade.fade_out.as_u64().to_string(),
+            ],
+            Self::Gain(gain) => vec!["gain".to_owned(), render_f64(gain.db.as_f64())],
+            Self::Pad(pad) => vec![
+                "pad".to_owned(),
+                pad.start.as_u64().to_string(),
+                pad.end.as_u64().to_string(),
+            ],
+            Self::Reverse(_) => vec!["reverse".to_owned()],
+            Self::Trim(trim) => vec![
+                "trim".to_owned(),
+                trim.start.as_u64().to_string(),
+                trim.end.as_u64().to_string(),
+            ],
         }
     }
 }
@@ -430,6 +466,22 @@ fn is_option_like(value: &str) -> bool {
     value.starts_with('-') && value.parse::<f64>().is_err()
 }
 
+fn render_f64(value: f64) -> String {
+    if value == 0.0 {
+        "0".to_owned()
+    } else {
+        value.to_string()
+    }
+}
+
+fn render_f32(value: f32) -> String {
+    if value == 0.0 {
+        "0".to_owned()
+    } else {
+        value.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
@@ -628,6 +680,58 @@ mod tests {
 
         for (parsed, direct) in parsed.iter().zip(direct) {
             assert_eq!(parsed.to_bits(), direct.to_bits());
+        }
+    }
+
+    #[test]
+    fn equivalent_commands_render_to_identical_canonical_tokens() {
+        let equivalent_commands = [
+            (&["gain"][..], &["gain", "0.0"][..], &["gain", "0"][..]),
+            (
+                &["gain-db", "1e0"][..],
+                &["gain", "1"][..],
+                &["gain", "1"][..],
+            ),
+            (
+                &["dc-shift", "-0.0"][..],
+                &["dcshift", "0"][..],
+                &["dcshift", "0"][..],
+            ),
+            (&["pad"][..], &["pad", "0", "0"][..], &["pad", "0", "0"][..]),
+            (
+                &["fade", "3"][..],
+                &["fade", "l", "3", "0"][..],
+                &["fade", "l", "3", "0"][..],
+            ),
+        ];
+
+        for (left, right, expected) in equivalent_commands {
+            let left = parse_effect_command(left).unwrap().render_tokens();
+            let right = parse_effect_command(right).unwrap().render_tokens();
+            assert_eq!(left, right);
+            assert_eq!(left, expected);
+        }
+    }
+
+    #[test]
+    fn command_rendering_uses_canonical_names_and_explicit_arguments() {
+        let commands = [
+            (
+                parse_effect_command(&["trim", "12", "34"]).unwrap(),
+                &["trim", "12", "34"][..],
+            ),
+            (
+                parse_effect_command(&["reverse"]).unwrap(),
+                &["reverse"][..],
+            ),
+            (
+                parse_effect_command(&["fade", "l", "4", "2"]).unwrap(),
+                &["fade", "l", "4", "2"][..],
+            ),
+        ];
+
+        for (command, expected) in commands {
+            assert_eq!(command.render_tokens(), expected);
         }
     }
 }

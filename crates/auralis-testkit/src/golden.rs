@@ -3,6 +3,9 @@
 //! Golden manifests are small TOML documents that describe one or more
 //! reference comparisons. Each case lives under the `id` table; the table key is
 //! the stable case identifier used in test reports and failure artifacts.
+//! Command vectors are rendered separately from command-line displays: vectors
+//! remain suitable for `std::process::Command`, while display helpers apply
+//! deterministic quoting and escaping for human-readable failure reports.
 //!
 //! # Examples
 //!
@@ -25,6 +28,10 @@
 //! assert_eq!(
 //!     case.render_sox_ng_command("sox_ng", case.input(), "out.wav"),
 //!     ["sox_ng", "-R", "-D", "sine_48k_mono.wav", "out.wav", "gain", "-3"],
+//! );
+//! assert_eq!(
+//!     case.render_sox_ng_command_line("sox_ng", "input file.wav", "out.wav"),
+//!     "sox_ng -R -D \"input file.wav\" out.wav gain -3",
 //! );
 //! # Ok::<(), auralis_testkit::golden::GoldenManifestError>(())
 //! ```
@@ -167,6 +174,22 @@ impl GoldenCase {
         command
     }
 
+    /// Renders a deterministic display form of the Auralis command.
+    ///
+    /// This is intended for failure reports and logs. It uses the same command
+    /// vector as [`Self::render_auralis_command`] and then applies
+    /// [`render_command_line`] so whitespace, quotes, backslashes, and control
+    /// characters are escaped consistently across runs.
+    #[must_use]
+    pub fn render_auralis_command_line(
+        &self,
+        executable: impl AsRef<str>,
+        input_path: impl AsRef<Path>,
+        output_path: impl AsRef<Path>,
+    ) -> String {
+        render_command_line(self.render_auralis_command(executable, input_path, output_path))
+    }
+
     /// Renders a deterministic SoX-ng command vector.
     ///
     /// The `-R` and `-D` flags are always included to match Auralis' repeatable
@@ -188,6 +211,21 @@ impl GoldenCase {
         ];
         command.extend(self.sox_ng.iter().cloned());
         command
+    }
+
+    /// Renders a deterministic display form of the SoX-ng command.
+    ///
+    /// This is intended for failure reports and logs. It includes the same
+    /// repeatability flags as [`Self::render_sox_ng_command`] and applies
+    /// [`render_command_line`] for stable quoting and escaping.
+    #[must_use]
+    pub fn render_sox_ng_command_line(
+        &self,
+        executable: impl AsRef<str>,
+        input_path: impl AsRef<Path>,
+        output_path: impl AsRef<Path>,
+    ) -> String {
+        render_command_line(self.render_sox_ng_command(executable, input_path, output_path))
     }
 
     fn from_raw(id: &str, raw: RawGoldenCase) -> Result<Self> {
@@ -212,6 +250,64 @@ impl GoldenCase {
             },
         })
     }
+}
+
+/// Renders a deterministic single-line display for a command vector.
+///
+/// Arguments that are plain ASCII command tokens are left unquoted. Arguments
+/// containing whitespace, quotes, backslashes, or control characters are
+/// double-quoted with stable backslash escaping. The returned string is meant
+/// for diagnostics and failure artifacts; callers should keep using the vector
+/// form when spawning a process.
+#[must_use]
+pub fn render_command_line<I, S>(command: I) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut rendered = String::new();
+    for (index, argument) in command.into_iter().enumerate() {
+        if index > 0 {
+            rendered.push(' ');
+        }
+        rendered.push_str(&quote_command_arg(argument.as_ref()));
+    }
+
+    rendered
+}
+
+/// Quotes one command argument for deterministic human-readable reports.
+///
+/// Safe ASCII command tokens are returned unchanged. Other arguments are
+/// double-quoted and escaped with deterministic sequences for `"`, `\`,
+/// newline, carriage return, tab, and other ASCII control bytes.
+#[must_use]
+pub fn quote_command_arg(argument: &str) -> String {
+    if !argument.is_empty() && argument.bytes().all(is_unquoted_command_byte) {
+        return argument.to_owned();
+    }
+
+    let mut quoted = String::with_capacity(argument.len() + 2);
+    quoted.push('"');
+    for character in argument.chars() {
+        match character {
+            '"' => quoted.push_str("\\\""),
+            '\\' => quoted.push_str("\\\\"),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            control if control.is_ascii_control() => {
+                use std::fmt::Write as _;
+
+                write!(quoted, "\\x{:02x}", control as u32)
+                    .expect("writing to an in-memory String cannot fail");
+            }
+            other => quoted.push(other),
+        }
+    }
+    quoted.push('"');
+
+    quoted
 }
 
 /// Metric thresholds used to decide whether a golden comparison passes.
@@ -412,9 +508,20 @@ fn path_to_command_arg(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn is_unquoted_command_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric()
+        || matches!(
+            byte,
+            b'@' | b'%' | b'_' | b'+' | b'=' | b':' | b',' | b'.' | b'/' | b'-'
+        )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{GoldenCommand, GoldenManifest, GoldenManifestError, GoldenMetric};
+    use super::{
+        GoldenCommand, GoldenManifest, GoldenManifestError, GoldenMetric, quote_command_arg,
+        render_command_line,
+    };
 
     const VALID_MANIFEST: &str = r#"
         [id.fade_out_stereo]
@@ -571,6 +678,64 @@ mod tests {
                 "gain",
                 "-3"
             ],
+        );
+    }
+
+    #[test]
+    fn command_line_rendering_quotes_and_escapes_deterministically() {
+        let command = [
+            "auralis",
+            "run",
+            "input file.wav",
+            "quote\"and\\slash",
+            "line\nbreak",
+            "tab\tvalue",
+            "",
+        ];
+
+        assert_eq!(
+            render_command_line(command),
+            "auralis run \"input file.wav\" \"quote\\\"and\\\\slash\" \"line\\nbreak\" \"tab\\tvalue\" \"\""
+        );
+        assert_eq!(quote_command_arg("safe/path-1.wav"), "safe/path-1.wav");
+        assert_eq!(quote_command_arg("needs space"), "\"needs space\"");
+    }
+
+    #[test]
+    fn golden_manifest_command_line_rendering_is_stable_across_runs() {
+        let manifest = GoldenManifest::parse_toml(
+            r#"
+            [id.quoted_paths]
+            input = "fixtures/input file.wav"
+            auralis = ["--gain-db", "-3"]
+            sox_ng = ["gain", "-3"]
+            max_abs = 0.0001
+            rms = 0.000001
+            snr_db = 90.0
+            "#,
+        )
+        .unwrap();
+        let case = manifest.get("quoted_paths").unwrap();
+
+        let first = case.render_auralis_command_line(
+            "auralis",
+            "fixtures/input file.wav",
+            "tmp/output file.wav",
+        );
+        let second = case.render_auralis_command_line(
+            "auralis",
+            "fixtures/input file.wav",
+            "tmp/output file.wav",
+        );
+
+        assert_eq!(first, second);
+        assert_eq!(
+            first,
+            "auralis run \"fixtures/input file.wav\" \"tmp/output file.wav\" --gain-db -3"
+        );
+        assert_eq!(
+            case.render_sox_ng_command_line("sox_ng", "fixtures/input file.wav", "tmp/out.wav"),
+            "sox_ng -R -D \"fixtures/input file.wav\" tmp/out.wav gain -3"
         );
     }
 

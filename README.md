@@ -358,6 +358,10 @@ as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "l",
 currently accepts the frame-count subset implemented by Auralis and rejects
 future SoX-ng options such as gain normalization, non-linear fade curves, and
 dcshift limiter gain with effect- and option-specific diagnostics.
+Parsed `EffectCommand` values render back to canonical SoX-ng-style token
+vectors using stable effect names, explicit default arguments, and deterministic
+numeric formatting, so equivalent values such as `gain`, `gain 0`, and
+`gain-db 0.0` produce the same manifest representation.
 
 ### `auralis-simd`
 
@@ -491,7 +495,10 @@ snr_db = 90.0
 The `auralis` array is appended after `auralis run <input> <output>`, while
 `sox_ng` is appended after `sox_ng -R -D <input> <output>`. Case IDs, tolerance
 fields, and command arguments are validated before tests run so failure reports
-can rely on deterministic command rendering.
+can rely on deterministic command rendering. The testkit also renders command
+vectors as display strings for reports with stable double-quote escaping for
+spaces, quotes, backslashes, and control characters while keeping the original
+argument vectors available for process execution.
 
 ### `auralis-python` future placeholder
 

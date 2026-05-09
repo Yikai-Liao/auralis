@@ -1061,6 +1061,8 @@ Acceptance tests:
 
 #### Feature 5.1.3: deterministic command rendering
 
+Status: implemented.
+
 Implement deterministic rendering for command manifests and failure reports.
 
 Acceptance tests:
