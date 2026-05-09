@@ -166,6 +166,17 @@ Auralis-owned public APIs.
 
 ### `crates/auralis-effects`
 
+Feature 5.6.4 completed this split. At completion, the largest resulting
+`crates/auralis-effects` Rust files were:
+
+| Lines | File |
+|---:|---|
+| 942 | `crates/auralis-effects/src/chain.rs` |
+| 746 | `crates/auralis-effects/src/command.rs` |
+| 696 | `crates/auralis-effects/src/effects_file.rs` |
+| 582 | `crates/auralis-effects/src/registry.rs` |
+| 233 | `crates/auralis-effects/src/fade.rs` |
+
 Target shape:
 
 - `src/lib.rs`: crate docs, module declarations, and public re-exports.

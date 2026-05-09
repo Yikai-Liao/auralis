@@ -340,7 +340,7 @@ Implementation notes:
 
 ### Feature 5.6.4: split `crates/auralis-effects/src/lib.rs`
 
-Status: planned.
+Status: implemented.
 
 Split effect implementations and tests by effect family.
 
@@ -362,6 +362,19 @@ Acceptance tests:
   imports require mechanical updates;
 - all existing effect and chain tests pass;
 - no resulting Rust source file exceeds 1,000 lines.
+
+Implementation notes:
+
+- `crates/auralis-effects/src/lib.rs` is now a crate-root facade with module
+  declarations and public re-exports.
+- Runtime behavior moved into `error`, `gain`, `dcshift`, `trim`, `pad`,
+  `fade`, and `reverse` modules without changing exported type or constructor
+  names.
+- The previous monolithic unit-test module moved into focused per-effect test
+  modules, with shared buffer and assertion helpers in `test_support`.
+- After the split, the largest `auralis-effects` Rust source file remains
+  `src/chain.rs` at 942 lines; the largest newly split effect module is
+  `src/fade.rs` at 233 lines.
 
 ### Feature 5.6.5: split `crates/auralis-wav/src/lib.rs`
 

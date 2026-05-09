@@ -101,8 +101,10 @@ ownership map in `doc/development/05-source-module-map.md`. The high-level
 `auralis` facade has been split into ownership modules while keeping its public
 re-exports stable, and `auralis-simd` now keeps backend metadata, selection,
 conversion, arithmetic kernels, and focused conformance tests in separate
-modules; the remaining oversized crate roots are tracked by the same 5.6
-development plan.
+modules. `auralis-effects` has also been split into per-effect implementation
+modules with focused unit tests while preserving the existing public effect
+types and command/chain behavior; the remaining oversized crate roots are
+tracked by the same 5.6 development plan.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -419,6 +421,9 @@ Contains typed effect processors built from DSP primitives:
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
+The crate root is a small facade; effect-local behavior lives in focused
+`gain`, `dcshift`, `trim`, `pad`, `reverse`, and `fade` modules, with shared
+typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
 `trim`, `pad`, `reverse`, and `fade` resolve to typed descriptors; aliases such
