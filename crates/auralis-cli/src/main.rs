@@ -85,7 +85,7 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         effects_file: Option<PathBuf>,
 
-        /// Positional SoX-ng-style effect chain tokens, such as `gain -3 reverse`.
+        /// Positional SoX-ng-style effect chain tokens, such as `gain -3 : reverse`.
         #[arg(value_name = "EFFECT", num_args = 0.., allow_hyphen_values = true)]
         effect_chain: Vec<String>,
     },

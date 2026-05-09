@@ -817,6 +817,112 @@ fn run_positional_effect_chain_preserves_user_order() {
 }
 
 #[test]
+fn run_accepts_boundary_separator_in_positional_chain_and_effects_file() {
+    let input = temp_path("auralis-cli-run-chain-boundary-input", "wav");
+    let flat_output = temp_path("auralis-cli-run-chain-boundary-flat-output", "wav");
+    let boundary_output = temp_path("auralis-cli-run-chain-boundary-output", "wav");
+    let file_output = temp_path("auralis-cli-run-chain-boundary-file-output", "wav");
+    let effects_file = temp_path("auralis-cli-run-chain-boundary", "effects");
+    write_pcm16_wav(&input, 1, &[4096, -8192, 12_288, -16_384]);
+    fs::write(&effects_file, "gain -6 :\ndcshift 0.125 reverse\n").unwrap();
+
+    let flat_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            flat_output.to_str().unwrap(),
+            "gain",
+            "-6",
+            "dcshift",
+            "0.125",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+    let boundary_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            boundary_output.to_str().unwrap(),
+            "gain",
+            "-6",
+            ":",
+            "dcshift",
+            "0.125",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+    let file_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            file_output.to_str().unwrap(),
+            "--effects-file",
+            effects_file.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        flat_command_output.status.success(),
+        "stderr: {}",
+        stderr(&flat_command_output)
+    );
+    assert!(
+        boundary_command_output.status.success(),
+        "stderr: {}",
+        stderr(&boundary_command_output)
+    );
+    assert!(
+        file_command_output.status.success(),
+        "stderr: {}",
+        stderr(&file_command_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&boundary_output),
+        read_pcm16_wav(&flat_output)
+    );
+    assert_eq!(read_pcm16_wav(&file_output), read_pcm16_wav(&flat_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(flat_output).unwrap();
+    fs::remove_file(boundary_output).unwrap();
+    fs::remove_file(file_output).unwrap();
+    fs::remove_file(effects_file).unwrap();
+}
+
+#[test]
+fn run_boundary_control_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-chain-boundary-control-input", "wav");
+    let output = temp_path("auralis-cli-run-chain-boundary-control-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "gain",
+            "-3",
+            ":",
+            "newfile",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(stderr.contains("unsupported boundary control"), "{stderr}");
+    assert!(
+        stderr.contains("`newfile` and `restart` semantics are not implemented"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_missing_effects_file_returns_clear_error() {
     let input = temp_path("auralis-cli-run-missing-effects-file-input", "wav");
     let effects_file = temp_path("auralis-cli-run-missing-effects-file", "effects");

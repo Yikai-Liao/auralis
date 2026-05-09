@@ -44,3 +44,29 @@ fn chain_golden_manifest_renders_recorded_commands() {
         "sox_ng -R -D input.wav out.wav fade t 5s gain -2"
     );
 }
+
+#[test]
+fn chain_golden_manifest_renders_boundary_tokens_deterministically() {
+    let manifest = GoldenManifest::parse_toml(
+        r#"
+        [id.chain_boundary_rendering]
+        input = "chains/stereo_steps.wav"
+        auralis = ["gain", "-3", ":", "dcshift", "0.125"]
+        sox_ng = ["gain", "-3", ":", "dcshift", "0.125"]
+        max_abs = 0.000031
+        rms = 0.000031
+        snr_db = 90.0
+        "#,
+    )
+    .unwrap();
+    let case = manifest.get("chain_boundary_rendering").unwrap();
+
+    assert_eq!(
+        case.render_auralis_command_line("auralis", "input.wav", "out.wav"),
+        "auralis run input.wav out.wav gain -3 : dcshift 0.125"
+    );
+    assert_eq!(
+        case.render_sox_ng_command_line("sox_ng", "input.wav", "out.wav"),
+        "sox_ng -R -D input.wav out.wav gain -3 : dcshift 0.125"
+    );
+}

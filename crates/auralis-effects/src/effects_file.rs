@@ -2,11 +2,12 @@
 //!
 //! Effects files are a text representation of the same positional command
 //! tokens accepted by [`crate::parse_effect_chain`]. Each non-empty,
-//! non-comment line may contain one or more implemented effect commands. Tokens
-//! are separated by whitespace; single and double quotes group whitespace into
-//! one token; a backslash escapes the next character outside single quotes; and
-//! `#` starts a comment when it appears outside quotes. Successful parses return
-//! a typed [`crate::EffectChain`], not long-lived string commands.
+//! non-comment line may contain one or more implemented effect commands, and
+//! `:` preserves an explicit chain boundary. Tokens are separated by
+//! whitespace; single and double quotes group whitespace into one token; a
+//! backslash escapes the next character outside single quotes; and `#` starts a
+//! comment when it appears outside quotes. Successful parses return a typed
+//! [`crate::EffectChain`], not long-lived string commands.
 //!
 //! # Examples
 //!
@@ -33,7 +34,8 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    EffectChain, EffectCommand, EffectCommandParseError, EffectRegistry, chain::command_end,
+    EffectChain, EffectChainBoundary, EffectCommandParseError, EffectRegistry,
+    chain::{command_end, is_chain_boundary_token, is_unsupported_boundary_control},
     parse_effect_command,
 };
 
@@ -69,34 +71,36 @@ pub fn parse_effects_file(path: impl AsRef<Path>) -> EffectsFileReadResult<Effec
 /// Parses an effects file from a string.
 ///
 /// Each non-empty, non-comment line may contain one or more positional effect
-/// commands. The parser uses the same command-boundary rules as
+/// commands. `:` separates and preserves explicit chain segments. The parser
+/// uses the same command-boundary rules as
 /// [`crate::parse_effect_chain`], so a file such as:
 ///
 /// ```text
 /// gain -3
-/// dcshift 0.125 reverse
+/// dcshift 0.125 : reverse
 /// ```
 ///
 /// produces the same typed chain as the flat CLI token stream `gain -3 dcshift
-/// 0.125 reverse`. A `#` outside quotes starts a comment. Single and double
-/// quotes are removed after grouping token text, and a backslash escapes the
-/// next character outside single quotes.
+/// 0.125 : reverse`. A `#` outside quotes starts a comment. Single and
+/// double quotes are removed after grouping token text, and a backslash escapes
+/// the next character outside single quotes.
 ///
 /// # Errors
 ///
 /// Returns [`EffectsFileParseError`] with one-based line and column positions
-/// when a token is malformed, an effect name is unknown or unsupported, or an
-/// effect command rejects its arguments.
+/// when a token is malformed, an effect name is unknown or unsupported, an
+/// effect command rejects its arguments, a boundary would create an empty
+/// segment, or a file uses the not-yet-implemented `newfile` or `restart`
+/// boundary controls.
 pub fn parse_effects_file_str(source: &str) -> EffectsFileParseResult<EffectChain> {
-    let mut commands = Vec::new();
+    let mut tokens = Vec::new();
 
     for (line_index, line) in source.lines().enumerate() {
         let line_number = line_index + 1;
-        let tokens = tokenize_line(line, line_number)?;
-        parse_line_commands(&tokens, &mut commands)?;
+        tokens.extend(tokenize_line(line, line_number)?);
     }
 
-    Ok(EffectChain::new(commands))
+    parse_file_commands(&tokens)
 }
 
 /// Errors produced while reading an effects file from disk.
@@ -171,6 +175,31 @@ pub enum EffectsFileParseError {
         #[source]
         source: EffectCommandParseError,
     },
+
+    /// A `:` boundary would create an empty chain segment.
+    #[error("effects file line {line}, column {column}: chain boundary creates an empty segment")]
+    EmptyBoundaryChain {
+        /// One-based source line.
+        line: usize,
+
+        /// One-based source column.
+        column: usize,
+    },
+
+    /// A SoX-ng boundary control token is known but not implemented yet.
+    #[error(
+        "effects file line {line}, column {column}: unsupported boundary control `{control}`; `newfile` and `restart` semantics are not implemented"
+    )]
+    UnsupportedBoundaryControl {
+        /// One-based source line.
+        line: usize,
+
+        /// One-based source column.
+        column: usize,
+
+        /// Unsupported boundary control token.
+        control: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -186,15 +215,32 @@ enum Quote {
     Double { opening_column: usize },
 }
 
-fn parse_line_commands(
-    tokens: &[Token],
-    commands: &mut Vec<EffectCommand>,
-) -> EffectsFileParseResult<()> {
+fn parse_file_commands(tokens: &[Token]) -> EffectsFileParseResult<EffectChain> {
     let token_values: Vec<&str> = tokens.iter().map(|token| token.value.as_str()).collect();
+    let mut commands = Vec::new();
+    let mut boundaries = Vec::new();
     let mut offset = 0;
+    let mut pending_boundary_token: Option<&Token> = None;
 
     while offset < tokens.len() {
         let start = &tokens[offset];
+        if is_chain_boundary_token(&start.value) {
+            if commands.is_empty() || pending_boundary_token.is_some() {
+                return Err(empty_boundary_chain(start));
+            }
+            boundaries.push(EffectChainBoundary::new(commands.len()));
+            pending_boundary_token = Some(start);
+            offset += 1;
+            continue;
+        }
+        if is_unsupported_boundary_control(&start.value) {
+            return Err(EffectsFileParseError::UnsupportedBoundaryControl {
+                line: start.line,
+                column: start.column,
+                control: start.value.clone(),
+            });
+        }
+
         let descriptor = EffectRegistry::resolve(&start.value).map_err(|source| {
             command_parse_failed(
                 start,
@@ -219,10 +265,15 @@ fn parse_line_commands(
         })?;
 
         commands.push(command);
+        pending_boundary_token = None;
         offset = end;
     }
 
-    Ok(())
+    if let Some(token) = pending_boundary_token {
+        return Err(empty_boundary_chain(token));
+    }
+
+    Ok(EffectChain::from_parts(commands, boundaries))
 }
 
 fn command_parse_failed(
@@ -235,6 +286,13 @@ fn command_parse_failed(
         column: token.column,
         command,
         source,
+    }
+}
+
+fn empty_boundary_chain(token: &Token) -> EffectsFileParseError {
+    EffectsFileParseError::EmptyBoundaryChain {
+        line: token.line,
+        column: token.column,
     }
 }
 
@@ -468,6 +526,24 @@ mod tests {
     }
 
     #[test]
+    fn boundary_syntax_is_preserved_across_effects_file_lines() {
+        let chain = parse_effects_file_str(
+            "
+            gain -3 :
+            dcshift 0.125 reverse
+            ",
+        )
+        .unwrap();
+
+        assert!(chain.has_boundaries());
+        assert_eq!(chain.boundaries()[0].before_command(), 1);
+        assert_eq!(
+            chain.render_tokens(),
+            ["gain", "-3", ":", "dcshift", "0.125", "reverse"]
+        );
+    }
+
+    #[test]
     fn quoted_and_escaped_tokens_follow_sox_style_rules() {
         let tokens =
             tokenize_line(r#"gain "-3" dcshift '0.125' reverse\#literal # comment"#, 4).unwrap();
@@ -535,6 +611,54 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "effects file line 1, column 9: command `trim 1` failed to parse: effect `trim` requires argument `end-frame`"
+        );
+    }
+
+    #[test]
+    fn empty_boundary_segments_report_line_and_column() {
+        let error = parse_effects_file_str("gain -3\n:").unwrap_err();
+
+        assert_eq!(
+            error,
+            EffectsFileParseError::EmptyBoundaryChain { line: 2, column: 1 }
+        );
+        assert_eq!(
+            error.to_string(),
+            "effects file line 2, column 1: chain boundary creates an empty segment"
+        );
+
+        let error = parse_effects_file_str("gain -3 :\n# comment").unwrap_err();
+        assert_eq!(
+            error,
+            EffectsFileParseError::EmptyBoundaryChain { line: 1, column: 9 }
+        );
+    }
+
+    #[test]
+    fn unsupported_boundary_controls_report_line_and_column() {
+        let error = parse_effects_file_str("gain -3 : newfile").unwrap_err();
+
+        assert_eq!(
+            error,
+            EffectsFileParseError::UnsupportedBoundaryControl {
+                line: 1,
+                column: 11,
+                control: "newfile".to_owned(),
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "effects file line 1, column 11: unsupported boundary control `newfile`; `newfile` and `restart` semantics are not implemented"
+        );
+
+        let error = parse_effects_file_str("gain -3\nrestart").unwrap_err();
+        assert_eq!(
+            error,
+            EffectsFileParseError::UnsupportedBoundaryControl {
+                line: 2,
+                column: 1,
+                control: "restart".to_owned(),
+            }
         );
     }
 

@@ -26,8 +26,9 @@ use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 pub use auralis_effects::{
-    EffectChain, EffectChainError, EffectChainParseError, EffectCommand, EffectsFileParseError,
-    EffectsFileReadError, parse_effect_chain, parse_effects_file, parse_effects_file_str,
+    EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError, EffectCommand,
+    EffectsFileParseError, EffectsFileReadError, parse_effect_chain, parse_effects_file,
+    parse_effects_file_str,
 };
 pub use auralis_simd::BackendKind;
 

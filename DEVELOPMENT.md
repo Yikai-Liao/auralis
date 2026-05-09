@@ -1154,6 +1154,8 @@ Acceptance tests:
 
 #### Feature 5.3.3: chain boundary syntax
 
+Status: implemented.
+
 Implement explicit chain boundary parsing and representation.
 
 Acceptance tests:

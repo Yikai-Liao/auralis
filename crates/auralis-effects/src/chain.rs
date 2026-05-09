@@ -1,8 +1,10 @@
 //! In-memory sequential effect chains.
 //!
 //! A chain is an ordered list of parsed, typed [`EffectCommand`] values. It
-//! processes an [`AudioBuffer`] in user order and reports processing failures
-//! with the command index and canonical command tokens that failed.
+//! can also preserve explicit SoX-ng-style `:` chain boundaries. Current
+//! Auralis processing executes the commands sequentially in memory; boundaries
+//! are retained for diagnostics, deterministic rendering, and later
+//! multi-chain semantics.
 //!
 //! # Examples
 //!
@@ -42,6 +44,10 @@ use crate::{
     EffectRegistry, parse_effect_command,
 };
 
+pub(crate) const CHAIN_BOUNDARY_TOKEN: &str = ":";
+
+const UNSUPPORTED_BOUNDARY_CONTROLS: &[&str] = &["newfile", "restart"];
+
 /// Crate-local result type for effect-chain processing.
 pub type ChainResult<T> = std::result::Result<T, EffectChainError>;
 
@@ -57,13 +63,44 @@ pub type ChainParseResult<T> = std::result::Result<T, EffectChainParseError>;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EffectChain {
     commands: Vec<EffectCommand>,
+    boundaries: Vec<EffectChainBoundary>,
+}
+
+/// A preserved explicit boundary between effect-chain segments.
+///
+/// A boundary's `before_command` value is the index of the command that starts
+/// the next segment. For example, parsing `gain -3 : reverse` produces one
+/// boundary with `before_command == 1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EffectChainBoundary {
+    before_command: usize,
+}
+
+impl EffectChainBoundary {
+    /// Creates a boundary before the command at `before_command`.
+    ///
+    /// The parser only emits boundaries between existing commands, never before
+    /// the first command or after the final command.
+    #[must_use]
+    pub const fn new(before_command: usize) -> Self {
+        Self { before_command }
+    }
+
+    /// Returns the command index that starts the segment after this boundary.
+    #[must_use]
+    pub const fn before_command(self) -> usize {
+        self.before_command
+    }
 }
 
 impl EffectChain {
     /// Creates a chain from commands in execution order.
     #[must_use]
     pub fn new(commands: Vec<EffectCommand>) -> Self {
-        Self { commands }
+        Self {
+            commands,
+            boundaries: Vec::new(),
+        }
     }
 
     /// Creates an empty chain.
@@ -71,6 +108,7 @@ impl EffectChain {
     pub const fn empty() -> Self {
         Self {
             commands: Vec::new(),
+            boundaries: Vec::new(),
         }
     }
 
@@ -78,6 +116,16 @@ impl EffectChain {
     #[must_use]
     pub fn commands(&self) -> &[EffectCommand] {
         &self.commands
+    }
+
+    /// Returns explicit chain boundaries in parse/render order.
+    ///
+    /// Boundaries are represented by the command index that starts the next
+    /// segment. They are preserved for deterministic diagnostics and rendering;
+    /// current processing still applies all commands sequentially.
+    #[must_use]
+    pub fn boundaries(&self) -> &[EffectChainBoundary] {
+        &self.boundaries
     }
 
     /// Returns the number of commands in the chain.
@@ -90,6 +138,39 @@ impl EffectChain {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
+    }
+
+    /// Returns true when the parsed chain contained one or more explicit `:`
+    /// boundaries.
+    #[must_use]
+    pub fn has_boundaries(&self) -> bool {
+        !self.boundaries.is_empty()
+    }
+
+    /// Renders this chain as canonical SoX-ng-style tokens.
+    ///
+    /// Effect commands are rendered through [`EffectCommand::render_tokens`].
+    /// Preserved boundaries render as a single `:` token between command
+    /// segments. The returned vector is process-safe and intentionally
+    /// unquoted.
+    #[must_use]
+    pub fn render_tokens(&self) -> Vec<String> {
+        let mut tokens = Vec::new();
+        let mut boundary_index = 0;
+
+        for (command_index, command) in self.commands.iter().copied().enumerate() {
+            while self
+                .boundaries
+                .get(boundary_index)
+                .is_some_and(|boundary| boundary.before_command == command_index)
+            {
+                tokens.push(CHAIN_BOUNDARY_TOKEN.to_owned());
+                boundary_index += 1;
+            }
+            tokens.extend(command.render_tokens());
+        }
+
+        tokens
     }
 
     /// Applies every command to `audio` using the scalar backend.
@@ -135,6 +216,16 @@ impl EffectChain {
 
         Ok(())
     }
+
+    pub(crate) fn from_parts(
+        commands: Vec<EffectCommand>,
+        boundaries: Vec<EffectChainBoundary>,
+    ) -> Self {
+        Self {
+            commands,
+            boundaries,
+        }
+    }
 }
 
 /// Parses a flat sequence of SoX-ng-style effect tokens into an [`EffectChain`].
@@ -142,14 +233,19 @@ impl EffectChain {
 /// The token stream is segmented by effect names and aliases, so
 /// `["gain", "-3", "reverse"]` becomes two commands while
 /// `["gain", "-n"]` remains a single failing command that reports the
-/// unsupported gain option. The resulting chain stores typed commands only and
+/// unsupported gain option. Explicit `:` boundaries are preserved for
+/// deterministic rendering. The resulting chain stores typed commands and
 /// applies them in the same order as the input tokens.
 ///
 /// # Errors
 ///
 /// Returns [`EffectChainParseError::CommandParseFailed`] when an effect name is
 /// unknown or unsupported, an argument is missing or invalid, or a command uses
-/// an option outside the currently implemented Auralis subset.
+/// an option outside the currently implemented Auralis subset. Returns
+/// [`EffectChainParseError::EmptyBoundaryChain`] for leading, repeated, or
+/// trailing `:` boundaries, and
+/// [`EffectChainParseError::UnsupportedBoundaryControl`] for `newfile` and
+/// `restart` until those SoX-ng semantics are implemented.
 ///
 /// # Examples
 ///
@@ -164,11 +260,31 @@ impl EffectChain {
 /// ```
 pub fn parse_effect_chain(tokens: &[&str]) -> ChainParseResult<EffectChain> {
     let mut commands = Vec::new();
+    let mut boundaries = Vec::new();
     let mut offset = 0;
+    let mut pending_boundary_token = None;
 
     while offset < tokens.len() {
-        let index = commands.len();
         let name = tokens[offset];
+        if is_chain_boundary_token(name) {
+            if commands.is_empty() || pending_boundary_token.is_some() {
+                return Err(EffectChainParseError::EmptyBoundaryChain {
+                    token_index: offset,
+                });
+            }
+            boundaries.push(EffectChainBoundary::new(commands.len()));
+            pending_boundary_token = Some(offset);
+            offset += 1;
+            continue;
+        }
+        if is_unsupported_boundary_control(name) {
+            return Err(EffectChainParseError::UnsupportedBoundaryControl {
+                token_index: offset,
+                control: name.to_owned(),
+            });
+        }
+
+        let index = commands.len();
 
         let descriptor = EffectRegistry::resolve(name).map_err(|source| {
             EffectChainParseError::CommandParseFailed {
@@ -188,10 +304,15 @@ pub fn parse_effect_chain(tokens: &[&str]) -> ChainParseResult<EffectChain> {
         })?;
 
         commands.push(command);
+        pending_boundary_token = None;
         offset = end;
     }
 
-    Ok(EffectChain::new(commands))
+    if let Some(token_index) = pending_boundary_token {
+        return Err(EffectChainParseError::EmptyBoundaryChain { token_index });
+    }
+
+    Ok(EffectChain::from_parts(commands, boundaries))
 }
 
 /// Errors produced while applying an [`EffectChain`].
@@ -234,6 +355,25 @@ pub enum EffectChainParseError {
         /// Typed command parser source error.
         #[source]
         source: EffectCommandParseError,
+    },
+
+    /// A `:` boundary would create an empty chain segment.
+    #[error("effect chain boundary at token {token_index} creates an empty chain segment")]
+    EmptyBoundaryChain {
+        /// Zero-based token index of the invalid boundary.
+        token_index: usize,
+    },
+
+    /// A SoX-ng boundary control token is known but not implemented yet.
+    #[error(
+        "effect chain token {token_index} (`{control}`) uses unsupported boundary control; `newfile` and `restart` semantics are not implemented"
+    )]
+    UnsupportedBoundaryControl {
+        /// Zero-based token index of the unsupported control.
+        token_index: usize,
+
+        /// Unsupported boundary control token.
+        control: String,
     },
 }
 
@@ -293,7 +433,7 @@ fn required_arg_end(tokens: &[&str], args_start: usize, required: usize) -> usiz
     let mut end = args_start;
     let mut consumed = 0;
 
-    while consumed < required && end < tokens.len() && !is_effect_boundary(tokens[end]) {
+    while consumed < required && end < tokens.len() && !is_command_boundary(tokens[end]) {
         consumed += 1;
         end += 1;
     }
@@ -309,7 +449,7 @@ fn optional_arg_end(tokens: &[&str], args_start: usize, max: usize) -> usize {
     let mut end = args_start;
     let mut consumed = 0;
 
-    while consumed < max && end < tokens.len() && !is_effect_boundary(tokens[end]) {
+    while consumed < max && end < tokens.len() && !is_command_boundary(tokens[end]) {
         consumed += 1;
         end += 1;
     }
@@ -328,12 +468,12 @@ fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
         end += 1;
     }
 
-    if end >= tokens.len() || is_effect_boundary(tokens[end]) {
+    if end >= tokens.len() || is_command_boundary(tokens[end]) {
         return end;
     }
     end += 1;
 
-    if end < tokens.len() && !is_effect_boundary(tokens[end]) {
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
         end += 1;
     }
 
@@ -341,11 +481,25 @@ fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
 }
 
 fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {
-    if end < tokens.len() && !is_effect_boundary(tokens[end]) {
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
         end + 1
     } else {
         end
     }
+}
+
+fn is_command_boundary(token: &str) -> bool {
+    is_chain_boundary_token(token)
+        || is_unsupported_boundary_control(token)
+        || is_effect_boundary(token)
+}
+
+pub(crate) fn is_chain_boundary_token(token: &str) -> bool {
+    token == CHAIN_BOUNDARY_TOKEN
+}
+
+pub(crate) fn is_unsupported_boundary_control(token: &str) -> bool {
+    UNSUPPORTED_BOUNDARY_CONTROLS.contains(&token)
 }
 
 fn is_effect_boundary(token: &str) -> bool {
@@ -357,7 +511,10 @@ fn is_effect_boundary(token: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{EffectChain, EffectChainError, EffectChainParseError, parse_effect_chain};
+    use super::{
+        EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError,
+        parse_effect_chain,
+    };
     use crate::{DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, Trim};
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
@@ -469,6 +626,37 @@ mod tests {
     }
 
     #[test]
+    fn chain_token_parser_preserves_boundaries_for_deterministic_rendering() {
+        let chain =
+            parse_effect_chain(&["gain", "-3", ":", "dcshift", "0.125", "reverse"]).unwrap();
+
+        assert!(chain.has_boundaries());
+        assert_eq!(chain.boundaries(), &[EffectChainBoundary::new(1)]);
+        assert_eq!(chain.boundaries()[0].before_command(), 1);
+        assert_eq!(
+            chain.render_tokens(),
+            ["gain", "-3", ":", "dcshift", "0.125", "reverse"]
+        );
+    }
+
+    #[test]
+    fn boundary_chain_processes_like_equivalent_sequential_chain_for_now() {
+        let source = audio_buffer(vec![0.25, -0.5, 1.0]);
+        let mut boundary = source.clone();
+        let mut flat = source;
+        let boundary_chain =
+            parse_effect_chain(&["gain", "-3", ":", "dcshift", "0.125", "reverse"]).unwrap();
+        let flat_chain =
+            parse_effect_chain(&["gain", "-3", "dcshift", "0.125", "reverse"]).unwrap();
+
+        boundary_chain.process_buffer(&mut boundary).unwrap();
+        flat_chain.process_buffer(&mut flat).unwrap();
+
+        assert_eq!(boundary_chain.render_tokens()[2], ":");
+        assert_samples_close(boundary.as_planar_f32(), flat.as_planar_f32());
+    }
+
+    #[test]
     fn chain_token_parser_preserves_defaults_and_alias_boundaries() {
         let chain = parse_effect_chain(&["gain", "dc-shift", "-0.25", "pad", "reverse"]).unwrap();
 
@@ -506,6 +694,55 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "effect chain command 1 (`trim 1`) failed to parse: effect `trim` requires argument `end-frame`"
+        );
+    }
+
+    #[test]
+    fn chain_token_parser_rejects_empty_boundary_segments() {
+        let leading = parse_effect_chain(&[":", "gain", "-3"]).unwrap_err();
+        let repeated = parse_effect_chain(&["gain", "-3", ":", ":", "reverse"]).unwrap_err();
+        let trailing = parse_effect_chain(&["gain", "-3", ":"]).unwrap_err();
+
+        assert_eq!(
+            leading,
+            EffectChainParseError::EmptyBoundaryChain { token_index: 0 }
+        );
+        assert_eq!(
+            repeated,
+            EffectChainParseError::EmptyBoundaryChain { token_index: 3 }
+        );
+        assert_eq!(
+            trailing,
+            EffectChainParseError::EmptyBoundaryChain { token_index: 2 }
+        );
+        assert_eq!(
+            trailing.to_string(),
+            "effect chain boundary at token 2 creates an empty chain segment"
+        );
+    }
+
+    #[test]
+    fn unsupported_newfile_and_restart_report_stable_boundary_diagnostics() {
+        let newfile = parse_effect_chain(&["gain", "-3", ":", "newfile"]).unwrap_err();
+        let restart = parse_effect_chain(&["gain", "-3", "restart"]).unwrap_err();
+
+        assert_eq!(
+            newfile,
+            EffectChainParseError::UnsupportedBoundaryControl {
+                token_index: 3,
+                control: "newfile".to_owned(),
+            }
+        );
+        assert_eq!(
+            restart,
+            EffectChainParseError::UnsupportedBoundaryControl {
+                token_index: 2,
+                control: "restart".to_owned(),
+            }
+        );
+        assert_eq!(
+            newfile.to_string(),
+            "effect chain token 3 (`newfile`) uses unsupported boundary control; `newfile` and `restart` semantics are not implemented"
         );
     }
 

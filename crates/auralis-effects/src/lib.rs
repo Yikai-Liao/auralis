@@ -37,8 +37,8 @@ mod effects_file;
 mod registry;
 
 pub use chain::{
-    ChainParseResult, ChainResult, EffectChain, EffectChainError, EffectChainParseError,
-    parse_effect_chain,
+    ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,
+    EffectChainParseError, parse_effect_chain,
 };
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use effects_file::{

@@ -54,7 +54,10 @@ scalar-vs-SIMD differential tests. The effects crate also parses
 SoX-ng-inspired effects files into typed `EffectChain` values with blank-line,
 comment, quote, escape, and line/column diagnostic handling, and
 `auralis run --effects-file <FILE>` executes those chains through the same
-ordered pipeline as positional CLI effect chains. The SIMD crate defines
+ordered pipeline as positional CLI effect chains. Positional chains and effects
+files preserve explicit `:` chain boundaries for deterministic rendering and
+diagnostics, while unsupported `newfile` and `restart` boundary controls return
+stable not-yet-implemented errors. The SIMD crate defines
 the Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -378,35 +381,38 @@ Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
 `gain-db 0.0` produce the same manifest representation. `EffectChain` groups
-typed commands into an in-memory sequential chain, applies them in caller order,
-supports forced scalar/SIMD backend selection for backend-aware effects, and
-reports processing failures with the zero-based command index, canonical command
-tokens, failed argument family, and typed source error. Flat token streams can
-also be parsed into an `EffectChain`, which is how `auralis run <input>
-<output> gain -3 reverse` shares the same ordering and diagnostics as the
-library API.
+typed commands into an in-memory sequential chain, preserves explicit `:`
+boundaries between chain segments, applies implemented commands in caller
+order, supports forced scalar/SIMD backend selection for backend-aware effects,
+and reports processing failures with the zero-based command index, canonical
+command tokens, failed argument family, and typed source error. Flat token
+streams can also be parsed into an `EffectChain`, which is how `auralis run
+<input> <output> gain -3 : reverse` shares the same ordering and diagnostics as
+the library API. The `newfile` and `restart` controls are reserved for later
+multi-output/restart features and currently return stable diagnostics.
 
-Effects files use the same token and command model as positional chains while
-remaining a library-level parser until CLI integration lands. A `#` outside
-quotes starts a comment, blank lines are ignored, single and double quotes group
-whitespace into one token, and a backslash escapes the next character outside
-single quotes. Each non-comment line may contain one or more commands:
+Effects files use the same token and command model as positional chains. A `#`
+outside quotes starts a comment, blank lines are ignored, single and double
+quotes group whitespace into one token, and a backslash escapes the next
+character outside single quotes. Each non-comment line may contain one or more
+commands:
 
 ```text
 # level and editing chain
 gain -3
-dcshift 0.125 reverse
+dcshift 0.125 : reverse
 fade l 24000 24000
 ```
 
 Parsing this text with `parse_effects_file_str` or `parse_effects_file`
 produces the same typed `EffectChain` as the flat CLI-style token stream `gain
--3 dcshift 0.125 reverse fade l 24000 24000`. The CLI accepts the same file
+-3 dcshift 0.125 : reverse fade l 24000 24000`. The CLI accepts the same file
 with `auralis run input.wav output.wav --effects-file chain.effects`; effects
 files are mutually exclusive with positional chain tokens and legacy effect
-flags because their relative order would otherwise be ambiguous. Malformed
-quotes, dangling escapes, unknown effects, unsupported SoX-ng effects, invalid
-command arguments, missing files, and unreadable files report stable errors.
+flags because their relative order would otherwise be ambiguous. Empty boundary
+segments, unsupported `newfile`/`restart` controls, malformed quotes, dangling
+escapes, unknown effects, unsupported SoX-ng effects, invalid command
+arguments, missing files, and unreadable files report stable errors.
 
 ### `auralis-simd`
 
@@ -499,17 +505,22 @@ auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --reverse
 auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
+auralis run input.wav output.wav gain -3 : dcshift 0.125 reverse
 auralis run input.wav output.wav --backend simd gain -3 fade l 24000 24000
 auralis run input.wav output.wav --effects-file chain.effects
 auralis run pipeline.toml
 auralis completions zsh
 ```
 
-The positional effect chain starts after the input and output paths. Backend
-selection remains an option, but legacy one-effect flags such as `--gain-db` are
-not combined with positional chain tokens or `--effects-file` because their
-relative order would be ambiguous. Effects files use the same parser as the
-library `parse_effects_file` API.
+The positional effect chain starts after the input and output paths. A `:`
+token preserves an explicit chain boundary in the parsed representation and
+deterministic rendering; current processing still executes the implemented
+commands sequentially in memory. SoX-ng `newfile` and `restart` boundary
+controls are recognized but rejected until their own pipeline features exist.
+Backend selection remains an option, but legacy one-effect flags such as
+`--gain-db` are not combined with positional chain tokens or `--effects-file`
+because their relative order would be ambiguous. Effects files use the same
+parser as the library `parse_effects_file` API.
 
 Selected crates:
 
@@ -549,7 +560,9 @@ fields, and command arguments are validated before tests run so failure reports
 can rely on deterministic command rendering. The testkit also renders command
 vectors as display strings for reports with stable double-quote escaping for
 spaces, quotes, backslashes, and control characters while keeping the original
-argument vectors available for process execution.
+argument vectors available for process execution. Explicit chain boundary
+tokens render deterministically as `:` in both Auralis and SoX-ng command
+displays.
 
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
 for a structural editing chain, a level-processing chain, and the currently
