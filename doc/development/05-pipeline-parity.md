@@ -265,7 +265,7 @@ Acceptance tests:
 
 ### Feature 5.6.2: split `crates/auralis/src/lib.rs`
 
-Status: planned.
+Status: implemented.
 
 Split the high-level facade by functional ownership.
 
@@ -288,6 +288,16 @@ Acceptance tests:
 - every resulting Rust source file is below 1,000 lines;
 - `lib.rs` becomes crate docs, module declarations, and re-exports;
 - moved tests remain focused and discoverable.
+
+Implementation notes:
+
+- `crates/auralis/src/lib.rs` is now a crate-root facade with module
+  declarations, public re-exports, and the `Result` alias.
+- Runtime behavior moved into `audio_file`, `pipeline`, `combine`,
+  `channel_policy`, `rate_policy`, `level_policy`, and `errors` modules.
+- The previous monolithic unit-test module moved into focused integration
+  tests under `crates/auralis/tests/` with shared fixtures in
+  `crates/auralis/tests/support/`.
 
 ### Feature 5.6.3: split `crates/auralis-simd/src/lib.rs`
 

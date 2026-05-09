@@ -38,7 +38,7 @@ The current project policy is "no Rust source file above 1,000 lines." The
 strict check uses `>` rather than `>=` so a file with exactly 1,000 lines is
 still accepted by the policy as written.
 
-## Current Line Counts
+## Feature 5.6.1 Baseline Line Counts
 
 | Lines | File | Classification |
 |---:|---|---|
@@ -73,11 +73,23 @@ enforced. There is no current generated or vendored-file exemption.
 
 ### `crates/auralis`
 
+Feature 5.6.2 completed this split. At completion, the largest resulting
+`crates/auralis` Rust files were:
+
+| Lines | File |
+|---:|---|
+| 840 | `crates/auralis/tests/combine.rs` |
+| 693 | `crates/auralis/src/combine.rs` |
+| 616 | `crates/auralis/src/audio_file.rs` |
+| 409 | `crates/auralis/tests/pipeline.rs` |
+| 401 | `crates/auralis/src/pipeline.rs` |
+| 388 | `crates/auralis/tests/output_policies.rs` |
+
 Target shape:
 
 - `src/lib.rs`: crate docs, public re-exports, module declarations, and the
   `Result` alias.
-- `src/error.rs`: high-level `Error` enum and `PartialEq` implementation.
+- `src/errors.rs`: high-level `Error` enum and `PartialEq` implementation.
 - `src/audio_file.rs`: `AudioFile`, WAV opening helpers, and constructors from
   existing buffers.
 - `src/pipeline.rs`: `Pipeline`, fluent effect application, chain application,
