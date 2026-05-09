@@ -97,7 +97,11 @@ Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
 `gain_f32`, `dc_shift_f32`, `fade_f32`, `mix_f32`, and `multiply_f32` kernels.
-Source modularization debt is scoped by a checked-in file-size audit and module
+L4 property and metamorphic coverage now uses Rust-side `proptest` checks for
+the implemented effect set, including identity parameters, reverse-twice
+invariance, gain/inverse-gain round trips for non-clipping input, and
+finite-output behavior for bounded finite samples. Source modularization debt
+is scoped by a checked-in file-size audit and module
 ownership map in `doc/development/05-source-module-map.md`. The high-level
 `auralis` facade has been split into ownership modules while keeping its public
 re-exports stable, and `auralis-simd` now keeps backend metadata, selection,

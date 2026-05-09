@@ -20,5 +20,8 @@ auralis-dsp = { path = "../auralis-dsp" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
 thiserror.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

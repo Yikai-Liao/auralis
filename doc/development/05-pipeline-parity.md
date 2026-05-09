@@ -567,7 +567,7 @@ Implementation notes:
 
 ### Feature 5.7.4: L4 property and metamorphic test framework
 
-Status: planned.
+Status: implemented.
 
 Move from hand-written examples toward systematic property tests.
 
@@ -584,6 +584,20 @@ Acceptance tests:
 - cover `gain +x` followed by `gain -x` approximately returns the original
   signal within documented tolerance for non-clipping input;
 - finite-input behavior is checked for effects that should preserve finiteness.
+
+Implementation notes:
+
+- `auralis-effects` now uses Rust-side `proptest` integration tests for the L4
+  property and metamorphic layer.
+- The property suite covers identity parameters for the implemented effect set:
+  `gain 0`, `dcshift 0`, zero-length `fade`, full-range `trim`, and `pad 0`.
+- The same suite checks `reverse` twice equals the original signal, gain and
+  inverse-gain round trips for bounded non-clipping input, and finite-output
+  behavior for representative gain, dcshift, fade, trim, pad, and reverse
+  transforms.
+- Python-side property tests remain intentionally N/A for this feature because
+  the Rust typed effect APIs are the behavior under test; future Python bindings
+  should add `hypothesis` only through the uv-managed test harness.
 
 ### Feature 5.7.5: L5 chunk invariance matrix
 
