@@ -858,6 +858,8 @@ Acceptance tests:
 
 #### Feature 4.2.2: SIMD `f32_to_i16`
 
+Status: implemented.
+
 Implement scalar and SIMD versions of `f32_to_i16`.
 
 Acceptance tests:

@@ -41,7 +41,10 @@ use std::{
 
 use auralis_codec::{AudioReader, AudioWriter, CodecError, CodecKind};
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
-use auralis_simd::{BackendKind, i16_to_f32_with_backend, select_backend};
+use auralis_simd::{
+    BackendKind, SampleConversionError, f32_to_i16_with_backend, i16_to_f32_with_backend,
+    select_backend,
+};
 use thiserror::Error;
 
 /// Crate-local result type using [`WavError`].
@@ -207,7 +210,30 @@ pub fn encode_pcm16<W>(writer: W, audio: &AudioBuffer) -> Result<()>
 where
     W: Write + Seek,
 {
-    Pcm16WavWriter::new(writer).write_pcm16(audio)
+    encode_pcm16_with_backend(writer, audio, BackendKind::Scalar)
+}
+
+/// Encodes a planar `f32` buffer as a PCM16 WAV stream with an explicit
+/// sample-conversion backend.
+///
+/// The encoded audio is identical to [`encode_pcm16`]. `requested_backend`
+/// controls only the `f32`-to-PCM16 conversion kernel; unsupported SIMD
+/// requests fall back through `auralis-simd` backend selection metadata before
+/// encoding continues. This is intended for backend conformance tests and
+/// deterministic backend-specific validation.
+///
+/// # Errors
+///
+/// Returns the same sample validation and write errors as [`encode_pcm16`].
+pub fn encode_pcm16_with_backend<W>(
+    writer: W,
+    audio: &AudioBuffer,
+    requested_backend: BackendKind,
+) -> Result<()>
+where
+    W: Write + Seek,
+{
+    Pcm16WavWriter::new(writer).write_pcm16_with_backend(audio, requested_backend)
 }
 
 /// Encodes a planar `f32` buffer as a PCM16 WAV file on disk.
@@ -220,13 +246,32 @@ where
 /// Returns [`WavError::CreateFailed`] if `path` cannot be created. Propagates
 /// the same sample validation and write errors as [`encode_pcm16`].
 pub fn encode_pcm16_path(path: impl AsRef<Path>, audio: &AudioBuffer) -> Result<()> {
+    encode_pcm16_path_with_backend(path, audio, BackendKind::Scalar)
+}
+
+/// Encodes a planar `f32` buffer as a PCM16 WAV file with an explicit
+/// sample-conversion backend.
+///
+/// Existing files at `path` are overwritten. See [`encode_pcm16`] for the
+/// clipping and quantization rules and [`encode_pcm16_with_backend`] for
+/// backend selection behavior.
+///
+/// # Errors
+///
+/// Returns [`WavError::CreateFailed`] if `path` cannot be created. Propagates
+/// the same sample validation and write errors as [`encode_pcm16`].
+pub fn encode_pcm16_path_with_backend(
+    path: impl AsRef<Path>,
+    audio: &AudioBuffer,
+    requested_backend: BackendKind,
+) -> Result<()> {
     let writer = hound::WavWriter::create(path, hound_spec(audio)).map_err(|error| {
         WavError::CreateFailed {
             message: error.to_string(),
         }
     })?;
 
-    write_pcm16_samples(writer, audio)
+    write_pcm16_samples_with_backend(writer, audio, requested_backend)
 }
 
 /// Reader for PCM16 WAV streams.
@@ -375,6 +420,22 @@ where
     /// write. Propagates the same validation and write errors as
     /// [`encode_pcm16`].
     pub fn write_pcm16(&mut self, audio: &AudioBuffer) -> Result<()> {
+        self.write_pcm16_with_backend(audio, BackendKind::Scalar)
+    }
+
+    /// Writes and finalizes one PCM16 WAV stream using an explicit
+    /// sample-conversion backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WavError::WriterAlreadyUsed`] if called after a previous
+    /// write. Propagates the same validation and write errors as
+    /// [`encode_pcm16`].
+    pub fn write_pcm16_with_backend(
+        &mut self,
+        audio: &AudioBuffer,
+        requested_backend: BackendKind,
+    ) -> Result<()> {
         let Some(destination) = self.destination.take() else {
             return Err(WavError::WriterAlreadyUsed);
         };
@@ -384,7 +445,7 @@ where
             }
         })?;
 
-        write_pcm16_samples(writer, audio)
+        write_pcm16_samples_with_backend(writer, audio, requested_backend)
     }
 }
 
@@ -437,7 +498,11 @@ fn hound_spec(audio: &AudioBuffer) -> hound::WavSpec {
     }
 }
 
-fn write_pcm16_samples<W>(mut writer: hound::WavWriter<W>, audio: &AudioBuffer) -> Result<()>
+fn write_pcm16_samples_with_backend<W>(
+    mut writer: hound::WavWriter<W>,
+    audio: &AudioBuffer,
+    requested_backend: BackendKind,
+) -> Result<()>
 where
     W: Write + Seek,
 {
@@ -445,6 +510,12 @@ where
     let frames = usize::try_from(audio.frames().as_u64()).map_err(|_| WavError::WriteFailed {
         message: "frame count cannot be represented on this platform".to_owned(),
     })?;
+    let sample_count = frames
+        .checked_mul(channels)
+        .ok_or_else(|| WavError::WriteFailed {
+            message: "sample count cannot be represented on this platform".to_owned(),
+        })?;
+    let mut interleaved_f32 = Vec::with_capacity(sample_count);
 
     for frame_index in 0..frames {
         for channel_index in 0..channels {
@@ -454,13 +525,24 @@ where
                     .ok_or_else(|| WavError::WriteFailed {
                         message: "audio buffer shape changed during encode".to_owned(),
                     })?;
-            let sample = pcm16_from_f32(sample, channel_index, frame_index)?;
-            writer
-                .write_sample(sample)
-                .map_err(|error| WavError::WriteFailed {
-                    message: error.to_string(),
-                })?;
+            interleaved_f32.push(sample);
         }
+    }
+
+    let mut interleaved_pcm16 = vec![0; interleaved_f32.len()];
+    f32_to_i16_with_backend(
+        select_backend(requested_backend),
+        &interleaved_f32,
+        &mut interleaved_pcm16,
+    )
+    .map_err(|error| sample_conversion_error(&error, channels))?;
+
+    for sample in interleaved_pcm16 {
+        writer
+            .write_sample(sample)
+            .map_err(|error| WavError::WriteFailed {
+                message: error.to_string(),
+            })?;
     }
 
     writer.finalize().map_err(|error| WavError::WriteFailed {
@@ -468,20 +550,16 @@ where
     })
 }
 
-#[allow(clippy::cast_possible_truncation)]
-fn pcm16_from_f32(sample: f32, channel_index: usize, frame_index: usize) -> Result<i16> {
-    if !sample.is_finite() {
-        return Err(WavError::NonFiniteSample {
-            channel_index,
-            frame_index,
-        });
+fn sample_conversion_error(error: &SampleConversionError, channels: usize) -> WavError {
+    match error {
+        SampleConversionError::NonFiniteSample { sample_index } => WavError::NonFiniteSample {
+            channel_index: *sample_index % channels,
+            frame_index: *sample_index / channels,
+        },
+        _ => WavError::WriteFailed {
+            message: error.to_string(),
+        },
     }
-
-    let scaled = (sample.clamp(-1.0, 1.0) * 32768.0)
-        .round()
-        .clamp(f32::from(i16::MIN), f32::from(i16::MAX));
-
-    Ok(scaled as i16)
 }
 
 fn frame_count(frames_per_channel: u32) -> FrameCount {
@@ -513,6 +591,7 @@ mod tests {
     use super::{
         Pcm16WavReader, Pcm16WavWriter, WavError, WavSampleEncoding, decode_pcm16,
         decode_pcm16_path, decode_pcm16_with_backend, encode_pcm16_path,
+        encode_pcm16_path_with_backend,
     };
 
     #[test]
@@ -672,6 +751,36 @@ mod tests {
                 f32::from(32_767_i16) / 32768.0,
             ]
         );
+    }
+
+    #[test]
+    fn encode_pcm16_matches_under_forced_scalar_and_requested_simd() {
+        let audio = audio_buffer(
+            2,
+            5,
+            &[
+                -1.5,
+                -1.0,
+                -0.5,
+                -0.5 / 32768.0,
+                0.0,
+                0.5 / 32768.0,
+                0.25,
+                0.999_984_74,
+                1.0,
+                1.5,
+            ],
+        );
+        let scalar_path =
+            encode_temp_wav_with_backend("auralis-wav-encode-scalar", &audio, BackendKind::Scalar);
+        let simd_path =
+            encode_temp_wav_with_backend("auralis-wav-encode-simd", &audio, BackendKind::Simd);
+        let scalar = decode_pcm16_path(&scalar_path).unwrap();
+        let simd = decode_pcm16_path(&simd_path).unwrap();
+
+        fs::remove_file(scalar_path).unwrap();
+        fs::remove_file(simd_path).unwrap();
+        assert_audio_bits_eq(&simd, &scalar);
     }
 
     #[test]
@@ -907,6 +1016,16 @@ mod tests {
     fn encode_temp_wav(prefix: &str, audio: &AudioBuffer) -> PathBuf {
         let path = temp_path(prefix, "wav");
         encode_pcm16_path(&path, audio).unwrap();
+        path
+    }
+
+    fn encode_temp_wav_with_backend(
+        prefix: &str,
+        audio: &AudioBuffer,
+        backend: BackendKind,
+    ) -> PathBuf {
+        let path = temp_path(prefix, "wav");
+        encode_pcm16_path_with_backend(&path, audio, backend).unwrap();
         path
     }
 

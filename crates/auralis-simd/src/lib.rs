@@ -204,10 +204,16 @@ impl BackendSelection {
 pub enum SampleConversionError {
     /// The source and destination buffers did not have the same length.
     BufferLengthMismatch {
-        /// Number of input PCM16 samples.
+        /// Number of input samples.
         input_len: usize,
-        /// Number of output `f32` samples.
+        /// Number of output samples.
         output_len: usize,
+    },
+
+    /// A floating-point input sample was NaN or infinite.
+    NonFiniteSample {
+        /// Zero-based index of the first non-finite input sample.
+        sample_index: usize,
     },
 }
 
@@ -220,6 +226,10 @@ impl fmt::Display for SampleConversionError {
             } => write!(
                 formatter,
                 "sample conversion input length {input_len} did not match output length {output_len}"
+            ),
+            Self::NonFiniteSample { sample_index } => write!(
+                formatter,
+                "sample conversion input sample {sample_index} was NaN or infinite"
             ),
         }
     }
@@ -332,7 +342,7 @@ pub fn select_named_backend(name: &str) -> Option<BackendSelection> {
 /// # Ok::<(), auralis_simd::SampleConversionError>(())
 /// ```
 pub fn i16_to_f32_scalar(input: &[i16], output: &mut [f32]) -> Result<(), SampleConversionError> {
-    validate_conversion_lengths(input, output)?;
+    validate_conversion_lengths(input.len(), output.len())?;
     i16_to_f32_scalar_unchecked(input, output);
     Ok(())
 }
@@ -355,11 +365,78 @@ pub fn i16_to_f32_with_backend(
     input: &[i16],
     output: &mut [f32],
 ) -> Result<(), SampleConversionError> {
-    validate_conversion_lengths(input, output)?;
+    validate_conversion_lengths(input.len(), output.len())?;
 
     match selection.selected_kind() {
         BackendKind::Scalar => i16_to_f32_scalar_unchecked(input, output),
         BackendKind::Simd => i16_to_f32_selected_simd(input, output),
+    }
+
+    Ok(())
+}
+
+/// Converts normalized `f32` samples into signed 16-bit PCM using the scalar
+/// reference backend.
+///
+/// Samples must be finite. Each sample is clipped to `[-1.0, 1.0]`, scaled by
+/// `32768.0`, rounded to the nearest integer with halfway cases rounded away
+/// from zero, then clipped to the `i16` range. This maps `-1.0` to
+/// [`i16::MIN`], `1.0` to [`i16::MAX`], and values that came from
+/// [`i16_to_f32_scalar`] back to their original PCM16 value where possible.
+/// The function allocates no memory and accepts empty buffers.
+///
+/// # Errors
+///
+/// Returns [`SampleConversionError::BufferLengthMismatch`] when `input` and
+/// `output` have different lengths. Returns
+/// [`SampleConversionError::NonFiniteSample`] for the first NaN or infinite
+/// input sample.
+///
+/// # Examples
+///
+/// ```
+/// let input = [-1.0, 0.0, 0.5, 1.0];
+/// let mut output = [0; 4];
+///
+/// auralis_simd::f32_to_i16_scalar(&input, &mut output)?;
+///
+/// assert_eq!(output, [i16::MIN, 0, 16_384, i16::MAX]);
+/// # Ok::<(), auralis_simd::SampleConversionError>(())
+/// ```
+pub fn f32_to_i16_scalar(input: &[f32], output: &mut [i16]) -> Result<(), SampleConversionError> {
+    validate_conversion_lengths(input.len(), output.len())?;
+    validate_finite_samples(input)?;
+    f32_to_i16_scalar_unchecked(input, output);
+    Ok(())
+}
+
+/// Converts normalized `f32` samples into signed 16-bit PCM using the backend
+/// recorded by `selection`.
+///
+/// Callers that need deterministic tests can pass the result of
+/// [`select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`]. When a SIMD request falls back to scalar, this
+/// function follows the selected backend recorded in the selection metadata.
+/// The clipping, rounding, and NaN/infinity behavior are identical to
+/// [`f32_to_i16_scalar`].
+///
+/// # Errors
+///
+/// Returns [`SampleConversionError::BufferLengthMismatch`] when `input` and
+/// `output` have different lengths. Returns
+/// [`SampleConversionError::NonFiniteSample`] for the first NaN or infinite
+/// input sample.
+pub fn f32_to_i16_with_backend(
+    selection: BackendSelection,
+    input: &[f32],
+    output: &mut [i16],
+) -> Result<(), SampleConversionError> {
+    validate_conversion_lengths(input.len(), output.len())?;
+    validate_finite_samples(input)?;
+
+    match selection.selected_kind() {
+        BackendKind::Scalar => f32_to_i16_scalar_unchecked(input, output),
+        BackendKind::Simd => f32_to_i16_selected_simd(input, output),
     }
 
     Ok(())
@@ -429,16 +506,30 @@ enum SimdStatus {
 }
 
 const PCM16_TO_F32_SCALE: f32 = 1.0 / 32768.0;
+const F32_TO_PCM16_SCALE: f32 = 32768.0;
 
-fn validate_conversion_lengths(input: &[i16], output: &[f32]) -> Result<(), SampleConversionError> {
-    if input.len() == output.len() {
+fn validate_conversion_lengths(
+    input_len: usize,
+    output_len: usize,
+) -> Result<(), SampleConversionError> {
+    if input_len == output_len {
         Ok(())
     } else {
         Err(SampleConversionError::BufferLengthMismatch {
-            input_len: input.len(),
-            output_len: output.len(),
+            input_len,
+            output_len,
         })
     }
+}
+
+fn validate_finite_samples(input: &[f32]) -> Result<(), SampleConversionError> {
+    for (sample_index, sample) in input.iter().enumerate() {
+        if !sample.is_finite() {
+            return Err(SampleConversionError::NonFiniteSample { sample_index });
+        }
+    }
+
+    Ok(())
 }
 
 #[inline]
@@ -448,9 +539,34 @@ fn i16_to_f32_scalar_unchecked(input: &[i16], output: &mut [f32]) {
     }
 }
 
+#[inline]
+fn f32_to_i16_scalar_unchecked(input: &[f32], output: &mut [i16]) {
+    for (&input, output) in input.iter().zip(output) {
+        *output = f32_to_i16_scalar_sample(input);
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the sample is rounded and clamped to the i16 range before casting"
+)]
+#[inline]
+fn f32_to_i16_scalar_sample(sample: f32) -> i16 {
+    let scaled = (sample.clamp(-1.0, 1.0) * F32_TO_PCM16_SCALE)
+        .round()
+        .clamp(f32::from(i16::MIN), f32::from(i16::MAX));
+
+    scaled as i16
+}
+
 #[cfg(not(feature = "simd"))]
 fn i16_to_f32_selected_simd(input: &[i16], output: &mut [f32]) {
     i16_to_f32_scalar_unchecked(input, output);
+}
+
+#[cfg(not(feature = "simd"))]
+fn f32_to_i16_selected_simd(input: &[f32], output: &mut [i16]) {
+    f32_to_i16_scalar_unchecked(input, output);
 }
 
 #[cfg(feature = "simd")]
@@ -502,6 +618,76 @@ fn i16_to_f32_selected_simd(input: &[i16], output: &mut [f32]) {
     Convert { input, output }.dispatch();
 }
 
+#[cfg(feature = "simd")]
+fn f32_to_i16_selected_simd(input: &[f32], output: &mut [i16]) {
+    use rten_simd::{
+        Isa, SimdOp,
+        ops::{FloatOps, NarrowSaturate, NumOps},
+    };
+
+    struct Convert<'input, 'output> {
+        input: &'input [f32],
+        output: &'output mut [i16],
+    }
+
+    impl SimdOp for Convert<'_, '_> {
+        type Output = ();
+
+        #[expect(
+            clippy::inline_always,
+            reason = "rten-simd recommends inlining eval so target-feature intrinsics compile into the dispatched kernel body"
+        )]
+        #[inline(always)]
+        fn eval<I: Isa>(self, isa: I) -> Self::Output {
+            let f32_ops = isa.f32();
+            let i32_ops = isa.i32();
+            let i16_ops = isa.i16();
+            let f32_vector_len = f32_ops.len();
+            let output_vector_len = i16_ops.len();
+            let min_sample = f32_ops.splat(-1.0);
+            let max_sample = f32_ops.splat(1.0);
+            let scale = f32_ops.splat(F32_TO_PCM16_SCALE);
+            let zero = f32_ops.zero();
+            let positive_round_offset = f32_ops.splat(0.5);
+            let negative_round_offset = f32_ops.splat(-0.5);
+
+            let mut input_chunks = self.input.chunks_exact(output_vector_len);
+            let mut output_chunks = self.output.chunks_exact_mut(output_vector_len);
+
+            for (input_chunk, output_chunk) in input_chunks.by_ref().zip(output_chunks.by_ref()) {
+                let (low_input, high_input) = input_chunk.split_at(f32_vector_len);
+                let low_scaled = f32_ops.mul(
+                    f32_ops.clamp(f32_ops.load(low_input), min_sample, max_sample),
+                    scale,
+                );
+                let high_scaled = f32_ops.mul(
+                    f32_ops.clamp(f32_ops.load(high_input), min_sample, max_sample),
+                    scale,
+                );
+                let low_round_offset = f32_ops.select(
+                    positive_round_offset,
+                    negative_round_offset,
+                    f32_ops.ge(low_scaled, zero),
+                );
+                let high_round_offset = f32_ops.select(
+                    positive_round_offset,
+                    negative_round_offset,
+                    f32_ops.ge(high_scaled, zero),
+                );
+                let low_i32 = f32_ops.to_int_trunc(f32_ops.add(low_scaled, low_round_offset));
+                let high_i32 = f32_ops.to_int_trunc(f32_ops.add(high_scaled, high_round_offset));
+                let packed = i32_ops.narrow_saturate(low_i32, high_i32);
+
+                i16_ops.store(packed, output_chunk);
+            }
+
+            f32_to_i16_scalar_unchecked(input_chunks.remainder(), output_chunks.into_remainder());
+        }
+    }
+
+    Convert { input, output }.dispatch();
+}
+
 mod private {
     use super::ScalarBackend;
 
@@ -519,8 +705,9 @@ mod tests {
 
     use super::{
         Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection,
-        SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor, i16_to_f32_scalar,
-        i16_to_f32_with_backend, select_backend, select_backend_with_status, select_named_backend,
+        SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor, f32_to_i16_scalar,
+        f32_to_i16_with_backend, i16_to_f32_scalar, i16_to_f32_with_backend, select_backend,
+        select_backend_with_status, select_named_backend,
     };
 
     #[test]
@@ -670,6 +857,104 @@ mod tests {
         assert_scalar_and_simd_conversion_match(&input);
     }
 
+    #[test]
+    fn scalar_f32_to_i16_matches_known_values_exactly() {
+        let input = [
+            -1.5,
+            -1.0,
+            -0.5,
+            -1.0 / 32768.0,
+            -0.5 / 32768.0,
+            0.0,
+            0.5 / 32768.0,
+            1.0 / 32768.0,
+            0.5,
+            f32::from(i16::MAX) / 32768.0,
+            1.0,
+            1.5,
+        ];
+        let mut output = [0; 12];
+
+        f32_to_i16_scalar(&input, &mut output).unwrap();
+
+        assert_eq!(
+            output,
+            [
+                i16::MIN,
+                i16::MIN,
+                -16_384,
+                -1,
+                -1,
+                0,
+                1,
+                1,
+                16_384,
+                i16::MAX,
+                i16::MAX,
+                i16::MAX,
+            ]
+        );
+    }
+
+    #[test]
+    fn f32_to_i16_rejects_mismatched_buffer_lengths() {
+        let input = [0.0, 0.25, 0.5];
+        let mut output = [0; 2];
+
+        let error = f32_to_i16_scalar(&input, &mut output).unwrap_err();
+
+        assert_eq!(
+            error,
+            SampleConversionError::BufferLengthMismatch {
+                input_len: 3,
+                output_len: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn f32_to_i16_rejects_nan_and_infinity() {
+        let input = [0.0, f32::INFINITY, f32::NAN, f32::NEG_INFINITY];
+        let mut output = [0; 4];
+
+        let error = f32_to_i16_scalar(&input, &mut output).unwrap_err();
+
+        assert_eq!(
+            error,
+            SampleConversionError::NonFiniteSample { sample_index: 1 }
+        );
+        assert_eq!(
+            error.to_string(),
+            "sample conversion input sample 1 was NaN or infinite"
+        );
+    }
+
+    #[test]
+    fn f32_to_i16_handles_empty_one_sample_odd_and_tail_lengths() {
+        for len in [0, 1, 3, 17, 33, 65] {
+            let input = patterned_f32(len);
+
+            assert_scalar_and_simd_f32_to_i16_match(&input);
+        }
+    }
+
+    #[test]
+    fn f32_to_i16_random_near_clipping_values_match_scalar_under_requested_simd() {
+        let mut input = seeded_f32(0xd1b5_4a32_d192_ed03, 4099);
+        input.extend([
+            -1.5,
+            -1.0,
+            -0.999_984_74,
+            -1.0 / 65536.0,
+            1.0 / 65536.0,
+            0.999_984_74,
+            1.0,
+            1.5,
+        ]);
+
+        assert_scalar_and_simd_f32_to_i16_match(&input);
+    }
+
     #[cfg(all(
         feature = "simd",
         any(
@@ -750,6 +1035,14 @@ mod tests {
         assert_sample_bits_eq(&simd, &scalar);
     }
 
+    fn assert_scalar_and_simd_f32_to_i16_match(input: &[f32]) {
+        let scalar = convert_f32_to_i16_with_backend(BackendKind::Scalar, input);
+        let simd = convert_f32_to_i16_with_backend(BackendKind::Simd, input);
+
+        assert_eq!(scalar, reference_f32_to_i16(input));
+        assert_eq!(simd, scalar);
+    }
+
     fn convert_with_backend(kind: BackendKind, input: &[i16]) -> Vec<f32> {
         let selection = select_backend(kind);
         let mut output = vec![0.0; input.len()];
@@ -759,11 +1052,39 @@ mod tests {
         output
     }
 
+    fn convert_f32_to_i16_with_backend(kind: BackendKind, input: &[f32]) -> Vec<i16> {
+        let selection = select_backend(kind);
+        let mut output = vec![0; input.len()];
+
+        f32_to_i16_with_backend(selection, input, &mut output).unwrap();
+
+        output
+    }
+
     fn reference_conversion(input: &[i16]) -> Vec<f32> {
         input
             .iter()
             .map(|&sample| f32::from(sample) / 32768.0)
             .collect()
+    }
+
+    fn reference_f32_to_i16(input: &[f32]) -> Vec<i16> {
+        input
+            .iter()
+            .map(|&sample| reference_f32_sample(sample))
+            .collect()
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the reference sample is rounded and clamped to the i16 range before casting"
+    )]
+    fn reference_f32_sample(sample: f32) -> i16 {
+        let scaled = (sample.clamp(-1.0, 1.0) * 32768.0)
+            .round()
+            .clamp(f32::from(i16::MIN), f32::from(i16::MAX));
+
+        scaled as i16
     }
 
     fn patterned_pcm16(len: usize) -> Vec<i16> {
@@ -784,6 +1105,26 @@ mod tests {
             .collect()
     }
 
+    fn patterned_f32(len: usize) -> Vec<f32> {
+        (0..len)
+            .map(|index| {
+                let pcm16 = patterned_pcm16_value(index);
+                let offset_bits = u16::try_from((index.wrapping_mul(37).wrapping_add(11)) & 0x03ff)
+                    .expect("masked test offset should fit in u16");
+                let offset = (f32::from(offset_bits) / 1024.0) - 0.5;
+
+                (f32::from(pcm16) + offset) / 32768.0
+            })
+            .collect()
+    }
+
+    fn patterned_pcm16_value(index: usize) -> i16 {
+        let value = (index.wrapping_mul(977).wrapping_add(12_345)) & 0xffff;
+        let sample_bits = u16::try_from(value).expect("masked test value should fit in u16");
+
+        sample_bits.cast_signed()
+    }
+
     fn seeded_pcm16(seed: u64, len: usize) -> Vec<i16> {
         let mut state = seed;
 
@@ -796,6 +1137,28 @@ mod tests {
                     u16::try_from(state >> 48).expect("shifted test state should fit in u16");
 
                 sample_bits.cast_signed()
+            })
+            .collect()
+    }
+
+    fn seeded_f32(seed: u64, len: usize) -> Vec<f32> {
+        let mut state = seed;
+
+        (0..len)
+            .map(|_| {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                let sample_bits =
+                    u16::try_from(state >> 48).expect("shifted test state should fit in u16");
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                let offset_bits = u16::try_from((state >> 54) & 0x03ff)
+                    .expect("shifted test offset should fit in u16");
+                let offset = (f32::from(offset_bits) / 512.0) - 1.0;
+
+                (f32::from(sample_bits.cast_signed()) + offset) / 32768.0
             })
             .collect()
     }

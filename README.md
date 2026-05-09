@@ -343,9 +343,10 @@ Effect implementations should be block-based and streaming-aware from the beginn
 Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
-PCM16-to-`f32` conversion kernels. The scalar kernel is the exact reference
-implementation; the SIMD kernel uses `rten-simd` behind the `simd` feature and
-falls back through Auralis backend selection when SIMD is unavailable.
+PCM16/`f32` conversion kernels in both directions. The scalar kernels are the
+exact reference implementations; the SIMD kernels use `rten-simd` behind the
+`simd` feature and fall back through Auralis backend selection when SIMD is
+unavailable.
 
 Backend names are stable lowercase strings:
 
@@ -383,6 +384,12 @@ Initial SIMD targets:
 - `i16_to_f32`
 - `f32_to_i16`
 - later: FIR and polyphase resampling inner loops
+
+`i16_to_f32` maps PCM16 samples by dividing by `32768.0`. `f32_to_i16`
+requires finite input samples, clips to `[-1.0, 1.0]`, scales by `32768.0`,
+rounds halfway cases away from zero, and clips the final integer to the PCM16
+range. WAV decode and encode expose explicit backend hooks for scalar-vs-SIMD
+conformance tests while preserving scalar defaults.
 
 Do not prioritize SIMD for state-machine-heavy or recursive algorithms at first.
 Do not implement SIMD before scalar correctness tests and differential tests
