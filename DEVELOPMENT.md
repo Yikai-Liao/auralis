@@ -895,6 +895,8 @@ Acceptance tests:
 
 #### Feature 4.3.2: SIMD `dcshift` retrofit
 
+Status: implemented.
+
 Add backend-dispatched kernels for implemented `dcshift`.
 
 Acceptance tests:

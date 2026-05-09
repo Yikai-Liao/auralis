@@ -20,7 +20,10 @@
 //! ```
 
 use auralis_core::Decibels;
-use auralis_simd::{BackendKind, BackendSelection, gain_f32_in_place_with_backend, select_backend};
+use auralis_simd::{
+    BackendKind, BackendSelection, dc_shift_f32_in_place_with_backend,
+    gain_f32_in_place_with_backend, select_backend,
+};
 
 /// Applies constant gain to each sample in place.
 ///
@@ -82,9 +85,24 @@ pub fn linear_gain(db: Decibels) -> f32 {
 /// transformed independently. It allocates no memory and runs in `O(n)` time.
 #[inline]
 pub fn dc_shift_in_place(samples: &mut [f32], shift: f32) {
-    for sample in samples {
-        *sample += shift;
-    }
+    dc_shift_in_place_with_backend(select_backend(BackendKind::Scalar), samples, shift);
+}
+
+/// Adds a constant normalized DC offset to each sample in place using the
+/// selected backend.
+///
+/// `shift` uses the same normalized full-scale units and numerical behavior as
+/// [`dc_shift_in_place`]. Callers can pass [`auralis_simd::select_backend`] with
+/// either [`BackendKind::Scalar`] or [`BackendKind::Simd`] to force deterministic
+/// scalar-vs-SIMD conformance runs. Unsupported SIMD requests follow the
+/// fallback recorded in `selection`.
+#[inline]
+pub fn dc_shift_in_place_with_backend(
+    selection: BackendSelection,
+    samples: &mut [f32],
+    shift: f32,
+) {
+    dc_shift_f32_in_place_with_backend(selection, samples, shift);
 }
 
 /// Applies a linear fade envelope to a contiguous channel segment in place.
@@ -148,7 +166,8 @@ fn ratio(numerator: u64, denominator: u64) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        dc_shift_in_place, fade_in_place, gain_in_place, gain_in_place_with_backend, linear_gain,
+        dc_shift_in_place, dc_shift_in_place_with_backend, fade_in_place, gain_in_place,
+        gain_in_place_with_backend, linear_gain,
     };
     use auralis_core::Decibels;
     use auralis_simd::{BackendKind, select_backend};
@@ -324,6 +343,29 @@ mod tests {
         dc_shift_in_place(&mut samples, 2.0);
 
         assert!(samples.iter().all(|sample| !sample.is_nan()));
+    }
+
+    #[test]
+    fn dc_shift_matches_under_forced_scalar_and_requested_simd() {
+        let source = [
+            -1.0,
+            -0.999_984_74,
+            -f32::MIN_POSITIVE,
+            -f32::from_bits(1),
+            -0.0,
+            0.0,
+            f32::from_bits(1),
+            f32::MIN_POSITIVE,
+            0.999_984_74,
+            1.0,
+        ];
+        let mut scalar = source;
+        let mut simd = source;
+
+        dc_shift_in_place_with_backend(select_backend(BackendKind::Scalar), &mut scalar, 0.125);
+        dc_shift_in_place_with_backend(select_backend(BackendKind::Simd), &mut simd, 0.125);
+
+        assert_sample_bits_eq(&simd, &scalar);
     }
 
     #[test]

@@ -42,7 +42,7 @@ provides backend conformance helpers for exact and tolerance-based
 scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
 backend trait skeleton with a scalar reference backend, deterministic `scalar` /
 `simd` backend selection, scalar/SIMD PCM16/`f32` sample conversion in both
-directions, and a backend-dispatched linear `gain_f32` kernel.
+directions, and backend-dispatched linear `gain_f32` and `dc_shift_f32` kernels.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -324,8 +324,8 @@ Contains scalar DSP primitives and reference implementations:
 - metrics used by tests where appropriate
 
 Scalar implementations are the source of truth for SIMD differential tests.
-`gain` has an explicit backend-dispatched entry point that keeps scalar as the
-default and uses the Auralis SIMD backend only when requested.
+`gain` and `dcshift` have explicit backend-dispatched entry points that keep
+scalar as the default and use the Auralis SIMD backend only when requested.
 
 ### `auralis-effects`
 
@@ -347,9 +347,9 @@ Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
 PCM16/`f32` conversion kernels in both directions plus the linear `gain_f32`
-kernel. The scalar kernels are the exact reference implementations; the SIMD
-kernels use `rten-simd` behind the `simd` feature and fall back through Auralis
-backend selection when SIMD is unavailable.
+and `dc_shift_f32` kernels. The scalar kernels are the exact reference
+implementations; the SIMD kernels use `rten-simd` behind the `simd` feature and
+fall back through Auralis backend selection when SIMD is unavailable.
 
 Backend names are stable lowercase strings:
 
@@ -382,6 +382,7 @@ traits and keeps SIMD as an implementation detail behind the `simd` feature.
 Initial SIMD targets:
 
 - `gain_f32`
+- `dc_shift_f32`
 - `mix2_f32`
 - `clip_f32`
 - `i16_to_f32`
@@ -396,7 +397,10 @@ conformance tests while preserving scalar defaults. `gain_f32` accepts a linear
 amplitude multiplier from the DSP `gain` decibel conversion, preserves signed
 zero for infinite-gain edge cases, and is covered by scalar-vs-SIMD parity
 tests for deterministic fixtures, tails, near-clipping values, silence, NaN,
-and infinity behavior.
+and infinity behavior. `dc_shift_f32` accepts a normalized full-scale offset
+from the typed `dcshift` effect and is covered by scalar-vs-SIMD parity tests
+for deterministic fixtures, tail lengths, silence, denormals, near-clipping
+values, NaN, and infinity behavior.
 
 Do not prioritize SIMD for state-machine-heavy or recursive algorithms at first.
 Do not implement SIMD before scalar correctness tests and differential tests
@@ -415,6 +419,7 @@ auralis run input.wav output.wav
 auralis run input.wav output.wav --gain-db -3
 auralis run input.wav output.wav --backend simd --gain-db -3
 auralis run input.wav output.wav --dc-shift 0.125
+auralis run input.wav output.wav --backend simd --dc-shift 0.125
 auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
 auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000

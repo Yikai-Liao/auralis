@@ -5,8 +5,9 @@
 //! optimized backends implement the same Auralis-owned traits while keeping
 //! implementation crates such as `rten-simd` out of public API types.
 //!
-//! Gain kernels accept a linear amplitude multiplier. Higher-level DSP APIs
-//! convert decibels into that multiplier before dispatching here.
+//! Gain kernels accept a linear amplitude multiplier. DC shift kernels accept a
+//! normalized full-scale offset. Higher-level DSP APIs validate effect
+//! configuration before dispatching here.
 //!
 //! # Examples
 //!
@@ -490,6 +491,46 @@ pub fn gain_f32_in_place_with_backend(
     }
 }
 
+/// Adds a constant normalized full-scale offset to `samples` using the scalar
+/// reference backend.
+///
+/// The operation is deterministic, in-place, non-allocating, and accepts empty
+/// buffers. It does not clip, normalize, or validate samples. Finite samples
+/// with a finite `shift` follow ordinary IEEE `f32` addition. NaN and infinity
+/// inputs retain the usual floating-point addition semantics.
+///
+/// # Examples
+///
+/// ```
+/// let mut samples = [-0.5, 0.0, 0.5];
+///
+/// auralis_simd::dc_shift_f32_in_place_scalar(&mut samples, 0.25);
+///
+/// assert_eq!(samples, [-0.25, 0.25, 0.75]);
+/// ```
+pub fn dc_shift_f32_in_place_scalar(samples: &mut [f32], shift: f32) {
+    dc_shift_f32_scalar_unchecked(samples, shift);
+}
+
+/// Adds a constant normalized full-scale offset to `samples` using the backend
+/// recorded by `selection`.
+///
+/// Callers that need deterministic tests can pass the result of
+/// [`select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`]. When a SIMD request falls back to scalar, this
+/// function follows the selected backend recorded in the selection metadata.
+/// Numerical behavior is identical to [`dc_shift_f32_in_place_scalar`].
+pub fn dc_shift_f32_in_place_with_backend(
+    selection: BackendSelection,
+    samples: &mut [f32],
+    shift: f32,
+) {
+    match selection.selected_kind() {
+        BackendKind::Scalar => dc_shift_f32_scalar_unchecked(samples, shift),
+        BackendKind::Simd => dc_shift_f32_selected_simd(samples, shift),
+    }
+}
+
 const fn scalar_descriptor() -> BackendDescriptor {
     BackendDescriptor::new(BackendKind::Scalar, BackendKind::Scalar.as_str(), true)
 }
@@ -616,6 +657,13 @@ fn gain_f32_scalar_unchecked(samples: &mut [f32], multiplier: f32) {
     }
 }
 
+#[inline]
+fn dc_shift_f32_scalar_unchecked(samples: &mut [f32], shift: f32) {
+    for sample in samples {
+        *sample += shift;
+    }
+}
+
 #[allow(
     clippy::cast_possible_truncation,
     reason = "the sample is rounded and clamped to the i16 range before casting"
@@ -642,6 +690,11 @@ fn f32_to_i16_selected_simd(input: &[f32], output: &mut [i16]) {
 #[cfg(not(feature = "simd"))]
 fn gain_f32_selected_simd(samples: &mut [f32], multiplier: f32) {
     gain_f32_scalar_unchecked(samples, multiplier);
+}
+
+#[cfg(not(feature = "simd"))]
+fn dc_shift_f32_selected_simd(samples: &mut [f32], shift: f32) {
+    dc_shift_f32_scalar_unchecked(samples, shift);
 }
 
 #[cfg(feature = "simd")]
@@ -803,6 +856,42 @@ fn gain_f32_selected_simd(samples: &mut [f32], multiplier: f32) {
     .dispatch();
 }
 
+#[cfg(feature = "simd")]
+fn dc_shift_f32_selected_simd(samples: &mut [f32], shift: f32) {
+    use rten_simd::{Isa, SimdOp, ops::NumOps};
+
+    struct ApplyDcShift<'samples> {
+        samples: &'samples mut [f32],
+        shift: f32,
+    }
+
+    impl SimdOp for ApplyDcShift<'_> {
+        type Output = ();
+
+        #[expect(
+            clippy::inline_always,
+            reason = "rten-simd recommends inlining eval so target-feature intrinsics compile into the dispatched kernel body"
+        )]
+        #[inline(always)]
+        fn eval<I: Isa>(self, isa: I) -> Self::Output {
+            let f32_ops = isa.f32();
+            let shift = f32_ops.splat(self.shift);
+            let vector_len = f32_ops.len();
+            let mut chunks = self.samples.chunks_exact_mut(vector_len);
+
+            for chunk in chunks.by_ref() {
+                let shifted = f32_ops.add(f32_ops.load(chunk), shift);
+
+                f32_ops.store(shifted, chunk);
+            }
+
+            dc_shift_f32_scalar_unchecked(chunks.into_remainder(), self.shift);
+        }
+    }
+
+    ApplyDcShift { samples, shift }.dispatch();
+}
+
 mod private {
     use super::ScalarBackend;
 
@@ -820,7 +909,8 @@ mod tests {
 
     use super::{
         Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection,
-        SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor, f32_to_i16_scalar,
+        SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor,
+        dc_shift_f32_in_place_scalar, dc_shift_f32_in_place_with_backend, f32_to_i16_scalar,
         f32_to_i16_with_backend, gain_f32_in_place_scalar, gain_f32_in_place_with_backend,
         i16_to_f32_scalar, i16_to_f32_with_backend, select_backend, select_backend_with_status,
         select_named_backend,
@@ -1128,6 +1218,66 @@ mod tests {
         }
     }
 
+    #[test]
+    fn scalar_dc_shift_f32_matches_known_values_exactly() {
+        let mut samples = [-1.0, -0.5, -0.0, 0.0, 0.25, 1.0];
+
+        dc_shift_f32_in_place_scalar(&mut samples, 0.25);
+
+        assert_sample_bits_eq(&samples, &[-0.75, -0.25, 0.25, 0.25, 0.5, 1.25]);
+    }
+
+    #[test]
+    fn dc_shift_f32_handles_empty_one_sample_odd_and_tail_lengths() {
+        for len in [0, 1, 3, 17, 33, 65] {
+            let input = patterned_f32(len);
+
+            assert_scalar_and_simd_dc_shift_match(&input, 0.125);
+        }
+    }
+
+    #[test]
+    fn dc_shift_f32_random_finite_values_match_scalar_under_requested_simd() {
+        let mut input = seeded_f32(0x1d58_13f7_2f0a_e4b9, 4099);
+        input.extend([
+            -1.0,
+            -0.999_984_74,
+            -f32::MIN_POSITIVE,
+            -f32::from_bits(1),
+            -0.0,
+            0.0,
+            f32::from_bits(1),
+            f32::MIN_POSITIVE,
+            0.999_984_74,
+            1.0,
+        ]);
+
+        for shift in [-2.0, -0.25, 0.0, 0.125, 2.0] {
+            assert_scalar_and_simd_dc_shift_match(&input, shift);
+        }
+    }
+
+    #[test]
+    fn dc_shift_f32_non_finite_values_follow_documented_behavior() {
+        let input = [
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            -f32::from_bits(1),
+            -0.0,
+            0.0,
+            f32::from_bits(1),
+            1.0,
+        ];
+
+        for shift in [-0.25, 0.0, 0.25] {
+            let scalar = dc_shift_with_backend(BackendKind::Scalar, &input, shift);
+            let simd = dc_shift_with_backend(BackendKind::Simd, &input, shift);
+
+            assert_semantically_same_samples(&simd, &scalar);
+        }
+    }
+
     #[cfg(all(
         feature = "simd",
         any(
@@ -1223,6 +1373,13 @@ mod tests {
         assert_sample_bits_eq(&simd, &scalar);
     }
 
+    fn assert_scalar_and_simd_dc_shift_match(input: &[f32], shift: f32) {
+        let scalar = dc_shift_with_backend(BackendKind::Scalar, input, shift);
+        let simd = dc_shift_with_backend(BackendKind::Simd, input, shift);
+
+        assert_sample_bits_eq(&simd, &scalar);
+    }
+
     fn convert_with_backend(kind: BackendKind, input: &[i16]) -> Vec<f32> {
         let selection = select_backend(kind);
         let mut output = vec![0.0; input.len()];
@@ -1246,6 +1403,15 @@ mod tests {
         let mut samples = input.to_vec();
 
         gain_f32_in_place_with_backend(selection, &mut samples, multiplier);
+
+        samples
+    }
+
+    fn dc_shift_with_backend(kind: BackendKind, input: &[f32], shift: f32) -> Vec<f32> {
+        let selection = select_backend(kind);
+        let mut samples = input.to_vec();
+
+        dc_shift_f32_in_place_with_backend(selection, &mut samples, shift);
 
         samples
     }

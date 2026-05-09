@@ -294,6 +294,69 @@ fn run_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
 }
 
 #[test]
+fn run_dc_shift_output_matches_under_forced_scalar_and_requested_simd() {
+    let input = temp_path("auralis-cli-run-dc-shift-backend-input", "wav");
+    let scalar_output = temp_path("auralis-cli-run-dc-shift-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-run-dc-shift-simd-output", "wav");
+    write_pcm16_wav(
+        &input,
+        1,
+        &[
+            i16::MIN,
+            -32_767,
+            -16_384,
+            -1,
+            0,
+            1,
+            16_384,
+            32_766,
+            i16::MAX,
+        ],
+    );
+
+    let scalar_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            scalar_output.to_str().unwrap(),
+            "--backend",
+            "scalar",
+            "--dc-shift",
+            "0.125",
+        ])
+        .output()
+        .unwrap();
+    let simd_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            simd_output.to_str().unwrap(),
+            "--backend",
+            "simd",
+            "--dc-shift",
+            "0.125",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        scalar_command_output.status.success(),
+        "stderr: {}",
+        stderr(&scalar_command_output)
+    );
+    assert!(
+        simd_command_output.status.success(),
+        "stderr: {}",
+        stderr(&simd_command_output)
+    );
+    assert_eq!(read_pcm16_wav(&simd_output), read_pcm16_wav(&scalar_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(scalar_output).unwrap();
+    fs::remove_file(simd_output).unwrap();
+}
+
+#[test]
 fn run_trim_frames_output_matches_library_pipeline() {
     let input = temp_path("auralis-cli-run-trim-frame-input", "wav");
     let cli_output = temp_path("auralis-cli-run-trim-frame-cli-output", "wav");

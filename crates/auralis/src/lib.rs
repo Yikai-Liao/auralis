@@ -212,9 +212,10 @@ impl Pipeline {
     /// `shift` is measured in full-scale sample units, where `0.25` adds one
     /// quarter of full scale and `0.0` is identity. The valid range is
     /// `-2.0..=2.0`, matching SoX-ng's single-argument `dcshift` command.
-    /// Processing is deterministic, in-place, non-allocating, and does not
-    /// clip; samples outside `[-1.0, 1.0]` are clipped by boundary writers such
-    /// as PCM16 WAV encoding.
+    /// Processing is deterministic, in-place, non-allocating, and uses the
+    /// requested backend for the backend-aware `DcShift` effect. Scalar remains
+    /// the default. The effect does not clip; samples outside `[-1.0, 1.0]`
+    /// are clipped by boundary writers such as PCM16 WAV encoding.
     #[must_use]
     pub fn dc_shift(mut self, shift: f32) -> Self {
         let Ok(audio) = &mut self.audio else {
@@ -222,7 +223,7 @@ impl Pipeline {
         };
 
         match DcShift::new(shift) {
-            Ok(dc_shift) => dc_shift.process_buffer(audio),
+            Ok(dc_shift) => dc_shift.process_buffer_with_backend(audio, self.requested_backend),
             Err(error) => self.audio = Err(error.into()),
         }
 
@@ -468,6 +469,37 @@ mod tests {
 
         assert_eq!(actual.frames(), FrameCount::new(2));
         assert_eq!(actual.as_planar_f32(), &[1.25, 1.5, -0.25, -0.5]);
+    }
+
+    #[test]
+    fn chain_dc_shift_matches_under_forced_scalar_and_requested_simd() {
+        let source = audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -f32::MIN_POSITIVE,
+            -f32::from_bits(1),
+            -0.0,
+            0.0,
+            f32::from_bits(1),
+            f32::MIN_POSITIVE,
+            0.999_984_74,
+            1.0,
+        ]);
+
+        let scalar = AudioFile::from_audio_buffer(source.clone())
+            .into_pipeline()
+            .with_backend(BackendKind::Scalar)
+            .dc_shift(0.125)
+            .into_audio_buffer()
+            .unwrap();
+        let simd = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_backend(BackendKind::Simd)
+            .dc_shift(0.125)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
     }
 
     #[test]
