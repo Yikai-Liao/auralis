@@ -120,6 +120,17 @@ documented runtime behavior.
 
 ### `crates/auralis-simd`
 
+Feature 5.6.3 completed this split. At completion, the largest resulting
+`crates/auralis-simd` Rust files were:
+
+| Lines | File |
+|---:|---|
+| 353 | `crates/auralis-simd/src/convert.rs` |
+| 295 | `crates/auralis-simd/src/test_support.rs` |
+| 236 | `crates/auralis-simd/src/backend.rs` |
+| 228 | `crates/auralis-simd/src/fade.rs` |
+| 196 | `crates/auralis-simd/src/multiply.rs` |
+
 Target shape:
 
 - `src/lib.rs`: crate docs, module declarations, and public re-exports.
@@ -142,15 +153,15 @@ Target shape:
 
 Test relocation:
 
-- move backend selection tests to `crates/auralis-simd/tests/backend.rs`;
-- move conversion conformance tests to
-  `crates/auralis-simd/tests/convert.rs`;
-- move gain, dcshift, fade, mix, and multiply conformance tests to focused
-  integration files;
-- put seeded fixture generators and assertion helpers in
-  `crates/auralis-simd/tests/support/`.
+- backend selection tests live in `src/selection.rs` and
+  `src/backend_tests.rs`;
+- conversion conformance tests live in `src/convert_tests.rs`;
+- gain, dcshift, fade, mix, and multiply conformance tests live in focused
+  crate-internal test modules beside the facade;
+- seeded fixture generators and assertion helpers live in `src/test_support.rs`.
 
-Feature 5.6.3 owns this split. `rten-simd` must remain hidden behind
+Feature 5.6.3 owns this split. It should not change public re-export names or
+documented scalar/SIMD behavior. `rten-simd` must remain hidden behind
 Auralis-owned public APIs.
 
 ### `crates/auralis-effects`

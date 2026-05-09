@@ -301,7 +301,7 @@ Implementation notes:
 
 ### Feature 5.6.3: split `crates/auralis-simd/src/lib.rs`
 
-Status: planned.
+Status: implemented.
 
 Split backend selection, sample conversion, arithmetic kernels, and tests.
 
@@ -324,6 +324,19 @@ Acceptance tests:
 - conversion and kernel conformance tests remain easy to find;
 - no resulting Rust source file exceeds 1,000 lines;
 - `rten-simd` remains hidden behind Auralis-owned APIs.
+
+Implementation notes:
+
+- `crates/auralis-simd/src/lib.rs` is now a crate-root facade with module
+  declarations and public re-exports.
+- Runtime behavior moved into `backend`, `selection`, `convert`, `gain`,
+  `dcshift`, `fade`, `mix`, and `multiply` modules without changing exported
+  type or function names.
+- The previous monolithic unit-test module moved into focused crate-internal
+  test modules, with seeded fixtures and sample assertions in
+  `test_support`.
+- After the split, the largest `auralis-simd` Rust source file is
+  `src/convert.rs` at 353 lines.
 
 ### Feature 5.6.4: split `crates/auralis-effects/src/lib.rs`
 

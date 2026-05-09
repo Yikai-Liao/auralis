@@ -99,8 +99,10 @@ sample conversion in both directions, and backend-dispatched linear
 Source modularization debt is scoped by a checked-in file-size audit and module
 ownership map in `doc/development/05-source-module-map.md`. The high-level
 `auralis` facade has been split into ownership modules while keeping its public
-re-exports stable; the remaining oversized crate roots are tracked by the same
-5.6 development plan.
+re-exports stable, and `auralis-simd` now keeps backend metadata, selection,
+conversion, arithmetic kernels, and focused conformance tests in separate
+modules; the remaining oversized crate roots are tracked by the same 5.6
+development plan.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -471,10 +473,11 @@ Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
 PCM16/`f32` conversion kernels in both directions plus the linear `gain_f32`,
-`dc_shift_f32`, and `fade_f32` kernels. The scalar kernels are the exact
-reference implementations; the SIMD kernels use `rten-simd` behind the `simd`
-feature and fall back through Auralis backend selection when SIMD is
-unavailable.
+`dc_shift_f32`, `fade_f32`, `mix_f32`, and `multiply_f32` kernels. The scalar
+kernels are the exact reference implementations; the SIMD kernels use
+`rten-simd` behind the `simd` feature and fall back through Auralis backend
+selection when SIMD is unavailable. The crate root is a facade over focused
+backend, selection, conversion, and per-kernel modules.
 
 Backend names are stable lowercase strings:
 
