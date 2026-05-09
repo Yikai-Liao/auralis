@@ -19,6 +19,14 @@ pub enum EffectError {
     #[error("pad frame count exceeds representable audio buffer length")]
     PadLengthOverflow,
 
+    /// A positioned pad requested insertions that are not strictly ordered.
+    #[error("pad positions must be in ascending order")]
+    PadPositionsOutOfOrder,
+
+    /// A positioned pad requested an insertion after the input duration.
+    #[error("pad position must be within the input duration")]
+    PadPositionOutOfBounds,
+
     /// A DC shift amount was not finite or not in the supported normalized range.
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,

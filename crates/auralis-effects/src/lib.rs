@@ -27,6 +27,7 @@ mod chain;
 mod chain_gain;
 mod command;
 mod command_gain;
+mod command_pad;
 mod dcshift;
 mod effects_file;
 mod error;
@@ -52,7 +53,7 @@ pub use effects_file::{
 pub use error::{EffectError, Result};
 pub use fade::{Fade, FadeCurve};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};
-pub use pad::Pad;
+pub use pad::{Pad, PositionedPad};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,

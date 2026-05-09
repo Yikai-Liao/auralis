@@ -453,7 +453,7 @@ mod tests {
     use std::{fs, path::PathBuf, time::SystemTime};
 
     use super::{EffectsFileParseError, parse_effects_file, parse_effects_file_str, tokenize_line};
-    use crate::{EffectCommandParseError, parse_effect_chain};
+    use crate::{EffectCommand, EffectCommandParseError, parse_effect_chain};
 
     #[test]
     fn reads_effects_from_text_file() {
@@ -475,7 +475,7 @@ mod tests {
         let rendered: Vec<Vec<String>> = chain
             .commands()
             .iter()
-            .map(|command| command.render_tokens())
+            .map(EffectCommand::render_tokens)
             .collect();
         assert_eq!(
             rendered,

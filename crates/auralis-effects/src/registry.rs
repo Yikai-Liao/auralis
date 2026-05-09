@@ -154,8 +154,8 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "pad",
         &[],
         "Pad",
-        "pad length [length]",
-        "add zero-valued frames before and after the input",
+        "pad {length[@position]}",
+        "add zero-valued frames before, after, or inside the input",
     ),
     EffectDescriptor::new(
         EffectKind::Reverse,

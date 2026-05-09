@@ -160,7 +160,7 @@ impl EffectChain {
         let mut tokens = Vec::new();
         let mut boundary_index = 0;
 
-        for (command_index, command) in self.commands.iter().copied().enumerate() {
+        for (command_index, command) in self.commands.iter().enumerate() {
             while self
                 .boundaries
                 .get(boundary_index)
@@ -206,11 +206,11 @@ impl EffectChain {
         requested_backend: BackendKind,
     ) -> ChainResult<()> {
         let mut gain_headroom = GainHeadroomState::default();
-        for (index, &command) in self.commands.iter().enumerate() {
+        for (index, command) in self.commands.iter().enumerate() {
             apply_command(command, audio, requested_backend, &mut gain_headroom).map_err(
                 |(argument, source)| EffectChainError::CommandFailed {
                     index,
-                    command,
+                    command: command.clone(),
                     argument,
                     source,
                 },
@@ -381,7 +381,7 @@ pub enum EffectChainParseError {
 }
 
 fn apply_command(
-    command: EffectCommand,
+    command: &EffectCommand,
     audio: &mut AudioBuffer,
     requested_backend: BackendKind,
     gain_headroom: &mut GainHeadroomState,
@@ -403,7 +403,7 @@ fn apply_command(
             Ok(())
         }
         EffectCommand::Gain(gain) => {
-            apply_gain_command(gain, audio, requested_backend, gain_headroom)?;
+            apply_gain_command(*gain, audio, requested_backend, gain_headroom)?;
             Ok(())
         }
         EffectCommand::Pad(pad) => {
@@ -433,7 +433,8 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::DcShift | EffectKind::Pad => optional_arg_end(tokens, args_start, 2),
+        EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
+        EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => required_arg_end(tokens, args_start, 2),
     }
@@ -476,6 +477,16 @@ fn optional_arg_end(tokens: &[&str], args_start: usize, max: usize) -> usize {
     }
 
     include_unexpected_argument(tokens, end)
+}
+
+fn pad_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    end
 }
 
 fn no_arg_end(tokens: &[&str], args_start: usize) -> usize {
@@ -641,7 +652,7 @@ mod tests {
         let rendered: Vec<Vec<String>> = chain
             .commands()
             .iter()
-            .map(|command| command.render_tokens())
+            .map(EffectCommand::render_tokens)
             .collect();
         assert_eq!(
             rendered,
@@ -692,7 +703,7 @@ mod tests {
         let rendered: Vec<Vec<String>> = chain
             .commands()
             .iter()
-            .map(|command| command.render_tokens())
+            .map(EffectCommand::render_tokens)
             .collect();
         assert_eq!(
             rendered,
@@ -868,7 +879,7 @@ mod tests {
         total_frames: u64,
         chunk_sizes: &[usize],
     ) {
-        for &command in chain.commands() {
+        for command in chain.commands() {
             match command {
                 EffectCommand::Gain(gain) => {
                     for chunk in chunks_mut(samples, chunk_sizes) {

@@ -89,7 +89,7 @@ fn process_streaming_safe_chain_by_chunks(
     audio: &mut AudioBuffer,
     schedule: &ChunkSchedule,
 ) {
-    for &command in chain.commands() {
+    for command in chain.commands() {
         match command {
             EffectCommand::Gain(gain) => {
                 process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
@@ -102,7 +102,7 @@ fn process_streaming_safe_chain_by_chunks(
                 });
             }
             EffectCommand::Fade(fade) => {
-                process_fade_by_channel_chunks(audio, fade, schedule);
+                process_fade_by_channel_chunks(audio, *fade, schedule);
             }
             _ => {
                 panic!("L5 streaming-safe chain fixture contained a non-streaming command")

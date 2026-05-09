@@ -167,6 +167,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_pad_mono_positioned]
+input = "effects/pad_mono_positioned.wav"
+corpus_id = "l0/short_mono_3"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pad", "2@1"]
+sox_ng = ["pad", "2s@1s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_pad_stereo_positioned]
+input = "effects/pad_stereo_positioned.wav"
+corpus_id = "l0/short_stereo_2"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pad", "1", "2@1", "1"]
+sox_ng = ["pad", "1s", "2s@1s", "1s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_reverse_mono_odd_length]
 input = "effects/reverse_mono.wav"
 corpus_id = "l0/odd_length_mono_17"

@@ -55,16 +55,16 @@ l7 = { status = "covered", reason = "Effect command fuzzing covers gain argument
 id = "effect.pad"
 kind = "effect"
 name = "pad"
-summary = "Zero padding before and after decoded audio."
+summary = "Zero padding before, after, or inside decoded audio."
 [subject.layers]
 l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
-l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover the implemented start/end padding form.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
-l3 = { status = "covered", reason = "Analytical unit tests check inserted silence, metadata shape, and overflow errors.", tests = ["crates/auralis-effects/src/pad.rs"] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover start/end and positioned padding forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical unit tests check inserted silence, positioned insertion order, metadata shape, out-of-bounds positions, and overflow errors.", tests = ["crates/auralis-effects/src/pad.rs"] }
 l4 = { status = "covered", reason = "Property tests include zero-padding identity and finite-output coverage for pad.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
 l5 = { status = "not_applicable", reason = "The current pad API is a whole-buffer structural transform and has no streaming processor to chunk.", tests = [] }
 l6 = { status = "not_applicable", reason = "Pad inserts structural silence and currently has no data-parallel SIMD kernel.", tests = [] }
-l7 = { status = "covered", reason = "Effect command fuzzing covers pad argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers pad argument parsing through the shared command parser, including positioned padding seeds.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/pad_positioned"] }
 
 [[subject]]
 id = "effect.reverse"

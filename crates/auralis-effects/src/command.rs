@@ -39,6 +39,7 @@ use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
 use crate::command_gain::{parse_gain, render_gain};
+use crate::command_pad::{parse_pad, render_pad};
 use crate::{
     DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Pad,
     Reverse, Trim,
@@ -52,9 +53,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 /// This enum is the command-model boundary: parsing may start from tokenized
 /// command strings, but successful results contain typed effect processors
 /// only. It intentionally models the currently implemented Auralis subset:
-/// future SoX-ng options such as dcshift limiter gain and positioned padding
-/// are rejected until their corresponding features are implemented.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// future SoX-ng effects are rejected until their corresponding features are
+/// implemented.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
     /// Constant normalized full-scale offset.
@@ -66,7 +67,7 @@ pub enum EffectCommand {
     /// Constant gain in decibels.
     Gain(Gain),
 
-    /// Start/end zero padding measured in frames.
+    /// Zero padding measured in frames, including optional positioned insertions.
     Pad(Pad),
 
     /// Frame-order reversal within each channel.
@@ -101,7 +102,7 @@ impl EffectCommand {
 
     /// Returns the typed effect kind represented by this command.
     #[must_use]
-    pub const fn kind(self) -> EffectKind {
+    pub const fn kind(&self) -> EffectKind {
         match self {
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Fade(_) => EffectKind::Fade,
@@ -120,7 +121,7 @@ impl EffectCommand {
     /// builders or use a display layer that applies stable quoting for failure
     /// reports.
     #[must_use]
-    pub fn render_tokens(self) -> Vec<String> {
+    pub fn render_tokens(&self) -> Vec<String> {
         match self {
             Self::DcShift(dc_shift) => {
                 let mut tokens = vec!["dcshift".to_owned(), render_f32(dc_shift.shift)];
@@ -129,13 +130,9 @@ impl EffectCommand {
                 }
                 tokens
             }
-            Self::Fade(fade) => render_fade(fade),
-            Self::Gain(gain) => render_gain(gain),
-            Self::Pad(pad) => vec![
-                "pad".to_owned(),
-                pad.start.as_u64().to_string(),
-                pad.end.as_u64().to_string(),
-            ],
+            Self::Fade(fade) => render_fade(*fade),
+            Self::Gain(gain) => render_gain(*gain),
+            Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Trim(trim) => vec![
                 "trim".to_owned(),
@@ -335,29 +332,6 @@ fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<EffectComman
         })
 }
 
-fn parse_pad(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let (start, end) = match args {
-        [] => (FrameCount::new(0), FrameCount::new(0)),
-        [start] => (
-            parse_frame_count(effect, "start-frame", start)?,
-            FrameCount::new(0),
-        ),
-        [start, end] => (
-            parse_frame_count(effect, "start-frame", start)?,
-            parse_frame_count(effect, "end-frame", end)?,
-        ),
-        [start, end, rest @ ..] => {
-            reject_extra_arguments(effect, rest)?;
-            (
-                parse_frame_count(effect, "start-frame", start)?,
-                parse_frame_count(effect, "end-frame", end)?,
-            )
-        }
-    };
-
-    Ok(EffectCommand::Pad(Pad::new(start, end)))
-}
-
 fn parse_reverse(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
     reject_extra_arguments(effect, args)?;
 
@@ -468,7 +442,7 @@ fn parse_f32(effect: &'static str, argument: &'static str, value: &str) -> Comma
         })
 }
 
-fn parse_frame_count(
+pub(super) fn parse_frame_count(
     effect: &'static str,
     argument: &'static str,
     value: &str,
@@ -537,7 +511,10 @@ fn render_f32(value: f32) -> String {
 #[cfg(test)]
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
-    use crate::{DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, Reverse, Trim};
+    use crate::{
+        DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad, Reverse,
+        Trim,
+    };
     use auralis_core::{Decibels, FrameCount};
 
     #[test]
@@ -558,6 +535,17 @@ mod tests {
             (
                 &["pad", "2", "1"][..],
                 EffectCommand::Pad(Pad::new(FrameCount::new(2), FrameCount::new(1))),
+            ),
+            (
+                &["pad", "2@1"][..],
+                EffectCommand::Pad(
+                    Pad::with_positioned(
+                        FrameCount::new(0),
+                        FrameCount::new(0),
+                        [PositionedPad::new(FrameCount::new(2), FrameCount::new(1))],
+                    )
+                    .unwrap(),
+                ),
             ),
             (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
             (
@@ -674,6 +662,34 @@ mod tests {
                 .unwrap()
                 .render_tokens(),
             ["dcshift", "0.5", "0.05"]
+        );
+    }
+
+    #[test]
+    fn parses_sox_ng_positioned_pad_arguments() {
+        assert_eq!(
+            parse_effect_command(&["pad", "1", "2@3", "4@5", "6"]).unwrap(),
+            EffectCommand::Pad(
+                Pad::with_positioned(
+                    FrameCount::new(1),
+                    FrameCount::new(6),
+                    [
+                        PositionedPad::new(FrameCount::new(2), FrameCount::new(3)),
+                        PositionedPad::new(FrameCount::new(4), FrameCount::new(5)),
+                    ],
+                )
+                .unwrap()
+            )
+        );
+        assert_eq!(
+            parse_effect_command(&["pad", "2@-0"]).unwrap(),
+            EffectCommand::Pad(Pad::new(FrameCount::new(0), FrameCount::new(2)))
+        );
+        assert_eq!(
+            parse_effect_command(&["pad", "1", "2@3", "4"])
+                .unwrap()
+                .render_tokens(),
+            ["pad", "1", "2@3", "4"]
         );
     }
 

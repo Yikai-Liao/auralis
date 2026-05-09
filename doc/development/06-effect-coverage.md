@@ -144,7 +144,22 @@ Implementation notes:
 
 ### Feature 6.1.7: `pad` positioned padding
 
+Status: implemented.
+
 Support SoX-ng-style positioned padding, not only start/end padding.
+
+Implementation notes:
+
+- The typed pad model now carries optional sorted `PositionedPad` insertions in
+  addition to the existing start/end padding fields.
+- The effect command parser accepts `pad LENGTH@POSITION`, multiple ascending
+  positioned insertions, and `@-0` end-position padding while preserving the
+  existing `pad START END` start/end form.
+- Pad processing inserts silence before the requested input frame, rejects
+  duplicate or unsorted positions, and returns a typed error when a position is
+  after the input duration.
+- Golden coverage includes standalone mono and stereo positioned-pad cases
+  against SoX-ng, and L7 fuzz seeds cover the positioned command syntax.
 
 ### Feature 6.1.8: `trim` multiple and relative positions
 
