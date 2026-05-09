@@ -35,6 +35,18 @@ pub enum EffectError {
     #[error("repeat output frame count exceeds representable audio buffer length")]
     RepeatLengthOverflow,
 
+    /// A remix command used an invalid basic routing specification.
+    #[error("remix output specifications must contain channel numbers, ranges, or a standalone 0")]
+    InvalidRemixRouting,
+
+    /// A remix command requested more output channels than Auralis can represent.
+    #[error("remix output channel count exceeds representable audio buffer length")]
+    RemixOutputChannelsOverflow,
+
+    /// A remix command referenced an input channel that is not present.
+    #[error("remix input channel is outside the input channel count")]
+    RemixInputChannelOutOfBounds,
+
     /// A DC shift amount was not finite or not in the supported normalized range.
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,

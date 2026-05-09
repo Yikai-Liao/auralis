@@ -66,6 +66,13 @@ pub(crate) fn apply_command(
             *audio = repeated;
             Ok(())
         }
+        EffectCommand::Remix(remix) => {
+            let remixed = remix
+                .process_buffer(audio)
+                .map_err(|source| ("out-spec", source))?;
+            *audio = remixed;
+            Ok(())
+        }
         EffectCommand::Reverse(reverse) => {
             reverse.process_buffer(audio);
             Ok(())
@@ -110,6 +117,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
             optional_arg_end(tokens, args_start, 2)
         }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
+        EffectKind::Remix => remix_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
@@ -156,6 +164,10 @@ fn pad_arg_end(tokens: &[&str], args_start: usize) -> usize {
     }
 
     end
+}
+
+fn remix_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    pad_arg_end(tokens, args_start)
 }
 
 fn no_arg_end(tokens: &[&str], args_start: usize) -> usize {

@@ -365,6 +365,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_remix_mono_silent_copy]
+input = "effects/remix_mono.wav"
+corpus_id = "auto/mono_channels"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["remix", "0", "1"]
+sox_ng = ["remix", "0", "1"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_remix_stereo_mixdown]
+input = "effects/remix_stereo.wav"
+corpus_id = "auto/stereo_channels"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["remix", "1,2"]
+sox_ng = ["remix", "1,2"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_reverse_mono_odd_length]
 input = "effects/reverse_mono.wav"
 corpus_id = "l0/odd_length_mono_17"

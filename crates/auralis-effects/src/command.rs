@@ -46,6 +46,7 @@ use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
 use crate::command_pad::{parse_pad, render_pad};
+use crate::command_remix::{parse_remix, render_remix};
 use crate::command_repeat::{parse_repeat, render_repeat};
 use crate::command_reverse::parse_reverse;
 use crate::command_saturation::{parse_saturation, render_saturation};
@@ -55,7 +56,7 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade,
-    Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
+    Gain, Norm, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -97,6 +98,9 @@ pub enum EffectCommand {
 
     /// SoX-ng-style finite output repetition.
     Repeat(Repeat),
+
+    /// SoX-ng-style basic channel routing.
+    Remix(Remix),
 
     /// Frame-order reversal within each channel.
     Reverse(Reverse),
@@ -140,6 +144,7 @@ impl EffectCommand {
             EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Repeat => parse_repeat(effect, args),
+            EffectKind::Remix => parse_remix(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
@@ -162,6 +167,7 @@ impl EffectCommand {
             Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Repeat(_) => EffectKind::Repeat,
+            Self::Remix(_) => EffectKind::Remix,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
@@ -190,6 +196,7 @@ impl EffectCommand {
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Repeat(repeat) => render_repeat(*repeat),
+            Self::Remix(remix) => render_remix(remix),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),

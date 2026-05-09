@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Channels, Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation,
-    SaturationType, SoftVol, Tremolo, Trim, Vol,
+    Channels, Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Remix, RemixOutputSpec,
+    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -172,6 +172,13 @@ proptest! {
         prop_assert_sample_bits_eq(channel_converted.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(channel_converted.frames(), source.frames());
         prop_assert_eq!(channel_converted.channels(), source.channels());
+
+        let remixed = identity_remix(source.channels().as_u16())
+            .process_buffer(&source)
+            .expect("identity remix cannot fail");
+        prop_assert_sample_bits_eq(remixed.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(remixed.frames(), source.frames());
+        prop_assert_eq!(remixed.channels(), source.channels());
     }
 
     #[test]
@@ -292,10 +299,31 @@ proptest! {
             .expect("small generated channel conversion succeeds");
         prop_assert_all_finite(&converted)?;
 
+        let remixed = Remix::new([
+            RemixOutputSpec::new([RemixSource::channel(1).expect("channel one is valid")])
+                .expect("single-source remix output is valid"),
+            RemixOutputSpec::silent(),
+        ])
+        .expect("two-output remix is valid")
+        .process_buffer(&source)
+        .expect("generated audio always has channel one");
+        prop_assert_all_finite(&remixed)?;
+
         let mut reversed = source;
         Reverse::new().process_buffer(&mut reversed);
         prop_assert_all_finite(&reversed)?;
     }
+}
+
+fn identity_remix(channels: u16) -> Remix {
+    let outputs = (1..=channels)
+        .map(|channel| {
+            RemixOutputSpec::new([RemixSource::channel(channel).expect("channel is nonzero")])
+                .expect("single-source output is valid")
+        })
+        .collect::<Vec<_>>();
+
+    Remix::new(outputs).expect("generated audio has at least one channel")
 }
 
 fn zero_audio_like(source: &AudioBuffer) -> AudioBuffer {

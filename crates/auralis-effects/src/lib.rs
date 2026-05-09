@@ -36,6 +36,7 @@ mod command_gain;
 mod command_norm;
 mod command_overdrive;
 mod command_pad;
+mod command_remix;
 mod command_repeat;
 mod command_reverse;
 mod command_saturation;
@@ -53,6 +54,7 @@ mod norm;
 mod overdrive;
 mod pad;
 mod registry;
+mod remix;
 mod repeat;
 mod reverse;
 mod saturation;
@@ -85,6 +87,7 @@ pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
+pub use remix::{Remix, RemixOutputSpec, RemixSource};
 pub use repeat::Repeat;
 pub use reverse::Reverse;
 pub use saturation::{Saturation, SaturationType};

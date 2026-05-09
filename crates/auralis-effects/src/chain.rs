@@ -769,6 +769,7 @@ mod tests {
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Repeat(_)
+                | EffectCommand::Remix(_)
                 | EffectCommand::Reverse(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)

@@ -51,6 +51,9 @@ pub enum EffectKind {
     /// SoX-ng-style finite output repetition.
     Repeat,
 
+    /// SoX-ng-style basic channel routing.
+    Remix,
+
     /// Frame-order reversal within each channel.
     Reverse,
 
@@ -223,6 +226,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Repeat",
         "repeat [count]",
         "append finite copies of the input audio",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Remix,
+        "remix",
+        &[],
+        "Remix",
+        "remix out-spec...",
+        "route and mix decoded input channels into explicit output channels",
     ),
     EffectDescriptor::new(
         EffectKind::Reverse,
@@ -601,6 +612,7 @@ mod tests {
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
             ("repeat", EffectKind::Repeat),
+            ("remix", EffectKind::Remix),
             ("reverse", EffectKind::Reverse),
             ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),

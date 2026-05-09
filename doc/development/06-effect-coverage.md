@@ -373,7 +373,24 @@ Implementation notes:
 
 ### Feature 6.3.2: `remix` basic routing
 
+Status: implemented.
+
 Implement basic channel routing.
+
+Implementation notes:
+
+- Added a typed `Remix` effect for SoX-ng-style basic out-spec routing with
+  1-based channel numbers, comma-separated contributors, channel ranges,
+  open ranges, the `-` all-channel range, and standalone `0` silent outputs.
+- Multi-input output specs use SoX-ng's default `1 / n` scaling. Gain
+  modifiers (`v`, `p`, `i`) and `-a`, `-m`, and `-p` option interactions are
+  deliberately rejected until Feature 6.3.3.
+- Chain execution treats `remix` as a whole-buffer channel-shape transform and
+  reports out-of-bounds input channels as typed command-context failures.
+- Golden coverage includes mono silent/copy routing and stereo mixdown cases
+  against SoX-ng, with L4 identity/finite-output coverage and an L7 fuzz seed.
+  L5 and L6 are not applicable because basic remix is a structural channel
+  routing/mixing transform without a SIMD kernel.
 
 ### Feature 6.3.3: `remix` gain modifiers
 
