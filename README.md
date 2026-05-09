@@ -75,7 +75,11 @@ fills shorter input tails with silence. Merge is a structural copy, so SIMD is
 not applicable. `--combine multiply` multiplies corresponding channels and
 samples from every input, uses the longest input length and largest channel
 count, treats missing frames or channels as silence, and uses the
-backend-dispatched scalar/SIMD multiply kernel. The SIMD crate defines
+backend-dispatched scalar/SIMD multiply kernel. `auralis run --channels N`
+uses an explicit output policy that mirrors SoX-ng's output `--channels`
+shorthand: the CLI preserves the pipeline channel count by default, converts
+only when a target count is requested, and `--no-auto-channels` turns that
+conversion into a strict channel-count check for tests. The SIMD crate defines
 the Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -544,6 +548,7 @@ auralis run first.wav output.wav --combine mix --input second.wav reverse
 auralis run first.wav output.wav --combine mix-power --input second.wav reverse
 auralis run first.wav output.wav --combine merge --input second.wav reverse
 auralis run first.wav output.wav --combine multiply --input second.wav reverse
+auralis run stereo.wav mono.wav --channels 1
 auralis run pipeline.toml
 auralis completions zsh
 ```
@@ -589,6 +594,17 @@ sample zero. A single input is an identity copy. The multiply combiner does not
 clip in memory; PCM16 WAV writing clips out-of-range samples using the normal
 encoder rules.
 
+Output channel conversion is an explicit output-boundary policy, not hidden
+library behavior. The high-level library defaults to preserving the current
+pipeline channel count. Callers can use `Pipeline::with_output_channels` or
+`Pipeline::with_channel_conversion_policy(ChannelConversionPolicy::Automatic(_))`
+to request SoX-ng-style `channels` conversion before writing; downmixing
+averages the same deterministic channel groups as SoX-ng and upmixing
+duplicates channels round-robin. Tests and strict callers can use
+`ChannelConversionPolicy::Require(_)`, exposed in the CLI as
+`--channels N --no-auto-channels`, to fail if conversion would have been
+inserted.
+
 Selected crates:
 
 - `clap` for the parser.
@@ -603,7 +619,8 @@ Contains test utilities shared by Rust tests and Python tests:
 - raw f32 helpers
 - WAV decode helpers
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
-- golden test manifest handling
+- golden test manifest handling, including output-channel metadata for cases
+  where SoX-ng auto-inserts `channels` conversion
 - scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
@@ -629,7 +646,9 @@ vectors as display strings for reports with stable double-quote escaping for
 spaces, quotes, backslashes, and control characters while keeping the original
 argument vectors available for process execution. Explicit chain boundary
 tokens render deterministically as `:` in both Auralis and SoX-ng command
-displays.
+displays. A case may set `output_channels = N`; if it also sets
+`sox_ng_auto_channels = true`, the manifest records that SoX-ng is expected to
+auto-insert its `channels` effect from the output option.
 
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
 for a structural editing chain, a level-processing chain, and the currently
@@ -637,7 +656,9 @@ implemented fade/gain filter-style chain. `tests/golden/concat.toml`,
 `tests/golden/sequence.toml`, `tests/golden/mix.toml`,
 `tests/golden/mix_power.toml`, `tests/golden/merge.toml`, and
 `tests/golden/multiply.toml` record combiner coverage for mismatched mono input
-lengths and stereo combine-before-reverse chains. The Python golden runners
+lengths and stereo combine-before-reverse chains.
+`tests/golden/auto_channels.toml` records output-channel policy coverage where
+SoX-ng auto-inserts `channels` conversion. The Python golden runners
 generate the deterministic PCM16 fixtures, execute both command lines, compare decoded
 sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
 report when output drifts outside its manifest tolerance.

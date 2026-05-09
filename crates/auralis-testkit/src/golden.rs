@@ -62,7 +62,9 @@ impl GoldenManifest {
     ///
     /// The accepted format contains one or more `[id.<case>]` tables. Each case
     /// table must define `input`, `auralis`, `sox_ng`, `max_abs`, `rms`, and
-    /// `snr_db`.
+    /// `snr_db`. Cases may also define `output_channels` and
+    /// `sox_ng_auto_channels = true` to record SoX-ng output-channel options
+    /// that auto-insert its `channels` effect.
     ///
     /// # Errors
     ///
@@ -114,6 +116,8 @@ impl GoldenManifest {
 pub struct GoldenCase {
     inputs: Vec<PathBuf>,
     combine: Option<String>,
+    output_channels: Option<u16>,
+    sox_ng_auto_channels: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     tolerance: GoldenTolerance,
@@ -146,6 +150,23 @@ impl GoldenCase {
     #[must_use]
     pub fn combine_method(&self) -> Option<&str> {
         self.combine.as_deref()
+    }
+
+    /// Returns the requested output channel count, if the manifest sets one.
+    ///
+    /// Single-output cases use this to render Auralis `--channels <N>` and
+    /// SoX-ng `--channels <N>` output options. When
+    /// [`Self::sox_ng_auto_channels_inserted`] is true, the manifest is
+    /// explicitly recording a SoX-ng automatic `channels` effect.
+    #[must_use]
+    pub const fn output_channels(&self) -> Option<u16> {
+        self.output_channels
+    }
+
+    /// Returns whether the SoX-ng command relies on auto-inserted `channels`.
+    #[must_use]
+    pub const fn sox_ng_auto_channels_inserted(&self) -> bool {
+        self.sox_ng_auto_channels
     }
 
     /// Returns the Auralis argument fragment recorded by the manifest.
@@ -221,6 +242,10 @@ impl GoldenCase {
                 command.push("--input".to_owned());
                 command.push(input.clone());
             }
+        }
+        if let Some(output_channels) = self.output_channels {
+            command.push("--channels".to_owned());
+            command.push(output_channels.to_string());
         }
         command.extend(self.auralis.iter().cloned());
         command
@@ -310,6 +335,10 @@ impl GoldenCase {
             command.push(self.rendered_combine_method().to_owned());
         }
         command.extend(input_paths);
+        if let Some(output_channels) = self.output_channels {
+            command.push("--channels".to_owned());
+            command.push(output_channels.to_string());
+        }
         command.push(path_to_command_arg(output_path.as_ref()));
         command.extend(self.sox_ng.iter().cloned());
         command
@@ -355,6 +384,8 @@ impl GoldenCase {
     fn from_raw(id: &str, raw: RawGoldenCase) -> Result<Self> {
         let inputs = validate_inputs(id, raw.input, raw.inputs)?;
         validate_combine_method(id, raw.combine.as_deref())?;
+        validate_output_channels(id, raw.output_channels)?;
+        validate_sox_ng_auto_channels(id, raw.sox_ng_auto_channels, raw.output_channels)?;
 
         validate_args(id, GoldenCommand::Auralis, &raw.auralis)?;
         validate_args(id, GoldenCommand::SoxNg, &raw.sox_ng)?;
@@ -365,6 +396,8 @@ impl GoldenCase {
         Ok(Self {
             inputs,
             combine: raw.combine,
+            output_channels: raw.output_channels,
+            sox_ng_auto_channels: raw.sox_ng_auto_channels,
             auralis: raw.auralis,
             sox_ng: raw.sox_ng,
             tolerance: GoldenTolerance {
@@ -497,6 +530,21 @@ pub enum GoldenManifestError {
         combine: String,
     },
 
+    /// A case requested an invalid output channel count.
+    InvalidOutputChannels {
+        /// Case identifier containing the invalid output channel count.
+        id: String,
+
+        /// Rejected output channel count.
+        channels: u16,
+    },
+
+    /// A case recorded SoX-ng automatic channels without an output channel target.
+    AutoChannelsWithoutOutputChannels {
+        /// Case identifier missing `output_channels`.
+        id: String,
+    },
+
     /// A command argument was an empty string.
     EmptyArgument {
         /// Case identifier containing the invalid argument.
@@ -553,6 +601,18 @@ impl fmt::Display for GoldenManifestError {
                     "golden manifest case `{id}` has invalid combine method `{combine}`"
                 )
             }
+            Self::InvalidOutputChannels { id, channels } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` has invalid output channel count `{channels}`"
+                )
+            }
+            Self::AutoChannelsWithoutOutputChannels { id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` records SoX-ng automatic channels without `output_channels`"
+                )
+            }
             Self::EmptyArgument { id, command } => {
                 write!(
                     formatter,
@@ -579,6 +639,8 @@ impl Error for GoldenManifestError {
             | Self::MissingInput { .. }
             | Self::AmbiguousInput { .. }
             | Self::InvalidCombineMethod { .. }
+            | Self::InvalidOutputChannels { .. }
+            | Self::AutoChannelsWithoutOutputChannels { .. }
             | Self::EmptyArgument { .. }
             | Self::InvalidTolerance { .. } => None,
         }
@@ -639,6 +701,9 @@ struct RawGoldenCase {
     input: Option<String>,
     inputs: Option<Vec<String>>,
     combine: Option<String>,
+    output_channels: Option<u16>,
+    #[serde(default)]
+    sox_ng_auto_channels: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     max_abs: f64,
@@ -710,6 +775,28 @@ fn validate_combine_method(id: &str, combine: Option<&str>) -> Result<()> {
             id: id.to_owned(),
             combine: combine.to_owned(),
         })
+    }
+}
+
+fn validate_output_channels(id: &str, output_channels: Option<u16>) -> Result<()> {
+    match output_channels {
+        Some(0) => Err(GoldenManifestError::InvalidOutputChannels {
+            id: id.to_owned(),
+            channels: 0,
+        }),
+        Some(_) | None => Ok(()),
+    }
+}
+
+fn validate_sox_ng_auto_channels(
+    id: &str,
+    sox_ng_auto_channels: bool,
+    output_channels: Option<u16>,
+) -> Result<()> {
+    if sox_ng_auto_channels && output_channels.is_none() {
+        Err(GoldenManifestError::AutoChannelsWithoutOutputChannels { id: id.to_owned() })
+    } else {
+        Ok(())
     }
 }
 
@@ -930,6 +1017,36 @@ mod tests {
     }
 
     #[test]
+    fn manifest_parse_records_output_channel_auto_conversion() {
+        let manifest = GoldenManifest::parse_toml(
+            r#"
+            [id.auto_channels_stereo_to_mono]
+            input = "auto/stereo.wav"
+            output_channels = 1
+            sox_ng_auto_channels = true
+            auralis = []
+            sox_ng = []
+            max_abs = 0.0
+            rms = 0.0
+            snr_db = 120.0
+            "#,
+        )
+        .unwrap();
+        let case = manifest.get("auto_channels_stereo_to_mono").unwrap();
+
+        assert_eq!(case.output_channels(), Some(1));
+        assert!(case.sox_ng_auto_channels_inserted());
+        assert_eq!(
+            case.render_auralis_command_line("auralis", "stereo.wav", "mono.wav"),
+            "auralis run stereo.wav mono.wav --channels 1"
+        );
+        assert_eq!(
+            case.render_sox_ng_command_line("sox_ng", "stereo.wav", "mono.wav"),
+            "sox_ng -R -D stereo.wav --channels 1 mono.wav"
+        );
+    }
+
+    #[test]
     fn invalid_manifest_is_rejected_for_missing_or_ambiguous_input_fields() {
         let missing = GoldenManifest::parse_toml(
             r#"
@@ -986,6 +1103,29 @@ mod tests {
             error,
             GoldenManifestError::InvalidCombineMethod { id, combine }
                 if id == "unknown_combine" && combine == "overlay"
+        ));
+    }
+
+    #[test]
+    fn invalid_manifest_is_rejected_for_auto_channels_without_output_channels() {
+        let error = GoldenManifest::parse_toml(
+            r#"
+            [id.missing_output_channels]
+            input = "auto/stereo.wav"
+            sox_ng_auto_channels = true
+            auralis = []
+            sox_ng = []
+            max_abs = 0.0
+            rms = 0.0
+            snr_db = 120.0
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            GoldenManifestError::AutoChannelsWithoutOutputChannels { id }
+                if id == "missing_output_channels"
         ));
     }
 

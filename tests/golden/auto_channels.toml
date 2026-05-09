@@ -1,0 +1,23 @@
+# Automatic output channel-conversion golden cases. `sox_ng_auto_channels`
+# records that SoX-ng receives an output `--channels` option and auto-inserts
+# its `channels` effect before writing.
+
+[id.auto_channels_stereo_to_mono]
+input = "auto/stereo_channels.wav"
+output_channels = 1
+sox_ng_auto_channels = true
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.auto_channels_mono_to_stereo]
+input = "auto/mono_channels.wav"
+output_channels = 2
+sox_ng_auto_channels = true
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

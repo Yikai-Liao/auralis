@@ -65,6 +65,10 @@ pub enum Error {
     #[error(transparent)]
     InputCombine(#[from] InputCombineError),
 
+    /// Output channel conversion failed before encoding.
+    #[error(transparent)]
+    ChannelConversion(#[from] ChannelConversionError),
+
     /// A seconds-based trim range could not be represented as frames.
     #[error("trim seconds range cannot be represented as frame positions")]
     InvalidTrimSecondsRange,
@@ -78,6 +82,7 @@ impl PartialEq for Error {
             (Self::Effect(left), Self::Effect(right)) => left == right,
             (Self::Chain(left), Self::Chain(right)) => left == right,
             (Self::InputCombine(left), Self::InputCombine(right)) => left == right,
+            (Self::ChannelConversion(left), Self::ChannelConversion(right)) => left == right,
             (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }
@@ -137,6 +142,227 @@ impl CombineMethod {
             "multiply" => Some(Self::Multiply),
             _ => None,
         }
+    }
+}
+
+/// Explicit policy for changing channel count at an output boundary.
+///
+/// Auralis library APIs never change channel count implicitly. The default
+/// [`Self::Preserve`] policy writes the current pipeline channel count.
+/// [`Self::Automatic`] applies SoX-ng-style `channels` conversion to the target
+/// count before encoding. [`Self::Require`] is useful for tests and strict
+/// callers: it records an expected output count while failing instead of
+/// automatically inserting conversion when the pipeline count differs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ChannelConversionPolicy {
+    /// Preserve the current pipeline channel count.
+    Preserve,
+
+    /// Convert to the target channel count before writing.
+    Automatic(ChannelCount),
+
+    /// Require the target channel count without automatic conversion.
+    Require(ChannelCount),
+}
+
+impl ChannelConversionPolicy {
+    /// Returns the default policy: preserve the current channel count.
+    #[must_use]
+    pub const fn preserve() -> Self {
+        Self::Preserve
+    }
+
+    /// Returns a policy that automatically converts to `target`.
+    #[must_use]
+    pub const fn automatic(target: ChannelCount) -> Self {
+        Self::Automatic(target)
+    }
+
+    /// Returns a policy that requires `target` without automatic conversion.
+    #[must_use]
+    pub const fn require(target: ChannelCount) -> Self {
+        Self::Require(target)
+    }
+
+    /// Returns the target output channel count when one is configured.
+    #[must_use]
+    pub const fn target_channels(self) -> Option<ChannelCount> {
+        match self {
+            Self::Preserve => None,
+            Self::Automatic(target) | Self::Require(target) => Some(target),
+        }
+    }
+
+    /// Returns whether this policy may insert channel conversion.
+    #[must_use]
+    pub const fn automatic_conversion_enabled(self) -> bool {
+        matches!(self, Self::Automatic(_))
+    }
+}
+
+/// Errors produced by explicit output channel conversion.
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum ChannelConversionError {
+    /// A target channel count was requested while automatic conversion was disabled.
+    #[error("automatic channel conversion from {actual} to {target} is disabled")]
+    AutomaticConversionDisabled {
+        /// Channel count currently present in the pipeline.
+        actual: ChannelCount,
+
+        /// Required output channel count.
+        target: ChannelCount,
+    },
+
+    /// The converted buffer shape was rejected by the core buffer model.
+    #[error(transparent)]
+    Core(#[from] auralis_core::AuralisError),
+
+    /// A backend-dispatched downmix kernel rejected channel slices.
+    #[error(transparent)]
+    Mix(#[from] auralis_simd::MixError),
+}
+
+/// Converts a decoded planar buffer to `target_channels` with SoX-ng `channels` semantics.
+///
+/// When the target matches the input channel count, the buffer is cloned
+/// unchanged. Downmixing averages deterministic input-channel groups in the
+/// same pattern as SoX-ng's automatic `channels` effect. Upmixing duplicates
+/// input channels in round-robin order. The transform preserves sample rate,
+/// sample format, frame count, and sample values except for required downmix
+/// averaging. The scalar backend is used as the reference path.
+///
+/// # Errors
+///
+/// Returns [`ChannelConversionError::Core`] if the converted buffer shape
+/// cannot be represented, or [`ChannelConversionError::Mix`] if a backend
+/// downmix kernel rejects the generated channel slices.
+pub fn convert_audio_channels(
+    audio: &AudioBuffer,
+    target_channels: ChannelCount,
+) -> std::result::Result<AudioBuffer, ChannelConversionError> {
+    convert_audio_channels_with_backend(audio, target_channels, BackendKind::Scalar)
+}
+
+/// Converts a decoded planar buffer to `target_channels` with a requested backend.
+///
+/// `requested_backend` selects the scalar/SIMD mix kernel used for downmixing
+/// through the same deterministic backend fallback rules used by other
+/// backend-aware sample processing. Upmixing is a structural copy and does not
+/// select a SIMD kernel.
+///
+/// # Errors
+///
+/// Returns the same errors as [`convert_audio_channels`].
+pub fn convert_audio_channels_with_backend(
+    audio: &AudioBuffer,
+    target_channels: ChannelCount,
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, ChannelConversionError> {
+    let input_channels = audio.channels();
+    if input_channels == target_channels {
+        return Ok(audio.clone());
+    }
+
+    let output_spec = AudioSpec::new(
+        audio.spec().sample_rate(),
+        target_channels,
+        audio.spec().sample_format(),
+    );
+    let mut output = AudioBuffer::zeroed(output_spec, audio.frames())?;
+
+    if input_channels < target_channels {
+        duplicate_channels(audio, &mut output)?;
+    } else {
+        downmix_channels_with_backend(audio, &mut output, requested_backend)?;
+    }
+
+    Ok(output)
+}
+
+fn apply_channel_conversion_policy_with_backend(
+    audio: AudioBuffer,
+    policy: ChannelConversionPolicy,
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, ChannelConversionError> {
+    match policy {
+        ChannelConversionPolicy::Preserve => Ok(audio),
+        ChannelConversionPolicy::Automatic(target) => {
+            convert_audio_channels_with_backend(&audio, target, requested_backend)
+        }
+        ChannelConversionPolicy::Require(target) if audio.channels() == target => Ok(audio),
+        ChannelConversionPolicy::Require(target) => {
+            Err(ChannelConversionError::AutomaticConversionDisabled {
+                actual: audio.channels(),
+                target,
+            })
+        }
+    }
+}
+
+fn duplicate_channels(
+    input: &AudioBuffer,
+    output: &mut AudioBuffer,
+) -> std::result::Result<(), ChannelConversionError> {
+    let input_channels = input.channels().as_usize();
+    for output_channel_index in 0..output.channels().as_usize() {
+        let input_channel_index = output_channel_index % input_channels;
+        let input_channel = input
+            .channel(input_channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        let output_channel = output
+            .channel_mut(output_channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        output_channel.copy_from_slice(input_channel);
+    }
+
+    Ok(())
+}
+
+fn downmix_channels_with_backend(
+    input: &AudioBuffer,
+    output: &mut AudioBuffer,
+    requested_backend: BackendKind,
+) -> std::result::Result<(), ChannelConversionError> {
+    let input_channels = input.channels().as_usize();
+    let output_channels = output.channels().as_usize();
+    let selection = auralis_simd::select_backend(requested_backend);
+
+    for output_channel_index in 0..output_channels {
+        let input_channels_per_output =
+            (input_channels + output_channels - 1 - output_channel_index) / output_channels;
+        let mut channel_inputs = Vec::with_capacity(input_channels_per_output);
+        for input_group_index in 0..input_channels_per_output {
+            let input_channel_index = input_group_index * output_channels + output_channel_index;
+            channel_inputs.push(
+                input
+                    .channel(input_channel_index)
+                    .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?,
+            );
+        }
+
+        let output_channel = output
+            .channel_mut(output_channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        auralis_simd::mix_f32_with_backend(
+            selection,
+            &channel_inputs,
+            output_channel,
+            reciprocal_usize(input_channels_per_output),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn reciprocal_usize(value: usize) -> f32 {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Channel conversion scales small channel groups as f32 sample arithmetic."
+    )]
+    {
+        1.0 / value as f32
     }
 }
 
@@ -1393,6 +1619,7 @@ impl AudioFile {
 pub struct Pipeline {
     audio: Result<AudioBuffer>,
     requested_backend: BackendKind,
+    channel_conversion_policy: ChannelConversionPolicy,
 }
 
 impl Pipeline {
@@ -1415,6 +1642,7 @@ impl Pipeline {
         Self {
             audio: Ok(audio),
             requested_backend,
+            channel_conversion_policy: ChannelConversionPolicy::Preserve,
         }
     }
 
@@ -1426,6 +1654,31 @@ impl Pipeline {
     #[must_use]
     pub const fn with_backend(mut self, requested_backend: BackendKind) -> Self {
         self.requested_backend = requested_backend;
+        self
+    }
+
+    /// Sets the explicit output channel-conversion policy for later writes.
+    ///
+    /// The default policy is [`ChannelConversionPolicy::Preserve`], which means
+    /// `write_wav` uses the pipeline's current channel count. Use
+    /// [`ChannelConversionPolicy::Automatic`] to request SoX-ng-style automatic
+    /// `channels` conversion at the output boundary, or
+    /// [`ChannelConversionPolicy::Require`] to verify a target channel count
+    /// while failing instead of converting when it differs.
+    #[must_use]
+    pub const fn with_channel_conversion_policy(mut self, policy: ChannelConversionPolicy) -> Self {
+        self.channel_conversion_policy = policy;
+        self
+    }
+
+    /// Requests SoX-ng-style automatic channel conversion before writing.
+    ///
+    /// This is a convenience wrapper around
+    /// [`Self::with_channel_conversion_policy`] using
+    /// [`ChannelConversionPolicy::Automatic`].
+    #[must_use]
+    pub const fn with_output_channels(mut self, channels: ChannelCount) -> Self {
+        self.channel_conversion_policy = ChannelConversionPolicy::Automatic(channels);
         self
     }
 
@@ -1639,6 +1892,11 @@ impl Pipeline {
     /// finalization fails.
     pub fn write_wav(self, path: impl AsRef<Path>) -> Result<()> {
         let audio = self.audio?;
+        let audio = apply_channel_conversion_policy_with_backend(
+            audio,
+            self.channel_conversion_policy,
+            self.requested_backend,
+        )?;
         auralis_wav::encode_pcm16_path_with_backend(path, &audio, self.requested_backend)?;
 
         Ok(())
@@ -1669,8 +1927,9 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 #[cfg(test)]
 mod tests {
     use super::{
-        AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
-        concatenate_audio_buffers, merge_audio_buffers, mix_audio_buffers,
+        AudioFile, BackendKind, ChannelConversionError, ChannelConversionPolicy, EffectChain,
+        EffectCommand, Error, InputCombineError, concatenate_audio_buffers, convert_audio_channels,
+        convert_audio_channels_with_backend, merge_audio_buffers, mix_audio_buffers,
         mix_audio_buffers_with_backend, mix_power_audio_buffers,
         mix_power_audio_buffers_with_backend, multiply_audio_buffers,
         multiply_audio_buffers_with_backend, sequence_audio_buffers,
@@ -2816,6 +3075,122 @@ mod tests {
     }
 
     #[test]
+    fn convert_audio_channels_downmixes_stereo_to_mono() {
+        let source = stereo_audio_buffer(vec![1.0, -1.0, 0.0, 0.5]);
+
+        let actual = convert_audio_channels(&source, ChannelCount::new(1).unwrap()).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(1).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.5, -0.25]);
+    }
+
+    #[test]
+    fn convert_audio_channels_upmixes_mono_to_stereo_by_duplication() {
+        let source = audio_buffer(vec![0.25, -0.5]);
+
+        let actual = convert_audio_channels(&source, ChannelCount::new(2).unwrap()).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.25, -0.5, 0.25, -0.5]);
+    }
+
+    #[test]
+    fn convert_audio_channels_downmixes_three_channels_with_sox_grouping() {
+        let source = audio_buffer_with_shape(
+            vec![1.0, 2.0, 10.0, 20.0, 3.0, 4.0],
+            2,
+            48_000,
+            3,
+            SampleFormat::Float32,
+        );
+
+        let actual = convert_audio_channels(&source, ChannelCount::new(2).unwrap()).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[2.0, 3.0, 10.0, 20.0]);
+    }
+
+    #[test]
+    fn convert_audio_channels_matches_under_forced_scalar_and_requested_simd() {
+        let source = audio_buffer_with_shape(
+            vec![
+                -1.0,
+                -0.5,
+                -0.0,
+                0.0,
+                0.5,
+                1.0,
+                0.999_984_74,
+                -0.999_984_74,
+                0.25,
+                -0.25,
+                0.75,
+                -0.75,
+            ],
+            4,
+            48_000,
+            3,
+            SampleFormat::Float32,
+        );
+
+        let scalar = convert_audio_channels_with_backend(
+            &source,
+            ChannelCount::new(1).unwrap(),
+            BackendKind::Scalar,
+        )
+        .unwrap();
+        let simd = convert_audio_channels_with_backend(
+            &source,
+            ChannelCount::new(1).unwrap(),
+            BackendKind::Simd,
+        )
+        .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+    }
+
+    #[test]
+    fn channel_conversion_policy_require_disables_automatic_conversion() {
+        let source = stereo_audio_buffer(vec![0.25, -0.5, 0.75, 0.0]);
+
+        let error = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_channel_conversion_policy(ChannelConversionPolicy::require(
+                ChannelCount::new(1).unwrap(),
+            ))
+            .write_wav(temp_path("auralis-channel-policy-reject", "wav"))
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            Error::ChannelConversion(ChannelConversionError::AutomaticConversionDisabled {
+                actual: ChannelCount::new(2).unwrap(),
+                target: ChannelCount::new(1).unwrap(),
+            })
+        );
+    }
+
+    #[test]
+    fn pipeline_write_wav_applies_explicit_output_channel_policy() {
+        let output = temp_path("auralis-channel-policy-output", "wav");
+        let source = stereo_audio_buffer(vec![0.5, -0.5, 1.0, 0.0]);
+
+        AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_output_channels(ChannelCount::new(1).unwrap())
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(&output).unwrap();
+        assert_eq!(decoded.channels(), ChannelCount::new(1).unwrap());
+        assert_samples_close(decoded.as_planar_f32(), &[0.75, -0.25]);
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
     fn invalid_trim_range_propagates_without_panic() {
         let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25]))
             .into_pipeline()
@@ -2987,5 +3362,14 @@ mod tests {
             .as_nanos();
 
         std::env::temp_dir().join(format!("auralis-chain-api-{nanos}"))
+    }
+
+    fn temp_path(prefix: &str, extension: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("{prefix}-{nanos}.{extension}"))
     }
 }

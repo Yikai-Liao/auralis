@@ -45,6 +45,14 @@ enum Command {
         #[arg(long = "input", value_name = "FILE")]
         additional_inputs: Vec<PathBuf>,
 
+        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
+        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
+        output_channels: Option<auralis::ChannelCount>,
+
+        /// Fail instead of automatically converting channels for --channels.
+        #[arg(long)]
+        no_auto_channels: bool,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -118,6 +126,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             backend,
             combine,
             additional_inputs,
+            output_channels,
+            no_auto_channels,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -136,6 +146,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 backend,
                 combine,
                 additional_inputs,
+                output_channels,
+                no_auto_channels,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -180,8 +192,11 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
         ensure_wav_extension(input, PathRole::Input)?;
     }
     let backend = options.backend;
+    let channel_conversion_policy = options.channel_conversion_policy()?;
     let effect_chain = options.effect_chain()?;
-    let pipeline = open_pipeline(input, options)?.with_backend(backend);
+    let pipeline = open_pipeline(input, options)?
+        .with_backend(backend)
+        .with_channel_conversion_policy(channel_conversion_policy);
 
     if let Some(effect_chain) = effect_chain {
         pipeline
@@ -234,6 +249,8 @@ struct RunOptions {
     backend: auralis::BackendKind,
     combine: auralis::CombineMethod,
     additional_inputs: Vec<PathBuf>,
+    output_channels: Option<auralis::ChannelCount>,
+    no_auto_channels: bool,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -294,6 +311,15 @@ impl RunOptions {
             || self.fade_in_frame.is_some()
             || self.fade_out_frame.is_some()
             || self.reverse
+    }
+
+    fn channel_conversion_policy(&self) -> Result<auralis::ChannelConversionPolicy, CliError> {
+        match (self.output_channels, self.no_auto_channels) {
+            (None, false) => Ok(auralis::ChannelConversionPolicy::Preserve),
+            (Some(channels), false) => Ok(auralis::ChannelConversionPolicy::automatic(channels)),
+            (Some(channels), true) => Ok(auralis::ChannelConversionPolicy::require(channels)),
+            (None, true) => Err(CliError::NoAutoChannelsWithoutOutputChannels),
+        }
     }
 
     fn trim_mode(&self) -> Result<Option<TrimMode>, CliError> {
@@ -412,6 +438,15 @@ fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
     })
 }
 
+fn parse_channel_count(value: &str) -> Result<auralis::ChannelCount, String> {
+    let channels = value
+        .parse::<u16>()
+        .map_err(|_| "channels must be a positive integer no larger than 65535".to_owned())?;
+
+    auralis::ChannelCount::new(channels)
+        .map_err(|_| "channels must be a positive integer no larger than 65535".to_owned())
+}
+
 #[derive(Debug)]
 enum CliError {
     Auralis(auralis::Error),
@@ -423,6 +458,7 @@ enum CliError {
     MixedEffectSyntax,
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
+    NoAutoChannelsWithoutOutputChannels,
     UnsupportedFormat { path: PathBuf, role: PathRole },
 }
 
@@ -469,6 +505,9 @@ impl std::fmt::Display for CliError {
                 .write_str("effects files cannot be combined with positional effect chain tokens"),
             Self::MixedEffectsFileAndLegacyEffectFlags => {
                 formatter.write_str("effects files cannot be combined with legacy effect flags")
+            }
+            Self::NoAutoChannelsWithoutOutputChannels => {
+                formatter.write_str("--no-auto-channels requires --channels")
             }
             Self::UnsupportedFormat { path, role } => {
                 write!(

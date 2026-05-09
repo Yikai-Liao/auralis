@@ -28,6 +28,7 @@ def run_sox_ng(
     effect_args: Sequence[str],
     *,
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
+    output_channels: int | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with deterministic flags and return the completed process."""
 
@@ -41,6 +42,7 @@ def run_sox_ng(
         "-D",
         str(input_path),
         *output_encoding,
+        *output_channel_args(output_channels),
         str(output_path),
         *effect_args,
     ]
@@ -54,6 +56,7 @@ def run_sox_ng_with_inputs(
     *,
     combine: str = "concatenate",
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
+    output_channels: int | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with multiple inputs and deterministic combine settings."""
 
@@ -71,7 +74,16 @@ def run_sox_ng_with_inputs(
         combine,
         *(str(path) for path in input_paths),
         *output_encoding,
+        *output_channel_args(output_channels),
         str(output_path),
         *effect_args,
     ]
     return subprocess.run(command, check=True, capture_output=True)
+
+
+def output_channel_args(output_channels: int | None) -> tuple[str, ...]:
+    """Return SoX-ng output channel options for an optional target count."""
+
+    if output_channels is None:
+        return ()
+    return ("--channels", str(output_channels))

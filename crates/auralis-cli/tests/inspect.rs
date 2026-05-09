@@ -153,6 +153,117 @@ fn run_copies_stereo_wav_samples_and_metadata() {
 }
 
 #[test]
+fn run_channels_downmixes_stereo_to_mono() {
+    let input = temp_path("auralis-cli-run-channels-downmix-input", "wav");
+    let output = temp_path("auralis-cli-run-channels-downmix-output", "wav");
+    write_pcm16_wav(&input, 2, &[8192, 24_576, -16_384, 16_384]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--channels",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![16_384, 0]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_channels_upmixes_mono_to_stereo() {
+    let input = temp_path("auralis-cli-run-channels-upmix-input", "wav");
+    let output = temp_path("auralis-cli-run-channels-upmix-output", "wav");
+    write_pcm16_wav(&input, 1, &[8192, -16_384]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--channels",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&output),
+        (2, vec![8192, 8192, -16_384, -16_384])
+    );
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_no_auto_channels_rejects_mismatched_output_count() {
+    let input = temp_path("auralis-cli-run-no-auto-channels-input", "wav");
+    let output = temp_path("auralis-cli-run-no-auto-channels-output", "wav");
+    write_pcm16_wav(&input, 2, &[1000, -1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--channels",
+            "1",
+            "--no-auto-channels",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("automatic channel conversion from 2 ch to 1 ch is disabled"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_no_auto_channels_requires_output_channels() {
+    let input = temp_path("auralis-cli-run-no-auto-channels-missing-input", "wav");
+    let output = temp_path("auralis-cli-run-no-auto-channels-missing-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--no-auto-channels",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --no-auto-channels requires --channels"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_concatenate_accepts_mismatched_mono_lengths() {
     let first = temp_path("auralis-cli-run-concat-mono-first", "wav");
     let second = temp_path("auralis-cli-run-concat-mono-second", "wav");
@@ -2068,6 +2179,16 @@ fn run_help_documents_gain_and_trim_units() {
     assert!(stdout.contains("--input <FILE>"), "{stdout}");
     assert!(
         stdout.contains("Additional PCM16 WAV input files to combine"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--channels <CHANNELS>"), "{stdout}");
+    assert!(
+        stdout.contains("Output channel count; inserts SoX-ng-style channel conversion"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--no-auto-channels"), "{stdout}");
+    assert!(
+        stdout.contains("Fail instead of automatically converting channels"),
         "{stdout}"
     );
     assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");

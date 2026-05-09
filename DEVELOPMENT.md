@@ -1269,6 +1269,8 @@ Define and implement explicit equivalents for SoX-ng automatic behavior.
 
 #### Feature 5.5.1: automatic channel conversion policy
 
+Status: implemented.
+
 Acceptance tests:
 
 - no hidden behavior in library APIs.
