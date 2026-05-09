@@ -459,9 +459,10 @@ as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "t",
 "24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
 accepts the frame-count subset implemented by Auralis and supports SoX-ng fade
 curve tokens `q`, `h`, `l`, `t`, and `p`, stop-position fade-out semantics,
-and fade-out lengths measured backward from the stop position; future SoX-ng
-options such as dcshift limiter gain are rejected with effect- and
-option-specific diagnostics. The implemented `gain` command
+and fade-out lengths measured backward from the stop position. The `dcshift`
+command accepts SoX-ng's optional limiter gain argument, for example
+`dcshift 0.5 0.05`, and applies immediate SoX-ng-style clipping only on that
+limiter path. The implemented `gain` command
 forms include plain fixed gain, `gain -h`, `gain -r`, combined
 `gain -rh`/`gain -hr` headroom reclaim, peak normalization with `gain -n`, and
 the simple limiter with `gain -l`, plus channel peak equalization with
@@ -973,7 +974,8 @@ Examples:
 
 - `gain`: multiply by `10^(db / 20)`
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
-  does not clip, while PCM16 WAV output clips to the representable range
+  does not clip unless SoX-ng's optional limiter gain is configured, while
+  PCM16 WAV output clips plain shifted samples to the representable range
 - `trim`: exact frame interval
 - `reverse`: exact frame order, including stereo frame grouping
 - `fade`: expected envelope shape

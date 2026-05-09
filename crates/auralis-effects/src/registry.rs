@@ -130,7 +130,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "dcshift",
         &["dc-shift", "dc_shift"],
         "DcShift",
-        "dcshift shift",
+        "dcshift shift [limiter-gain]",
         "add a constant normalized full-scale offset",
     ),
     EffectDescriptor::new(

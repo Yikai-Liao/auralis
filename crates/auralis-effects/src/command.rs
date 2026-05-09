@@ -123,7 +123,11 @@ impl EffectCommand {
     pub fn render_tokens(self) -> Vec<String> {
         match self {
             Self::DcShift(dc_shift) => {
-                vec!["dcshift".to_owned(), render_f32(dc_shift.shift)]
+                let mut tokens = vec!["dcshift".to_owned(), render_f32(dc_shift.shift)];
+                if let Some(limiter_gain) = dc_shift.limiter_gain {
+                    tokens.push(render_f32(limiter_gain));
+                }
+                tokens
             }
             Self::Fade(fade) => render_fade(fade),
             Self::Gain(gain) => render_gain(gain),
@@ -285,15 +289,27 @@ pub enum EffectCommandParseError {
 fn parse_dc_shift(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
     let shift = required_arg(effect, args, "shift")?;
     let shift = parse_f32(effect, "shift", shift)?;
-    reject_extra_arguments(effect, &args[1..])?;
+    let limiter_gain = args
+        .get(1)
+        .map(|value| parse_f32(effect, "limiter-gain", value))
+        .transpose()?;
+    reject_extra_arguments(effect, args.get(2..).unwrap_or_default())?;
 
-    DcShift::new(shift)
-        .map(EffectCommand::DcShift)
-        .map_err(|source| EffectCommandParseError::InvalidEffectConfig {
+    let dc_shift = match limiter_gain {
+        Some(limiter_gain) => DcShift::with_limiter_gain(shift, limiter_gain),
+        None => DcShift::new(shift),
+    };
+    dc_shift.map(EffectCommand::DcShift).map_err(|source| {
+        EffectCommandParseError::InvalidEffectConfig {
             effect,
-            argument: "shift",
+            argument: if limiter_gain.is_some() {
+                "limiter-gain"
+            } else {
+                "shift"
+            },
             source,
-        })
+        }
+    })
 }
 
 fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
@@ -648,6 +664,20 @@ mod tests {
     }
 
     #[test]
+    fn parses_dc_shift_limiter_gain() {
+        assert_eq!(
+            parse_effect_command(&["dcshift", "0.5", "0.05"]).unwrap(),
+            EffectCommand::DcShift(DcShift::with_limiter_gain(0.5, 0.05).unwrap())
+        );
+        assert_eq!(
+            parse_effect_command(&["dcshift", "5e-1", "5e-2"])
+                .unwrap()
+                .render_tokens(),
+            ["dcshift", "0.5", "0.05"]
+        );
+    }
+
+    #[test]
     fn unsupported_options_name_the_effect_and_option() {
         let error = parse_effect_command(&["gain", "-q"]).unwrap_err();
 
@@ -867,6 +897,11 @@ mod tests {
                 &["dc-shift", "-0.0"][..],
                 &["dcshift", "0"][..],
                 &["dcshift", "0"][..],
+            ),
+            (
+                &["dc-shift", "5e-1", "5e-2"][..],
+                &["dcshift", "0.5", "0.05"][..],
+                &["dcshift", "0.5", "0.05"][..],
             ),
             (&["pad"][..], &["pad", "0", "0"][..], &["pad", "0", "0"][..]),
             (

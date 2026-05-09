@@ -12,6 +12,7 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
     assert_eq!(
         ids,
         [
+            "effect_dcshift_limiter_mono_positive",
             "effect_dcshift_mono_positive",
             "effect_dcshift_stereo_negative",
             "effect_fade_mono_half_sine_in",

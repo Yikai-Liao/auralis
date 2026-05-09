@@ -125,7 +125,22 @@ Implementation notes:
 
 ### Feature 6.1.6: `dcshift` limiter gain
 
+Status: implemented.
+
 Implement the limiter gain option and document clipping/limiting behavior.
+
+Implementation notes:
+
+- `DcShift` now carries an optional SoX-ng limiter gain while preserving the
+  existing single-argument direct API behavior.
+- `dcshift SHIFT LIMITER_GAIN` parses and renders through the shared typed
+  command model, including flat effect-chain token streams.
+- Plain `dcshift` remains an unclipped additive offset inside Auralis; the
+  limiter-gain form follows SoX-ng's peak-threshold limiter and clips the
+  effect output immediately before later chain commands see it.
+- Analytical tests cover positive and negative limiter behavior, command
+  parsing, and scalar-vs-SIMD fallback parity. Golden coverage includes a
+  standalone full-scale mono limiter case against SoX-ng.
 
 ### Feature 6.1.7: `pad` positioned padding
 

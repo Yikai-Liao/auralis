@@ -431,10 +431,9 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     let args_start = command_start + 1;
 
     match kind {
-        EffectKind::DcShift => required_arg_end(tokens, args_start, 1),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Pad => optional_arg_end(tokens, args_start, 2),
+        EffectKind::DcShift | EffectKind::Pad => optional_arg_end(tokens, args_start, 2),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => required_arg_end(tokens, args_start, 2),
     }
