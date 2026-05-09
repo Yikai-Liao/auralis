@@ -20,8 +20,10 @@ Initial scope is deliberately narrow: **WAV only**. Other audio formats are repr
 
 Auralis is currently pre-alpha. The repository contains the initial Rust
 workspace skeleton, uv-based Python test harness, and core audio type
-vocabulary with planar internal audio buffers; the WAV pipeline, DSP kernels,
-and CLI commands are still intentionally unimplemented.
+vocabulary with planar internal audio buffers. The codec trait boundary is in
+place for WAV-only scope and explicit unsupported-format reporting; WAV
+decoding, WAV encoding, DSP kernels, and CLI commands are still intentionally
+unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 

@@ -9,6 +9,10 @@ version = "0.0.0"
 [[package]]
 name = "auralis-codec"
 version = "0.0.0"
+dependencies = [
+ "auralis-core",
+ "thiserror",
+]
 
 [[package]]
 name = "auralis-core"

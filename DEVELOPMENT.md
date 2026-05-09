@@ -355,6 +355,8 @@ Do not implement file I/O yet.
 
 ### Feature 1.1: WAV codec trait boundary
 
+Status: implemented.
+
 Implement in `auralis-codec`:
 
 - `AudioReader` trait
