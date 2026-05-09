@@ -2,8 +2,8 @@
 
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
-    Channels, Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Pad, PositionedPad, Reverse,
-    Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
+    Channels, Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad, PositionedPad,
+    Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
 };
 
 #[test]
@@ -45,6 +45,7 @@ fn parses_supported_effect_commands_into_typed_configs() {
             ),
         ),
         (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
+        (&["oops"][..], EffectCommand::Oops(Oops::new())),
         (&["swap"][..], EffectCommand::Swap(Swap::new())),
         (
             &["softvol", "2", "10", "0.1"][..],

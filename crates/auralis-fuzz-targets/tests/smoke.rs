@@ -39,6 +39,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"overdrive 12 25",
         b"saturation sqrt 0.75 0.1 0.25",
         b"swap",
+        b"oops",
         b"repeat 2",
         b"remix -a -p 1v0.5,2p-6 0 -2i0",
         b"tremolo 5 75",

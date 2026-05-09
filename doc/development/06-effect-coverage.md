@@ -431,7 +431,21 @@ Implementation notes:
 
 ### Feature 6.3.5: `oops`
 
+Status: implemented.
+
 Implement out-of-phase stereo behavior.
+
+Implementation notes:
+
+- Added a typed `Oops` effect matching SoX-ng's `oops` alias for
+  `remix 1,2i 1,2i`: subtract channel 2 from channel 1, clip to normalized
+  full scale, and emit the same difference in both output channels.
+- Inputs with fewer than two channels are rejected, matching SoX-ng's
+  too-few-input-channels behavior; extra input channels are ignored.
+- Golden coverage includes a standalone stereo `oops` case against SoX-ng, with
+  L4 finite-output coverage, L5 frame-chunk coverage, and an L7 fuzz seed for
+  command parsing. Mono golden coverage is intentionally not applicable because
+  SoX-ng rejects mono `oops` input.
 
 ### Feature 6.3.6: `centercut` core
 

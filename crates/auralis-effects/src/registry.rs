@@ -42,6 +42,9 @@ pub enum EffectKind {
     /// Whole-buffer peak normalization.
     Norm,
 
+    /// SoX-ng-style out-of-phase stereo extraction.
+    Oops,
+
     /// SoX-ng-style overdrive distortion.
     Overdrive,
 
@@ -205,6 +208,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Norm",
         "norm [level]",
         "normalize peak level at this point in the effect chain",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Oops,
+        "oops",
+        &[],
+        "Oops",
+        "oops",
+        "extract out-of-phase stereo by subtracting channel 2 from channel 1",
     ),
     EffectDescriptor::new(
         EffectKind::Overdrive,

@@ -156,6 +156,17 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_oops_stereo]
+input = "effects/oops_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["oops"]
+sox_ng = ["oops"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_overdrive_mono_default]
 input = "effects/overdrive_mono.wav"
 corpus_id = "l0/sine_mono_32"

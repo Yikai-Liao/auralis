@@ -37,6 +37,7 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_gain_stereo_minus_6",
             "effect_norm_mono_minus_3",
             "effect_norm_stereo_default",
+            "effect_oops_stereo",
             "effect_overdrive_mono_default",
             "effect_overdrive_stereo_explicit",
             "effect_pad_mono_both_sides",
@@ -84,6 +85,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "fade",
         "vol",
         "norm",
+        "oops",
         "contrast",
         "softvol",
         "tremolo",
@@ -101,7 +103,9 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
             .iter()
             .any(|(id, case)| id.contains(effect) && case.corpus_id().unwrap().contains("stereo"));
 
-        assert!(mono, "missing mono standalone golden case for {effect}");
+        if effect != "oops" {
+            assert!(mono, "missing mono standalone golden case for {effect}");
+        }
         assert!(stereo, "missing stereo standalone golden case for {effect}");
     }
 }

@@ -48,6 +48,13 @@ pub(crate) fn apply_command(
         EffectCommand::Norm(norm) => norm
             .process_buffer_with_backend(audio, requested_backend)
             .map_err(|source| ("level", source)),
+        EffectCommand::Oops(oops) => {
+            let extracted = oops
+                .process_buffer(audio)
+                .map_err(|source| ("channels", source))?;
+            *audio = extracted;
+            Ok(())
+        }
         EffectCommand::Overdrive(overdrive) => {
             overdrive.process_buffer(audio);
             Ok(())
@@ -122,7 +129,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
-        EffectKind::Reverse | EffectKind::Swap => no_arg_end(tokens, args_start),
+        EffectKind::Oops | EffectKind::Reverse | EffectKind::Swap => no_arg_end(tokens, args_start),
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::SoftVol | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),

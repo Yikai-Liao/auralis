@@ -44,6 +44,7 @@ use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
+use crate::command_oops::parse_oops;
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_remix::{parse_remix, render_remix};
@@ -57,8 +58,8 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade,
-    Gain, Norm, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo, Trim,
-    Vol,
+    Gain, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo,
+    Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -91,6 +92,9 @@ pub enum EffectCommand {
 
     /// SoX-ng-style whole-buffer peak normalization.
     Norm(Norm),
+
+    /// SoX-ng-style out-of-phase stereo extraction.
+    Oops(Oops),
 
     /// SoX-ng-style overdrive distortion.
     Overdrive(Overdrive),
@@ -146,6 +150,7 @@ impl EffectCommand {
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
             EffectKind::Norm => parse_norm(effect, args),
+            EffectKind::Oops => parse_oops(effect, args),
             EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Repeat => parse_repeat(effect, args),
@@ -170,6 +175,7 @@ impl EffectCommand {
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
             Self::Norm(_) => EffectKind::Norm,
+            Self::Oops(_) => EffectKind::Oops,
             Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Repeat(_) => EffectKind::Repeat,
@@ -200,6 +206,7 @@ impl EffectCommand {
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
             Self::Norm(norm) => render_norm(*norm),
+            Self::Oops(_) => vec!["oops".to_owned()],
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Repeat(repeat) => render_repeat(*repeat),

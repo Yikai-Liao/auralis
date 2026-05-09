@@ -4,7 +4,7 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Channels, Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Remix, RemixOutputSpec,
+    Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec,
     RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
@@ -321,6 +321,15 @@ proptest! {
         .process_buffer(&source)
         .expect("generated audio always has channel one");
         prop_assert_all_finite(&remixed)?;
+
+        if source.channels().as_usize() >= 2 {
+            let out_of_phase = Oops::new()
+                .process_buffer(&source)
+                .expect("generated multichannel audio has channel two");
+            prop_assert_all_finite(&out_of_phase)?;
+            prop_assert_eq!(out_of_phase.channels(), ChannelCount::new(2).unwrap());
+            prop_assert_eq!(out_of_phase.frames(), source.frames());
+        }
 
         let mut reversed = source;
         Reverse::new().process_buffer(&mut reversed);
