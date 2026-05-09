@@ -42,6 +42,16 @@ pub enum EffectError {
         sample_index: usize,
     },
 
+    /// A `vol` gain value was not finite.
+    #[error("vol gain must be finite")]
+    InvalidVolGain,
+
+    /// A `vol` limiter gain was outside SoX-ng's supported range.
+    #[error(
+        "vol limiter gain must be finite, greater than 0, less than 1, and require absolute gain >= 1"
+    )]
+    InvalidVolLimiterGain,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

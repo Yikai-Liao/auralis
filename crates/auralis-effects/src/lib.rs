@@ -29,6 +29,7 @@ mod command;
 mod command_gain;
 mod command_pad;
 mod command_trim;
+mod command_vol;
 mod dcshift;
 mod effects_file;
 mod error;
@@ -40,6 +41,7 @@ mod reverse;
 #[cfg(test)]
 mod test_support;
 mod trim;
+mod vol;
 
 pub use chain::{
     ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,
@@ -61,3 +63,4 @@ pub use registry::{
 };
 pub use reverse::Reverse;
 pub use trim::{Trim, TrimPosition};
+pub use vol::{Vol, VolGainType};

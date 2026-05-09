@@ -41,6 +41,9 @@ pub enum EffectKind {
 
     /// End-exclusive frame range selection.
     Trim,
+
+    /// SoX-ng-style volume scaling.
+    Vol,
 }
 
 /// Metadata for one implemented effect name.
@@ -172,6 +175,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Trim",
         "trim start [length]",
         "keep an end-exclusive frame or seconds range",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Vol,
+        "vol",
+        &["volume"],
+        "Vol",
+        "vol gain [a|p|d(a) [limitergain]]",
+        "apply volume scaling with optional limiter gain",
     ),
 ];
 
@@ -499,6 +510,7 @@ mod tests {
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
             ("trim", EffectKind::Trim),
+            ("vol", EffectKind::Vol),
         ];
 
         for (name, kind) in expected {
@@ -516,6 +528,7 @@ mod tests {
             ("dc_shift", "dcshift", EffectKind::DcShift),
             ("gain-db", "gain", EffectKind::Gain),
             ("gain_db", "gain", EffectKind::Gain),
+            ("volume", "vol", EffectKind::Vol),
         ];
 
         for (alias, canonical, kind) in expected {

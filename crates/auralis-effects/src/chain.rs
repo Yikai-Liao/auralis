@@ -424,6 +424,10 @@ fn apply_command(
             *audio = trimmed;
             Ok(())
         }
+        EffectCommand::Vol(vol) => {
+            vol.process_buffer_with_backend(audio, requested_backend);
+            Ok(())
+        }
     }
 }
 
@@ -437,6 +441,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
+        EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
 }
 
@@ -888,6 +893,11 @@ mod tests {
                     for chunk in chunks_mut(samples, chunk_sizes) {
                         fade.process_channel_segment(chunk, total_frames, FrameCount::new(start));
                         start += u64::try_from(chunk.len()).unwrap();
+                    }
+                }
+                EffectCommand::Vol(vol) => {
+                    for chunk in chunks_mut(samples, chunk_sizes) {
+                        vol.process_samples(chunk);
                     }
                 }
                 EffectCommand::Pad(_) | EffectCommand::Reverse(_) | EffectCommand::Trim(_) => {

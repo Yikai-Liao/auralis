@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
+use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim, Vol};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 
@@ -105,6 +105,11 @@ proptest! {
             .process_buffer(&mut gained);
         prop_assert_sample_bits_eq(gained.as_planar_f32(), source.as_planar_f32())?;
 
+        let mut volume_scaled = source.clone();
+        Vol::amplitude(1.0).expect("unity vol gain is valid")
+            .process_buffer(&mut volume_scaled);
+        prop_assert_sample_bits_eq(volume_scaled.as_planar_f32(), source.as_planar_f32())?;
+
         let mut shifted = source.clone();
         DcShift::new(0.0).expect("zero shift is valid").process_buffer(&mut shifted);
         prop_assert_sample_bits_eq(shifted.as_planar_f32(), source.as_planar_f32())?;
@@ -172,6 +177,11 @@ proptest! {
         Gain::new(Decibels::new(db).expect("generated dB is finite"))
             .process_buffer(&mut gained);
         prop_assert_all_finite(&gained)?;
+
+        let mut volume_scaled = source.clone();
+        Vol::amplitude(0.5).expect("generated vol gain is valid")
+            .process_buffer(&mut volume_scaled);
+        prop_assert_all_finite(&volume_scaled)?;
 
         let mut shifted = source.clone();
         DcShift::new(shift).expect("generated shift is valid").process_buffer(&mut shifted);

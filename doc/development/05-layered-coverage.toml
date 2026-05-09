@@ -97,6 +97,21 @@ l6 = { status = "not_applicable", reason = "Trim is a structural slice and curre
 l7 = { status = "covered", reason = "Effect command fuzzing covers trim argument parsing through the shared command parser and a multi-position seed.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/trim_multi"] }
 
 [[subject]]
+id = "effect.vol"
+kind = "effect"
+name = "vol"
+summary = "SoX-ng-style volume scaling with amplitude, power, dB, clipping, and optional limiter gain."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover amplitude, dB, power, and limiter-gain command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check amplitude scaling, power and dB conversion, clipping, limiter threshold behavior, parser syntax, and invalid limiter errors.", tests = ["crates/auralis-effects/src/vol.rs", "crates/auralis-effects/src/command_vol.rs", "crates/auralis-effects/tests/vol.rs"] }
+l4 = { status = "covered", reason = "Property tests include unity identity and finite-output coverage for vol.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers vol whole-buffer versus chunked processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for vol typed effect dispatch.", tests = ["crates/auralis-effects/tests/vol.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers vol argument parsing and limiter syntax through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/vol_limiter"] }
+
+[[subject]]
 id = "pipeline.effect_chain"
 kind = "pipeline"
 name = "effect-chain"

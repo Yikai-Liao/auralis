@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{DcShift, EffectChain, EffectCommand, Fade, Gain};
+use auralis_effects::{DcShift, EffectChain, EffectCommand, Fade, Gain, Vol};
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
 #[test]
@@ -38,6 +38,25 @@ fn dcshift_matches_whole_buffer_for_l5_chunk_matrix() {
         dc_shift.process_buffer(&mut whole);
         process_chunks_mut(chunked.as_planar_f32_mut(), schedule, |chunk, _offset| {
             dc_shift.process_samples(chunk);
+        });
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
+fn vol_matches_whole_buffer_for_l5_chunk_matrix() {
+    let vol = Vol::amplitude(0.5).expect("fixture vol gain is valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(source.as_planar_f32().len());
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        vol.process_buffer(&mut whole);
+        process_chunks_mut(chunked.as_planar_f32_mut(), schedule, |chunk, _offset| {
+            vol.process_samples(chunk);
         });
 
         assert_same_audio(&chunked, &whole, schedule);
@@ -103,6 +122,11 @@ fn process_streaming_safe_chain_by_chunks(
             }
             EffectCommand::Fade(fade) => {
                 process_fade_by_channel_chunks(audio, *fade, schedule);
+            }
+            EffectCommand::Vol(vol) => {
+                process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
+                    vol.process_samples(chunk);
+                });
             }
             _ => {
                 panic!("L5 streaming-safe chain fixture contained a non-streaming command")

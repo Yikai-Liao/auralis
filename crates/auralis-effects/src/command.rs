@@ -41,9 +41,10 @@ use thiserror::Error;
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_trim::{parse_trim, render_trim};
+use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Pad,
-    Reverse, Trim,
+    Reverse, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -76,6 +77,9 @@ pub enum EffectCommand {
 
     /// End-exclusive frame range selection.
     Trim(Trim),
+
+    /// SoX-ng-style volume scaling with optional limiter gain.
+    Vol(Vol),
 }
 
 impl EffectCommand {
@@ -98,6 +102,7 @@ impl EffectCommand {
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
+            EffectKind::Vol => parse_vol(effect, args),
         }
     }
 
@@ -111,6 +116,7 @@ impl EffectCommand {
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Trim(_) => EffectKind::Trim,
+            Self::Vol(_) => EffectKind::Vol,
         }
     }
 
@@ -136,6 +142,7 @@ impl EffectCommand {
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Trim(trim) => render_trim(trim),
+            Self::Vol(vol) => render_vol(*vol),
         }
     }
 }
@@ -390,7 +397,11 @@ pub(super) fn parse_decibels(
     })
 }
 
-fn parse_f64(effect: &'static str, argument: &'static str, value: &str) -> CommandResult<f64> {
+pub(super) fn parse_f64(
+    effect: &'static str,
+    argument: &'static str,
+    value: &str,
+) -> CommandResult<f64> {
     reject_option_like_argument(effect, value)?;
 
     value
@@ -403,7 +414,11 @@ fn parse_f64(effect: &'static str, argument: &'static str, value: &str) -> Comma
         })
 }
 
-fn parse_f32(effect: &'static str, argument: &'static str, value: &str) -> CommandResult<f32> {
+pub(super) fn parse_f32(
+    effect: &'static str,
+    argument: &'static str,
+    value: &str,
+) -> CommandResult<f32> {
     reject_option_like_argument(effect, value)?;
 
     value
@@ -474,7 +489,7 @@ pub(super) fn render_f64(value: f64) -> String {
     }
 }
 
-fn render_f32(value: f32) -> String {
+pub(super) fn render_f32(value: f32) -> String {
     if value == 0.0 {
         "0".to_owned()
     } else {

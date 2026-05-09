@@ -184,7 +184,23 @@ Implementation notes:
 
 ### Feature 6.2.1: `vol`
 
+Status: implemented.
+
 Implement volume scaling and supported option syntax.
+
+Implementation notes:
+
+- Added a typed `Vol` effect with amplitude, power, and dB gain modes, including
+  negative amplitude/power phase inversion and immediate SoX-ng-style clipping.
+- The effect command parser accepts `vol GAIN`, `vol GAIN amplitude`,
+  `vol GAIN power`, `vol GAIN dB`, suffix forms such as `vol -6dB`, and
+  optional limiter gain when the absolute amplitude multiplier is at least one.
+- Limiter processing follows SoX-ng's threshold formula and remains scalar;
+  the no-limiter multiply path uses the selected gain backend and clips after
+  multiplication.
+- Golden coverage includes standalone amplitude, dB, power, and limiter-gain
+  cases against SoX-ng, with L4 identity/finite-output coverage, L5 chunk
+  invariance, L6 scalar-vs-SIMD parity, and an L7 fuzz seed for limiter syntax.
 
 ### Feature 6.2.2: `norm`
 

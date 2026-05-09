@@ -90,6 +90,50 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_vol_mono_half_amplitude]
+input = "effects/vol_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vol", "0.5"]
+sox_ng = ["vol", "0.5"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
+[id.effect_vol_stereo_minus_6_db]
+input = "effects/vol_stereo_db.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vol", "-6", "dB"]
+sox_ng = ["vol", "-6", "dB"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_vol_stereo_quarter_power]
+input = "effects/vol_stereo_power.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vol", "0.25", "power"]
+sox_ng = ["vol", "0.25", "power"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
+[id.effect_vol_limiter_mono_plus_2]
+input = "effects/vol_limiter_mono.wav"
+corpus_id = "l0/full_scale_mono_8"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vol", "2", "amplitude", "0.05"]
+sox_ng = ["vol", "2", "amplitude", "0.05"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_dcshift_mono_positive]
 input = "effects/dcshift_mono.wav"
 corpus_id = "l0/step_mono_16"
