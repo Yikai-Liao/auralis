@@ -28,6 +28,8 @@ fn seeds() -> Vec<&'static [u8]> {
         b"not a wav",
         MINIMAL_PCM16_WAV,
         b"gain -3",
+        b"gain -n -3",
+        b"gain -l 6",
         b"gain -h -6 gain -r",
         b"dcshift 0.25 : reverse\nfade l 2 3\n",
         b"'unterminated",

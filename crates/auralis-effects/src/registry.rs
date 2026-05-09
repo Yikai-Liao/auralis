@@ -147,7 +147,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         &["gain-db", "gain_db"],
         "Gain",
         "gain [options] [gain-dB]",
-        "apply constant gain measured in decibels",
+        "apply gain with optional SoX-ng level management",
     ),
     EffectDescriptor::new(
         EffectKind::Pad,

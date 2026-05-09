@@ -27,8 +27,8 @@ pub enum EffectError {
     #[error("gain -r requires prior gain -h headroom below full scale")]
     MissingGainHeadroom,
 
-    /// A `gain -r` scan encountered a non-finite sample.
-    #[error("gain -r encountered non-finite sample at flattened sample {sample_index}")]
+    /// A gain scan encountered a non-finite sample.
+    #[error("gain scan encountered non-finite sample at flattened sample {sample_index}")]
     NonFiniteGainSample {
         /// Zero-based flattened sample index in planar channel order.
         sample_index: usize,

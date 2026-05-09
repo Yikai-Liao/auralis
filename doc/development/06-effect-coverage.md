@@ -37,8 +37,24 @@ Implementation notes:
 
 ### Feature 6.1.2: `gain` normalize and limiter options
 
+Status: implemented.
+
 Implement remaining level-management options that belong to `gain`, without
 confusing them with pipeline `--norm`.
+
+Implementation notes:
+
+- The effect command parser accepts `gain -n`, `gain -l`, and combined
+  `gain -nl`/`gain -ln` option forms with an optional fixed gain value.
+- `gain -n DB` scans the current chain buffer, scales the peak to full scale,
+  then applies the fixed dB offset. Silence remains silent.
+- `gain -l DB` applies SoX-ng's simple limiter curve after the fixed gain; the
+  limiter is scalar because it is not a pure multiply kernel.
+- SoX-ng's mutually exclusive combinations are rejected: `-n` with `-r`, and
+  `-l` with `-h`. Channel equalize and balance options remain scheduled for
+  Feature 6.1.3.
+- Golden coverage includes standalone `gain -n` and `gain -l` cases against
+  SoX-ng.
 
 ### Feature 6.1.3: `gain` channel equalize and balance options
 

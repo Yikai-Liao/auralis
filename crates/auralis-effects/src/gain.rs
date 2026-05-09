@@ -11,10 +11,11 @@ use auralis_simd::{BackendKind, select_backend};
 ///
 /// Plain gain does not clip, normalize, allocate, or inspect channel
 /// boundaries, so processing a whole buffer and processing the same samples in
-/// chunks produce identical results. SoX-ng headroom options are represented by
-/// [`GainHeadroom`]; direct sample processing still applies only the configured
-/// fixed gain, while [`crate::EffectChain`] uses the headroom mode to implement
-/// `gain -h` and `gain -r` command semantics.
+/// chunks produce identical results. SoX-ng whole-buffer options are represented
+/// by [`GainHeadroom`], [`Self::normalize`], and [`Self::limiter`]; direct
+/// sample processing still applies only the configured fixed gain, while
+/// [`crate::EffectChain`] uses those flags to implement command semantics such
+/// as `gain -n`, `gain -l`, `gain -h`, and `gain -r`.
 ///
 /// # Examples
 ///
@@ -47,6 +48,14 @@ pub struct Gain {
 
     /// SoX-ng headroom/reclaim mode for command-chain execution.
     pub headroom: GainHeadroom,
+
+    /// Whether command-chain execution should scan the current buffer and
+    /// normalize its peak to full scale before applying [`Self::db`].
+    pub normalize: bool,
+
+    /// Whether command-chain execution should apply SoX-ng's simple limiter
+    /// curve after the fixed-gain multiplier.
+    pub limiter: bool,
 }
 
 /// SoX-ng `gain` headroom/reclaim mode.
@@ -73,6 +82,30 @@ impl Gain {
         Self {
             db,
             headroom: GainHeadroom::None,
+            normalize: false,
+            limiter: false,
+        }
+    }
+
+    /// Creates a `gain -n` processor that normalizes peak level during chain execution.
+    #[must_use]
+    pub const fn normalize(db: Decibels) -> Self {
+        Self {
+            db,
+            headroom: GainHeadroom::None,
+            normalize: true,
+            limiter: false,
+        }
+    }
+
+    /// Creates a `gain -l` processor that applies SoX-ng's simple limiter.
+    #[must_use]
+    pub const fn limiter(db: Decibels) -> Self {
+        Self {
+            db,
+            headroom: GainHeadroom::None,
+            normalize: false,
+            limiter: true,
         }
     }
 
@@ -82,6 +115,8 @@ impl Gain {
         Self {
             db,
             headroom: GainHeadroom::Reserve,
+            normalize: false,
+            limiter: false,
         }
     }
 
@@ -91,6 +126,8 @@ impl Gain {
         Self {
             db,
             headroom: GainHeadroom::Reclaim,
+            normalize: false,
+            limiter: false,
         }
     }
 
@@ -100,7 +137,33 @@ impl Gain {
         Self {
             db,
             headroom: GainHeadroom::ReclaimAndReserve,
+            normalize: false,
+            limiter: false,
         }
+    }
+
+    /// Returns this processor with peak normalization enabled.
+    #[must_use]
+    pub const fn with_normalize(mut self) -> Self {
+        self.normalize = true;
+        self
+    }
+
+    pub(crate) const fn with_normalize_if(mut self, normalize: bool) -> Self {
+        self.normalize = normalize;
+        self
+    }
+
+    /// Returns this processor with the simple limiter enabled.
+    #[must_use]
+    pub const fn with_limiter(mut self) -> Self {
+        self.limiter = true;
+        self
+    }
+
+    pub(crate) const fn with_limiter_if(mut self, limiter: bool) -> Self {
+        self.limiter = limiter;
+        self
     }
 
     /// Returns true when this command should reserve headroom metadata.
@@ -225,5 +288,22 @@ mod tests {
         assert!(Gain::reserve_headroom(db(-6.0)).reserves_headroom());
         assert!(Gain::reclaim_headroom(db(0.0)).reclaims_headroom());
         assert_samples_close(plain.as_planar_f32(), headroom.as_planar_f32());
+    }
+
+    #[test]
+    fn level_management_constructors_preserve_fixed_gain_processing() {
+        let source = vec![0.25, -0.5, 1.0];
+        let mut plain = audio_buffer(source.clone());
+        let mut normalize = audio_buffer(source.clone());
+        let mut limiter = audio_buffer(source);
+
+        Gain::new(db(-6.0)).process_buffer(&mut plain);
+        Gain::normalize(db(-6.0)).process_buffer(&mut normalize);
+        Gain::limiter(db(-6.0)).process_buffer(&mut limiter);
+
+        assert!(Gain::normalize(db(0.0)).normalize);
+        assert!(Gain::limiter(db(6.0)).limiter);
+        assert_samples_close(plain.as_planar_f32(), normalize.as_planar_f32());
+        assert_samples_close(plain.as_planar_f32(), limiter.as_planar_f32());
     }
 }

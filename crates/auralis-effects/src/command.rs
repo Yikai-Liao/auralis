@@ -43,9 +43,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 /// This enum is the command-model boundary: parsing may start from tokenized
 /// command strings, but successful results contain typed effect processors
 /// only. It intentionally models the currently implemented Auralis subset:
-/// future SoX-ng options such as gain normalization, fade curve types, dcshift
-/// limiter gain, and positioned padding are rejected until their corresponding
-/// features are implemented.
+/// future SoX-ng options such as fade curve types, dcshift limiter gain, and
+/// positioned padding are rejected until their corresponding features are
+/// implemented.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
@@ -267,20 +267,30 @@ pub enum EffectCommandParseError {
         #[source]
         source: EffectError,
     },
+
+    /// Mutually exclusive options were combined for an effect command.
+    #[error("invalid option combination for effect `{effect}`: {options}")]
+    InvalidOptionCombination {
+        /// Canonical effect name.
+        effect: &'static str,
+
+        /// Human-readable option combination.
+        options: &'static str,
+    },
 }
 
 fn parse_gain(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let mut reserve_headroom = false;
-    let mut reclaim_headroom = false;
+    let mut options = GainOptionFlags::default();
     let mut value_args = args;
 
     while let Some((option, rest)) = value_args.split_first() {
         if !is_option_like(option) {
             break;
         }
-        parse_gain_options(effect, option, &mut reserve_headroom, &mut reclaim_headroom)?;
+        parse_gain_options(effect, option, &mut options)?;
         value_args = rest;
     }
+    validate_gain_option_combination(effect, options)?;
 
     let db = match value_args {
         [] => Decibels::new(0.0).map_err(|source| EffectCommandParseError::InvalidCoreValue {
@@ -295,21 +305,45 @@ fn parse_gain(effect: &'static str, args: &[&str]) -> CommandResult<EffectComman
         }
     };
 
-    let gain = match (reclaim_headroom, reserve_headroom) {
+    let gain = match (
+        options.contains(GainOptionFlags::RECLAIM_HEADROOM),
+        options.contains(GainOptionFlags::RESERVE_HEADROOM),
+    ) {
         (false, false) => Gain::new(db),
         (false, true) => Gain::reserve_headroom(db),
         (true, false) => Gain::reclaim_headroom(db),
         (true, true) => Gain::reclaim_and_reserve_headroom(db),
-    };
+    }
+    .with_normalize_if(options.contains(GainOptionFlags::NORMALIZE))
+    .with_limiter_if(options.contains(GainOptionFlags::LIMITER));
 
     Ok(EffectCommand::Gain(gain))
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct GainOptionFlags {
+    bits: u8,
+}
+
+impl GainOptionFlags {
+    const RESERVE_HEADROOM: u8 = 1 << 0;
+    const RECLAIM_HEADROOM: u8 = 1 << 1;
+    const NORMALIZE: u8 = 1 << 2;
+    const LIMITER: u8 = 1 << 3;
+
+    const fn contains(self, flag: u8) -> bool {
+        self.bits & flag != 0
+    }
+
+    const fn insert(&mut self, flag: u8) {
+        self.bits |= flag;
+    }
 }
 
 fn parse_gain_options(
     effect: &'static str,
     option: &str,
-    reserve_headroom: &mut bool,
-    reclaim_headroom: &mut bool,
+    flags: &mut GainOptionFlags,
 ) -> CommandResult<()> {
     let mut chars = option.strip_prefix('-').unwrap_or_default().chars();
     let Some(first) = chars.next() else {
@@ -321,8 +355,10 @@ fn parse_gain_options(
 
     for option_char in std::iter::once(first).chain(chars) {
         match option_char {
-            'h' => *reserve_headroom = true,
-            'r' => *reclaim_headroom = true,
+            'h' => flags.insert(GainOptionFlags::RESERVE_HEADROOM),
+            'r' => flags.insert(GainOptionFlags::RECLAIM_HEADROOM),
+            'n' => flags.insert(GainOptionFlags::NORMALIZE),
+            'l' => flags.insert(GainOptionFlags::LIMITER),
             unsupported => {
                 return Err(EffectCommandParseError::UnsupportedOption {
                     effect,
@@ -332,6 +368,28 @@ fn parse_gain_options(
         }
     }
 
+    Ok(())
+}
+
+fn validate_gain_option_combination(
+    effect: &'static str,
+    flags: GainOptionFlags,
+) -> CommandResult<()> {
+    if flags.contains(GainOptionFlags::NORMALIZE)
+        && flags.contains(GainOptionFlags::RECLAIM_HEADROOM)
+    {
+        return Err(EffectCommandParseError::InvalidOptionCombination {
+            effect,
+            options: "only one of -n and -r may be given",
+        });
+    }
+    if flags.contains(GainOptionFlags::LIMITER) && flags.contains(GainOptionFlags::RESERVE_HEADROOM)
+    {
+        return Err(EffectCommandParseError::InvalidOptionCombination {
+            effect,
+            options: "only one of -l and -h may be given",
+        });
+    }
     Ok(())
 }
 
@@ -542,11 +600,17 @@ fn render_f32(value: f32) -> String {
 
 fn render_gain(gain: Gain) -> Vec<String> {
     let mut tokens = vec!["gain".to_owned()];
+    if gain.normalize {
+        tokens.push("-n".to_owned());
+    }
     match gain.headroom {
         GainHeadroom::None => {}
         GainHeadroom::Reserve => tokens.push("-h".to_owned()),
         GainHeadroom::Reclaim => tokens.push("-r".to_owned()),
         GainHeadroom::ReclaimAndReserve => tokens.push("-rh".to_owned()),
+    }
+    if gain.limiter {
+        tokens.push("-l".to_owned());
     }
     tokens.push(render_f64(gain.db.as_f64()));
     tokens
@@ -642,18 +706,57 @@ mod tests {
 
     #[test]
     fn unsupported_options_name_the_effect_and_option() {
-        let error = parse_effect_command(&["gain", "-n"]).unwrap_err();
+        let error = parse_effect_command(&["gain", "-e"]).unwrap_err();
 
         assert_eq!(
             error,
             EffectCommandParseError::UnsupportedOption {
                 effect: "gain",
-                option: "-n".to_owned(),
+                option: "-e".to_owned(),
             }
         );
         assert_eq!(
             error.to_string(),
-            "unsupported option `-n` for effect `gain`"
+            "unsupported option `-e` for effect `gain`"
+        );
+    }
+
+    #[test]
+    fn parses_gain_normalize_and_limiter_options() {
+        assert_eq!(
+            parse_effect_command(&["gain", "-n", "-3"]).unwrap(),
+            EffectCommand::Gain(Gain::normalize(Decibels::new(-3.0).unwrap()))
+        );
+        assert_eq!(
+            parse_effect_command(&["gain", "-l", "6"]).unwrap(),
+            EffectCommand::Gain(Gain::limiter(Decibels::new(6.0).unwrap()))
+        );
+        assert_eq!(
+            parse_effect_command(&["gain", "-nl", "6"])
+                .unwrap()
+                .render_tokens(),
+            ["gain", "-n", "-l", "6"]
+        );
+    }
+
+    #[test]
+    fn gain_rejects_sox_ng_option_combinations_that_are_mutually_exclusive() {
+        let normalize_restore = parse_effect_command(&["gain", "-nr"]).unwrap_err();
+        assert_eq!(
+            normalize_restore,
+            EffectCommandParseError::InvalidOptionCombination {
+                effect: "gain",
+                options: "only one of -n and -r may be given",
+            }
+        );
+
+        let limiter_headroom = parse_effect_command(&["gain", "-lh", "-3"]).unwrap_err();
+        assert_eq!(
+            limiter_headroom,
+            EffectCommandParseError::InvalidOptionCombination {
+                effect: "gain",
+                options: "only one of -l and -h may be given",
+            }
         );
     }
 
