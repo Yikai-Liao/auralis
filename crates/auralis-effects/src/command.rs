@@ -51,6 +51,7 @@ use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
+use crate::command_lowpass::{parse_lowpass, render_lowpass};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_oops::parse_oops;
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
@@ -67,8 +68,9 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain, Norm, Oops,
-    Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain, LowPass, Norm,
+    Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble, Tremolo, Trim,
+    Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -86,82 +88,58 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 pub enum EffectCommand {
     /// SoX-ng-style all-pass filter family.
     AllPass(AllPass),
-
     /// SoX-ng-style resonator band-pass filter.
     Band(Band),
-
     /// SoX-ng-style RBJ band-pass filter.
     BandPass(BandPass),
-
     /// SoX-ng-style RBJ band-reject filter.
     BandReject(BandReject),
-
     /// SoX-ng-style bass tone control.
     Bass(Bass),
-
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad(Biquad),
-
     /// SoX-ng-style center-cut stereo separation.
     Centercut(Centercut),
-
     /// SoX-ng-style explicit channel-count conversion.
     Channels(Channels),
-
     /// SoX-ng-style phase contrast enhancement.
     Contrast(Contrast),
-
     /// Constant normalized full-scale offset.
     DcShift(DcShift),
-
     /// SoX-ng-style peaking equalizer filter.
     Equalizer(Equalizer),
-
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
     Fade(Fade),
-
     /// Constant gain in decibels.
     Gain(Gain),
-
+    /// SoX-ng-style low-pass filter family.
+    LowPass(LowPass),
     /// SoX-ng-style whole-buffer peak normalization.
     Norm(Norm),
-
     /// SoX-ng-style out-of-phase stereo extraction.
     Oops(Oops),
-
     /// SoX-ng-style overdrive distortion.
     Overdrive(Overdrive),
-
     /// Zero padding measured in frames, including optional positioned insertions.
     Pad(Pad),
-
     /// SoX-ng-style finite output repetition.
     Repeat(Repeat),
-
     /// SoX-ng-style basic channel routing.
     Remix(Remix),
-
     /// Frame-order reversal within each channel.
     Reverse(Reverse),
-
     /// SoX-ng-style saturation distortion.
     Saturation(Saturation),
-
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
-
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap(Swap),
-
     /// SoX-ng-style treble tone control.
     Treble(Treble),
-
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo(Tremolo),
-
     /// End-exclusive frame range selection.
     Trim(Trim),
-
     /// SoX-ng-style volume scaling with optional limiter gain.
     Vol(Vol),
 }
@@ -193,6 +171,7 @@ impl EffectCommand {
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
+            EffectKind::LowPass => parse_lowpass(effect, args),
             EffectKind::Norm => parse_norm(effect, args),
             EffectKind::Oops => parse_oops(effect, args),
             EffectKind::Overdrive => parse_overdrive(effect, args),
@@ -227,6 +206,7 @@ impl EffectCommand {
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
+            Self::LowPass(_) => EffectKind::LowPass,
             Self::Norm(_) => EffectKind::Norm,
             Self::Oops(_) => EffectKind::Oops,
             Self::Overdrive(_) => EffectKind::Overdrive,
@@ -267,6 +247,7 @@ impl EffectCommand {
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
+            Self::LowPass(low_pass) => render_lowpass(*low_pass),
             Self::Norm(norm) => render_norm(*norm),
             Self::Oops(_) => vec!["oops".to_owned()],
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),

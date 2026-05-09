@@ -777,6 +777,7 @@ mod tests {
                 | EffectCommand::BandReject(_)
                 | EffectCommand::Bass(_)
                 | EffectCommand::Equalizer(_)
+                | EffectCommand::LowPass(_)
                 | EffectCommand::Treble(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)

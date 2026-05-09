@@ -156,6 +156,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_lowpass_mono_default]
+input = "effects/lowpass_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["lowpass", "1000"]
+sox_ng = ["lowpass", "1000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_lowpass_stereo_one_pole]
+input = "effects/lowpass_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["lowpass", "-1", "500"]
+sox_ng = ["lowpass", "-1", "500"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"
