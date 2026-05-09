@@ -63,6 +63,9 @@ pub enum EffectKind {
     /// Constant gain in decibels.
     Gain,
 
+    /// SoX-ng-style high-pass filter family.
+    HighPass,
+
     /// SoX-ng-style low-pass filter family.
     LowPass,
 
@@ -294,6 +297,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Gain",
         "gain [options] [gain-dB]",
         "apply gain with optional SoX-ng level management",
+    ),
+    EffectDescriptor::new(
+        EffectKind::HighPass,
+        "highpass",
+        &[],
+        "HighPass",
+        "highpass [-1|-2] frequency [width]",
+        "apply a high-pass filter",
     ),
     EffectDescriptor::new(
         EffectKind::LowPass,
@@ -748,6 +759,7 @@ mod tests {
             ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
+            ("highpass", EffectKind::HighPass),
             ("lowpass", EffectKind::LowPass),
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
@@ -815,18 +827,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("highpass").unwrap_err();
+        let error = EffectRegistry::resolve("deemph").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "highpass".to_owned(),
+                name: "deemph".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `highpass`")
+                .contains("missing SoX-ng coverage entry for `deemph`")
         );
     }
 

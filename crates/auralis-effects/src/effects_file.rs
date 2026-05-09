@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nhighpass 3000 1q").unwrap_err();
+        let error = parse_effects_file_str("gain -3\ndeemph").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `highpass` failed to parse: known SoX-ng effect `highpass` is not implemented by Auralis; missing SoX-ng coverage entry for `highpass`"
+            "effects file line 2, column 1: command `deemph` failed to parse: known SoX-ng effect `deemph` is not implemented by Auralis; missing SoX-ng coverage entry for `deemph`"
         );
     }
 

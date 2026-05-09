@@ -17,32 +17,11 @@ pub(crate) fn apply_command(
     if apply_in_place_command(command, audio, requested_backend) {
         return Ok(());
     }
+    if apply_filter_command(command, audio)? {
+        return Ok(());
+    }
 
     match command {
-        EffectCommand::AllPass(all_pass) => all_pass
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::Band(band) => band
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::BandPass(band_pass) => band_pass
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::BandReject(band_reject) => band_reject
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::Bass(bass) => bass
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::Equalizer(equalizer) => equalizer
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::LowPass(low_pass) => low_pass
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
-        EffectCommand::Treble(treble) => treble
-            .process_buffer(audio)
-            .map_err(|source| ("filter-design", source)),
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio),
         EffectCommand::Channels(channels) => {
             let converted = channels
@@ -114,7 +93,37 @@ pub(crate) fn apply_command(
         | EffectCommand::Swap(_)
         | EffectCommand::Tremolo(_)
         | EffectCommand::Vol(_) => unreachable!("in-place commands returned early"),
+        EffectCommand::AllPass(_)
+        | EffectCommand::Band(_)
+        | EffectCommand::BandPass(_)
+        | EffectCommand::BandReject(_)
+        | EffectCommand::Bass(_)
+        | EffectCommand::Equalizer(_)
+        | EffectCommand::HighPass(_)
+        | EffectCommand::LowPass(_)
+        | EffectCommand::Treble(_) => unreachable!("filter commands returned early"),
     }
+}
+
+fn apply_filter_command(
+    command: &EffectCommand,
+    audio: &mut AudioBuffer,
+) -> std::result::Result<bool, (&'static str, EffectError)> {
+    match command {
+        EffectCommand::AllPass(all_pass) => all_pass.process_buffer(audio),
+        EffectCommand::Band(band) => band.process_buffer(audio),
+        EffectCommand::BandPass(band_pass) => band_pass.process_buffer(audio),
+        EffectCommand::BandReject(band_reject) => band_reject.process_buffer(audio),
+        EffectCommand::Bass(bass) => bass.process_buffer(audio),
+        EffectCommand::Equalizer(equalizer) => equalizer.process_buffer(audio),
+        EffectCommand::HighPass(high_pass) => high_pass.process_buffer(audio),
+        EffectCommand::LowPass(low_pass) => low_pass.process_buffer(audio),
+        EffectCommand::Treble(treble) => treble.process_buffer(audio),
+        _ => return Ok(false),
+    }
+    .map_err(|source| ("filter-design", source))?;
+
+    Ok(true)
 }
 
 fn apply_in_place_command(
@@ -181,6 +190,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::BandReject
         | EffectKind::Bass
         | EffectKind::Equalizer
+        | EffectKind::HighPass
         | EffectKind::LowPass
         | EffectKind::Treble
         | EffectKind::SoftVol

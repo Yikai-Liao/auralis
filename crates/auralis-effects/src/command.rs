@@ -51,6 +51,7 @@ use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
+use crate::command_highpass::{parse_highpass, render_highpass};
 use crate::command_lowpass::{parse_lowpass, render_lowpass};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_oops::parse_oops;
@@ -68,9 +69,9 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain, LowPass, Norm,
-    Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble, Tremolo, Trim,
-    Vol,
+    EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain, HighPass,
+    LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble,
+    Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -112,6 +113,8 @@ pub enum EffectCommand {
     Fade(Fade),
     /// Constant gain in decibels.
     Gain(Gain),
+    /// SoX-ng-style high-pass filter family.
+    HighPass(HighPass),
     /// SoX-ng-style low-pass filter family.
     LowPass(LowPass),
     /// SoX-ng-style whole-buffer peak normalization.
@@ -171,6 +174,7 @@ impl EffectCommand {
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
+            EffectKind::HighPass => parse_highpass(effect, args),
             EffectKind::LowPass => parse_lowpass(effect, args),
             EffectKind::Norm => parse_norm(effect, args),
             EffectKind::Oops => parse_oops(effect, args),
@@ -206,6 +210,7 @@ impl EffectCommand {
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
+            Self::HighPass(_) => EffectKind::HighPass,
             Self::LowPass(_) => EffectKind::LowPass,
             Self::Norm(_) => EffectKind::Norm,
             Self::Oops(_) => EffectKind::Oops,
@@ -247,6 +252,7 @@ impl EffectCommand {
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
+            Self::HighPass(high_pass) => render_highpass(*high_pass),
             Self::LowPass(low_pass) => render_lowpass(*low_pass),
             Self::Norm(norm) => render_norm(*norm),
             Self::Oops(_) => vec!["oops".to_owned()],

@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
-`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `LowPass`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
-gain, channels, norm, contrast, softvol, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, lowpass, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, and vol, and the CLI gain/channels/norm/contrast/softvol/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/lowpass/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+gain, channels, norm, contrast, softvol, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
+fade, and vol, and the CLI gain/channels/norm/contrast/softvol/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -57,7 +57,7 @@ saturation, finite `repeat [count]` output duplication, `oops` out-of-phase ster
 `remix [-a|-m] [-p] out-spec...` channel routing with source gain modifiers.
 The chain path also supports explicit SoX-ng-style `channels number` conversion
 at a user-visible effect position, using the same conversion primitive as the
-output `--channels` policy. `auralis run <input.wav> <output.wav> gain -3 channels 1 norm -6 contrast softvol 2 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 lowpass 1000 biquad 0.5 0 0 1 -0.5 0 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 remix 1 oops swap dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+output `--channels` policy. `auralis run <input.wav> <output.wav> gain -3 channels 1 norm -6 contrast softvol 2 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 highpass 500 lowpass 1000 biquad 0.5 0 0 1 -0.5 0 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 remix 1 oops swap dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -81,6 +81,8 @@ The implemented `bandreject` command covers SoX-ng's RBJ notch filter shape
 with the same hertz, kilohertz, Q, and octave width units.
 The implemented `lowpass` command covers SoX-ng's default RBJ two-pole low-pass
 filter with optional width units and the single-pole `-1` form.
+The implemented `highpass` command covers SoX-ng's default RBJ two-pole
+high-pass filter with optional width units and the single-pole `-1` form.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -487,18 +489,20 @@ Contains typed effect processors built from DSP primitives:
 - `Bass`
 - `Treble`
 - `Equalizer`
+- `HighPass`
+- `LowPass`
 - `Biquad`
 - `Oops`
 - `Swap`
-- later: `Lowpass`, `Highpass`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
+- later: `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `channels`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `channels`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
+`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `eq`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -573,6 +577,9 @@ support shelf slope plus hertz, kilohertz, Q, and octave width suffixes.
 The implemented `equalizer` command accepts `frequency width gain`, uses the
 RBJ peaking-EQ helper, and supports hertz, kilohertz, Q, and octave width
 suffixes.
+The implemented `highpass` command accepts `highpass [-1|-2] frequency
+[width]`, defaults omitted width to `0.707q`, uses the RBJ high-pass helper for
+two-pole forms, and supports hertz, kilohertz, Q, and octave width suffixes.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -862,7 +869,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -881,6 +888,7 @@ coverage includes mono silent/copy routing, stereo mixdown, source gain
 modifiers, and automatic power-scaling forms; `centercut` coverage includes
 bare stereo separation and exposed `-a`, `-b`, and `-w` option parsing;
 `equalizer` coverage includes Q-width mono and octave-width stereo peaking-EQ
+forms; `highpass` coverage includes default two-pole mono and one-pole stereo
 forms;
 `oops` coverage includes stereo
 out-of-phase extraction because mono input is invalid; `swap` coverage includes mono
