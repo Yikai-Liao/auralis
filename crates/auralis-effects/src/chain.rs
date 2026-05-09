@@ -773,6 +773,7 @@ mod tests {
                 | EffectCommand::Reverse(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)
+                | EffectCommand::Swap(_)
                 | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_) => {
                     panic!("test helper only supports streaming-safe commands")

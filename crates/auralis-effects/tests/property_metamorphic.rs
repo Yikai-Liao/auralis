@@ -5,7 +5,7 @@ use auralis_core::{
 };
 use auralis_effects::{
     Channels, Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, Vol,
+    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -195,6 +195,19 @@ proptest! {
     }
 
     #[test]
+    fn swap_twice_returns_original_signal(audio in generated_audio()) {
+        let source = audio.to_buffer();
+        let mut actual = source.clone();
+
+        Swap::new().process_buffer(&mut actual);
+        Swap::new().process_buffer(&mut actual);
+
+        prop_assert_sample_bits_eq(actual.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(actual.frames(), source.frames());
+        prop_assert_eq!(actual.channels(), source.channels());
+    }
+
+    #[test]
     fn gain_then_inverse_gain_approximately_returns_non_clipping_input(
         audio in generated_audio(),
         db in 0.0_f64..=6.0,
@@ -312,6 +325,10 @@ proptest! {
         let mut reversed = source;
         Reverse::new().process_buffer(&mut reversed);
         prop_assert_all_finite(&reversed)?;
+
+        let mut swapped = reversed;
+        Swap::new().process_buffer(&mut swapped);
+        prop_assert_all_finite(&swapped)?;
     }
 }
 

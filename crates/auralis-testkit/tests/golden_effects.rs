@@ -55,6 +55,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_saturation_stereo_sqrt",
             "effect_softvol_mono_gain_1_5",
             "effect_softvol_stereo_recovery_headroom",
+            "effect_swap_mono_identity",
+            "effect_swap_stereo",
             "effect_tremolo_mono_default_depth",
             "effect_tremolo_stereo_depth_75",
             "effect_trim_mono_middle",
@@ -90,6 +92,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "repeat",
         "channels",
         "remix",
+        "swap",
     ] {
         let mono = manifest
             .iter()

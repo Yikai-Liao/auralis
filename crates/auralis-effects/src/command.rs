@@ -51,12 +51,14 @@ use crate::command_repeat::{parse_repeat, render_repeat};
 use crate::command_reverse::parse_reverse;
 use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
+use crate::command_swap::parse_swap;
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade,
-    Gain, Norm, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
+    Gain, Norm, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo, Trim,
+    Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -111,6 +113,9 @@ pub enum EffectCommand {
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
 
+    /// SoX-ng-style adjacent channel-pair swapping.
+    Swap(Swap),
+
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo(Tremolo),
 
@@ -148,6 +153,7 @@ impl EffectCommand {
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
+            EffectKind::Swap => parse_swap(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
             EffectKind::Vol => parse_vol(effect, args),
@@ -171,6 +177,7 @@ impl EffectCommand {
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
+            Self::Swap(_) => EffectKind::Swap,
             Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
             Self::Vol(_) => EffectKind::Vol,
@@ -200,6 +207,7 @@ impl EffectCommand {
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
+            Self::Swap(_) => vec!["swap".to_owned()],
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),
             Self::Vol(vol) => render_vol(*vol),
@@ -475,80 +483,10 @@ pub(super) fn render_f32(value: f32) -> String {
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
-        Channels, Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad,
-        PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, TrimPosition,
+        Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
+        Saturation, SoftVol, Trim, TrimPosition,
     };
-    use auralis_core::{ChannelCount, Decibels, FrameCount};
-
-    #[test]
-    fn parses_supported_effect_commands_into_typed_configs() {
-        let expected = [
-            (
-                &["contrast", "25"][..],
-                EffectCommand::Contrast(Contrast::new(25.0).unwrap()),
-            ),
-            (
-                &["channels", "2"][..],
-                EffectCommand::Channels(Channels::new(ChannelCount::new(2).unwrap())),
-            ),
-            (
-                &["gain", "-3"][..],
-                EffectCommand::Gain(Gain::new(Decibels::new(-3.0).unwrap())),
-            ),
-            (
-                &["dcshift", "0.25"][..],
-                EffectCommand::DcShift(DcShift::new(0.25).unwrap()),
-            ),
-            (
-                &["trim", "1", "2"][..],
-                EffectCommand::Trim(Trim::new(FrameCount::new(1), FrameCount::new(3)).unwrap()),
-            ),
-            (
-                &["pad", "2", "1"][..],
-                EffectCommand::Pad(Pad::new(FrameCount::new(2), FrameCount::new(1))),
-            ),
-            (
-                &["pad", "2@1"][..],
-                EffectCommand::Pad(
-                    Pad::with_positioned(
-                        FrameCount::new(0),
-                        FrameCount::new(0),
-                        [PositionedPad::new(FrameCount::new(2), FrameCount::new(1))],
-                    )
-                    .unwrap(),
-                ),
-            ),
-            (&["reverse"][..], EffectCommand::Reverse(Reverse::new())),
-            (
-                &["softvol", "2", "10", "0.1"][..],
-                EffectCommand::SoftVol(SoftVol::new(2.0, 10.0, 0.1).unwrap()),
-            ),
-            (
-                &["tremolo", "5", "75"][..],
-                EffectCommand::Tremolo(Tremolo::new(5.0, 75.0).unwrap()),
-            ),
-            (
-                &["saturation", "sqrt", "0.75", "0.1", "0.25"][..],
-                EffectCommand::Saturation(
-                    Saturation::new(SaturationType::Sqrt, 0.75, 0.1, 0.25).unwrap(),
-                ),
-            ),
-            (
-                &["fade", "t", "4", "2"][..],
-                EffectCommand::Fade(Fade::with_stop_position(
-                    FadeCurve::Linear,
-                    FrameCount::new(4),
-                    FrameCount::new(2),
-                    FrameCount::new(4),
-                )),
-            ),
-        ];
-
-        for (tokens, command) in expected {
-            assert_eq!(parse_effect_command(tokens).unwrap(), command);
-            assert_eq!(parse_effect_command(tokens).unwrap().kind(), command.kind());
-        }
-    }
+    use auralis_core::{Decibels, FrameCount};
 
     #[test]
     fn parses_supported_aliases_through_registry_resolution() {

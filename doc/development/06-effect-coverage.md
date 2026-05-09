@@ -414,7 +414,20 @@ Implementation notes:
 
 ### Feature 6.3.4: `swap`
 
+Status: implemented.
+
 Implement channel swapping.
+
+Implementation notes:
+
+- Added a typed `Swap` effect matching SoX-ng's adjacent channel-pair swap:
+  stereo channels exchange positions, multichannel input swaps pairs
+  `1 <-> 2`, `3 <-> 4`, and an odd trailing channel is preserved.
+- The `swap` command parser accepts no arguments, renders as `swap`, and is
+  wired through the effect registry and effect-chain execution path.
+- Golden coverage includes mono identity and stereo pair-swap cases against
+  SoX-ng, with L4 swap-twice identity coverage, frame-chunk invariance, and an
+  L7 fuzz seed for command parsing.
 
 ### Feature 6.3.5: `oops`
 

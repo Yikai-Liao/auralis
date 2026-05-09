@@ -409,6 +409,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_swap_mono_identity]
+input = "effects/swap_mono.wav"
+corpus_id = "l0/short_mono_3"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["swap"]
+sox_ng = ["swap"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_swap_stereo]
+input = "effects/swap_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["swap"]
+sox_ng = ["swap"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_reverse_mono_odd_length]
 input = "effects/reverse_mono.wav"
 corpus_id = "l0/odd_length_mono_17"

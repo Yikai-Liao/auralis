@@ -63,6 +63,9 @@ pub enum EffectKind {
     /// SoX-ng-style soft volume control.
     SoftVol,
 
+    /// SoX-ng-style adjacent channel-pair swapping.
+    Swap,
+
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo,
 
@@ -258,6 +261,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "SoftVol",
         "softvol [volume [double-time [headroom]]]",
         "apply soft volume scaling that avoids clipping",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Swap,
+        "swap",
+        &[],
+        "Swap",
+        "swap",
+        "swap adjacent decoded channel pairs",
     ),
     EffectDescriptor::new(
         EffectKind::Tremolo,
@@ -616,6 +627,7 @@ mod tests {
             ("reverse", EffectKind::Reverse),
             ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),
+            ("swap", EffectKind::Swap),
             ("tremolo", EffectKind::Tremolo),
             ("trim", EffectKind::Trim),
             ("vol", EffectKind::Vol),
