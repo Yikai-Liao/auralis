@@ -458,7 +458,7 @@ Audit summary:
 
 ### Feature 5.7.1: L0 deterministic corpus library
 
-Status: planned.
+Status: implemented.
 
 Create a unified Rust/Python corpus layer instead of constructing ad hoc samples
 inside individual tests.
@@ -483,6 +483,17 @@ Acceptance tests:
 - Rust and Python helpers agree on sample values for shared cases;
 - existing golden tests can request corpus cases by stable ID;
 - no large hand-picked audio files are required.
+
+Implementation notes:
+
+- `auralis-testkit::corpus` and `auralis_testkit.corpus` now expose matching
+  stable corpus IDs for the README L0 families: silence, impulse, step, sine,
+  sweep, seeded noise, full-scale, near-zero, odd-length, mono/stereo, and
+  short-buffer cases.
+- Existing golden manifests record `corpus_id` or `corpus_ids`, and Python
+  golden runners resolve those IDs through the shared corpus layer instead of
+  local per-test fixture switch statements.
+- The corpus remains programmatic; no checked-in audio fixtures were added.
 
 ### Feature 5.7.2: L2 golden metadata and failure artifacts
 

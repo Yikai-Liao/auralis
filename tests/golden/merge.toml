@@ -4,6 +4,7 @@
 
 [id.merge_mono_to_stereo_mismatched_lengths]
 inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+corpus_ids = ["combine/mono_short", "combine/mono_long"]
 combine = "merge"
 auralis = []
 sox_ng = []
@@ -13,6 +14,7 @@ snr_db = 120.0
 
 [id.merge_stereo_channels_reverse_chain]
 inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]
 combine = "merge"
 auralis = ["reverse"]
 sox_ng = ["reverse"]

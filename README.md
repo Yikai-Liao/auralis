@@ -678,7 +678,9 @@ Selected crates:
 
 Contains test utilities shared by Rust tests and Python tests:
 
-- synthetic corpus generation
+- shared deterministic corpus generation by stable ID for silence, impulse,
+  step, sine, sweep, seeded noise, full-scale, near-zero, odd-length,
+  mono/stereo, and short-buffer cases
 - raw f32 helpers
 - WAV decode helpers
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
@@ -695,6 +697,7 @@ Golden manifests use TOML tables keyed under `id`:
 ```toml
 [id.gain_minus_3_mono]
 input = "sine_48k_mono.wav"
+corpus_id = "l0/sine_mono_32"
 auralis = ["--gain-db", "-3"]
 sox_ng = ["gain", "-3"]
 max_abs = 1e-4
@@ -710,7 +713,10 @@ vectors as display strings for reports with stable double-quote escaping for
 spaces, quotes, backslashes, and control characters while keeping the original
 argument vectors available for process execution. Explicit chain boundary
 tokens render deterministically as `:` in both Auralis and SoX-ng command
-displays. A case may set `output_channels = N`; if it also sets
+displays. A single-input case may set `corpus_id = "..."`, and multi-input
+cases may set `corpus_ids = ["...", "..."]`, so Rust and Python golden runners
+can generate the same deterministic PCM16 fixtures without per-test local
+sample builders. A case may set `output_channels = N`; if it also sets
 `sox_ng_auto_channels = true`, the manifest records that SoX-ng is expected to
 auto-insert its `channels` effect from the output option. A case may also set
 `output_sample_rate = N` and `sox_ng_auto_rate = true` to record SoX-ng's
@@ -729,9 +735,10 @@ records output-rate policy coverage where SoX-ng auto-inserts `rate`
 conversion. `tests/golden/auto_level.toml` records output-level guard and
 normalization coverage for representative clipping and peak-normalization
 cases. The Python golden runners
-generate the deterministic PCM16 fixtures, execute both command lines, compare decoded
-sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
-report when output drifts outside its manifest tolerance.
+resolve each manifest `corpus_id` or `corpus_ids`, generate deterministic PCM16
+fixtures, execute both command lines, compare decoded sample metadata plus
+max-abs/RMS/SNR/peak metrics, and write a JSON failure report when output drifts
+outside its manifest tolerance.
 
 ### `auralis-python` future placeholder
 
@@ -870,8 +877,12 @@ Generate small, controlled test signals:
 - near-zero signal
 - odd-length buffers
 - mono and stereo buffers
+- short files shorter than filter windows or delay lines
 
-The corpus should be generated programmatically. Do not rely primarily on hand-picked music files.
+The corpus is generated programmatically in `auralis-testkit::corpus` and
+`auralis_testkit.corpus` from stable IDs such as `l0/sine_mono_32`; golden
+manifests can reference those IDs through `corpus_id` or `corpus_ids`. Do not
+rely primarily on hand-picked music files.
 
 ### L1: WAV I/O correctness
 

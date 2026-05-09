@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from auralis_testkit.corpus import pcm16_fixture
+from auralis_testkit.corpus import pcm16_corpus_fixture
 from auralis_testkit.metrics import max_abs_error, peak, rms_error, snr_db
 from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng
 
@@ -40,7 +40,7 @@ def test_cli_auto_channels_matches_sox_ng_golden_manifest(
     case: dict[str, Any],
     tmp_path: Path,
 ) -> None:
-    input_path = _write_fixture(case["input"], tmp_path / case["input"])
+    input_path = _write_fixture(case["corpus_id"], tmp_path / case["input"])
     output_channels = int(case["output_channels"])
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     sox_output = tmp_path / f"{case_id}.sox.wav"
@@ -129,29 +129,9 @@ def test_cli_auto_channels_matches_sox_ng_golden_manifest(
         pytest.fail("; ".join(failures) + f"; report={report_path}")
 
 
-def _write_fixture(input_name: str, path: Path) -> Path:
-    fixtures = {
-        "auto/stereo_channels.wav": _stereo_channels,
-        "auto/mono_channels.wav": _mono_channels,
-    }
-    try:
-        samples = fixtures[input_name]()
-    except KeyError as error:
-        raise AssertionError(f"no fixture generator for {input_name}") from error
-
+def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    return pcm16_fixture(path, samples, sample_rate=SAMPLE_RATE)
-
-
-def _stereo_channels() -> np.ndarray:
-    return np.array(
-        [[0.25, -0.5], [0.75, 0.5]],
-        dtype=np.float32,
-    )
-
-
-def _mono_channels() -> np.ndarray:
-    return np.array([0.25, -0.5, 0.0], dtype=np.float32)
+    return pcm16_corpus_fixture(path, corpus_id)
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:

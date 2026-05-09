@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from auralis_testkit.corpus import pcm16_fixture
+from auralis_testkit.corpus import pcm16_corpus_fixture
 from auralis_testkit.metrics import max_abs_error, peak, rms_error, snr_db
 from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng_with_inputs
 
@@ -56,8 +56,8 @@ def test_cli_combine_matches_sox_ng_golden_manifest(
 ) -> None:
     combine = case["combine"]
     input_paths = [
-        _write_fixture(input_name, tmp_path / input_name)
-        for input_name in case["inputs"]
+        _write_fixture(corpus_id, tmp_path / input_name)
+        for input_name, corpus_id in zip(case["inputs"], case["corpus_ids"], strict=True)
     ]
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     sox_output = tmp_path / f"{case_id}.sox.wav"
@@ -148,42 +148,9 @@ def test_cli_combine_matches_sox_ng_golden_manifest(
         pytest.fail("; ".join(failures) + f"; report={report_path}")
 
 
-def _write_fixture(input_name: str, path: Path) -> Path:
-    fixtures = {
-        "combine/mono_short.wav": _mono_short,
-        "combine/mono_long.wav": _mono_long,
-        "combine/stereo_front.wav": _stereo_front,
-        "combine/stereo_tail.wav": _stereo_tail,
-    }
-    try:
-        samples = fixtures[input_name]()
-    except KeyError as error:
-        raise AssertionError(f"no fixture generator for {input_name}") from error
-
+def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    return pcm16_fixture(path, samples, sample_rate=SAMPLE_RATE)
-
-
-def _mono_short() -> np.ndarray:
-    return np.array([0.25, -0.5], dtype=np.float32)
-
-
-def _mono_long() -> np.ndarray:
-    return np.array([0.75, 0.0, -0.25], dtype=np.float32)
-
-
-def _stereo_front() -> np.ndarray:
-    return np.array(
-        [[-0.5, -0.25, 0.0], [0.5, 0.25, 0.0]],
-        dtype=np.float32,
-    )
-
-
-def _stereo_tail() -> np.ndarray:
-    return np.array(
-        [[0.25, 0.5], [-0.25, -0.5]],
-        dtype=np.float32,
-    )
+    return pcm16_corpus_fixture(path, corpus_id)
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:

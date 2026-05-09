@@ -7,6 +7,7 @@
 //! separately.
 
 pub mod backend_conformance;
+pub mod corpus;
 pub mod golden;
 
 /// Returns the largest absolute sample error between `reference` and `actual`.

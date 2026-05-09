@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from auralis_testkit.corpus import pcm16_fixture
+from auralis_testkit.corpus import pcm16_corpus_fixture
 from auralis_testkit.metrics import max_abs_error, peak, rms_error, snr_db
 from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng
 
@@ -40,7 +40,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
     case: dict[str, Any],
     tmp_path: Path,
 ) -> None:
-    input_path = _write_fixture(case["input"], tmp_path / case["input"])
+    input_path = _write_fixture(case["corpus_id"], tmp_path / case["input"])
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     auralis_effects_file = tmp_path / f"{case_id}.effects"
     auralis_effects_file_output = tmp_path / f"{case_id}.auralis.effects-file.wav"
@@ -156,48 +156,9 @@ def _effects_file_source(args: list[str]) -> str:
     ) + "\n"
 
 
-def _write_fixture(input_name: str, path: Path) -> Path:
-    fixtures = {
-        "chains/stereo_steps.wav": _stereo_steps,
-        "chains/stereo_multitone.wav": _stereo_multitone,
-        "chains/stereo_ramp_tone.wav": _stereo_ramp_tone,
-    }
-    try:
-        samples = fixtures[input_name]()
-    except KeyError as error:
-        raise AssertionError(f"no fixture generator for {input_name}") from error
-
+def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    return pcm16_fixture(path, samples, sample_rate=SAMPLE_RATE)
-
-
-def _stereo_steps() -> np.ndarray:
-    left = np.array(
-        [-0.6, -0.45, -0.3, -0.15, 0.0, 0.15, 0.3, 0.45, 0.6, 0.75],
-        dtype=np.float32,
-    )
-    right = -left / np.float32(2.0)
-    return np.stack([left, right])
-
-
-def _stereo_multitone() -> np.ndarray:
-    frame = np.arange(64, dtype=np.float32)
-    left = (
-        np.float32(0.25) * np.sin(np.float32(2.0 * math.pi / 16.0) * frame)
-        + np.float32(0.1) * np.sin(np.float32(2.0 * math.pi / 7.0) * frame)
-    )
-    right = (
-        np.float32(0.20) * np.cos(np.float32(2.0 * math.pi / 11.0) * frame)
-        - np.float32(0.05) * np.sin(np.float32(2.0 * math.pi / 5.0) * frame)
-    )
-    return np.stack([left.astype(np.float32), right.astype(np.float32)])
-
-
-def _stereo_ramp_tone() -> np.ndarray:
-    frame = np.arange(32, dtype=np.float32)
-    left = np.linspace(-0.5, 0.5, 32, dtype=np.float32)
-    right = np.float32(0.35) * np.sin(np.float32(2.0 * math.pi / 8.0) * frame)
-    return np.stack([left, right.astype(np.float32)])
+    return pcm16_corpus_fixture(path, corpus_id)
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:

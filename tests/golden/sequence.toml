@@ -4,6 +4,7 @@
 
 [id.sequence_mono_boundary]
 inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+corpus_ids = ["combine/mono_short", "combine/mono_long"]
 combine = "sequence"
 auralis = []
 sox_ng = []
@@ -13,6 +14,7 @@ snr_db = 120.0
 
 [id.sequence_stereo_reverse_chain]
 inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]
 combine = "sequence"
 auralis = ["reverse"]
 sox_ng = ["reverse"]

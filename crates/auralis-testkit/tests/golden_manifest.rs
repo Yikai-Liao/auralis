@@ -10,6 +10,7 @@ use auralis_testkit::golden::{
 const VALID_MANIFEST: &str = r#"
     [id.fade_out_stereo]
     input = "stereo/step.wav"
+    corpus_id = "l0/step_mono_16"
     auralis = ["--fade-out-frame", "4"]
     sox_ng = ["fade", "0", "0", "4s"]
     max_abs = 0.0001
@@ -18,6 +19,7 @@ const VALID_MANIFEST: &str = r#"
 
     [id.gain_minus_3_mono]
     input = "mono/sine.wav"
+    corpus_id = "l0/sine_mono_32"
     auralis = ["--gain-db", "-3"]
     sox_ng = ["gain", "-3"]
     max_abs = 0.0001
@@ -42,6 +44,8 @@ fn manifest_parse_preserves_case_fields() {
 
     assert_eq!(case.input().to_string_lossy(), "mono/sine.wav");
     assert_eq!(case.inputs(), [PathBuf::from("mono/sine.wav")]);
+    assert_eq!(case.corpus_id(), Some("l0/sine_mono_32"));
+    assert_eq!(case.corpus_ids(), ["l0/sine_mono_32"]);
     assert_eq!(case.combine_method(), None);
     assert_eq!(case.auralis_args(), ["--gain-db", "-3"]);
     assert_eq!(case.sox_ng_args(), ["gain", "-3"]);
@@ -118,6 +122,7 @@ fn manifest_parse_preserves_multi_input_cases() {
         r#"
         [id.concat_then_gain]
         inputs = ["combine/first.wav", "combine/second.wav"]
+        corpus_ids = ["combine/mono_short", "combine/mono_long"]
         auralis = ["gain", "-3"]
         sox_ng = ["gain", "-3"]
         max_abs = 0.0001
@@ -135,6 +140,11 @@ fn manifest_parse_preserves_multi_input_cases() {
             PathBuf::from("combine/first.wav"),
             PathBuf::from("combine/second.wav")
         ]
+    );
+    assert_eq!(case.corpus_id(), Some("combine/mono_short"));
+    assert_eq!(
+        case.corpus_ids(),
+        ["combine/mono_short", "combine/mono_long"]
     );
     assert_eq!(
         case.render_auralis_command_line_with_inputs(
@@ -188,6 +198,55 @@ fn manifest_parse_preserves_explicit_combine_method() {
         ),
         "sox_ng -R -D --combine sequence first.wav second.wav out.wav reverse"
     );
+}
+
+#[test]
+fn invalid_manifest_is_rejected_for_unknown_corpus_id() {
+    let error = GoldenManifest::parse_toml(
+        r#"
+        [id.unknown_corpus]
+        input = "mono/sine.wav"
+        corpus_id = "missing/case"
+        auralis = ["gain", "-3"]
+        sox_ng = ["gain", "-3"]
+        max_abs = 0.0001
+        rms = 0.000001
+        snr_db = 90.0
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        GoldenManifestError::InvalidCorpusId { id, corpus_id }
+            if id == "unknown_corpus" && corpus_id == "missing/case"
+    ));
+}
+
+#[test]
+fn invalid_manifest_is_rejected_for_mismatched_corpus_ids() {
+    let error = GoldenManifest::parse_toml(
+        r#"
+        [id.bad_corpus_count]
+        inputs = ["combine/first.wav", "combine/second.wav"]
+        corpus_ids = ["combine/mono_short"]
+        auralis = []
+        sox_ng = []
+        max_abs = 0.0
+        rms = 0.0
+        snr_db = 120.0
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        GoldenManifestError::CorpusIdInputCountMismatch {
+            id,
+            inputs: 2,
+            corpus_ids: 1,
+        } if id == "bad_corpus_count"
+    ));
 }
 
 #[test]

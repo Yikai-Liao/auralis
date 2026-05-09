@@ -4,6 +4,7 @@
 
 [id.auto_channels_stereo_to_mono]
 input = "auto/stereo_channels.wav"
+corpus_id = "auto/stereo_channels"
 output_channels = 1
 sox_ng_auto_channels = true
 auralis = []
@@ -14,6 +15,7 @@ snr_db = 120.0
 
 [id.auto_channels_mono_to_stereo]
 input = "auto/mono_channels.wav"
+corpus_id = "auto/mono_channels"
 output_channels = 2
 sox_ng_auto_channels = true
 auralis = []

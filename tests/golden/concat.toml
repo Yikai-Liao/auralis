@@ -3,6 +3,7 @@
 
 [id.concat_mono_mismatched_lengths]
 inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+corpus_ids = ["combine/mono_short", "combine/mono_long"]
 auralis = []
 sox_ng = []
 max_abs = 0.0
@@ -11,6 +12,7 @@ snr_db = 120.0
 
 [id.concat_stereo_reverse_chain]
 inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]
 auralis = ["reverse"]
 sox_ng = ["reverse"]
 max_abs = 0.0

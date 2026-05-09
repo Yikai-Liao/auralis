@@ -5,6 +5,7 @@
 
 [id.auto_guard_gain_clipping]
 input = "auto/level_headroom.wav"
+corpus_id = "auto/level_headroom"
 auralis = ["--guard", "--gain-db", "6"]
 sox_ng = ["norm"]
 max_abs = 0.0001
@@ -13,6 +14,7 @@ snr_db = 90.0
 
 [id.auto_norm_default]
 input = "auto/level_headroom.wav"
+corpus_id = "auto/level_headroom"
 auralis = ["--norm"]
 sox_ng = ["norm"]
 max_abs = 0.0001
@@ -21,6 +23,7 @@ snr_db = 90.0
 
 [id.auto_norm_minus_6]
 input = "auto/level_headroom.wav"
+corpus_id = "auto/level_headroom"
 auralis = ["--norm=-6"]
 sox_ng = ["norm", "-6"]
 max_abs = 0.0001

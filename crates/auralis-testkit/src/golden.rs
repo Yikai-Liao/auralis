@@ -7,34 +7,6 @@
 //! remain suitable for `std::process::Command`, while display helpers apply
 //! deterministic quoting and escaping for human-readable failure reports.
 //!
-//! # Examples
-//!
-//! ```
-//! use auralis_testkit::golden::GoldenManifest;
-//!
-//! let manifest = GoldenManifest::parse_toml(
-//!     r#"
-//!     [id.gain_minus_3_mono]
-//!     input = "sine_48k_mono.wav"
-//!     auralis = ["--gain-db", "-3"]
-//!     sox_ng = ["gain", "-3"]
-//!     max_abs = 1e-4
-//!     rms = 1e-6
-//!     snr_db = 90.0
-//!     "#,
-//! )?;
-//!
-//! let (_, case) = manifest.iter().next().expect("one case");
-//! assert_eq!(
-//!     case.render_sox_ng_command("sox_ng", case.input(), "out.wav"),
-//!     ["sox_ng", "-R", "-D", "sine_48k_mono.wav", "out.wav", "gain", "-3"],
-//! );
-//! assert_eq!(
-//!     case.render_sox_ng_command_line("sox_ng", "input file.wav", "out.wav"),
-//!     "sox_ng -R -D \"input file.wav\" out.wav gain -3",
-//! );
-//! # Ok::<(), auralis_testkit::golden::GoldenManifestError>(())
-//! ```
 
 use std::{
     collections::BTreeMap,
@@ -44,6 +16,8 @@ use std::{
 };
 
 use serde::Deserialize;
+
+use crate::corpus::is_known_corpus_id;
 
 /// Result type for golden manifest parsing and validation.
 pub type Result<T> = std::result::Result<T, GoldenManifestError>;
@@ -117,6 +91,7 @@ impl GoldenManifest {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoldenCase {
     inputs: Vec<PathBuf>,
+    corpus_ids: Vec<String>,
     combine: Option<String>,
     output_channels: Option<u16>,
     output_sample_rate: Option<u32>,
@@ -145,6 +120,23 @@ impl GoldenCase {
     #[must_use]
     pub fn inputs(&self) -> &[PathBuf] {
         &self.inputs
+    }
+
+    /// Returns the first stable corpus identifier recorded by the manifest, if
+    /// present.
+    ///
+    /// Single-input cases use `corpus_id = "..."`; multi-input cases use
+    /// `corpus_ids = ["...", "..."]`. The manifest still records file names
+    /// separately so command rendering and fixture paths stay stable.
+    #[must_use]
+    pub fn corpus_id(&self) -> Option<&str> {
+        self.corpus_ids.first().map(String::as_str)
+    }
+
+    /// Returns all stable corpus identifiers recorded by the manifest.
+    #[must_use]
+    pub fn corpus_ids(&self) -> &[String] {
+        &self.corpus_ids
     }
 
     /// Returns the requested multi-input combiner method, if explicitly set.
@@ -412,6 +404,7 @@ impl GoldenCase {
 
     fn from_raw(id: &str, raw: RawGoldenCase) -> Result<Self> {
         let inputs = validate_inputs(id, raw.input, raw.inputs)?;
+        let corpus_ids = validate_corpus_ids(id, inputs.len(), raw.corpus_id, raw.corpus_ids)?;
         validate_combine_method(id, raw.combine.as_deref())?;
         validate_output_channels(id, raw.output_channels)?;
         validate_output_sample_rate(id, raw.output_sample_rate)?;
@@ -426,6 +419,7 @@ impl GoldenCase {
 
         Ok(Self {
             inputs,
+            corpus_ids,
             combine: raw.combine,
             output_channels: raw.output_channels,
             output_sample_rate: raw.output_sample_rate,
@@ -554,6 +548,33 @@ pub enum GoldenManifestError {
         id: String,
     },
 
+    /// A case defined both `corpus_id` and `corpus_ids`.
+    AmbiguousCorpusId {
+        /// Case identifier containing both corpus identifier fields.
+        id: String,
+    },
+
+    /// A case defined an empty or unknown corpus identifier.
+    InvalidCorpusId {
+        /// Case identifier containing the invalid corpus identifier.
+        id: String,
+
+        /// Rejected corpus identifier.
+        corpus_id: String,
+    },
+
+    /// A case recorded a corpus identifier count that does not match inputs.
+    CorpusIdInputCountMismatch {
+        /// Case identifier containing mismatched corpus IDs.
+        id: String,
+
+        /// Number of manifest inputs.
+        inputs: usize,
+
+        /// Number of manifest corpus IDs.
+        corpus_ids: usize,
+    },
+
     /// A case requested an unknown multi-input combiner method.
     InvalidCombineMethod {
         /// Case identifier containing the invalid combiner method.
@@ -643,6 +664,28 @@ impl fmt::Display for GoldenManifestError {
                     "golden manifest case `{id}` must not define both `input` and `inputs`"
                 )
             }
+            Self::AmbiguousCorpusId { id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` must not define both `corpus_id` and `corpus_ids`"
+                )
+            }
+            Self::InvalidCorpusId { id, corpus_id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` has invalid corpus id `{corpus_id}`"
+                )
+            }
+            Self::CorpusIdInputCountMismatch {
+                id,
+                inputs,
+                corpus_ids,
+            } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` has {inputs} inputs but {corpus_ids} corpus ids"
+                )
+            }
             Self::InvalidCombineMethod { id, combine } => {
                 write!(
                     formatter,
@@ -698,6 +741,9 @@ impl Error for GoldenManifestError {
             | Self::EmptyInput { .. }
             | Self::MissingInput { .. }
             | Self::AmbiguousInput { .. }
+            | Self::AmbiguousCorpusId { .. }
+            | Self::InvalidCorpusId { .. }
+            | Self::CorpusIdInputCountMismatch { .. }
             | Self::InvalidCombineMethod { .. }
             | Self::InvalidOutputChannels { .. }
             | Self::InvalidOutputSampleRate { .. }
@@ -762,6 +808,8 @@ struct RawManifest {
 struct RawGoldenCase {
     input: Option<String>,
     inputs: Option<Vec<String>>,
+    corpus_id: Option<String>,
+    corpus_ids: Option<Vec<String>>,
     combine: Option<String>,
     output_channels: Option<u16>,
     output_sample_rate: Option<u32>,
@@ -826,6 +874,41 @@ fn validate_inputs(
             }
         }
     }
+}
+
+fn validate_corpus_ids(
+    id: &str,
+    input_count: usize,
+    corpus_id: Option<String>,
+    corpus_ids: Option<Vec<String>>,
+) -> Result<Vec<String>> {
+    let corpus_ids = match (corpus_id, corpus_ids) {
+        (Some(_), Some(_)) => {
+            return Err(GoldenManifestError::AmbiguousCorpusId { id: id.to_owned() });
+        }
+        (None, None) => return Ok(Vec::new()),
+        (Some(corpus_id), None) => vec![corpus_id],
+        (None, Some(corpus_ids)) => corpus_ids,
+    };
+
+    if corpus_ids.len() != input_count {
+        return Err(GoldenManifestError::CorpusIdInputCountMismatch {
+            id: id.to_owned(),
+            inputs: input_count,
+            corpus_ids: corpus_ids.len(),
+        });
+    }
+    if let Some(corpus_id) = corpus_ids
+        .iter()
+        .find(|corpus_id| corpus_id.is_empty() || !is_known_corpus_id(corpus_id))
+    {
+        return Err(GoldenManifestError::InvalidCorpusId {
+            id: id.to_owned(),
+            corpus_id: corpus_id.clone(),
+        });
+    }
+
+    Ok(corpus_ids)
 }
 
 fn validate_combine_method(id: &str, combine: Option<&str>) -> Result<()> {
