@@ -1282,6 +1282,8 @@ Acceptance tests:
 
 #### Feature 5.5.2: automatic sample-rate conversion policy
 
+Status: implemented.
+
 Acceptance tests:
 
 - no hidden behavior in library APIs.

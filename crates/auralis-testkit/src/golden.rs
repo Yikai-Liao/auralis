@@ -62,9 +62,11 @@ impl GoldenManifest {
     ///
     /// The accepted format contains one or more `[id.<case>]` tables. Each case
     /// table must define `input`, `auralis`, `sox_ng`, `max_abs`, `rms`, and
-    /// `snr_db`. Cases may also define `output_channels` and
+    /// `snr_db`. Cases may also define `output_channels`,
+    /// `output_sample_rate`, `sox_ng_auto_rate = true`, and
     /// `sox_ng_auto_channels = true` to record SoX-ng output-channel options
-    /// that auto-insert its `channels` effect.
+    /// and output-rate options that auto-insert its `channels` and `rate`
+    /// effects.
     ///
     /// # Errors
     ///
@@ -117,7 +119,9 @@ pub struct GoldenCase {
     inputs: Vec<PathBuf>,
     combine: Option<String>,
     output_channels: Option<u16>,
+    output_sample_rate: Option<u32>,
     sox_ng_auto_channels: bool,
+    sox_ng_auto_rate: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     tolerance: GoldenTolerance,
@@ -163,10 +167,27 @@ impl GoldenCase {
         self.output_channels
     }
 
+    /// Returns the requested output sample rate, if the manifest sets one.
+    ///
+    /// Single-output cases use this to render Auralis `--rate <N>` and SoX-ng
+    /// `--rate <N>` output options. When
+    /// [`Self::sox_ng_auto_rate_inserted`] is true, the manifest is explicitly
+    /// recording a SoX-ng automatic `rate` effect.
+    #[must_use]
+    pub const fn output_sample_rate(&self) -> Option<u32> {
+        self.output_sample_rate
+    }
+
     /// Returns whether the SoX-ng command relies on auto-inserted `channels`.
     #[must_use]
     pub const fn sox_ng_auto_channels_inserted(&self) -> bool {
         self.sox_ng_auto_channels
+    }
+
+    /// Returns whether the SoX-ng command relies on auto-inserted `rate`.
+    #[must_use]
+    pub const fn sox_ng_auto_rate_inserted(&self) -> bool {
+        self.sox_ng_auto_rate
     }
 
     /// Returns the Auralis argument fragment recorded by the manifest.
@@ -246,6 +267,10 @@ impl GoldenCase {
         if let Some(output_channels) = self.output_channels {
             command.push("--channels".to_owned());
             command.push(output_channels.to_string());
+        }
+        if let Some(output_sample_rate) = self.output_sample_rate {
+            command.push("--rate".to_owned());
+            command.push(output_sample_rate.to_string());
         }
         command.extend(self.auralis.iter().cloned());
         command
@@ -339,6 +364,10 @@ impl GoldenCase {
             command.push("--channels".to_owned());
             command.push(output_channels.to_string());
         }
+        if let Some(output_sample_rate) = self.output_sample_rate {
+            command.push("--rate".to_owned());
+            command.push(output_sample_rate.to_string());
+        }
         command.push(path_to_command_arg(output_path.as_ref()));
         command.extend(self.sox_ng.iter().cloned());
         command
@@ -385,7 +414,9 @@ impl GoldenCase {
         let inputs = validate_inputs(id, raw.input, raw.inputs)?;
         validate_combine_method(id, raw.combine.as_deref())?;
         validate_output_channels(id, raw.output_channels)?;
+        validate_output_sample_rate(id, raw.output_sample_rate)?;
         validate_sox_ng_auto_channels(id, raw.sox_ng_auto_channels, raw.output_channels)?;
+        validate_sox_ng_auto_rate(id, raw.sox_ng_auto_rate, raw.output_sample_rate)?;
 
         validate_args(id, GoldenCommand::Auralis, &raw.auralis)?;
         validate_args(id, GoldenCommand::SoxNg, &raw.sox_ng)?;
@@ -397,7 +428,9 @@ impl GoldenCase {
             inputs,
             combine: raw.combine,
             output_channels: raw.output_channels,
+            output_sample_rate: raw.output_sample_rate,
             sox_ng_auto_channels: raw.sox_ng_auto_channels,
+            sox_ng_auto_rate: raw.sox_ng_auto_rate,
             auralis: raw.auralis,
             sox_ng: raw.sox_ng,
             tolerance: GoldenTolerance {
@@ -539,9 +572,24 @@ pub enum GoldenManifestError {
         channels: u16,
     },
 
+    /// A case requested an invalid output sample rate.
+    InvalidOutputSampleRate {
+        /// Case identifier containing the invalid output sample rate.
+        id: String,
+
+        /// Rejected output sample rate.
+        sample_rate: u32,
+    },
+
     /// A case recorded SoX-ng automatic channels without an output channel target.
     AutoChannelsWithoutOutputChannels {
         /// Case identifier missing `output_channels`.
+        id: String,
+    },
+
+    /// A case recorded SoX-ng automatic rate without an output sample-rate target.
+    AutoRateWithoutOutputSampleRate {
+        /// Case identifier missing `output_sample_rate`.
         id: String,
     },
 
@@ -607,10 +655,22 @@ impl fmt::Display for GoldenManifestError {
                     "golden manifest case `{id}` has invalid output channel count `{channels}`"
                 )
             }
+            Self::InvalidOutputSampleRate { id, sample_rate } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` has invalid output sample rate `{sample_rate}`"
+                )
+            }
             Self::AutoChannelsWithoutOutputChannels { id } => {
                 write!(
                     formatter,
                     "golden manifest case `{id}` records SoX-ng automatic channels without `output_channels`"
+                )
+            }
+            Self::AutoRateWithoutOutputSampleRate { id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` records SoX-ng automatic rate without `output_sample_rate`"
                 )
             }
             Self::EmptyArgument { id, command } => {
@@ -640,7 +700,9 @@ impl Error for GoldenManifestError {
             | Self::AmbiguousInput { .. }
             | Self::InvalidCombineMethod { .. }
             | Self::InvalidOutputChannels { .. }
+            | Self::InvalidOutputSampleRate { .. }
             | Self::AutoChannelsWithoutOutputChannels { .. }
+            | Self::AutoRateWithoutOutputSampleRate { .. }
             | Self::EmptyArgument { .. }
             | Self::InvalidTolerance { .. } => None,
         }
@@ -702,8 +764,11 @@ struct RawGoldenCase {
     inputs: Option<Vec<String>>,
     combine: Option<String>,
     output_channels: Option<u16>,
+    output_sample_rate: Option<u32>,
     #[serde(default)]
     sox_ng_auto_channels: bool,
+    #[serde(default)]
+    sox_ng_auto_rate: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     max_abs: f64,
@@ -788,6 +853,16 @@ fn validate_output_channels(id: &str, output_channels: Option<u16>) -> Result<()
     }
 }
 
+fn validate_output_sample_rate(id: &str, output_sample_rate: Option<u32>) -> Result<()> {
+    match output_sample_rate {
+        Some(0) => Err(GoldenManifestError::InvalidOutputSampleRate {
+            id: id.to_owned(),
+            sample_rate: 0,
+        }),
+        Some(_) | None => Ok(()),
+    }
+}
+
 fn validate_sox_ng_auto_channels(
     id: &str,
     sox_ng_auto_channels: bool,
@@ -795,6 +870,18 @@ fn validate_sox_ng_auto_channels(
 ) -> Result<()> {
     if sox_ng_auto_channels && output_channels.is_none() {
         Err(GoldenManifestError::AutoChannelsWithoutOutputChannels { id: id.to_owned() })
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_sox_ng_auto_rate(
+    id: &str,
+    sox_ng_auto_rate: bool,
+    output_sample_rate: Option<u32>,
+) -> Result<()> {
+    if sox_ng_auto_rate && output_sample_rate.is_none() {
+        Err(GoldenManifestError::AutoRateWithoutOutputSampleRate { id: id.to_owned() })
     } else {
         Ok(())
     }
@@ -1047,6 +1134,36 @@ mod tests {
     }
 
     #[test]
+    fn manifest_parse_records_output_sample_rate_auto_conversion() {
+        let manifest = GoldenManifest::parse_toml(
+            r#"
+            [id.auto_rate_downsample]
+            input = "auto/rate_48k.wav"
+            output_sample_rate = 24000
+            sox_ng_auto_rate = true
+            auralis = []
+            sox_ng = []
+            max_abs = 0.0
+            rms = 0.0
+            snr_db = 120.0
+            "#,
+        )
+        .unwrap();
+        let case = manifest.get("auto_rate_downsample").unwrap();
+
+        assert_eq!(case.output_sample_rate(), Some(24_000));
+        assert!(case.sox_ng_auto_rate_inserted());
+        assert_eq!(
+            case.render_auralis_command_line("auralis", "in.wav", "out.wav"),
+            "auralis run in.wav out.wav --rate 24000"
+        );
+        assert_eq!(
+            case.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
+            "sox_ng -R -D in.wav --rate 24000 out.wav"
+        );
+    }
+
+    #[test]
     fn invalid_manifest_is_rejected_for_missing_or_ambiguous_input_fields() {
         let missing = GoldenManifest::parse_toml(
             r#"
@@ -1126,6 +1243,29 @@ mod tests {
             error,
             GoldenManifestError::AutoChannelsWithoutOutputChannels { id }
                 if id == "missing_output_channels"
+        ));
+    }
+
+    #[test]
+    fn invalid_manifest_is_rejected_for_auto_rate_without_output_sample_rate() {
+        let error = GoldenManifest::parse_toml(
+            r#"
+            [id.missing_output_sample_rate]
+            input = "auto/rate_48k.wav"
+            sox_ng_auto_rate = true
+            auralis = []
+            sox_ng = []
+            max_abs = 0.0
+            rms = 0.0
+            snr_db = 120.0
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            GoldenManifestError::AutoRateWithoutOutputSampleRate { id }
+                if id == "missing_output_sample_rate"
         ));
     }
 

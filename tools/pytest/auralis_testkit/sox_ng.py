@@ -29,6 +29,7 @@ def run_sox_ng(
     *,
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
     output_channels: int | None = None,
+    output_sample_rate: int | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with deterministic flags and return the completed process."""
 
@@ -43,6 +44,7 @@ def run_sox_ng(
         str(input_path),
         *output_encoding,
         *output_channel_args(output_channels),
+        *output_rate_args(output_sample_rate),
         str(output_path),
         *effect_args,
     ]
@@ -57,6 +59,7 @@ def run_sox_ng_with_inputs(
     combine: str = "concatenate",
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
     output_channels: int | None = None,
+    output_sample_rate: int | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with multiple inputs and deterministic combine settings."""
 
@@ -75,6 +78,7 @@ def run_sox_ng_with_inputs(
         *(str(path) for path in input_paths),
         *output_encoding,
         *output_channel_args(output_channels),
+        *output_rate_args(output_sample_rate),
         str(output_path),
         *effect_args,
     ]
@@ -87,3 +91,11 @@ def output_channel_args(output_channels: int | None) -> tuple[str, ...]:
     if output_channels is None:
         return ()
     return ("--channels", str(output_channels))
+
+
+def output_rate_args(output_sample_rate: int | None) -> tuple[str, ...]:
+    """Return SoX-ng output rate options for an optional target rate."""
+
+    if output_sample_rate is None:
+        return ()
+    return ("--rate", str(output_sample_rate))

@@ -1,0 +1,23 @@
+# Automatic output sample-rate conversion golden cases. `sox_ng_auto_rate`
+# records that SoX-ng receives an output `--rate` option and auto-inserts its
+# `rate` effect before writing.
+
+[id.auto_rate_downsample_48k_to_24k]
+input = "auto/rate_48k_silence.wav"
+output_sample_rate = 24000
+sox_ng_auto_rate = true
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.auto_rate_upsample_48k_to_96k]
+input = "auto/rate_48k_silence.wav"
+output_sample_rate = 96000
+sox_ng_auto_rate = true
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

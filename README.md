@@ -79,8 +79,13 @@ backend-dispatched scalar/SIMD multiply kernel. `auralis run --channels N`
 uses an explicit output policy that mirrors SoX-ng's output `--channels`
 shorthand: the CLI preserves the pipeline channel count by default, converts
 only when a target count is requested, and `--no-auto-channels` turns that
-conversion into a strict channel-count check for tests. The SIMD crate defines
-the Auralis-owned backend trait skeleton with a scalar reference backend,
+conversion into a strict channel-count check for tests. `auralis run --rate N`
+uses the same explicit output-boundary policy for sample rate: the CLI
+preserves the pipeline rate by default, applies Auralis' deterministic scalar
+linear resampler only when requested, and `--no-auto-rate` turns the request
+into a strict sample-rate check. The fuller user-visible `rate` effect and
+quality modes remain future DEVELOPMENT.md work. The SIMD crate defines the
+Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
 `gain_f32`, `dc_shift_f32`, `fade_f32`, `mix_f32`, and `multiply_f32` kernels.
@@ -605,6 +610,19 @@ duplicates channels round-robin. Tests and strict callers can use
 `--channels N --no-auto-channels`, to fail if conversion would have been
 inserted.
 
+Output sample-rate conversion follows the same explicit output-boundary model.
+The high-level library defaults to preserving the current pipeline sample rate,
+and `Pipeline::into_audio_buffer` never applies output-rate policy. Callers can
+use `Pipeline::with_output_sample_rate` or
+`Pipeline::with_sample_rate_conversion_policy(SampleRateConversionPolicy::Automatic(_))`
+to request deterministic scalar conversion before writing. The converter emits
+`round(input_frames * target_rate / source_rate)` frames and samples each
+channel with linear interpolation at `output_frame * source_rate / target_rate`.
+Tests and strict callers can use `SampleRateConversionPolicy::Require(_)`,
+exposed in the CLI as `--rate N --no-auto-rate`, to fail if conversion would
+have been inserted. SIMD is currently not used for this boundary resampler; the
+later `rate` effect features own the broader quality and optimization work.
+
 Selected crates:
 
 - `clap` for the parser.
@@ -619,8 +637,8 @@ Contains test utilities shared by Rust tests and Python tests:
 - raw f32 helpers
 - WAV decode helpers
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
-- golden test manifest handling, including output-channel metadata for cases
-  where SoX-ng auto-inserts `channels` conversion
+- golden test manifest handling, including output-channel and output-rate
+  metadata for cases where SoX-ng auto-inserts `channels` or `rate` conversion
 - scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
@@ -648,7 +666,9 @@ argument vectors available for process execution. Explicit chain boundary
 tokens render deterministically as `:` in both Auralis and SoX-ng command
 displays. A case may set `output_channels = N`; if it also sets
 `sox_ng_auto_channels = true`, the manifest records that SoX-ng is expected to
-auto-insert its `channels` effect from the output option.
+auto-insert its `channels` effect from the output option. A case may also set
+`output_sample_rate = N` and `sox_ng_auto_rate = true` to record SoX-ng's
+automatic `rate` insertion from an output sample-rate option.
 
 The root `tests/golden/chains.toml` manifest records positional-chain coverage
 for a structural editing chain, a level-processing chain, and the currently
@@ -658,7 +678,9 @@ implemented fade/gain filter-style chain. `tests/golden/concat.toml`,
 `tests/golden/multiply.toml` record combiner coverage for mismatched mono input
 lengths and stereo combine-before-reverse chains.
 `tests/golden/auto_channels.toml` records output-channel policy coverage where
-SoX-ng auto-inserts `channels` conversion. The Python golden runners
+SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
+records output-rate policy coverage where SoX-ng auto-inserts `rate`
+conversion. The Python golden runners
 generate the deterministic PCM16 fixtures, execute both command lines, compare decoded
 sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
 report when output drifts outside its manifest tolerance.

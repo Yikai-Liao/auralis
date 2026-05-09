@@ -53,6 +53,14 @@ enum Command {
         #[arg(long)]
         no_auto_channels: bool,
 
+        /// Output sample rate; inserts deterministic rate conversion if needed.
+        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
+        output_sample_rate: Option<auralis::SampleRate>,
+
+        /// Fail instead of automatically converting sample rate for --rate.
+        #[arg(long)]
+        no_auto_rate: bool,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -128,6 +136,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             additional_inputs,
             output_channels,
             no_auto_channels,
+            output_sample_rate,
+            no_auto_rate,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -148,6 +158,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 additional_inputs,
                 output_channels,
                 no_auto_channels,
+                output_sample_rate,
+                no_auto_rate,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -193,9 +205,11 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     }
     let backend = options.backend;
     let channel_conversion_policy = options.channel_conversion_policy()?;
+    let sample_rate_conversion_policy = options.sample_rate_conversion_policy()?;
     let effect_chain = options.effect_chain()?;
     let pipeline = open_pipeline(input, options)?
         .with_backend(backend)
+        .with_sample_rate_conversion_policy(sample_rate_conversion_policy)
         .with_channel_conversion_policy(channel_conversion_policy);
 
     if let Some(effect_chain) = effect_chain {
@@ -251,6 +265,8 @@ struct RunOptions {
     additional_inputs: Vec<PathBuf>,
     output_channels: Option<auralis::ChannelCount>,
     no_auto_channels: bool,
+    output_sample_rate: Option<auralis::SampleRate>,
+    no_auto_rate: bool,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -319,6 +335,21 @@ impl RunOptions {
             (Some(channels), false) => Ok(auralis::ChannelConversionPolicy::automatic(channels)),
             (Some(channels), true) => Ok(auralis::ChannelConversionPolicy::require(channels)),
             (None, true) => Err(CliError::NoAutoChannelsWithoutOutputChannels),
+        }
+    }
+
+    fn sample_rate_conversion_policy(
+        &self,
+    ) -> Result<auralis::SampleRateConversionPolicy, CliError> {
+        match (self.output_sample_rate, self.no_auto_rate) {
+            (None, false) => Ok(auralis::SampleRateConversionPolicy::Preserve),
+            (Some(sample_rate), false) => {
+                Ok(auralis::SampleRateConversionPolicy::automatic(sample_rate))
+            }
+            (Some(sample_rate), true) => {
+                Ok(auralis::SampleRateConversionPolicy::require(sample_rate))
+            }
+            (None, true) => Err(CliError::NoAutoRateWithoutOutputRate),
         }
     }
 
@@ -447,6 +478,15 @@ fn parse_channel_count(value: &str) -> Result<auralis::ChannelCount, String> {
         .map_err(|_| "channels must be a positive integer no larger than 65535".to_owned())
 }
 
+fn parse_sample_rate(value: &str) -> Result<auralis::SampleRate, String> {
+    let sample_rate = value
+        .parse::<u32>()
+        .map_err(|_| "rate must be a positive integer no larger than 4294967295".to_owned())?;
+
+    auralis::SampleRate::new(sample_rate)
+        .map_err(|_| "rate must be a positive integer no larger than 4294967295".to_owned())
+}
+
 #[derive(Debug)]
 enum CliError {
     Auralis(auralis::Error),
@@ -459,6 +499,7 @@ enum CliError {
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
     NoAutoChannelsWithoutOutputChannels,
+    NoAutoRateWithoutOutputRate,
     UnsupportedFormat { path: PathBuf, role: PathRole },
 }
 
@@ -508,6 +549,9 @@ impl std::fmt::Display for CliError {
             }
             Self::NoAutoChannelsWithoutOutputChannels => {
                 formatter.write_str("--no-auto-channels requires --channels")
+            }
+            Self::NoAutoRateWithoutOutputRate => {
+                formatter.write_str("--no-auto-rate requires --rate")
             }
             Self::UnsupportedFormat { path, role } => {
                 write!(

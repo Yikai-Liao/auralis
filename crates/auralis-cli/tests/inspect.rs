@@ -264,6 +264,120 @@ fn run_no_auto_channels_requires_output_channels() {
 }
 
 #[test]
+fn run_rate_downsamples_output_sample_rate() {
+    let input = temp_path("auralis-cli-run-rate-downsample-input", "wav");
+    let output = temp_path("auralis-cli-run-rate-downsample-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, 1000, 1000, 1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--rate",
+            "24000",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(
+        read_pcm16_wav_with_sample_rate(&output),
+        (24_000, 1, vec![1000, 1000])
+    );
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_rate_upsamples_output_sample_rate() {
+    let input = temp_path("auralis-cli-run-rate-upsample-input", "wav");
+    let output = temp_path("auralis-cli-run-rate-upsample-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, 1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--rate",
+            "96000",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(
+        read_pcm16_wav_with_sample_rate(&output),
+        (96_000, 1, vec![1000, 1000, 1000, 1000])
+    );
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_no_auto_rate_rejects_mismatched_output_rate() {
+    let input = temp_path("auralis-cli-run-no-auto-rate-input", "wav");
+    let output = temp_path("auralis-cli-run-no-auto-rate-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--rate",
+            "24000",
+            "--no-auto-rate",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("automatic sample-rate conversion from 48000 Hz to 24000 Hz is disabled"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_no_auto_rate_requires_output_rate() {
+    let input = temp_path("auralis-cli-run-no-auto-rate-missing-input", "wav");
+    let output = temp_path("auralis-cli-run-no-auto-rate-missing-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--no-auto-rate",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --no-auto-rate requires --rate"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_concatenate_accepts_mismatched_mono_lengths() {
     let first = temp_path("auralis-cli-run-concat-mono-first", "wav");
     let second = temp_path("auralis-cli-run-concat-mono-second", "wav");
@@ -2191,6 +2305,16 @@ fn run_help_documents_gain_and_trim_units() {
         stdout.contains("Fail instead of automatically converting channels"),
         "{stdout}"
     );
+    assert!(stdout.contains("--rate <RATE>"), "{stdout}");
+    assert!(
+        stdout.contains("Output sample rate; inserts deterministic rate conversion"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--no-auto-rate"), "{stdout}");
+    assert!(
+        stdout.contains("Fail instead of automatically converting sample rate"),
+        "{stdout}"
+    );
     assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");
     assert!(
         stdout.contains("Constant normalized DC offset to add"),
@@ -2333,10 +2457,16 @@ fn riff_header_with_extra(
 }
 
 fn read_pcm16_wav(path: &Path) -> (u16, Vec<i16>) {
+    let (_, channels, samples) = read_pcm16_wav_with_sample_rate(path);
+    (channels, samples)
+}
+
+fn read_pcm16_wav_with_sample_rate(path: &Path) -> (u32, u16, Vec<i16>) {
     let bytes = fs::read(path).unwrap();
     assert_eq!(&bytes[0..4], b"RIFF");
     assert_eq!(&bytes[8..12], b"WAVE");
     let channels = u16::from_le_bytes(bytes[22..24].try_into().unwrap());
+    let sample_rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
     let data_offset = data_chunk_offset(&bytes);
     let data_len = u32::from_le_bytes(bytes[data_offset + 4..data_offset + 8].try_into().unwrap());
     let data_start = data_offset + 8;
@@ -2346,7 +2476,7 @@ fn read_pcm16_wav(path: &Path) -> (u16, Vec<i16>) {
         .map(|sample| i16::from_le_bytes(sample.try_into().unwrap()))
         .collect();
 
-    (channels, samples)
+    (sample_rate, channels, samples)
 }
 
 fn metadata_chunk_is_absent(path: &Path) -> bool {
