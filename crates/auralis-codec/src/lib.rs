@@ -42,6 +42,15 @@ pub enum CodecError {
         /// Human-readable failure detail from the concrete codec.
         message: String,
     },
+
+    /// A concrete encoder failed to write the requested stream.
+    #[error("{kind} encode failed: {message}")]
+    EncodeFailed {
+        /// Codec kind that failed while encoding.
+        kind: CodecKind,
+        /// Human-readable failure detail from the concrete codec.
+        message: String,
+    },
 }
 
 /// Description of an unsupported codec request.

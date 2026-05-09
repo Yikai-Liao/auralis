@@ -1,8 +1,8 @@
 //! WAV codec support for Auralis.
 //!
-//! This crate currently implements deterministic PCM16 WAV decoding into
-//! Auralis' internal planar `f32` [`auralis_core::AudioBuffer`]. Encoding is
-//! intentionally left to a later milestone.
+//! This crate currently implements deterministic PCM16 WAV decoding and
+//! encoding between RIFF/WAVE files and Auralis' internal planar `f32`
+//! [`auralis_core::AudioBuffer`].
 //!
 //! # Examples
 //!
@@ -35,18 +35,18 @@
 use std::{
     fmt,
     fs::File,
-    io::{BufReader, Read},
+    io::{BufReader, Read, Seek, Write},
     path::Path,
 };
 
-use auralis_codec::{AudioReader, CodecError, CodecKind};
+use auralis_codec::{AudioReader, AudioWriter, CodecError, CodecKind};
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use thiserror::Error;
 
 /// Crate-local result type using [`WavError`].
 pub type Result<T> = std::result::Result<T, WavError>;
 
-/// Errors produced while decoding WAV input.
+/// Errors produced while decoding or encoding WAV input.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum WavError {
@@ -84,6 +84,33 @@ pub enum WavError {
     #[error("could not open WAV input: {message}")]
     OpenFailed {
         /// Human-readable I/O failure detail.
+        message: String,
+    },
+
+    /// The output path could not be created.
+    #[error("could not create WAV output: {message}")]
+    CreateFailed {
+        /// Human-readable I/O failure detail.
+        message: String,
+    },
+
+    /// The output stream already consumed its writer.
+    #[error("WAV writer has already written an output stream")]
+    WriterAlreadyUsed,
+
+    /// The input buffer contained a non-finite sample value.
+    #[error("WAV sample at channel {channel_index}, frame {frame_index} must be finite")]
+    NonFiniteSample {
+        /// Zero-based channel index of the invalid sample.
+        channel_index: usize,
+        /// Zero-based frame index of the invalid sample.
+        frame_index: usize,
+    },
+
+    /// The WAV output stream could not be written or finalized.
+    #[error("could not write WAV output: {message}")]
+    WriteFailed {
+        /// Human-readable writer failure detail.
         message: String,
     },
 }
@@ -138,6 +165,46 @@ pub fn decode_pcm16_path(path: impl AsRef<Path>) -> Result<AudioBuffer> {
     })?;
 
     decode_pcm16(BufReader::new(file))
+}
+
+/// Encodes a planar `f32` buffer as a PCM16 WAV stream.
+///
+/// Samples are clipped to `[-1.0, 1.0]` before conversion. Negative samples use
+/// a `32768.0` scale, then the quantized integer is clipped to the `i16` range.
+/// This maps `-1.0` to `i16::MIN`, `1.0` to `i16::MAX`, and already-decoded
+/// PCM16 values back to their original integer representation where possible.
+/// Intermediate values are rounded to the nearest integer. The input buffer is
+/// never modified.
+///
+/// # Errors
+///
+/// Returns [`WavError::NonFiniteSample`] if any sample is NaN or infinite.
+/// Returns [`WavError::WriteFailed`] if the WAV header, sample payload, or
+/// finalization step cannot be written.
+pub fn encode_pcm16<W>(writer: W, audio: &AudioBuffer) -> Result<()>
+where
+    W: Write + Seek,
+{
+    Pcm16WavWriter::new(writer).write_pcm16(audio)
+}
+
+/// Encodes a planar `f32` buffer as a PCM16 WAV file on disk.
+///
+/// Existing files at `path` are overwritten. See [`encode_pcm16`] for the
+/// clipping and quantization rules.
+///
+/// # Errors
+///
+/// Returns [`WavError::CreateFailed`] if `path` cannot be created. Propagates
+/// the same sample validation and write errors as [`encode_pcm16`].
+pub fn encode_pcm16_path(path: impl AsRef<Path>, audio: &AudioBuffer) -> Result<()> {
+    let writer = hound::WavWriter::create(path, hound_spec(audio)).map_err(|error| {
+        WavError::CreateFailed {
+            message: error.to_string(),
+        }
+    })?;
+
+    write_pcm16_samples(writer, audio)
 }
 
 /// Reader for PCM16 WAV streams.
@@ -228,6 +295,70 @@ where
     }
 }
 
+/// Writer for PCM16 WAV streams.
+///
+/// The writer is intentionally one-shot: WAV headers are finalized after
+/// [`Self::write_pcm16`] so later write attempts return
+/// [`WavError::WriterAlreadyUsed`] instead of silently appending invalid data.
+pub struct Pcm16WavWriter<W>
+where
+    W: Write + Seek,
+{
+    destination: Option<W>,
+}
+
+impl<W> Pcm16WavWriter<W>
+where
+    W: Write + Seek,
+{
+    /// Creates a PCM16 WAV writer around a seekable byte stream.
+    ///
+    /// The stream is expected to be positioned at the start of the output.
+    #[must_use]
+    pub const fn new(writer: W) -> Self {
+        Self {
+            destination: Some(writer),
+        }
+    }
+
+    /// Writes and finalizes one PCM16 WAV stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WavError::WriterAlreadyUsed`] if called after a previous
+    /// write. Propagates the same validation and write errors as
+    /// [`encode_pcm16`].
+    pub fn write_pcm16(&mut self, audio: &AudioBuffer) -> Result<()> {
+        let Some(destination) = self.destination.take() else {
+            return Err(WavError::WriterAlreadyUsed);
+        };
+        let writer = hound::WavWriter::new(destination, hound_spec(audio)).map_err(|error| {
+            WavError::WriteFailed {
+                message: error.to_string(),
+            }
+        })?;
+
+        write_pcm16_samples(writer, audio)
+    }
+}
+
+impl<W> AudioWriter for Pcm16WavWriter<W>
+where
+    W: Write + Seek,
+{
+    fn codec_kind(&self) -> CodecKind {
+        CodecKind::Wav
+    }
+
+    fn write_audio(&mut self, audio: &AudioBuffer) -> auralis_codec::Result<()> {
+        self.write_pcm16(audio)
+            .map_err(|error| CodecError::EncodeFailed {
+                kind: CodecKind::Wav,
+                message: error.to_string(),
+            })
+    }
+}
+
 impl From<WavError> for CodecError {
     fn from(error: WavError) -> Self {
         Self::DecodeFailed {
@@ -251,6 +382,62 @@ fn ensure_pcm16(spec: hound::WavSpec) -> Result<()> {
     }
 }
 
+fn hound_spec(audio: &AudioBuffer) -> hound::WavSpec {
+    hound::WavSpec {
+        channels: audio.channels().as_u16(),
+        sample_rate: audio.spec().sample_rate().as_u32(),
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    }
+}
+
+fn write_pcm16_samples<W>(mut writer: hound::WavWriter<W>, audio: &AudioBuffer) -> Result<()>
+where
+    W: Write + Seek,
+{
+    let channels = audio.channels().as_usize();
+    let frames = usize::try_from(audio.frames().as_u64()).map_err(|_| WavError::WriteFailed {
+        message: "frame count cannot be represented on this platform".to_owned(),
+    })?;
+
+    for frame_index in 0..frames {
+        for channel_index in 0..channels {
+            let sample =
+                audio
+                    .sample(channel_index, frame_index)
+                    .ok_or_else(|| WavError::WriteFailed {
+                        message: "audio buffer shape changed during encode".to_owned(),
+                    })?;
+            let sample = pcm16_from_f32(sample, channel_index, frame_index)?;
+            writer
+                .write_sample(sample)
+                .map_err(|error| WavError::WriteFailed {
+                    message: error.to_string(),
+                })?;
+        }
+    }
+
+    writer.finalize().map_err(|error| WavError::WriteFailed {
+        message: error.to_string(),
+    })
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn pcm16_from_f32(sample: f32, channel_index: usize, frame_index: usize) -> Result<i16> {
+    if !sample.is_finite() {
+        return Err(WavError::NonFiniteSample {
+            channel_index,
+            frame_index,
+        });
+    }
+
+    let scaled = (sample.clamp(-1.0, 1.0) * 32768.0)
+        .round()
+        .clamp(f32::from(i16::MIN), f32::from(i16::MAX));
+
+    Ok(scaled as i16)
+}
+
 fn frame_count(frames_per_channel: u32) -> FrameCount {
     FrameCount::new(u64::from(frames_per_channel))
 }
@@ -271,9 +458,15 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use auralis_codec::{AudioReader, CodecKind};
+    use auralis_codec::{AudioReader, AudioWriter, CodecError, CodecKind};
+    use auralis_core::{
+        AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
+    };
 
-    use super::{Pcm16WavReader, WavError, WavSampleEncoding, decode_pcm16, decode_pcm16_path};
+    use super::{
+        Pcm16WavReader, Pcm16WavWriter, WavError, WavSampleEncoding, decode_pcm16,
+        decode_pcm16_path, encode_pcm16_path,
+    };
 
     #[test]
     fn decodes_mono_pcm16_to_planar_f32() {
@@ -360,6 +553,101 @@ mod tests {
     }
 
     #[test]
+    fn encodes_mono_pcm16_from_planar_f32() {
+        let audio = audio_buffer(1, 4, &[-1.0, 0.0, 0.5, f32::from(32_767_i16) / 32768.0]);
+        let path = encode_temp_wav("auralis-wav-encode-mono", &audio);
+        let decoded = decode_pcm16_path(&path).unwrap();
+
+        fs::remove_file(path).unwrap();
+        assert_eq!(decoded.spec().sample_rate().as_u32(), 48_000);
+        assert_eq!(decoded.spec().channels().as_u16(), 1);
+        assert_eq!(decoded.frames().as_u64(), 4);
+        assert_eq!(
+            decoded.channel(0).unwrap(),
+            &[-1.0, 0.0, 0.5, f32::from(32_767_i16) / 32768.0]
+        );
+    }
+
+    #[test]
+    fn encodes_stereo_pcm16_by_interleaving_frames() {
+        let audio = audio_buffer(2, 3, &[-1.0, -0.5, 0.0, 0.999_969_5, 0.5, 0.25]);
+        let path = encode_temp_wav("auralis-wav-encode-stereo", &audio);
+        let decoded = decode_pcm16_path(&path).unwrap();
+
+        fs::remove_file(path).unwrap();
+        assert_eq!(decoded.spec().channels().as_u16(), 2);
+        assert_eq!(decoded.frames().as_u64(), 3);
+        assert_eq!(decoded.channel(0).unwrap(), &[-1.0, -0.5, 0.0]);
+        assert_eq!(
+            decoded.channel(1).unwrap(),
+            &[f32::from(32_767_i16) / 32768.0, 0.5, 0.25]
+        );
+    }
+
+    #[test]
+    fn encode_clips_samples_to_pcm16_range() {
+        let audio = audio_buffer(1, 4, &[-2.0, -1.0, 1.0, 2.0]);
+        let path = encode_temp_wav("auralis-wav-encode-clip", &audio);
+        let decoded = decode_pcm16_path(&path).unwrap();
+
+        fs::remove_file(path).unwrap();
+        assert_eq!(
+            decoded.channel(0).unwrap(),
+            &[
+                -1.0,
+                -1.0,
+                f32::from(32_767_i16) / 32768.0,
+                f32::from(32_767_i16) / 32768.0,
+            ]
+        );
+    }
+
+    #[test]
+    fn encode_rejects_non_finite_samples() {
+        let audio = audio_buffer(2, 2, &[0.0, 0.25, 0.5, f32::NAN]);
+        let path = temp_path("auralis-wav-encode-nan", "wav");
+        let error = encode_pcm16_path(&path, &audio).unwrap_err();
+
+        let _ = fs::remove_file(path);
+        assert_eq!(
+            error,
+            WavError::NonFiniteSample {
+                channel_index: 1,
+                frame_index: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn round_trips_generated_pcm16_signal() {
+        let input = audio_buffer(2, 4, &[-0.75, -0.25, 0.25, 0.75, 0.0, 0.125, -0.125, 0.5]);
+        let first_path = encode_temp_wav("auralis-wav-roundtrip-first", &input);
+        let decoded = decode_pcm16_path(&first_path).unwrap();
+        let second_path = encode_temp_wav("auralis-wav-roundtrip-second", &decoded);
+        let round_tripped = decode_pcm16_path(&second_path).unwrap();
+
+        fs::remove_file(first_path).unwrap();
+        fs::remove_file(second_path).unwrap();
+        assert_eq!(round_tripped, decoded);
+    }
+
+    #[test]
+    fn implements_codec_writer_boundary() {
+        let audio = audio_buffer(1, 1, &[0.0]);
+        let mut writer = Pcm16WavWriter::new(Cursor::new(Vec::new()));
+
+        writer.write_audio(&audio).unwrap();
+        assert_eq!(writer.codec_kind(), CodecKind::Wav);
+        assert!(matches!(
+            writer.write_audio(&audio),
+            Err(CodecError::EncodeFailed {
+                kind: CodecKind::Wav,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn mono_decode_matches_sox_ng_golden_raw_float_reference() {
         compare_sox_ng(1, &[-32768, -1234, 0, 12_345, 32_767]);
     }
@@ -367,6 +655,51 @@ mod tests {
     #[test]
     fn stereo_decode_matches_sox_ng_golden_raw_float_reference() {
         compare_sox_ng(2, &[-32768, 32_767, -12_000, 12_000, 0, 4096]);
+    }
+
+    #[test]
+    fn encoded_stereo_samples_match_sox_ng_pcm16_reference() {
+        let channels = 2;
+        let audio = audio_buffer(2, 3, &[-0.75, 0.0, 0.75, -0.5, 0.5, 0.999_969_5]);
+        let auralis_output = encode_temp_wav("auralis-wav-sox-encode-auralis", &audio);
+        let raw_input = temp_path("auralis-wav-sox-encode-input", "f32");
+        let sox_output = temp_path("auralis-wav-sox-encode-output", "wav");
+        write_le_f32(
+            &raw_input,
+            &interleave_planar(audio.as_planar_f32(), channels),
+        )
+        .unwrap();
+
+        let sox_ng = env::var("AURALIS_SOX_NG_BIN").unwrap_or_else(|_| "sox_ng".to_owned());
+        let status = Command::new(sox_ng)
+            .args([
+                "-R",
+                "-D",
+                "-t",
+                "f32",
+                "-r",
+                "48000",
+                "-c",
+                "2",
+                raw_input.to_str().unwrap(),
+                "-b",
+                "16",
+                "-e",
+                "signed-integer",
+                sox_output.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let auralis = decode_pcm16_path(&auralis_output).unwrap();
+        let sox = decode_pcm16_path(&sox_output).unwrap();
+
+        fs::remove_file(auralis_output).unwrap();
+        fs::remove_file(raw_input).unwrap();
+        fs::remove_file(sox_output).unwrap();
+
+        assert_close_by_one_lsb(auralis.as_planar_f32(), sox.as_planar_f32());
     }
 
     fn compare_sox_ng(channels: u16, samples: &[i16]) {
@@ -466,6 +799,15 @@ mod tests {
             .collect())
     }
 
+    fn write_le_f32(path: &Path, samples: &[f32]) -> std::io::Result<()> {
+        let mut bytes = Vec::with_capacity(samples.len() * 4);
+        for sample in samples {
+            bytes.extend_from_slice(&sample.to_le_bytes());
+        }
+
+        fs::write(path, bytes)
+    }
+
     fn interleave_planar(planar: &[f32], channels: u16) -> Vec<f32> {
         let channel_count = usize::from(channels);
         let frames = planar.len() / channel_count;
@@ -478,5 +820,32 @@ mod tests {
         }
 
         interleaved
+    }
+
+    fn audio_buffer(channels: u16, frames: u64, planar: &[f32]) -> AudioBuffer {
+        let spec = AudioSpec::new(
+            SampleRate::new(48_000).unwrap(),
+            ChannelCount::new(channels).unwrap(),
+            SampleFormat::Float32,
+        );
+
+        AudioBuffer::from_planar_f32(spec, FrameCount::new(frames), planar.to_vec()).unwrap()
+    }
+
+    fn encode_temp_wav(prefix: &str, audio: &AudioBuffer) -> PathBuf {
+        let path = temp_path(prefix, "wav");
+        encode_pcm16_path(&path, audio).unwrap();
+        path
+    }
+
+    fn assert_close_by_one_lsb(left: &[f32], right: &[f32]) {
+        assert_eq!(left.len(), right.len());
+        for (index, (left, right)) in left.iter().zip(right).enumerate() {
+            let delta = (left - right).abs();
+            assert!(
+                delta <= 1.0 / 32768.0,
+                "sample {index} differed by {delta}: {left} != {right}"
+            );
+        }
     }
 }

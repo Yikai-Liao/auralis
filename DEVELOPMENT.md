@@ -401,6 +401,8 @@ Do not implement writing yet.
 
 ### Feature 1.3: PCM16 WAV encode
 
+Status: implemented.
+
 Implement planar `f32` to PCM16 WAV writing.
 
 Acceptance tests:
