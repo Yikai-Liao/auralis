@@ -494,6 +494,22 @@ Implementation notes:
 
 Implement a scalar biquad primitive before exposing effect names.
 
+Status: implemented.
+
+Implementation notes:
+
+- Added reusable `BiquadCoefficients`, `Biquad`, and `BiquadState` types for
+  normalized direct-form biquad filtering with `a0 = 1`.
+- Raw `b0 b1 b2 a0 a1 a2` coefficient input can be normalized through the
+  primitive while rejecting non-finite coefficients and zero `a0` values.
+- Processing uses deterministic scalar transposed direct-form II state with
+  one independent state per channel; callers can preserve `BiquadState` across
+  chunks for streaming-safe processing.
+- Coverage includes analytical impulse-response, identity, raw-normalization,
+  invalid-coefficient, stereo-state, property, and chunk-invariance tests. No
+  SoX-ng golden command is added yet because Feature 6.4.2 owns the exposed
+  `biquad` effect surface.
+
 ### Feature 6.4.2: `biquad` effect
 
 Expose direct coefficient-based biquad processing.

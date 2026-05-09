@@ -23,6 +23,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod biquad;
 mod centercut;
 mod chain;
 mod chain_dispatch;
@@ -71,6 +72,7 @@ mod tremolo;
 mod trim;
 mod vol;
 
+pub use biquad::{Biquad, BiquadCoefficients, BiquadState};
 pub use centercut::Centercut;
 pub use chain::{
     ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,

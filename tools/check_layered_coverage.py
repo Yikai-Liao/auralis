@@ -65,8 +65,10 @@ def validate() -> list[str]:
         elif kind == "pipeline":
             if subject_id.startswith("pipeline.combine."):
                 combine_ids.add(subject_id)
+        elif kind == "primitive":
+            pass
         else:
-            errors.append(f"{subject_id}: kind must be effect or pipeline")
+            errors.append(f"{subject_id}: kind must be effect, pipeline, or primitive")
 
         validate_layers(subject, subject_id, errors)
 

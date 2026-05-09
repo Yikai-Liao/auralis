@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Saturation, SaturationType, Tremolo,
-    Vol,
+    Biquad, BiquadCoefficients, BiquadState, Contrast, DcShift, EffectChain, EffectCommand, Fade,
+    Gain, Saturation, SaturationType, Tremolo, Vol,
 };
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
@@ -123,6 +123,25 @@ fn tremolo_matches_whole_buffer_for_l5_chunk_matrix() {
 }
 
 #[test]
+fn biquad_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
+    let coefficients = BiquadCoefficients::normalized(0.5, 0.25, 0.125, -0.25, 0.0625)
+        .expect("fixture coefficients are finite");
+    let biquad = Biquad::new(coefficients);
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        biquad.process_buffer(&mut whole);
+        process_biquad_by_channel_chunks(&mut chunked, coefficients, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -220,6 +239,22 @@ fn process_streaming_safe_chain_by_chunks(
             }
             _ => panic!("L5 streaming-safe chain fixture contained an unknown command"),
         }
+    }
+}
+
+fn process_biquad_by_channel_chunks(
+    audio: &mut AudioBuffer,
+    coefficients: BiquadCoefficients,
+    schedule: &ChunkSchedule,
+) {
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel_mut(channel_index)
+            .expect("channel index is within the audio shape");
+        let mut state = BiquadState::new(coefficients);
+        process_chunks_mut(channel, schedule, |chunk, _start_frame| {
+            state.process_mono_samples(chunk);
+        });
     }
 }
 

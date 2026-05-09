@@ -7,6 +7,21 @@
 schema_version = 1
 
 [[subject]]
+id = "primitive.biquad"
+kind = "primitive"
+name = "biquad"
+summary = "Reusable scalar direct-form biquad filter primitive for future tone/filter effects."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "The primitive is not a user-facing effect and does not consume deterministic corpus IDs directly.", tests = [] }
+l1 = { status = "not_applicable", reason = "The primitive operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "not_applicable", reason = "Feature 6.4.1 intentionally does not expose a SoX-ng command surface; golden coverage starts with the biquad effect.", tests = [] }
+l3 = { status = "covered", reason = "Analytical tests cover identity coefficients, raw-coefficient normalization, one-pole impulse response, stereo-independent state, invalid coefficients, and chunk-state equivalence.", tests = ["crates/auralis-effects/src/biquad.rs"] }
+l4 = { status = "covered", reason = "Property tests cover identity preservation and finite output for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers state-preserving biquad chunks versus whole-buffer processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "not_applicable", reason = "The initial primitive is scalar-only and establishes the reference path before any SIMD filter kernel exists.", tests = [] }
+l7 = { status = "not_applicable", reason = "No parser or serialized command surface exists for the primitive in Feature 6.4.1.", tests = [] }
+
+[[subject]]
 id = "effect.centercut"
 kind = "effect"
 name = "centercut"

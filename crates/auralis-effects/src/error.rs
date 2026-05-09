@@ -35,6 +35,10 @@ pub enum EffectError {
     #[error("repeat output frame count exceeds representable audio buffer length")]
     RepeatLengthOverflow,
 
+    /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
+    #[error("biquad coefficients must be finite and a0 must be nonzero")]
+    InvalidBiquadCoefficients,
+
     /// A remix command used an invalid basic routing specification.
     #[error("remix output specifications must contain channel numbers, ranges, or a standalone 0")]
     InvalidRemixRouting,

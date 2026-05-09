@@ -4,9 +4,9 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Centercut, Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix,
-    RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap,
-    Tremolo, Trim, Vol,
+    Biquad, BiquadCoefficients, Centercut, Channels, Contrast, DcShift, Fade, Gain, Norm, Oops,
+    Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation,
+    SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -126,6 +126,10 @@ proptest! {
             .expect("zero-speed tremolo is valid")
             .process_buffer(&mut unmodulated);
         prop_assert_sample_bits_eq(unmodulated.as_planar_f32(), source.as_planar_f32())?;
+
+        let mut biquad_filtered = source.clone();
+        Biquad::default().process_buffer(&mut biquad_filtered);
+        prop_assert_sample_bits_eq(biquad_filtered.as_planar_f32(), source.as_planar_f32())?;
 
         let mut normalized_silence = zero_audio_like(&source);
         Norm::zero_db().expect("zero dB is valid")
@@ -282,6 +286,14 @@ proptest! {
             .expect("generated saturation settings are valid")
             .process_buffer(&mut saturated);
         prop_assert_all_finite(&saturated)?;
+
+        let mut biquad_filtered = source.clone();
+        Biquad::new(
+            BiquadCoefficients::normalized(0.5, 0.25, 0.125, -0.25, 0.0625)
+                .expect("fixture coefficients are finite"),
+        )
+        .process_buffer(&mut biquad_filtered);
+        prop_assert_all_finite(&biquad_filtered)?;
 
         let mut faded = source.clone();
         let fade_in = FrameCount::new(u64::try_from(audio.frames / 2).expect("frame strategy fits u64"));
