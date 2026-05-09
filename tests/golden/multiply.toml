@@ -1,0 +1,21 @@
+# Representative multiply-combiner golden cases. Multiply is a parallel
+# arithmetic combiner: corresponding samples are multiplied, and shorter inputs
+# or missing channels contribute silence.
+
+[id.multiply_mono_mismatched_lengths]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+combine = "multiply"
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.multiply_stereo_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+combine = "multiply"
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

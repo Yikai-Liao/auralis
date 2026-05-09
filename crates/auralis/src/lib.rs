@@ -106,6 +106,9 @@ pub enum CombineMethod {
 
     /// Merge all channels from all inputs into one multichannel output.
     Merge,
+
+    /// Multiply corresponding channels and samples from all inputs.
+    Multiply,
 }
 
 impl CombineMethod {
@@ -118,6 +121,7 @@ impl CombineMethod {
             Self::Mix => "mix",
             Self::MixPower => "mix-power",
             Self::Merge => "merge",
+            Self::Multiply => "multiply",
         }
     }
 
@@ -130,6 +134,7 @@ impl CombineMethod {
             "mix" => Some(Self::Mix),
             "mix-power" => Some(Self::MixPower),
             "merge" => Some(Self::Merge),
+            "multiply" => Some(Self::Multiply),
             _ => None,
         }
     }
@@ -257,6 +262,10 @@ pub enum InputCombineError {
     /// A backend-dispatched mixing kernel rejected the channel slices.
     #[error(transparent)]
     Mix(#[from] auralis_simd::MixError),
+
+    /// A backend-dispatched multiply kernel rejected the channel slices.
+    #[error(transparent)]
+    Multiply(#[from] auralis_simd::MultiplyError),
 }
 
 /// Concatenates already-decoded planar audio buffers.
@@ -454,6 +463,89 @@ pub fn merge_audio_buffers(
             output_channel[..source.len()].copy_from_slice(source);
             output_channel_index += 1;
         }
+    }
+
+    Ok(output)
+}
+
+/// Multiplies already-decoded planar audio buffers using SoX-ng `multiply` semantics.
+///
+/// The output frame count is the longest input and the output channel count is
+/// the largest input channel count. Each output sample is the product of all
+/// corresponding input samples for that channel and frame. Missing tail frames
+/// and missing channels are treated as silence, so any missing contribution
+/// makes that output sample `0.0`. A single input is an identity copy. Inputs
+/// must share sample rate and internal sample format; channel counts may
+/// differ.
+///
+/// Multiplication itself does not clip or normalize. If multiplied samples are
+/// outside `[-1.0, 1.0]`, later boundary writers such as PCM16 WAV encoding
+/// apply their documented clipping.
+///
+/// # Errors
+///
+/// Returns [`InputCombineError::EmptyInputList`] for no inputs, a mismatch
+/// variant when an input's sample rate or sample format is incompatible with
+/// the first input, or an overflow/shape/kernel error if the output buffer
+/// cannot be represented.
+pub fn multiply_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    multiply_audio_buffers_with_backend(inputs, BackendKind::Scalar)
+}
+
+/// Multiplies already-decoded planar audio buffers with a requested backend.
+///
+/// `requested_backend` selects the scalar or SIMD multiply kernel through the
+/// same deterministic backend fallback rules used by backend-aware effects.
+/// Numerical behavior matches [`multiply_audio_buffers`].
+///
+/// # Errors
+///
+/// Returns the same errors as [`multiply_audio_buffers`].
+pub fn multiply_audio_buffers_with_backend(
+    inputs: &[AudioBuffer],
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    let Some(first) = inputs.first() else {
+        return Err(InputCombineError::EmptyInputList);
+    };
+
+    let spec = first.spec();
+    let mut max_frames = first.frames();
+    let mut max_channels = spec.channels();
+    for (input_index, input) in inputs.iter().enumerate() {
+        validate_mix_input(input_index, spec, input)?;
+        if input.frames() > max_frames {
+            max_frames = input.frames();
+        }
+        if input.channels() > max_channels {
+            max_channels = input.channels();
+        }
+    }
+
+    let output_spec = AudioSpec::new(spec.sample_rate(), max_channels, spec.sample_format());
+    let mut output = AudioBuffer::zeroed(output_spec, max_frames)?;
+    let selection = auralis_simd::select_backend(requested_backend);
+
+    for channel_index in 0..max_channels.as_usize() {
+        let mut channel_inputs = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            if channel_index < input.channels().as_usize() {
+                channel_inputs.push(
+                    input
+                        .channel(channel_index)
+                        .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?,
+                );
+            } else {
+                channel_inputs.push(&[]);
+            }
+        }
+
+        let output_channel = output
+            .channel_mut(channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        auralis_simd::multiply_f32_with_backend(selection, &channel_inputs, output_channel)?;
     }
 
     Ok(output)
@@ -987,6 +1079,60 @@ impl AudioFile {
         Self::from_audio_buffers_merged_with_backend(&inputs, requested_backend)
     }
 
+    /// Opens multiple PCM16 WAV files and multiplies corresponding samples.
+    ///
+    /// This is the library counterpart to `auralis run --combine multiply`.
+    /// Each input is decoded into planar `f32`; output samples are the product
+    /// of corresponding input channels and frames. The output length is the
+    /// longest input and the output channel count is the largest input channel
+    /// count. Missing tail frames and missing channels are silence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the multiplied buffer cannot be
+    /// represented.
+    pub fn open_wavs_multiplied<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        Self::open_wavs_multiplied_with_backend(paths, BackendKind::Scalar)
+    }
+
+    /// Opens multiple PCM16 WAV files and multiplies corresponding samples with a requested backend.
+    ///
+    /// `requested_backend` controls decode conversion, the scalar/SIMD multiply
+    /// kernel, later backend-aware effects, and output encoding after
+    /// [`Self::into_pipeline`]. SIMD requests follow Auralis' deterministic
+    /// scalar fallback rules when SIMD is unavailable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty, sample rates or
+    /// sample formats are incompatible, or the multiplied buffer cannot be
+    /// represented.
+    pub fn open_wavs_multiplied_with_backend<I, P>(
+        paths: I,
+        requested_backend: BackendKind,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut inputs = Vec::new();
+        for path in paths {
+            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+                path,
+                requested_backend,
+            )?);
+        }
+
+        Self::from_audio_buffers_multiplied_with_backend(&inputs, requested_backend)
+    }
+
     /// Wraps an existing audio buffer in the high-level file type.
     ///
     /// This is primarily useful for tests and applications that decoded audio
@@ -1176,6 +1322,43 @@ impl AudioFile {
     ) -> Result<Self> {
         Ok(Self {
             audio: merge_audio_buffers(inputs)?,
+            requested_backend,
+        })
+    }
+
+    /// Multiplies existing audio buffers into the high-level file type.
+    ///
+    /// Inputs are combined before the returned value enters the effect
+    /// pipeline. Output samples are the product of corresponding input channels
+    /// and frames. The output length is the longest input and the output
+    /// channel count is the largest input channel count. Missing tail frames
+    /// and missing channels are silence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the multiplied buffer
+    /// cannot be represented.
+    pub fn from_audio_buffers_multiplied(inputs: &[AudioBuffer]) -> Result<Self> {
+        Self::from_audio_buffers_multiplied_with_backend(inputs, BackendKind::Scalar)
+    }
+
+    /// Multiplies existing audio buffers with a requested processing backend.
+    ///
+    /// The backend is recorded for later pipeline stages and selects the
+    /// scalar/SIMD multiply kernel for this combiner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, sample
+    /// rates or sample formats are incompatible, or the multiplied buffer
+    /// cannot be represented.
+    pub fn from_audio_buffers_multiplied_with_backend(
+        inputs: &[AudioBuffer],
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
+        Ok(Self {
+            audio: multiply_audio_buffers_with_backend(inputs, requested_backend)?,
             requested_backend,
         })
     }
@@ -1489,7 +1672,8 @@ mod tests {
         AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
         concatenate_audio_buffers, merge_audio_buffers, mix_audio_buffers,
         mix_audio_buffers_with_backend, mix_power_audio_buffers,
-        mix_power_audio_buffers_with_backend, sequence_audio_buffers,
+        mix_power_audio_buffers_with_backend, multiply_audio_buffers,
+        multiply_audio_buffers_with_backend, sequence_audio_buffers,
     };
     use std::{
         fs,
@@ -2461,6 +2645,173 @@ mod tests {
             decoded.as_planar_f32(),
             &[0.25, -0.5, 0.0, 0.75, 0.0, -0.25],
         );
+        fs::remove_dir_all(tempdir).unwrap();
+    }
+
+    #[test]
+    fn multiply_audio_buffers_multiplies_equal_length_mono_inputs() {
+        let first = audio_buffer(vec![0.5, -0.5, 1.0]);
+        let second = audio_buffer(vec![0.25, 1.0, -0.5]);
+
+        let actual = multiply_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.channels(), ChannelCount::new(1).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.125, -0.5, -0.5]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_treats_mismatched_lengths_as_silence() {
+        let first = audio_buffer(vec![0.5, -0.5]);
+        let second = audio_buffer(vec![0.25, 1.0, -0.5]);
+
+        let actual = multiply_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.125, -0.5, 0.0]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_preserves_stereo_channel_grouping() {
+        let first = stereo_audio_buffer(vec![0.5, -0.5, 1.0, -1.0]);
+        let second = stereo_audio_buffer(vec![0.25, 1.0, -0.5, -0.5]);
+
+        let actual = multiply_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.125, -0.5, -0.5, 0.5]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_accepts_mismatched_channel_counts_with_silence() {
+        let mono = audio_buffer(vec![0.5, -0.5]);
+        let stereo = stereo_audio_buffer(vec![0.25, 1.0, -0.5, -0.5]);
+
+        let actual = multiply_audio_buffers(&[mono, stereo]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.125, -0.5, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_single_input_is_identity() {
+        let first = audio_buffer(vec![0.5, -0.5, 1.0]);
+
+        let actual = multiply_audio_buffers(&[first]).unwrap();
+
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.5, -0.5, 1.0]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_zero_sample_zeros_product() {
+        let first = audio_buffer(vec![0.5, -0.5, 1.0]);
+        let second = audio_buffer(vec![1.0, 0.0, 1.0]);
+
+        let actual = multiply_audio_buffers(&[first, second]).unwrap();
+
+        assert_sample_bits_eq(actual.as_planar_f32(), &[0.5, -0.0, 1.0]);
+    }
+
+    #[test]
+    fn multiply_audio_buffers_rejects_mismatched_sample_rate() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 44_100, 1, SampleFormat::Float32);
+
+        let error = multiply_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleRate {
+                input_index: 1,
+                expected: SampleRate::new(48_000).unwrap(),
+                actual: SampleRate::new(44_100).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn multiply_audio_buffers_rejects_mismatched_sample_format() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 48_000, 1, SampleFormat::Pcm16);
+
+        let error = multiply_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleFormat {
+                input_index: 1,
+                expected: SampleFormat::Float32,
+                actual: SampleFormat::Pcm16,
+            }
+        );
+    }
+
+    #[test]
+    fn multiply_audio_buffers_matches_under_forced_scalar_and_requested_simd() {
+        let first = audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+        ]);
+        let second = audio_buffer(vec![1.0, 0.999_984_74, 0.5, 0.0, -0.0]);
+
+        let scalar = multiply_audio_buffers_with_backend(
+            &[first.clone(), second.clone()],
+            BackendKind::Scalar,
+        )
+        .unwrap();
+        let simd =
+            multiply_audio_buffers_with_backend(&[first, second], BackendKind::Simd).unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+    }
+
+    #[test]
+    fn multiplied_audio_enters_effect_pipeline_before_effects() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75, 1.0, -0.25]);
+
+        let actual = AudioFile::from_audio_buffers_multiplied(&[first, second])
+            .unwrap()
+            .into_pipeline()
+            .gain_db(6.0)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        let multiplier = 10.0_f32.powf(6.0 / 20.0);
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[0.0, (-0.5 * 1.0) * multiplier, (0.25 * 0.75) * multiplier],
+        );
+    }
+
+    #[test]
+    fn open_wavs_multiplied_round_trips_through_file_boundary() {
+        let tempdir = temp_dir();
+        fs::create_dir(&tempdir).unwrap();
+        let first = tempdir.join("first.wav");
+        let second = tempdir.join("second.wav");
+        let output = tempdir.join("output.wav");
+
+        auralis_wav::encode_pcm16_path(&first, &audio_buffer(vec![0.25, -0.5])).unwrap();
+        auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75, 1.0, -0.25])).unwrap();
+
+        AudioFile::open_wavs_multiplied([&first, &second])
+            .unwrap()
+            .into_pipeline()
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+        assert_samples_close(decoded.as_planar_f32(), &[0.1875, -0.5, 0.0]);
         fs::remove_dir_all(tempdir).unwrap();
     }
 

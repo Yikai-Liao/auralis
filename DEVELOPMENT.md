@@ -1250,6 +1250,8 @@ Acceptance tests:
 
 #### Feature 5.4.6: multiply combiner
 
+Status: implemented.
+
 Implement the multiply combiner.
 
 Acceptance tests:
