@@ -298,6 +298,8 @@ Completion criteria:
 
 ### Feature 0.2: core error and type vocabulary
 
+Status: implemented.
+
 Implement in `auralis-core`:
 
 - `AuralisError`

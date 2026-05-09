@@ -18,6 +18,9 @@ repository = "https://github.com/sox-rs/auralis"
 rust-version = "1.95"
 version = "0.0.0"
 
+[workspace.dependencies]
+thiserror = "2.0.17"
+
 [workspace.lints.rust]
 missing_docs = "warn"
 
