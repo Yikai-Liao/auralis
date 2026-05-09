@@ -662,6 +662,162 @@ fn run_fade_frames_output_matches_under_forced_scalar_and_requested_simd() {
 }
 
 #[test]
+fn run_positional_effect_chain_output_matches_in_memory_chain() {
+    let input = temp_path("auralis-cli-run-chain-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-chain-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-chain-library-output", "wav");
+    write_pcm16_wav(&input, 2, &[-16_384, 16_384, -8_192, 8_192, 0, 4096]);
+    let chain_tokens = ["gain", "-6", "dcshift", "0.125", "reverse"];
+    let chain = auralis::parse_effect_chain(&chain_tokens).unwrap();
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .apply_effect_chain(&chain)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "gain",
+            "-6",
+            "dcshift",
+            "0.125",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
+fn run_positional_effect_chain_preserves_user_order() {
+    let input = temp_path("auralis-cli-run-chain-order-input", "wav");
+    let gain_then_shift = temp_path("auralis-cli-run-chain-gain-shift-output", "wav");
+    let shift_then_gain = temp_path("auralis-cli-run-chain-shift-gain-output", "wav");
+    write_pcm16_wav(&input, 1, &[4096, 8192, 12_288]);
+
+    let gain_then_shift_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            gain_then_shift.to_str().unwrap(),
+            "gain",
+            "-6",
+            "dcshift",
+            "0.125",
+        ])
+        .output()
+        .unwrap();
+    let shift_then_gain_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            shift_then_gain.to_str().unwrap(),
+            "dcshift",
+            "0.125",
+            "gain",
+            "-6",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        gain_then_shift_output.status.success(),
+        "stderr: {}",
+        stderr(&gain_then_shift_output)
+    );
+    assert!(
+        shift_then_gain_output.status.success(),
+        "stderr: {}",
+        stderr(&shift_then_gain_output)
+    );
+    assert_ne!(
+        read_pcm16_wav(&gain_then_shift),
+        read_pcm16_wav(&shift_then_gain)
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(gain_then_shift).unwrap();
+    fs::remove_file(shift_then_gain).unwrap();
+}
+
+#[test]
+fn run_invalid_positional_chain_reports_failing_effect_and_argument() {
+    let input = temp_path("auralis-cli-run-invalid-chain-input", "wav");
+    let output = temp_path("auralis-cli-run-invalid-chain-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "gain",
+            "-3",
+            "trim",
+            "1",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("effect chain command 1 (`trim 1`) failed to parse"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("effect `trim` requires argument `end-frame`"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn run_rejects_mixed_positional_chain_and_legacy_effect_flags() {
+    let input = temp_path("auralis-cli-run-mixed-chain-input", "wav");
+    let output = temp_path("auralis-cli-run-mixed-chain-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--gain-db",
+            "-3",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("positional effect chains cannot be combined with legacy effect flags"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
@@ -809,6 +965,11 @@ fn run_help_documents_gain_and_trim_units() {
     assert!(stdout.contains("--reverse"), "{stdout}");
     assert!(
         stdout.contains("Reverse frame order within each channel"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("[EFFECT]..."), "{stdout}");
+    assert!(
+        stdout.contains("Positional SoX-ng-style effect chain tokens"),
         "{stdout}"
     );
 }

@@ -35,7 +35,10 @@ mod chain;
 mod command;
 mod registry;
 
-pub use chain::{ChainResult, EffectChain, EffectChainError};
+pub use chain::{
+    ChainParseResult, ChainResult, EffectChain, EffectChainError, EffectChainParseError,
+    parse_effect_chain,
+};
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,

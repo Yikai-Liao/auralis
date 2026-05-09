@@ -25,7 +25,9 @@
 use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
-pub use auralis_effects::{EffectChain, EffectChainError, EffectCommand};
+pub use auralis_effects::{
+    EffectChain, EffectChainError, EffectChainParseError, EffectCommand, parse_effect_chain,
+};
 pub use auralis_simd::BackendKind;
 
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};

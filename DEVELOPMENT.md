@@ -1093,6 +1093,8 @@ Acceptance tests:
 
 #### Feature 5.2.2: CLI sequential chain syntax
 
+Status: implemented.
+
 Expose multi-effect chains in `auralis run`.
 
 Acceptance tests:

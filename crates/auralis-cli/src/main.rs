@@ -17,6 +17,7 @@ struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Command {
     /// Print metadata for a supported audio file.
     Inspect {
@@ -79,6 +80,10 @@ enum Command {
         /// Reverse frame order within each channel.
         #[arg(long)]
         reverse: bool,
+
+        /// Positional SoX-ng-style effect chain tokens, such as `gain -3 reverse`.
+        #[arg(value_name = "EFFECT", num_args = 0.., allow_hyphen_values = true)]
+        effect_chain: Vec<String>,
     },
 }
 
@@ -110,10 +115,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
             fade_in_frame,
             fade_out_frame,
             reverse,
-        } => run_pipeline(
-            &input,
-            &output,
-            RunOptions {
+            effect_chain,
+        } => {
+            let options = RunOptions {
                 backend,
                 gain_db,
                 dc_shift,
@@ -126,8 +130,11 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 fade_in_frame,
                 fade_out_frame,
                 reverse,
-            },
-        ),
+                effect_chain,
+            };
+
+            run_pipeline(&input, &output, &options)
+        }
     }
 }
 
@@ -148,14 +155,23 @@ fn inspect(input: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), CliError> {
+fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
-    let trim = options.trim_mode()?;
     let backend = options.backend;
+    let effect_chain = options.effect_chain()?;
     let pipeline = auralis::AudioFile::open_wav_with_backend(input, backend)?
         .into_pipeline()
         .with_backend(backend);
+
+    if let Some(effect_chain) = effect_chain {
+        pipeline
+            .apply_effect_chain(&effect_chain)
+            .write_wav(output)?;
+        return Ok(());
+    }
+
+    let trim = options.trim_mode()?;
     let pipeline = if let Some(gain_db) = options.gain_db {
         pipeline.gain_db(gain_db)
     } else {
@@ -194,7 +210,7 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 struct RunOptions {
     backend: auralis::BackendKind,
     gain_db: Option<f64>,
@@ -208,10 +224,39 @@ struct RunOptions {
     fade_in_frame: Option<u64>,
     fade_out_frame: Option<u64>,
     reverse: bool,
+    effect_chain: Vec<String>,
 }
 
 impl RunOptions {
-    fn trim_mode(self) -> Result<Option<TrimMode>, CliError> {
+    fn effect_chain(&self) -> Result<Option<auralis::EffectChain>, CliError> {
+        if self.effect_chain.is_empty() {
+            return Ok(None);
+        }
+        if self.has_legacy_effect_options() {
+            return Err(CliError::MixedEffectSyntax);
+        }
+
+        let tokens: Vec<&str> = self.effect_chain.iter().map(String::as_str).collect();
+        auralis::parse_effect_chain(&tokens)
+            .map(Some)
+            .map_err(CliError::from)
+    }
+
+    fn has_legacy_effect_options(&self) -> bool {
+        self.gain_db.is_some()
+            || self.dc_shift.is_some()
+            || self.trim_start_frame.is_some()
+            || self.trim_end_frame.is_some()
+            || self.trim_start_seconds.is_some()
+            || self.trim_end_seconds.is_some()
+            || self.pad_start_frame.is_some()
+            || self.pad_end_frame.is_some()
+            || self.fade_in_frame.is_some()
+            || self.fade_out_frame.is_some()
+            || self.reverse
+    }
+
+    fn trim_mode(&self) -> Result<Option<TrimMode>, CliError> {
         let has_frame_trim = self.trim_start_frame.is_some() || self.trim_end_frame.is_some();
         let has_seconds_trim = self.trim_start_seconds.is_some() || self.trim_end_seconds.is_some();
 
@@ -268,9 +313,11 @@ fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
 #[derive(Debug)]
 enum CliError {
     Auralis(auralis::Error),
+    ChainParse(auralis::EffectChainParseError),
     Wav(WavError),
     IncompleteTrimRange { unit: TrimUnit },
     MixedTrimUnits,
+    MixedEffectSyntax,
     UnsupportedFormat { path: PathBuf, role: PathRole },
 }
 
@@ -299,6 +346,7 @@ impl std::fmt::Display for CliError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Auralis(error) => write!(formatter, "{error}"),
+            Self::ChainParse(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::IncompleteTrimRange { unit } => match unit {
                 TrimUnit::Frames => formatter
@@ -309,6 +357,8 @@ impl std::fmt::Display for CliError {
             },
             Self::MixedTrimUnits => formatter
                 .write_str("trim range must use either frame units or seconds units, not both"),
+            Self::MixedEffectSyntax => formatter
+                .write_str("positional effect chains cannot be combined with legacy effect flags"),
             Self::UnsupportedFormat { path, role } => {
                 write!(
                     formatter,
@@ -323,6 +373,12 @@ impl std::fmt::Display for CliError {
 impl From<auralis::Error> for CliError {
     fn from(error: auralis::Error) -> Self {
         Self::Auralis(error)
+    }
+}
+
+impl From<auralis::EffectChainParseError> for CliError {
+    fn from(error: auralis::EffectChainParseError) -> Self {
+        Self::ChainParse(error)
     }
 }
 

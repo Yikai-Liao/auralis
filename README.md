@@ -39,6 +39,9 @@ to typed descriptors, parsed command tokens become typed effect configs, and
 unknown names or unsupported SoX-ng options return stable diagnostics. Parsed
 commands can be grouped into an in-memory `EffectChain` and executed in order
 with indexed command-context errors and forced scalar/SIMD backend selection.
+`auralis run <input.wav> <output.wav> gain -3 dcshift 0.125 reverse` exposes
+the same typed chain model at the CLI, preserving positional user order while
+the earlier single-effect flags remain available for compatibility.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -112,8 +115,12 @@ The first command-line equivalent should be simple and scriptable:
 auralis run input.wav output.wav --gain-db -3
 ```
 
-After the Rust pipeline API is stable, Auralis can add a positional effect-chain
-form such as `auralis input.wav output.wav gain -3 trim 0.5 10.0`.
+The positional effect-chain form uses the same typed command parser and chain
+executor as the library:
+
+```bash
+auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
+```
 
 A structured pipeline form should also exist for reproducible batch workflows:
 
@@ -368,7 +375,10 @@ numeric formatting, so equivalent values such as `gain`, `gain 0`, and
 typed commands into an in-memory sequential chain, applies them in caller order,
 supports forced scalar/SIMD backend selection for backend-aware effects, and
 reports processing failures with the zero-based command index, canonical command
-tokens, failed argument family, and typed source error.
+tokens, failed argument family, and typed source error. Flat token streams can
+also be parsed into an `EffectChain`, which is how `auralis run <input>
+<output> gain -3 reverse` shares the same ordering and diagnostics as the
+library API.
 
 ### `auralis-simd`
 
@@ -460,12 +470,16 @@ auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
 auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out-frame 24000
 auralis run input.wav output.wav --reverse
+auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
+auralis run input.wav output.wav --backend simd gain -3 fade l 24000 24000
 auralis run pipeline.toml
 auralis completions zsh
 ```
 
-Do not start with a complex SoX/FFmpeg-style positional effect chain. Add that
-only after the Rust pipeline API is stable.
+The positional effect chain starts after the input and output paths. Backend
+selection remains an option, but legacy one-effect flags such as `--gain-db` are
+not combined with positional chain tokens because their relative order would be
+ambiguous.
 
 Selected crates:
 

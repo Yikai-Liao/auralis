@@ -37,17 +37,23 @@ use auralis_core::AudioBuffer;
 use auralis_simd::BackendKind;
 use thiserror::Error;
 
-use crate::{EffectCommand, EffectError};
+use crate::{
+    EffectCommand, EffectCommandParseError, EffectError, EffectKind, EffectNameError,
+    EffectRegistry, parse_effect_command,
+};
 
 /// Crate-local result type for effect-chain processing.
 pub type ChainResult<T> = std::result::Result<T, EffectChainError>;
 
+/// Crate-local result type for tokenized effect-chain parsing.
+pub type ChainParseResult<T> = std::result::Result<T, EffectChainParseError>;
+
 /// An ordered in-memory sequence of typed effect commands.
 ///
 /// `EffectChain` owns validated command values and applies them exactly in the
-/// order supplied by the caller. It does not parse CLI syntax and does not hide
-/// defaults; callers can use [`crate::parse_effect_command`] before constructing
-/// the chain when they start from SoX-ng-style tokens.
+/// order supplied by the caller. It does not hide defaults; callers can use
+/// [`parse_effect_chain`] before constructing the chain when they start from a
+/// flat SoX-ng-style token stream.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EffectChain {
     commands: Vec<EffectCommand>,
@@ -131,6 +137,63 @@ impl EffectChain {
     }
 }
 
+/// Parses a flat sequence of SoX-ng-style effect tokens into an [`EffectChain`].
+///
+/// The token stream is segmented by effect names and aliases, so
+/// `["gain", "-3", "reverse"]` becomes two commands while
+/// `["gain", "-n"]` remains a single failing command that reports the
+/// unsupported gain option. The resulting chain stores typed commands only and
+/// applies them in the same order as the input tokens.
+///
+/// # Errors
+///
+/// Returns [`EffectChainParseError::CommandParseFailed`] when an effect name is
+/// unknown or unsupported, an argument is missing or invalid, or a command uses
+/// an option outside the currently implemented Auralis subset.
+///
+/// # Examples
+///
+/// ```
+/// use auralis_effects::parse_effect_chain;
+///
+/// let chain = parse_effect_chain(&["gain", "-3", "reverse"])?;
+///
+/// assert_eq!(chain.len(), 2);
+/// assert_eq!(chain.commands()[0].render_tokens(), ["gain", "-3"]);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn parse_effect_chain(tokens: &[&str]) -> ChainParseResult<EffectChain> {
+    let mut commands = Vec::new();
+    let mut offset = 0;
+
+    while offset < tokens.len() {
+        let index = commands.len();
+        let name = tokens[offset];
+
+        let descriptor = EffectRegistry::resolve(name).map_err(|source| {
+            EffectChainParseError::CommandParseFailed {
+                index,
+                command: name.to_owned(),
+                source: source.into(),
+            }
+        })?;
+        let end = command_end(descriptor.kind(), tokens, offset);
+        let command_tokens = &tokens[offset..end];
+        let command = parse_effect_command(command_tokens).map_err(|source| {
+            EffectChainParseError::CommandParseFailed {
+                index,
+                command: command_tokens.join(" "),
+                source,
+            }
+        })?;
+
+        commands.push(command);
+        offset = end;
+    }
+
+    Ok(EffectChain::new(commands))
+}
+
 /// Errors produced while applying an [`EffectChain`].
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
@@ -152,6 +215,25 @@ pub enum EffectChainError {
         /// Typed effect source error.
         #[source]
         source: EffectError,
+    },
+}
+
+/// Errors produced while parsing a tokenized [`EffectChain`].
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum EffectChainParseError {
+    /// One command in the chain could not be parsed into a typed effect command.
+    #[error("effect chain command {index} (`{command}`) failed to parse: {source}")]
+    CommandParseFailed {
+        /// Zero-based command index.
+        index: usize,
+
+        /// Raw command tokens that were being parsed.
+        command: String,
+
+        /// Typed command parser source error.
+        #[source]
+        source: EffectCommandParseError,
     },
 }
 
@@ -194,9 +276,88 @@ fn apply_command(
     }
 }
 
+fn command_end(kind: EffectKind, tokens: &[&str], command_start: usize) -> usize {
+    let args_start = command_start + 1;
+
+    match kind {
+        EffectKind::DcShift => required_arg_end(tokens, args_start, 1),
+        EffectKind::Fade => fade_arg_end(tokens, args_start),
+        EffectKind::Gain => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Pad => optional_arg_end(tokens, args_start, 2),
+        EffectKind::Reverse => no_arg_end(tokens, args_start),
+        EffectKind::Trim => required_arg_end(tokens, args_start, 2),
+    }
+}
+
+fn required_arg_end(tokens: &[&str], args_start: usize, required: usize) -> usize {
+    let mut end = args_start;
+    let mut consumed = 0;
+
+    while consumed < required && end < tokens.len() && !is_effect_boundary(tokens[end]) {
+        consumed += 1;
+        end += 1;
+    }
+
+    if consumed < required {
+        end
+    } else {
+        include_unexpected_argument(tokens, end)
+    }
+}
+
+fn optional_arg_end(tokens: &[&str], args_start: usize, max: usize) -> usize {
+    let mut end = args_start;
+    let mut consumed = 0;
+
+    while consumed < max && end < tokens.len() && !is_effect_boundary(tokens[end]) {
+        consumed += 1;
+        end += 1;
+    }
+
+    include_unexpected_argument(tokens, end)
+}
+
+fn no_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    include_unexpected_argument(tokens, args_start)
+}
+
+fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    if matches!(tokens.get(end).copied(), Some("l" | "q" | "h" | "t" | "p")) {
+        end += 1;
+    }
+
+    if end >= tokens.len() || is_effect_boundary(tokens[end]) {
+        return end;
+    }
+    end += 1;
+
+    if end < tokens.len() && !is_effect_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    include_unexpected_argument(tokens, end)
+}
+
+fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {
+    if end < tokens.len() && !is_effect_boundary(tokens[end]) {
+        end + 1
+    } else {
+        end
+    }
+}
+
+fn is_effect_boundary(token: &str) -> bool {
+    match EffectRegistry::resolve(token) {
+        Ok(_) | Err(EffectNameError::UnsupportedSoxNgEffect { .. }) => true,
+        Err(EffectNameError::EmptyName | EffectNameError::UnknownEffect { .. }) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{EffectChain, EffectChainError};
+    use super::{EffectChain, EffectChainError, EffectChainParseError, parse_effect_chain};
     use crate::{DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, Trim};
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
@@ -281,6 +442,87 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "effect chain command 1 (`trim 0 3`) failed while applying `frame-range`: trim frame range must be within the input duration"
+        );
+    }
+
+    #[test]
+    fn parses_flat_tokens_into_user_ordered_effect_chain() {
+        let chain = parse_effect_chain(&[
+            "gain", "-3", "dcshift", "0.125", "fade", "l", "2", "1", "reverse",
+        ])
+        .unwrap();
+
+        let rendered: Vec<Vec<String>> = chain
+            .commands()
+            .iter()
+            .map(|command| command.render_tokens())
+            .collect();
+        assert_eq!(
+            rendered,
+            vec![
+                vec!["gain", "-3"],
+                vec!["dcshift", "0.125"],
+                vec!["fade", "l", "2", "1"],
+                vec!["reverse"],
+            ]
+        );
+    }
+
+    #[test]
+    fn chain_token_parser_preserves_defaults_and_alias_boundaries() {
+        let chain = parse_effect_chain(&["gain", "dc-shift", "-0.25", "pad", "reverse"]).unwrap();
+
+        let rendered: Vec<Vec<String>> = chain
+            .commands()
+            .iter()
+            .map(|command| command.render_tokens())
+            .collect();
+        assert_eq!(
+            rendered,
+            vec![
+                vec!["gain", "0"],
+                vec!["dcshift", "-0.25"],
+                vec!["pad", "0", "0"],
+                vec!["reverse"],
+            ]
+        );
+    }
+
+    #[test]
+    fn chain_token_parser_reports_failing_command_and_argument() {
+        let error = parse_effect_chain(&["gain", "-3", "trim", "1", "reverse"]).unwrap_err();
+
+        assert_eq!(
+            error,
+            EffectChainParseError::CommandParseFailed {
+                index: 1,
+                command: "trim 1".to_owned(),
+                source: crate::EffectCommandParseError::MissingArgument {
+                    effect: "trim",
+                    argument: "end-frame",
+                },
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "effect chain command 1 (`trim 1`) failed to parse: effect `trim` requires argument `end-frame`"
+        );
+    }
+
+    #[test]
+    fn chain_token_parser_keeps_option_like_values_with_current_command() {
+        let error = parse_effect_chain(&["gain", "-n", "reverse"]).unwrap_err();
+
+        assert_eq!(
+            error,
+            EffectChainParseError::CommandParseFailed {
+                index: 0,
+                command: "gain -n".to_owned(),
+                source: crate::EffectCommandParseError::UnsupportedOption {
+                    effect: "gain",
+                    option: "-n".to_owned(),
+                },
+            }
         );
     }
 
