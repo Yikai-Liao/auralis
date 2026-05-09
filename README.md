@@ -32,8 +32,10 @@ linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `DcShift`,
 `Trim`, `Pad`, `Reverse`, and `Fade` effect processors, the high-level library
 chain API for applying gain, dcshift, trim, pad, reverse, and fade, and the CLI
-gain/dcshift/trim/pad/reverse/fade transforms are implemented. Other effect
-transform CLI options are still intentionally unimplemented.
+gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
+testkit includes deterministic sample comparison metrics for max absolute
+error, RMS error, SNR, peak, and DC offset. Other effect transform CLI options
+are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -398,7 +400,7 @@ Contains test utilities shared by Rust tests and Python tests:
 - synthetic corpus generation
 - raw f32 helpers
 - WAV decode helpers
-- metric calculation
+- metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
 - golden test manifest handling
 - SoX-ng command wrapper
 - tolerance definitions
@@ -668,6 +670,10 @@ peak_error
 dc_offset_error
 spectral_error_db
 ```
+
+The implemented Rust metric helpers are `max_abs_error`, `rms_error`, `snr_db`,
+`peak`, and `dc_offset`. Empty inputs are treated as silence, unequal error
+metric inputs compare missing samples as `0.0`, and NaN inputs return NaN.
 
 Simple deterministic effects should have strict thresholds. Stateful or numerical effects may use wider, documented tolerances.
 

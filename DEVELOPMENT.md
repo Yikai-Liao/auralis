@@ -670,6 +670,8 @@ Some test infrastructure can be implemented alongside early features, but each p
 
 ### Feature 3.1: Rust metrics module
 
+Status: implemented.
+
 Implement:
 
 - `max_abs_error`
