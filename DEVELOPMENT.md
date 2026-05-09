@@ -732,172 +732,1531 @@ Acceptance tests:
 
 ---
 
-## SIMD milestone
+## SoX-ng coverage strategy
 
-SIMD must wait until scalar correctness is stable for at least the first basic effects.
+From this point forward, prioritize SoX-ng effect and pipeline behavior before
+adding more file formats. WAV PCM16 remains the canonical interchange container
+for golden tests until the effect surface is broad and stable.
 
-### Feature 4.1: SIMD backend trait
+The current SoX-ng effect surface to track is:
 
-Define internal kernel trait without exposing `rten-simd` publicly.
-
-Example:
-
-```rust
-pub trait SampleKernelBackend {
-    fn gain_in_place(samples: &mut [f32], gain: f32);
-    fn mix2(out: &mut [f32], a: &[f32], b: &[f32], wa: f32, wb: f32);
-}
+```text
+allpass band bandpass bandreject bass bend biquad centercut channels chorus
+compand contrast dcshift deemph delay dither dolbyb dop downsample earwax echo
+echos equalizer fade fir firfit flanger gain highpass hilbert ladspa loudness
+lowpass mcompand noiseprof noisered norm oops overdrive pad phaser pitch rate
+remix repeat reverb reverse riaa saturation sdm silence sinc softvol speed
+splice stat stats stretch swap synth tempo treble tremolo trim upsample vad vol
 ```
 
-Acceptance tests:
+Every new effect feature must add or update a SoX-ng coverage entry with:
 
-- scalar backend implements trait.
-- dispatch path can force scalar.
-- public API unchanged.
+- SoX-ng command syntax and supported options.
+- Auralis typed API and CLI mapping.
+- implemented / partial / blocked status.
+- scalar backend status.
+- SIMD backend status or an explicit N/A reason.
+- golden cases and tolerances.
+- known semantic differences from SoX-ng.
 
-Do not add `rten-simd` implementation yet.
-
----
-
-### Feature 4.2: `rten-simd` gain backend
-
-Implement SIMD gain backend.
-
-Acceptance tests:
-
-- scalar vs SIMD differential tests.
-- empty slice.
-- one sample.
-- tail lengths around vector width.
-- seeded random buffers.
-- near-clipping values.
-- backend can be forced in tests.
-
-Benchmark:
-
-- compare scalar vs SIMD on representative buffer sizes.
-
-Do not SIMD-optimize other kernels yet.
+Do not claim SoX-ng parity for an effect until its options, edge cases, pipeline
+positioning, CLI behavior, and golden tests are covered.
 
 ---
 
-### Feature 4.3: SIMD sample conversion
+## Feature granularity after 3.3
 
-Implement:
+From Feature 3.3 onward, every commit-sized work item must be a leaf feature.
+Milestone headings group work only; they are not implementation targets.
 
-- `i16_to_f32`
-- `f32_to_i16`
+Rules:
+
+- A `Feature x.y.z` item is one gnhf iteration and one focused commit.
+- A milestone or group such as `6.1` is not directly implementable.
+- If a leaf feature grows beyond one effect, one option family, one backend
+  kernel, or one pipeline primitive, split it before implementation.
+- Each leaf feature must satisfy the acceptance checklist on its own.
+- Shared test helpers may be a separate leaf feature when adding them would make
+  the effect commit too large.
+
+---
+
+## SIMD foundation milestone
+
+SIMD starts early. Every new sample-processing feature after Feature 3.3 must
+ship with both a scalar reference path and a SIMD backend when the core loop is
+data-parallel. If SIMD is not applicable, the feature must document why.
+
+### Milestone 4.1: backend contract and dispatch
+
+#### Feature 4.1.1: backend trait skeleton
+
+Define internal backend traits without exposing `rten-simd` publicly.
+
+Acceptance tests:
+
+- scalar backend implements the backend trait.
+- public library APIs do not expose backend crate types.
+- a placeholder SIMD backend can be compiled where the selected backend crate is
+  available.
+
+---
+
+#### Feature 4.1.2: deterministic backend selection
+
+Implement named backends:
+
+- `scalar`
+- `simd`
+
+Acceptance tests:
+
+- tests can force scalar.
+- tests can force SIMD when available.
+- unsupported SIMD platforms fall back to scalar with a documented reason.
+- backend choice does not change public APIs.
+
+---
+
+#### Feature 4.1.3: scalar-vs-SIMD conformance helpers
+
+Implement shared test helpers for backend differential tests.
+
+Acceptance tests:
+
+- helpers compare exact output and tolerance-based output.
+- helpers report backend name, case ID, first failing index, and error metrics.
+- helpers can run the same case under forced scalar and forced SIMD.
+
+---
+
+### Milestone 4.2: SIMD sample conversion
+
+#### Feature 4.2.1: SIMD `i16_to_f32`
+
+Implement scalar and SIMD versions of `i16_to_f32`.
+
+Acceptance tests:
+
+- exact known conversions.
+- empty, one-sample, odd-length, and vector-tail lengths.
+- seeded random buffers across the full PCM16 range.
+- scalar-vs-SIMD output equality.
+- WAV decode tests pass under forced scalar and forced SIMD.
+
+---
+
+#### Feature 4.2.2: SIMD `f32_to_i16`
+
+Implement scalar and SIMD versions of `f32_to_i16`.
 
 Acceptance tests:
 
 - exact known conversions.
 - clipping and rounding documented.
-- scalar vs SIMD differential.
-- WAV encode/decode tests still pass.
+- NaN and infinity behavior documented.
+- empty, one-sample, odd-length, and vector-tail lengths.
+- seeded random buffers including near-clipping values.
+- scalar-vs-SIMD output equality or documented one-LSB tolerance.
+- WAV encode tests pass under forced scalar and forced SIMD.
 
 ---
 
-## Filter milestone
+### Milestone 4.3: SIMD retrofit for implemented basic effects
 
-Filters begin only after basic effects and testkit are stable.
+#### Feature 4.3.1: SIMD `gain` retrofit
 
-### Feature 5.1: biquad primitive
-
-Implement scalar biquad with explicit coefficient structure.
+Add backend-dispatched kernels for implemented `gain`.
 
 Acceptance tests:
 
-- known coefficient cases.
-- impulse response.
-- silence preservation.
-- finite input produces finite output.
-- chunk invariance.
-
-Do not implement lowpass/highpass user effects yet.
+- existing analytical and SoX-ng golden tests pass unchanged.
+- scalar and SIMD outputs match for deterministic fixtures.
+- random buffers cover silence, near-clipping values, NaN, and infinities where
+  public behavior is defined.
+- CLI output is identical or within documented tolerance under forced scalar and
+  forced SIMD.
 
 ---
 
-### Feature 5.2: lowpass effect
+#### Feature 4.3.2: SIMD `dcshift` retrofit
 
-Implement typed lowpass effect using biquad or documented design.
+Add backend-dispatched kernels for implemented `dcshift`.
 
 Acceptance tests:
 
-- analytical frequency response.
-- impulse response sanity.
-- chunk invariance.
-- SoX-ng golden comparison with documented tolerance.
-- CLI and library behavior match.
+- existing analytical and SoX-ng golden tests pass unchanged.
+- scalar and SIMD outputs match for deterministic fixtures.
+- random buffers cover silence, denormals, near-clipping values, NaN, and
+  infinities where public behavior is defined.
+- CLI output is identical or within documented tolerance under forced scalar and
+  forced SIMD.
 
 ---
 
-### Feature 5.3: highpass effect
+#### Feature 4.3.3: SIMD linear `fade` retrofit
 
-Same structure as lowpass.
+Add backend-dispatched kernels for linear fade envelope multiplication.
 
 Acceptance tests:
 
-- DC rejection.
-- frequency response.
-- chunk invariance.
+- existing analytical and SoX-ng golden tests pass unchanged.
+- scalar and SIMD outputs match for deterministic fade-in, fade-out, and
+  combined fade fixtures.
+- CLI output is identical or within the documented tolerance under forced scalar
+  and forced SIMD.
+
+---
+
+## Effect test contract
+
+Every effect feature after Feature 3.3 must include the following test layers.
+
+### Rust unit and property tests
+
+Required for every effect:
+
+- config parsing and validation.
+- typed API construction.
+- identity parameters, if the effect has an identity case.
+- zero-length, one-frame, mono, stereo, and odd frame counts.
+- finite input produces documented finite or non-finite output.
+- no library panics for user-controlled parameters.
+- property or metamorphic tests where useful, such as reverse twice is identity,
+  zero gain is identity, and splitting then joining preserves frame order.
+
+### Chunk invariance tests
+
+Each effect must be tested as whole-buffer processing and as chunked streaming.
+
+Required chunk patterns:
+
+- all-at-once.
+- one frame at a time.
+- powers of two around the internal block size.
+- uneven chunks such as 3, 5, 7, 11, 97.
+- empty chunks interleaved with non-empty chunks.
+- final flush for effects with latency or tail output.
+
+Stateful effects must document expected latency, warm-up behavior, tail length,
+and whether chunked output is bit-exact or tolerance-based.
+
+### Scalar-vs-SIMD tests
+
+Required for every effect with a data-parallel kernel:
+
+- force scalar and SIMD backends on the same input.
+- compare empty, tiny, vector-width-minus-one, vector-width, vector-width-plus-one,
+  and large buffers.
+- test aligned and unaligned logical offsets when the implementation supports
+  views or slices.
+- test seeded random input and structured signals.
+- compare direct effect output and full CLI output.
+
+If SIMD is not applicable, the feature must add a short N/A note to the coverage
+entry. Examples: command parser only, external plugin host, or algorithm dominated
+by serial state transitions with no useful vectorizable inner loop.
+
+### SoX-ng golden tests
+
+Golden tests use SoX-ng as a behavioral oracle, not as an implementation guide.
+
+Required rules:
+
+- Use `sox_ng -R -D` unless the tested behavior is dithering or randomness.
+- Record the exact SoX-ng command in the manifest.
+- Generate deterministic WAV PCM16 fixtures through Python or Rust testkit.
+- Compare decoded samples, not container bytes.
+- Check output sample rate, channel count, frame count, peak, RMS error, max
+  absolute error, and SNR where applicable.
+- Store tolerances per effect and per option family.
+- Save JSON failure reports with the fields listed in the failure artifact policy.
+
+Required fixture families:
+
+- silence.
+- impulse and step.
+- full-scale and near-full-scale sine.
+- swept sine.
+- multi-tone signal.
+- deterministic white noise.
+- stereo phase and channel-identification fixtures.
+- short files shorter than filter windows or delay lines.
+
+Tolerance guidance:
+
+- exact editing effects should be sample-exact after PCM quantization.
+- simple gain and offset effects should be within PCM16 quantization tolerance.
+- IIR/FIR filters should use max error, RMS error, and spectral checks.
+- time stretching, pitch, reverb, noise reduction, and dynamics may need broader
+  tolerances, but the tolerance must be justified in the manifest.
+
+### CLI and pipeline equivalence tests
+
+Every effect must prove that:
+
+- typed Rust API output matches CLI output.
+- single-effect CLI output matches the same effect inside a multi-effect pipeline.
+- manifest command rendering is deterministic.
+- invalid arguments fail with clear diagnostics and no partial output unless the
+  behavior is explicitly documented.
+
+---
+
+## Pipeline parity milestone
+
+Pipeline behavior is now higher priority than additional file formats because
+many SoX-ng effects only make sense inside chains.
+
+### Milestone 5.1: effect command model
+
+#### Feature 5.1.1: effect registry and name resolution
+
+Implement a registry for supported effect names and aliases.
+
+Acceptance tests:
+
+- supported names resolve to typed effect descriptors.
+- unknown names fail with suggestions.
+- unsupported SoX-ng effects fail with a message that names the missing coverage.
+- existing typed APIs remain unchanged.
+
+---
+
+#### Feature 5.1.2: command parser for implemented effects
+
+Implement an internal command model that can represent SoX-ng-style effect
+invocations while keeping typed APIs primary.
+
+Acceptance tests:
+
+- parse implemented effect names and options into typed configs.
+- reject unsupported options with a diagnostic that names the effect and option.
+- no stringly typed effect config leaks into public library APIs.
+- preserve typed API behavior for existing effects.
+
+---
+
+#### Feature 5.1.3: deterministic command rendering
+
+Implement deterministic rendering for command manifests and failure reports.
+
+Acceptance tests:
+
+- equivalent command values render identically.
+- quoting and escaping are deterministic.
+- golden manifest command rendering is stable across runs.
+
+---
+
+### Milestone 5.2: multi-effect chains
+
+#### Feature 5.2.1: in-memory sequential chain
+
+Implement sequential chains in the library.
+
+Acceptance tests:
+
+- multiple effects execute in user-specified order.
+- chain output matches repeated direct library calls.
+- failures report which effect and option failed.
+- chunk invariance holds across the full chain.
+- scalar and SIMD backends can be forced for the full chain.
+
+---
+
+#### Feature 5.2.2: CLI sequential chain syntax
+
+Expose multi-effect chains in `auralis run`.
+
+Acceptance tests:
+
+- CLI order matches user-specified order.
+- CLI output matches in-memory chain output.
+- invalid chain syntax reports the failing effect and argument.
+- existing single-effect CLI behavior remains compatible.
+
+---
+
+#### Feature 5.2.3: SoX-ng golden tests for chains
+
+Add golden manifest cases for representative chains.
+
+Acceptance tests:
+
+- at least one editing chain, one level chain, and one filter chain.
+- Auralis and SoX-ng command lines are recorded.
+- decoded samples and metadata are compared with documented tolerances.
+
+---
+
+### Milestone 5.3: effects files and chain boundaries
+
+#### Feature 5.3.1: effects file parser
+
+Implement a parser for SoX-ng-inspired effects files.
+
+Acceptance tests:
+
+- read effects from a text file.
+- ignore blank lines and documented comments.
+- reject malformed files with line and column diagnostics.
+- parsed effects match equivalent CLI args.
+
+---
+
+#### Feature 5.3.2: effects file CLI integration
+
+Wire effects files into the CLI.
+
+Acceptance tests:
+
+- CLI accepts an effects file.
+- effects file output matches equivalent CLI args.
+- missing files and unreadable files fail clearly.
+- golden tests cover the same chain from CLI args and effects file.
+
+---
+
+#### Feature 5.3.3: chain boundary syntax
+
+Implement explicit chain boundary parsing and representation.
+
+Acceptance tests:
+
+- boundary syntax is accepted in CLI args and effects files.
+- empty chains are rejected or documented.
+- boundary rendering is deterministic in manifests.
+- unsupported `newfile` and `restart` semantics report stable diagnostics until
+  their leaf features are implemented.
+
+---
+
+### Milestone 5.4: input combiners
+
+Implement multi-input pipeline combiners before more codecs:
+
+#### Feature 5.4.1: concatenate combiner
+
+Implement the concatenate combiner.
+
+Acceptance tests:
+
+- mono and stereo inputs.
+- mismatched lengths.
+- mismatched channel count behavior documented.
+- SoX-ng golden comparison.
+- full-chain test combining inputs before effects.
+
+---
+
+#### Feature 5.4.2: sequence combiner
+
+Implement the sequence combiner.
+
+Acceptance tests:
+
+- mono and stereo inputs.
+- sequence boundary behavior matches documented semantics.
+- SoX-ng golden comparison.
+- full-chain test combining inputs before effects.
+
+---
+
+#### Feature 5.4.3: mix combiner
+
+Implement the mix combiner.
+
+Acceptance tests:
+
+- equal-length and mismatched-length inputs.
+- clipping and normalization behavior documented.
+- scalar-vs-SIMD tests for mixing kernels.
 - SoX-ng golden comparison.
 
 ---
 
-## Resampler milestone
+#### Feature 5.4.4: mix-power combiner
 
-Do not start the resampler until WAV, basic effects, metrics, golden tests, and chunk invariance infrastructure are mature.
+Implement the mix-power combiner.
 
-### Feature 6.1: resampler specification
+Acceptance tests:
 
-Before implementation, write the spec:
-
-- supported ratios
-- quality levels
-- phase behavior
-- expected latency
-- output length formula
-- alias rejection thresholds
-- comparison strategy against SoX-ng
-
-Acceptance test:
-
-- spec document exists.
-- tests are scaffolded but skipped with explicit reason.
+- equal-length and mismatched-length inputs.
+- power scaling behavior documented.
+- scalar-vs-SIMD tests for mixing kernels.
+- SoX-ng golden comparison.
 
 ---
 
-### Feature 6.2+: implementation steps
+#### Feature 5.4.5: merge combiner
 
-Implement only after the spec is reviewed:
+Implement the merge combiner.
 
-1. trivial same-rate identity
-2. simple linear resampler for baseline
-3. higher-quality polyphase resampler
-4. SoX-ng golden comparisons
-5. analytical alias tests
-6. SIMD inner loop after scalar correctness
+Acceptance tests:
+
+- mono-to-stereo merge.
+- multichannel merge.
+- mismatched length behavior documented.
+- SoX-ng golden comparison.
 
 ---
 
-## Future milestones
+#### Feature 5.4.6: multiply combiner
 
-These are placeholders, not immediate work:
+Implement the multiply combiner.
 
-- delay
-- echo
-- reverb
-- compand
-- silence detection
-- rate quality modes
-- FLAC support
-- AIFF support
-- raw PCM support
-- Python package via PyO3
-- NumPy-compatible buffer interface
-- stable public crate release
+Acceptance tests:
 
-Do not start these until earlier milestones have passed.
+- mono and stereo inputs.
+- zero and one identity cases.
+- scalar-vs-SIMD tests for multiply kernels.
+- SoX-ng golden comparison.
+
+---
+
+### Milestone 5.5: automatic pipeline effects
+
+Define and implement explicit equivalents for SoX-ng automatic behavior.
+
+#### Feature 5.5.1: automatic channel conversion policy
+
+Acceptance tests:
+
+- no hidden behavior in library APIs.
+- CLI defaults are documented.
+- disabling automatic channel conversion is possible in tests.
+- SoX-ng comparison tests record when SoX-ng auto-inserted channel conversion.
+
+---
+
+#### Feature 5.5.2: automatic sample-rate conversion policy
+
+Acceptance tests:
+
+- no hidden behavior in library APIs.
+- CLI defaults are documented.
+- disabling automatic rate conversion is possible in tests.
+- SoX-ng comparison tests record when SoX-ng auto-inserted `rate`.
+
+---
+
+#### Feature 5.5.3: guard and norm pipeline behavior
+
+Acceptance tests:
+
+- guard behavior is explicit in library APIs.
+- CLI `--guard` and `--norm` behavior is documented.
+- SoX-ng golden tests cover representative clipping cases.
+
+---
+
+#### Feature 5.5.4: automatic dither insertion policy
+
+Implement only after the `dither` effect exists.
+
+Acceptance tests:
+
+- dither insertion rules are explicit and testable.
+- disabling dither is possible in tests.
+- SoX-ng comparison tests record when SoX-ng auto-inserted `dither`.
+
+---
+
+## Effect coverage milestones
+
+Implement effects in the following order. Each effect must satisfy the effect
+test contract, include scalar and SIMD work where applicable, and update the
+SoX-ng coverage entry.
+
+### Milestone 6.1: complete existing SoX-ng semantics
+
+#### Feature 6.1.1: `gain` headroom and reclaim options
+
+Implement `gain -h` and `gain -r`.
+
+Acceptance tests:
+
+- manifest case per option.
+- option interactions tested where SoX-ng documents combinations.
+- scalar-vs-SIMD tests for gain kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.2: `gain` normalize and limiter options
+
+Implement `gain -n` and `gain -l`.
+
+Acceptance tests:
+
+- manifest case per option.
+- limiter behavior documented and tested.
+- scalar-vs-SIMD tests for gain kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.3: `gain` channel equalize and balance options
+
+Implement `gain -e`, `gain -b`, and `gain -B`.
+
+Acceptance tests:
+
+- stereo and multichannel fixtures.
+- peak and RMS balance behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.4: `fade` curve types
+
+Implement `fade` curve types `q`, `h`, `t`, `l`, and `p`.
+
+Acceptance tests:
+
+- analytical envelope tests for each curve.
+- scalar-vs-SIMD tests for envelope multiplication.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.5: `fade` stop position and fade-out length
+
+Acceptance tests:
+
+- fade-in only, fade-out only, and combined fade.
+- exact output length behavior documented.
+- chunk invariance.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.6: `dcshift` limiter gain
+
+Acceptance tests:
+
+- limiter threshold behavior documented.
+- scalar-vs-SIMD tests for offset and limiter kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.7: `pad` positioned padding
+
+Implement multiple `length[@position]` entries.
+
+Acceptance tests:
+
+- exact editing behavior.
+- overlapping or unsorted positions documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.1.8: `trim` multiple and relative positions
+
+Acceptance tests:
+
+- multiple positions.
+- relative positions where compatible.
+- exact editing behavior.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.2: volume, level, and simple modulation effects
+
+#### Feature 6.2.1: `vol`
+
+Acceptance tests:
+
+- amplitude, power, and dB modes.
+- limiter gain behavior.
+- scalar-vs-SIMD tests for sample-wise kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.2: `norm`
+
+Acceptance tests:
+
+- default and explicit level.
+- silence behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.3: `contrast`
+
+Acceptance tests:
+
+- default and non-default amount.
+- analytical sanity tests.
+- scalar-vs-SIMD tests for sample-wise kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.4: `softvol`
+
+Acceptance tests:
+
+- volume, double-time, and headroom options.
+- chunk invariance for ramps.
+- scalar-vs-SIMD tests for gain application.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.5: `tremolo`
+
+Acceptance tests:
+
+- speed and depth options.
+- phase continuity across chunks.
+- scalar-vs-SIMD tests for modulation kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.6: `overdrive`
+
+Acceptance tests:
+
+- gain and color options.
+- clipping behavior documented.
+- scalar-vs-SIMD tests for waveshaping kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.7: `saturation`
+
+Acceptance tests:
+
+- `tanh`, `sqrt`, and `diode` modes.
+- blend, offset, and mode-specific parameters.
+- scalar-vs-SIMD tests for waveshaping kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.2.8: `repeat`
+
+Acceptance tests:
+
+- finite repeat counts.
+- reject or explicitly block infinite repeat in library-safe contexts.
+- exact frame count tests.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.3: channel and mixing effects
+
+#### Feature 6.3.1: `channels`
+
+Acceptance tests:
+
+- mono-to-stereo, stereo-to-mono, and multichannel fixtures.
+- channel identity fixtures prove routing and gain.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.2: `remix` basic routing
+
+Acceptance tests:
+
+- selecting, dropping, and duplicating input channels.
+- silent channel `0`.
+- channel identity fixtures.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.3: `remix` gain modifiers
+
+Acceptance tests:
+
+- `v`, `p`, and `i` modifiers.
+- `-a`, `-m`, and `-p` options.
+- scalar-vs-SIMD tests for mixing kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.4: `swap`
+
+Acceptance tests:
+
+- stereo pair swap.
+- odd channel count behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.5: `oops`
+
+Acceptance tests:
+
+- stereo phase cancellation fixture.
+- mono and non-stereo behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.6: `centercut` core
+
+Acceptance tests:
+
+- left, right, and center separation fixtures.
+- window-size behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.3.7: `centercut` options
+
+Implement `-a`, `-b`, and `-w`.
+
+Acceptance tests:
+
+- option-specific golden cases.
+- invalid window size diagnostics.
+- scalar-vs-SIMD tests for mix kernels where applicable.
+
+---
+
+### Milestone 6.4: biquad and tone filters
+
+#### Feature 6.4.1: biquad primitive
+
+Acceptance tests:
+
+- coefficient construction tests.
+- impulse and step responses.
+- chunk invariance with filter state.
+- scalar-vs-SIMD tests where the chosen structure permits it.
+
+---
+
+#### Feature 6.4.2: `biquad` effect
+
+Acceptance tests:
+
+- externally supplied coefficients.
+- invalid coefficient diagnostics.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.3: RBJ coefficient helpers
+
+Acceptance tests:
+
+- low-pass, high-pass, shelving, peaking, all-pass, band-pass, and band-reject
+  coefficient fixtures.
+- finite coefficients for valid inputs.
+- invalid frequency and width diagnostics.
+
+---
+
+#### Feature 6.4.4: `allpass`
+
+Acceptance tests:
+
+- `-1` and `-2` modes.
+- impulse and frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.5: `band`
+
+Acceptance tests:
+
+- default and `-n` mode.
+- impulse and frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.6: `bandpass`
+
+Acceptance tests:
+
+- default and `-c` mode.
+- frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.7: `bandreject`
+
+Acceptance tests:
+
+- frequency response.
+- chunk invariance.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.8: `bass`
+
+Acceptance tests:
+
+- gain, frequency, and width options.
+- frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.9: `treble`
+
+Acceptance tests:
+
+- gain, frequency, and width options.
+- frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.10: `equalizer`
+
+Acceptance tests:
+
+- frequency, width, and gain options.
+- frequency response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.11: `lowpass`
+
+Acceptance tests:
+
+- `-1` and `-2` modes.
+- DC pass and high-frequency rejection.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.12: `highpass`
+
+Acceptance tests:
+
+- `-1` and `-2` modes.
+- DC rejection.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.13: `deemph`
+
+Acceptance tests:
+
+- documented CD de-emphasis response.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.4.14: `riaa`
+
+Acceptance tests:
+
+- documented RIAA response.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.5: delay, echo, and modulation effects
+
+#### Feature 6.5.1: `delay`
+
+Acceptance tests:
+
+- per-channel delay positions.
+- impulse response verifies delay placement.
+- short-input tests shorter than delay lines.
+- tail flush behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.2: `echo`
+
+Acceptance tests:
+
+- gain-in, gain-out, delay, and decay.
+- impulse response verifies feedback placement.
+- chunk invariance including tail output.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.3: `echos`
+
+Acceptance tests:
+
+- multiple delay and decay pairs.
+- tail flush behavior.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.4: `chorus` core
+
+Acceptance tests:
+
+- default options.
+- sine and triangle modulation.
+- chunk invariance.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.5: `chorus` interpolation and multi-delay options
+
+Acceptance tests:
+
+- none, linear, and quadratic interpolation.
+- multiple delay voices.
+- scalar-vs-SIMD tests for wet/dry mix and interpolation kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.6: `flanger`
+
+Acceptance tests:
+
+- delay, depth, regen, width, speed, shape, phase, and interpolation options.
+- chunk invariance including modulation phase.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.7: `phaser`
+
+Acceptance tests:
+
+- interpolation, wave shape, gain, delay, regen, and speed options.
+- chunk invariance including modulation phase.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.5.8: `reverb`
+
+Acceptance tests:
+
+- default and representative parameter sets.
+- wet-only mode.
+- tail length documented.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.6: sample-rate and time-domain effects
+
+#### Feature 6.6.1: `downsample`
+
+Acceptance tests:
+
+- output length formula.
+- factor validation.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.2: `upsample`
+
+Acceptance tests:
+
+- output length formula.
+- zero-stuffing behavior.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.3: `speed`
+
+Acceptance tests:
+
+- factor and cents syntax where compatible.
+- output rate and length behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.4: `rate` specification and scaffolding
+
+Acceptance tests:
+
+- spec documents quality levels, phase behavior, latency, output length, and
+  alias rejection targets.
+- skipped tests name the missing implementation reason.
+
+---
+
+#### Feature 6.6.5: `rate` quick and low-quality modes
+
+Acceptance tests:
+
+- output length formulas.
+- alias rejection and pass-band checks for implemented modes.
+- scalar-vs-SIMD tests for resampler inner loops.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.6: `rate` high-quality modes
+
+Acceptance tests:
+
+- `-m`, `-h`, `-v`, and related quality modes implemented incrementally.
+- phase behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.7: `rate` override options
+
+Acceptance tests:
+
+- one option family per test case.
+- unsupported options fail with stable diagnostics until implemented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.8: `stretch`
+
+Acceptance tests:
+
+- factor, window, fade, shift, and fading options.
+- output length formula.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.9: `tempo` core
+
+Acceptance tests:
+
+- default, music, speech, and linear modes.
+- output length formula.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.10: `tempo` tuning options
+
+Acceptance tests:
+
+- segment, search, overlap, and quick-search options.
+- boundary diagnostics.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.11: `pitch`
+
+Acceptance tests:
+
+- pitch shift in cents.
+- segment, search, overlap, and quick-search options.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.12: `bend`
+
+Acceptance tests:
+
+- single and multiple bend segments.
+- frame-rate and oversample options.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.6.13: `splice`
+
+Acceptance tests:
+
+- half-sine, triangular, and quarter-sine modes.
+- position, excess, and leeway options.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.7: dynamics, silence, and noise effects
+
+#### Feature 6.7.1: `compand` parser and transfer function
+
+Acceptance tests:
+
+- attack/decay parsing.
+- soft-knee and transfer point parsing.
+- transfer curve tests.
+- invalid syntax diagnostics.
+
+---
+
+#### Feature 6.7.2: `compand` processor
+
+Acceptance tests:
+
+- envelope follower tests with known attack and decay curves.
+- delay and gain behavior.
+- chunk invariance with lookahead.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.3: `mcompand`
+
+Acceptance tests:
+
+- crossover parsing.
+- per-band compand behavior.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.4: `loudness`
+
+Acceptance tests:
+
+- gain, reference, and filter-size options.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.5: `silence`
+
+Acceptance tests:
+
+- above and below period rules.
+- threshold boundary tests.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.6: `vad` core
+
+Acceptance tests:
+
+- trigger level and timing options.
+- speech-like and silence fixtures.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.7: `vad` advanced options
+
+Acceptance tests:
+
+- noise estimate, measurement, and filter options.
+- stable diagnostics for invalid ranges.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.7.8: `noiseprof`
+
+Acceptance tests:
+
+- generated profile is deterministic.
+- profile output format documented.
+- SoX-ng golden comparisons where output format aligns.
+
+---
+
+#### Feature 6.7.9: `noisered`
+
+Acceptance tests:
+
+- generated profile round trips from `noiseprof`.
+- amount option.
+- speech-like and noise fixtures.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.8: FIR, analysis, generation, and dither effects
+
+#### Feature 6.8.1: `fir` coefficient input
+
+Acceptance tests:
+
+- coefficient file and inline coefficients.
+- invalid coefficient diagnostics.
+- impulse response tests.
+
+---
+
+#### Feature 6.8.2: `fir` streaming processor
+
+Acceptance tests:
+
+- convolution tests.
+- chunk invariance.
+- scalar-vs-SIMD tests for convolution kernels.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.3: `firfit`
+
+Acceptance tests:
+
+- knots file and inline frequency/gain pairs.
+- generated FIR response sanity checks.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.4: `hilbert`
+
+Acceptance tests:
+
+- tap count option.
+- phase-shift spectral checks.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.5: `sinc` low-pass and high-pass
+
+Acceptance tests:
+
+- attenuation, beta, phase, transition bandwidth, and tap options.
+- spectral checks.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.6: `sinc` band-pass and band-reject
+
+Acceptance tests:
+
+- two-frequency forms.
+- spectral checks.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.7: `dither` TPDF and sloped TPDF
+
+Acceptance tests:
+
+- deterministic random tests with fixed seeds.
+- precision option.
+- SoX-ng golden comparisons with `-R` and dither enabled.
+
+---
+
+#### Feature 6.8.8: `dither` noise shaping
+
+Acceptance tests:
+
+- supported shaping filters.
+- spectrum checks.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.9: `stat`
+
+Acceptance tests:
+
+- text output options.
+- JSON output option.
+- SoX-ng output comparison where stable.
+
+---
+
+#### Feature 6.8.10: `stats`
+
+Acceptance tests:
+
+- window, bits, hex, scale, and JSON options.
+- SoX-ng output comparison where stable.
+
+---
+
+#### Feature 6.8.11: `synth` basic waveforms
+
+Acceptance tests:
+
+- sine, square, triangle, sawtooth, and trapezium.
+- length, offset, phase, and normalization.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.8.12: `synth` noise, sweep, and combine modes
+
+Acceptance tests:
+
+- white, TPDF, pink, and brown noise.
+- linear, quadratic, exponential, and stepped sweeps.
+- create, mix, amod, fmod, and vdelay combine modes.
+- SoX-ng golden comparisons.
+
+---
+
+### Milestone 6.9: specialized and integration effects
+
+Implement or explicitly block with a documented reason:
+
+#### Feature 6.9.1: `dolbyb` feasibility and spec
+
+Acceptance tests:
+
+- coverage entry explains implementation strategy or blocker.
+- CLI diagnostic is stable if blocked.
+
+---
+
+#### Feature 6.9.2: `dolbyb` implementation
+
+Implement only if Feature 6.9.1 records a safe implementation path.
+
+Acceptance tests:
+
+- encode and decode modes.
+- filter and threshold options.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.9.3: `dop`
+
+Acceptance tests:
+
+- DSD-over-PCM packing behavior.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.9.4: `earwax`
+
+Acceptance tests:
+
+- stereo-only behavior documented.
+- SoX-ng golden comparisons.
+
+---
+
+#### Feature 6.9.5: `ladspa` host or stable block
+
+Acceptance tests:
+
+- if implemented, plugin loading errors are typed and safe.
+- if blocked, CLI diagnostics are stable and actionable.
+- coverage entry explains the dependency and safety boundary.
+
+---
+
+#### Feature 6.9.6: `sdm` feasibility and spec
+
+Acceptance tests:
+
+- coverage entry explains implementation strategy or blocker.
+- CLI diagnostic is stable if blocked.
+
+---
+
+#### Feature 6.9.7: `sdm` implementation
+
+Implement only if Feature 6.9.6 records a safe implementation path.
+
+Acceptance tests:
+
+- filter, order, path count, and latency options.
+- SoX-ng golden comparisons.
+
+---
+
+## Format support milestone
+
+Additional formats are intentionally after effect and pipeline coverage. Add a
+format earlier only when it is required to test an effect that cannot be tested
+faithfully through WAV PCM16.
+
+Each format leaf feature uses the format acceptance tests below.
+
+### Milestone 7.1: richer WAV support
+
+#### Feature 7.1.1: WAV PCM8
+
+#### Feature 7.1.2: WAV PCM24
+
+#### Feature 7.1.3: WAV PCM32
+
+#### Feature 7.1.4: WAV float32
+
+#### Feature 7.1.5: WAV float64
+
+#### Feature 7.1.6: WAV u-law and A-law
+
+#### Feature 7.1.7: WAV RIFX
+
+### Milestone 7.2: raw formats
+
+#### Feature 7.2.1: raw signed and unsigned PCM
+
+#### Feature 7.2.2: raw float32 and float64
+
+#### Feature 7.2.3: raw endian, bit-order, and nibble-order options
+
+### Milestone 7.3: AIFF formats
+
+#### Feature 7.3.1: AIFF PCM
+
+#### Feature 7.3.2: AIFC encodings
+
+### Milestone 7.4: FLAC
+
+#### Feature 7.4.1: FLAC decode
+
+#### Feature 7.4.2: FLAC encode
+
+### Milestone 7.5: AU/SND
+
+#### Feature 7.5.1: AU/SND
+
+### Milestone 7.6: external decode strategy
+
+#### Feature 7.6.1: external-tool-backed decode strategy
+
+Format acceptance tests for each format leaf feature:
+
+- decode and encode fixtures where the format supports both.
+- unsupported encoding diagnostics.
+- metadata preservation where the format has metadata.
+- SoX-ng decode comparison into a common WAV or raw-float representation.
+- effect pipeline tests using the new format only after standalone codec tests pass.
+
+---
+
+## Python and package milestone
+
+Do not add PyO3 bindings until effect pipeline behavior is stable.
+
+Future work:
+
+- Python package via PyO3.
+- NumPy-compatible buffer interface.
+- stable public crate release.
+
+Before then, Python remains a test harness for corpus generation, golden
+comparison, metrics, and failure artifacts.
 
 ---
 
@@ -909,8 +2268,12 @@ Every feature should add or update a checklist like this in the relevant issue, 
 Feature: <name>
 
 Implementation:
+[ ] SoX-ng coverage entry updated, if this is an effect or pipeline feature
 [ ] Typed API added
 [ ] CLI integration added, if applicable
+[ ] Scalar reference path added, if this processes samples
+[ ] SIMD backend added, or SIMD N/A reason documented
+[ ] Backend selection can be forced in tests, if this processes samples
 [ ] Error handling added
 [ ] Documentation added
 [ ] Examples added
@@ -919,11 +2282,12 @@ Tests:
 [ ] Unit tests
 [ ] Doc tests
 [ ] Integration tests
+[ ] CLI and typed API equivalence tests, if applicable
 [ ] SoX-ng golden tests, if applicable
 [ ] Analytical tests, if applicable
 [ ] Property/metamorphic tests, if applicable
 [ ] Chunk invariance tests, if applicable
-[ ] Scalar-vs-SIMD tests, if applicable
+[ ] Scalar-vs-SIMD tests, or SIMD N/A reason checked
 [ ] Python uv pytest tests, if applicable
 
 Quality gate:
@@ -932,6 +2296,7 @@ Quality gate:
 [ ] cargo test --workspace --all-features
 [ ] cargo test --doc --workspace
 [ ] uv run pytest, if Python tests exist
+[ ] SoX-ng golden test command, if golden manifests exist
 [ ] cargo bench, if performance-sensitive
 ```
 
@@ -1017,16 +2382,21 @@ String-based APIs may exist for CLI compatibility, but typed APIs are the primar
 
 ## When to add SIMD
 
-Only add SIMD when all are true:
+SIMD is part of the normal implementation path after Feature 3.3, not a late
+optimization phase. For every new sample-processing feature:
 
-1. scalar implementation exists,
-2. scalar tests are complete,
-3. profiler or benchmark shows the kernel matters,
-4. kernel is suitable for SIMD,
-5. scalar-vs-SIMD tests can be written,
-6. backend selection can be controlled in tests.
+1. define the scalar reference behavior first,
+2. add or extend the backend trait for the effect's core kernel,
+3. implement the SIMD backend in the same feature when the kernel is
+   data-parallel,
+4. add forced scalar and forced SIMD tests,
+5. add scalar-vs-SIMD differential tests,
+6. document a SIMD N/A reason only when the algorithm has no useful vectorizable
+   kernel.
 
-Do not add SIMD because it looks elegant.
+Benchmarks are still required for performance-sensitive kernels, but lack of a
+benchmark is not a reason to skip the SIMD backend for an otherwise vectorizable
+effect.
 
 `rten-simd` is the selected portable SIMD direction, but it remains optional and
 must be hidden behind Auralis-owned backend traits. Do not expose `rten-simd`
