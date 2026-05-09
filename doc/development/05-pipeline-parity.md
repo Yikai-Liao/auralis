@@ -245,7 +245,10 @@ Target policy:
 
 ### Feature 5.6.1: file-size audit and module map
 
-Status: planned next.
+Status: implemented.
+
+Module map:
+[`05-source-module-map.md`](05-source-module-map.md).
 
 Produce a checked-in module map for the oversized files and document ownership
 boundaries before moving code.

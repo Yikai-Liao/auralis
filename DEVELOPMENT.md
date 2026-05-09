@@ -186,6 +186,12 @@ Known offenders at the time this plan was written:
 | `crates/auralis-effects/src/lib.rs` | 1103 | split effect implementations and effect tests |
 | `crates/auralis-wav/src/lib.rs` | 1079 | split reader, writer, format validation, and tests |
 
+The exact Feature 5.6.1 file-size audit and ownership map is checked in at
+[`doc/development/05-source-module-map.md`](doc/development/05-source-module-map.md).
+That audit supersedes the approximate counts above and identifies additional
+oversized test/testkit files that must be split before the no-thousand-line-file
+policy can be enforced.
+
 The source modularization plan is Feature 5.6.x.
 
 ### Third-party dependency boundaries

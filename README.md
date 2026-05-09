@@ -96,6 +96,9 @@ Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
 `gain_f32`, `dc_shift_f32`, `fade_f32`, `mix_f32`, and `multiply_f32` kernels.
+Source modularization debt is scoped by a checked-in file-size audit and module
+ownership map in `doc/development/05-source-module-map.md`; the audit is
+documentation-only and does not change runtime behavior.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
