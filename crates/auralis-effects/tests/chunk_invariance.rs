@@ -161,6 +161,10 @@ fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
 #[test]
 fn streaming_safe_chain_matches_whole_buffer_for_l5_chunk_matrix() {
     let chain = EffectChain::new(vec![
+        EffectCommand::Biquad(Biquad::new(
+            BiquadCoefficients::normalized(0.5, 0.25, 0.125, -0.25, 0.0625)
+                .expect("fixture coefficients are finite"),
+        )),
         EffectCommand::Gain(Gain::new(Decibels::new(-6.0).expect("fixture dB is valid"))),
         EffectCommand::DcShift(DcShift::new(0.125).expect("fixture shift is valid")),
         EffectCommand::Fade(Fade::new(FrameCount::new(257), FrameCount::new(383))),
@@ -195,6 +199,9 @@ fn process_streaming_safe_chain_by_chunks(
 ) {
     for command in chain.commands() {
         match command {
+            EffectCommand::Biquad(biquad) => {
+                process_biquad_by_channel_chunks(audio, biquad.coefficients(), schedule);
+            }
             EffectCommand::Gain(gain) => {
                 process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
                     gain.process_samples(chunk);
@@ -227,6 +234,7 @@ fn process_streaming_safe_chain_by_chunks(
                 process_tremolo_by_channel_chunks(audio, *tremolo, schedule);
             }
             EffectCommand::Centercut(_)
+            | EffectCommand::Channels(_)
             | EffectCommand::Norm(_)
             | EffectCommand::Oops(_)
             | EffectCommand::Pad(_)

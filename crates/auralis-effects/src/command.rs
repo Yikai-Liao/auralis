@@ -38,6 +38,7 @@ use std::{
 use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
+use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
 use crate::command_contrast::{parse_contrast, render_contrast};
@@ -58,7 +59,7 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    Centercut, Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError,
+    Biquad, Centercut, Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation,
     SoftVol, Swap, Tremolo, Trim, Vol,
 };
@@ -76,6 +77,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
+    /// SoX-ng-style direct coefficient biquad IIR filter.
+    Biquad(Biquad),
+
     /// SoX-ng-style center-cut stereo separation.
     Centercut(Centercut),
 
@@ -148,6 +152,7 @@ impl EffectCommand {
         let effect = descriptor.canonical_name();
 
         match descriptor.kind() {
+            EffectKind::Biquad => parse_biquad(effect, args),
             EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
@@ -174,6 +179,7 @@ impl EffectCommand {
     #[must_use]
     pub const fn kind(&self) -> EffectKind {
         match self {
+            Self::Biquad(_) => EffectKind::Biquad,
             Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
             Self::Contrast(_) => EffectKind::Contrast,
@@ -206,6 +212,7 @@ impl EffectCommand {
     #[must_use]
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
+            Self::Biquad(biquad) => render_biquad(*biquad),
             Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
             Self::Contrast(contrast) => render_contrast(*contrast),

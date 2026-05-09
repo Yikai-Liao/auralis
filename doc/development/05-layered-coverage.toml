@@ -22,6 +22,21 @@ l6 = { status = "not_applicable", reason = "The initial primitive is scalar-only
 l7 = { status = "not_applicable", reason = "No parser or serialized command surface exists for the primitive in Feature 6.4.1.", tests = [] }
 
 [[subject]]
+id = "effect.biquad"
+kind = "effect"
+name = "biquad"
+summary = "SoX-ng-style direct coefficient second-order IIR filter."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono impulse and stereo sine corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono and stereo raw-coefficient biquad commands.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover raw coefficient command parsing, canonical normalized rendering, chain execution, and invalid coefficient rejection.", tests = ["crates/auralis-effects/src/biquad.rs", "crates/auralis-effects/src/command_biquad.rs", "crates/auralis-effects/tests/biquad.rs"] }
+l4 = { status = "covered", reason = "Property tests cover identity preservation and finite output for bounded generated input through the shared biquad processor.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers state-preserving biquad chunks and includes biquad in a streaming-safe effect chain.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "not_applicable", reason = "Biquad currently uses the scalar stateful filter path and has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers biquad coefficient parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/biquad"] }
+
+[[subject]]
 id = "effect.centercut"
 kind = "effect"
 name = "centercut"

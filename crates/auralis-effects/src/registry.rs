@@ -24,6 +24,9 @@ const MAX_SUGGESTIONS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EffectKind {
+    /// SoX-ng-style direct coefficient biquad IIR filter.
+    Biquad,
+
     /// SoX-ng-style center-cut stereo separation.
     Centercut,
 
@@ -164,6 +167,14 @@ impl EffectDescriptor {
 
 /// Implemented effects known to Auralis, in deterministic canonical-name order.
 pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor::new(
+        EffectKind::Biquad,
+        "biquad",
+        &[],
+        "Biquad",
+        "biquad b0 b1 b2 a0 a1 a2",
+        "apply a direct coefficient second-order IIR filter",
+    ),
     EffectDescriptor::new(
         EffectKind::Centercut,
         "centercut",
@@ -636,6 +647,7 @@ mod tests {
     #[test]
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
+            ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),

@@ -14,6 +14,10 @@ pub(crate) fn apply_command(
     requested_backend: BackendKind,
     gain_headroom: &mut GainHeadroomState,
 ) -> std::result::Result<(), (&'static str, EffectError)> {
+    if apply_in_place_command(command, audio, requested_backend) {
+        return Ok(());
+    }
+
     match command {
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio),
         EffectCommand::Channels(channels) => {
@@ -21,14 +25,6 @@ pub(crate) fn apply_command(
                 .process_buffer_with_backend(audio, requested_backend)
                 .map_err(|source| ("channels", source))?;
             *audio = converted;
-            Ok(())
-        }
-        EffectCommand::Contrast(contrast) => {
-            contrast.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::DcShift(dc_shift) => {
-            dc_shift.process_buffer_with_backend(audio, requested_backend);
             Ok(())
         }
         EffectCommand::Fade(fade) => {
@@ -56,10 +52,6 @@ pub(crate) fn apply_command(
             *audio = extracted;
             Ok(())
         }
-        EffectCommand::Overdrive(overdrive) => {
-            overdrive.process_buffer(audio);
-            Ok(())
-        }
         EffectCommand::Pad(pad) => {
             let padded = pad
                 .process_buffer(audio)
@@ -81,26 +73,6 @@ pub(crate) fn apply_command(
             *audio = remixed;
             Ok(())
         }
-        EffectCommand::Reverse(reverse) => {
-            reverse.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::Saturation(saturation) => {
-            saturation.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::SoftVol(softvol) => {
-            softvol.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::Swap(swap) => {
-            swap.process_buffer(audio);
-            Ok(())
-        }
-        EffectCommand::Tremolo(tremolo) => {
-            tremolo.process_buffer(audio);
-            Ok(())
-        }
         EffectCommand::Trim(trim) => {
             let trimmed = trim
                 .process_buffer(audio)
@@ -108,11 +80,43 @@ pub(crate) fn apply_command(
             *audio = trimmed;
             Ok(())
         }
+        EffectCommand::Biquad(_)
+        | EffectCommand::Contrast(_)
+        | EffectCommand::DcShift(_)
+        | EffectCommand::Overdrive(_)
+        | EffectCommand::Reverse(_)
+        | EffectCommand::Saturation(_)
+        | EffectCommand::SoftVol(_)
+        | EffectCommand::Swap(_)
+        | EffectCommand::Tremolo(_)
+        | EffectCommand::Vol(_) => unreachable!("in-place commands returned early"),
+    }
+}
+
+fn apply_in_place_command(
+    command: &EffectCommand,
+    audio: &mut AudioBuffer,
+    requested_backend: BackendKind,
+) -> bool {
+    match command {
+        EffectCommand::Biquad(biquad) => biquad.process_buffer(audio),
+        EffectCommand::Contrast(contrast) => contrast.process_buffer(audio),
+        EffectCommand::DcShift(dc_shift) => {
+            dc_shift.process_buffer_with_backend(audio, requested_backend);
+        }
+        EffectCommand::Overdrive(overdrive) => overdrive.process_buffer(audio),
+        EffectCommand::Reverse(reverse) => reverse.process_buffer(audio),
+        EffectCommand::Saturation(saturation) => saturation.process_buffer(audio),
+        EffectCommand::SoftVol(softvol) => softvol.process_buffer(audio),
+        EffectCommand::Swap(swap) => swap.process_buffer(audio),
+        EffectCommand::Tremolo(tremolo) => tremolo.process_buffer(audio),
         EffectCommand::Vol(vol) => {
             vol.process_buffer_with_backend(audio, requested_backend);
-            Ok(())
         }
+        _ => return false,
     }
+
+    true
 }
 
 fn apply_centercut_command(
@@ -131,6 +135,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     let args_start = command_start + 1;
 
     match kind {
+        EffectKind::Biquad => optional_arg_end(tokens, args_start, 6),
         EffectKind::Centercut => centercut_arg_end(tokens, args_start),
         EffectKind::Channels => optional_arg_end(tokens, args_start, 1),
         EffectKind::Fade => fade_arg_end(tokens, args_start),

@@ -401,7 +401,9 @@ mod tests {
         EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError,
         parse_effect_chain,
     };
-    use crate::{DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, SoftVol, Trim};
+    use crate::{
+        BiquadState, DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, SoftVol, Trim,
+    };
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
     };
@@ -741,6 +743,12 @@ mod tests {
     ) {
         for command in chain.commands() {
             match command {
+                EffectCommand::Biquad(biquad) => {
+                    let mut state = BiquadState::new(biquad.coefficients());
+                    for chunk in chunks_mut(samples, chunk_sizes) {
+                        state.process_mono_samples(chunk);
+                    }
+                }
                 EffectCommand::Gain(gain) => {
                     for chunk in chunks_mut(samples, chunk_sizes) {
                         gain.process_samples(chunk);

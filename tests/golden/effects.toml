@@ -2,6 +2,28 @@
 # output rate/channel conversion is absent, guard/norm are absent, and the
 # Python runner invokes SoX-ng with `-R -D` so automatic dither is disabled.
 
+[id.effect_biquad_mono_one_pole]
+input = "effects/biquad_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["biquad", "0.5", "0", "0", "1", "-0.5", "0"]
+sox_ng = ["biquad", "0.5", "0", "0", "1", "-0.5", "0"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_biquad_stereo_one_pole]
+input = "effects/biquad_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["biquad", "2", "0", "0", "4", "-2", "0"]
+sox_ng = ["biquad", "2", "0", "0", "4", "-2", "0"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_centercut_stereo_default]
 input = "effects/centercut_stereo.wav"
 corpus_id = "l0/opposite_phase_stereo_8192"

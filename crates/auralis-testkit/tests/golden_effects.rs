@@ -12,6 +12,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
     assert_eq!(
         ids,
         [
+            "effect_biquad_mono_one_pole",
+            "effect_biquad_stereo_one_pole",
             "effect_centercut_stereo_default",
             "effect_centercut_stereo_options",
             "effect_channels_mono_to_stereo",
@@ -79,6 +81,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
 
     for effect in [
+        "biquad",
         "gain",
         "centercut",
         "dcshift",

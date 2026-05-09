@@ -514,6 +514,19 @@ Implementation notes:
 
 Expose direct coefficient-based biquad processing.
 
+Status: implemented.
+
+Implementation notes:
+
+- `biquad b0 b1 b2 a0 a1 a2` now parses through the shared effect command
+  model, normalizes raw coefficients by `a0`, rejects non-finite coefficients
+  and zero `a0`, and renders canonical equivalent commands with `a0 = 1`.
+- Effect-chain execution applies the existing scalar biquad primitive with
+  independent state per channel.
+- Golden coverage includes mono impulse and stereo sine one-pole cases against
+  SoX-ng, with parser fuzz coverage and L0-L7 matrix entries for the exposed
+  command surface.
+
 ### Feature 6.4.3: RBJ coefficient helpers
 
 Add reusable coefficient helpers for tone filters.
