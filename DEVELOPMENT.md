@@ -1030,6 +1030,8 @@ many SoX-ng effects only make sense inside chains.
 
 #### Feature 5.1.1: effect registry and name resolution
 
+Status: implemented.
+
 Implement a registry for supported effect names and aliases.
 
 Acceptance tests:

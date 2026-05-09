@@ -28,6 +28,13 @@ use auralis_dsp::{
 use auralis_simd::{BackendKind, select_backend};
 use thiserror::Error;
 
+mod registry;
+
+pub use registry::{
+    EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
+    SUPPORTED_EFFECTS, resolve_effect_name,
+};
+
 /// Crate-local result type using [`EffectError`].
 pub type Result<T> = std::result::Result<T, EffectError>;
 
