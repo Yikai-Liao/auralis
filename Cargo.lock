@@ -78,6 +78,9 @@ dependencies = [
 [[package]]
 name = "auralis-dsp"
 version = "0.0.0"
+dependencies = [
+ "auralis-core",
+]
 
 [[package]]
 name = "auralis-effects"

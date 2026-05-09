@@ -475,6 +475,8 @@ Completion of WAV milestone:
 
 ### Feature 2.1: scalar `gain` kernel
 
+Status: implemented.
+
 Implement in `auralis-dsp`:
 
 ```rust

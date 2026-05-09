@@ -10,5 +10,8 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+auralis-core = { path = "../auralis-core" }
+
 [lints]
 workspace = true
