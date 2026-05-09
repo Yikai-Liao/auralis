@@ -81,6 +81,10 @@ enum Command {
         #[arg(long)]
         reverse: bool,
 
+        /// Read the effect chain from a SoX-ng-style effects file.
+        #[arg(long, value_name = "FILE")]
+        effects_file: Option<PathBuf>,
+
         /// Positional SoX-ng-style effect chain tokens, such as `gain -3 reverse`.
         #[arg(value_name = "EFFECT", num_args = 0.., allow_hyphen_values = true)]
         effect_chain: Vec<String>,
@@ -115,6 +119,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             fade_in_frame,
             fade_out_frame,
             reverse,
+            effects_file,
             effect_chain,
         } => {
             let options = RunOptions {
@@ -130,6 +135,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 fade_in_frame,
                 fade_out_frame,
                 reverse,
+                effects_file,
                 effect_chain,
             };
 
@@ -224,16 +230,35 @@ struct RunOptions {
     fade_in_frame: Option<u64>,
     fade_out_frame: Option<u64>,
     reverse: bool,
+    effects_file: Option<PathBuf>,
     effect_chain: Vec<String>,
 }
 
 impl RunOptions {
     fn effect_chain(&self) -> Result<Option<auralis::EffectChain>, CliError> {
+        let has_positional_chain = !self.effect_chain.is_empty();
+        let has_effects_file = self.effects_file.is_some();
+
+        match (has_positional_chain, has_effects_file) {
+            (false, false) => return Ok(None),
+            (true, true) => return Err(CliError::MixedEffectsFileAndPositionalChain),
+            (true, false) if self.has_legacy_effect_options() => {
+                return Err(CliError::MixedEffectSyntax);
+            }
+            (false, true) if self.has_legacy_effect_options() => {
+                return Err(CliError::MixedEffectsFileAndLegacyEffectFlags);
+            }
+            _ => {}
+        }
+
+        if let Some(path) = &self.effects_file {
+            return auralis::parse_effects_file(path)
+                .map(Some)
+                .map_err(CliError::from);
+        }
+
         if self.effect_chain.is_empty() {
             return Ok(None);
-        }
-        if self.has_legacy_effect_options() {
-            return Err(CliError::MixedEffectSyntax);
         }
 
         let tokens: Vec<&str> = self.effect_chain.iter().map(String::as_str).collect();
@@ -314,10 +339,13 @@ fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
 enum CliError {
     Auralis(auralis::Error),
     ChainParse(auralis::EffectChainParseError),
+    EffectsFile(auralis::EffectsFileReadError),
     Wav(WavError),
     IncompleteTrimRange { unit: TrimUnit },
     MixedTrimUnits,
     MixedEffectSyntax,
+    MixedEffectsFileAndPositionalChain,
+    MixedEffectsFileAndLegacyEffectFlags,
     UnsupportedFormat { path: PathBuf, role: PathRole },
 }
 
@@ -347,6 +375,7 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Auralis(error) => write!(formatter, "{error}"),
             Self::ChainParse(error) => write!(formatter, "{error}"),
+            Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::IncompleteTrimRange { unit } => match unit {
                 TrimUnit::Frames => formatter
@@ -359,6 +388,11 @@ impl std::fmt::Display for CliError {
                 .write_str("trim range must use either frame units or seconds units, not both"),
             Self::MixedEffectSyntax => formatter
                 .write_str("positional effect chains cannot be combined with legacy effect flags"),
+            Self::MixedEffectsFileAndPositionalChain => formatter
+                .write_str("effects files cannot be combined with positional effect chain tokens"),
+            Self::MixedEffectsFileAndLegacyEffectFlags => {
+                formatter.write_str("effects files cannot be combined with legacy effect flags")
+            }
             Self::UnsupportedFormat { path, role } => {
                 write!(
                     formatter,
@@ -379,6 +413,12 @@ impl From<auralis::Error> for CliError {
 impl From<auralis::EffectChainParseError> for CliError {
     fn from(error: auralis::EffectChainParseError) -> Self {
         Self::ChainParse(error)
+    }
+}
+
+impl From<auralis::EffectsFileReadError> for CliError {
+    fn from(error: auralis::EffectsFileReadError) -> Self {
+        Self::EffectsFile(error)
     }
 }
 

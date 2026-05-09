@@ -42,7 +42,13 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
 ) -> None:
     input_path = _write_fixture(case["input"], tmp_path / case["input"])
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
+    auralis_effects_file = tmp_path / f"{case_id}.effects"
+    auralis_effects_file_output = tmp_path / f"{case_id}.auralis.effects-file.wav"
     sox_output = tmp_path / f"{case_id}.sox.wav"
+    auralis_effects_file.write_text(
+        _effects_file_source(case["auralis"]),
+        encoding="utf-8",
+    )
 
     auralis_command = [
         "cargo",
@@ -56,8 +62,28 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         str(auralis_output),
         *case["auralis"],
     ]
+    auralis_effects_file_command = [
+        "cargo",
+        "run",
+        "--quiet",
+        "--package",
+        "auralis-cli",
+        "--",
+        "run",
+        str(input_path),
+        str(auralis_effects_file_output),
+        "--effects-file",
+        str(auralis_effects_file),
+    ]
     auralis_result = subprocess.run(
         auralis_command,
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    auralis_effects_file_result = subprocess.run(
+        auralis_effects_file_command,
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
@@ -70,7 +96,12 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         pytest.skip(str(error))
 
     auralis_rate, auralis_samples = _read_pcm16(auralis_output)
+    auralis_effects_file_rate, auralis_effects_file_samples = _read_pcm16(
+        auralis_effects_file_output
+    )
     sox_rate, sox_samples = _read_pcm16(sox_output)
+    assert auralis_effects_file_rate == auralis_rate
+    np.testing.assert_array_equal(auralis_effects_file_samples, auralis_samples)
     metadata = _metadata(auralis_rate, auralis_samples, sox_rate, sox_samples)
 
     assert metadata["auralis"]["sample_rate"] == metadata["sox_ng"]["sample_rate"]
@@ -102,6 +133,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
             "case_id": case_id,
             "input": case["input"],
             "auralis_command": auralis_result.args,
+            "auralis_effects_file_command": auralis_effects_file_result.args,
             "sox_ng_command": sox_result.args,
             "tolerances": {
                 "max_abs": case["max_abs"],
@@ -116,6 +148,12 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
             encoding="utf-8",
         )
         pytest.fail("; ".join(failures) + f"; report={report_path}")
+
+
+def _effects_file_source(args: list[str]) -> str:
+    return "# generated from the golden manifest's positional Auralis arguments\n" + " ".join(
+        args
+    ) + "\n"
 
 
 def _write_fixture(input_name: str, path: Path) -> Path:

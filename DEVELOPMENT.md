@@ -1139,6 +1139,8 @@ Acceptance tests:
 
 #### Feature 5.3.2: effects file CLI integration
 
+Status: implemented.
+
 Wire effects files into the CLI.
 
 Acceptance tests:

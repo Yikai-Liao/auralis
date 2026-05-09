@@ -52,8 +52,9 @@ Auralis and SoX-ng command vectors for reproducible comparison reports, and
 provides backend conformance helpers for exact and tolerance-based
 scalar-vs-SIMD differential tests. The effects crate also parses
 SoX-ng-inspired effects files into typed `EffectChain` values with blank-line,
-comment, quote, escape, and line/column diagnostic handling; CLI wiring for
-effects files is intentionally left for the next feature. The SIMD crate defines
+comment, quote, escape, and line/column diagnostic handling, and
+`auralis run --effects-file <FILE>` executes those chains through the same
+ordered pipeline as positional CLI effect chains. The SIMD crate defines
 the Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -400,9 +401,12 @@ fade l 24000 24000
 
 Parsing this text with `parse_effects_file_str` or `parse_effects_file`
 produces the same typed `EffectChain` as the flat CLI-style token stream `gain
--3 dcshift 0.125 reverse fade l 24000 24000`. Malformed quotes, dangling
-escapes, unknown effects, unsupported SoX-ng effects, and invalid command
-arguments report one-based line and column positions.
+-3 dcshift 0.125 reverse fade l 24000 24000`. The CLI accepts the same file
+with `auralis run input.wav output.wav --effects-file chain.effects`; effects
+files are mutually exclusive with positional chain tokens and legacy effect
+flags because their relative order would otherwise be ambiguous. Malformed
+quotes, dangling escapes, unknown effects, unsupported SoX-ng effects, invalid
+command arguments, missing files, and unreadable files report stable errors.
 
 ### `auralis-simd`
 
@@ -496,14 +500,16 @@ auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out
 auralis run input.wav output.wav --reverse
 auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
 auralis run input.wav output.wav --backend simd gain -3 fade l 24000 24000
+auralis run input.wav output.wav --effects-file chain.effects
 auralis run pipeline.toml
 auralis completions zsh
 ```
 
 The positional effect chain starts after the input and output paths. Backend
 selection remains an option, but legacy one-effect flags such as `--gain-db` are
-not combined with positional chain tokens because their relative order would be
-ambiguous.
+not combined with positional chain tokens or `--effects-file` because their
+relative order would be ambiguous. Effects files use the same parser as the
+library `parse_effects_file` API.
 
 Selected crates:
 
