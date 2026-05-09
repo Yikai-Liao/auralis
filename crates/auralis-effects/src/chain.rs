@@ -763,7 +763,8 @@ mod tests {
                         vol.process_samples(chunk);
                     }
                 }
-                EffectCommand::Contrast(_)
+                EffectCommand::Channels(_)
+                | EffectCommand::Contrast(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)

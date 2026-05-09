@@ -352,8 +352,24 @@ Implementation notes:
 
 ### Feature 6.3.1: `channels`
 
+Status: implemented.
+
 Implement the explicit `channels` effect. It should share conversion primitives
 with output channel policy without hiding behavior.
+
+Implementation notes:
+
+- Added a typed `Channels` effect matching SoX-ng's `channels number` command
+  shape. It preserves sample rate, sample format, and frame count while
+  changing decoded channel layout.
+- Matching channel counts are identity copies, upmixing duplicates input
+  channels round-robin, and downmixing averages deterministic input-channel
+  groups using the same backend-dispatched primitive now shared by the output
+  channel policy.
+- Golden coverage includes standalone mono-to-stereo and stereo-to-mono cases
+  against SoX-ng. L4 covers identity and finite-output behavior, L6 compares
+  scalar and requested-SIMD downmix execution, and L7 includes a parser fuzz
+  seed for `channels`.
 
 ### Feature 6.3.2: `remix` basic routing
 

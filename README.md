@@ -30,11 +30,11 @@ multi-range trim positions, zero padding with frame counts and insertion
 positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
-The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Norm`,
+The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
-gain, norm, contrast, softvol, tremolo, overdrive, saturation, repeat, dcshift, trim, pad, reverse,
-fade, and vol, and the CLI gain/norm/contrast/softvol/tremolo/overdrive/saturation/repeat/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+gain, channels, norm, contrast, softvol, tremolo, overdrive, saturation, repeat, dcshift, trim, pad, reverse,
+fade, and vol, and the CLI gain/channels/norm/contrast/softvol/tremolo/overdrive/saturation/repeat/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -54,7 +54,9 @@ clipping-avoidant volume control with optional recovery and headroom, and
 `overdrive [gain [color]]` cubic soft-clipping distortion, and
 `saturation [type [blend [offset [drive|color|threshold]]]]` nonlinear
 saturation, and finite `repeat [count]` output duplication.
-`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+The chain path also supports explicit SoX-ng-style `channels number` conversion
+at a user-visible effect position, using the same conversion primitive as the
+output `--channels` policy. `auralis run <input.wav> <output.wav> gain -3 channels 1 norm -6 contrast softvol 2 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -447,6 +449,7 @@ when requested.
 Contains typed effect processors built from DSP primitives:
 
 - `Gain`
+- `Channels`
 - `Norm`
 - `DcShift`
 - `Trim`
@@ -463,11 +466,11 @@ Contains typed effect processors built from DSP primitives:
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, `saturation`, `repeat`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, `saturation`, `repeat`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `repeat`, `reverse`, `fade`, `vol`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
+`trim`, `pad`, `repeat`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -1074,6 +1077,8 @@ Examples:
 - `overdrive` preserves finite bounded input as finite output
 - `saturation` preserves finite bounded input as finite output
 - `repeat 0` is identity and finite bounded input stays finite
+- `channels` with the current channel count is identity and channel-converted
+  finite input stays finite
 - `gain +6 dB` followed by `gain -6 dB` approximately returns the original signal within tolerance
 
 ### L5: chunk invariance
@@ -1091,8 +1096,9 @@ that matrix. It injects empty chunks and a final empty call for flush-path
 coverage, and it reports the deterministic random seed in schedule labels.
 Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, `Vol`, `Tremolo`,
 stateful `Overdrive`, and streaming-safe `EffectChain` execution. `Norm` is documented as a
-whole-buffer scan and `Repeat` is documented as whole-buffer structural duplication; neither is
-chunk-invariant.
+whole-buffer scan, `Repeat` is documented as whole-buffer structural
+duplication, and `Channels` is documented as an explicit shape-changing
+structural transform; these are not chunk-invariant under the current API.
 
 ### L6: scalar vs SIMD differential tests
 

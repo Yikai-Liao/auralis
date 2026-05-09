@@ -2,6 +2,28 @@
 # output rate/channel conversion is absent, guard/norm are absent, and the
 # Python runner invokes SoX-ng with `-R -D` so automatic dither is disabled.
 
+[id.effect_channels_mono_to_stereo]
+input = "effects/channels_mono.wav"
+corpus_id = "auto/mono_channels"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["channels", "2"]
+sox_ng = ["channels", "2"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_channels_stereo_to_mono]
+input = "effects/channels_stereo.wav"
+corpus_id = "auto/stereo_channels"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["channels", "1"]
+sox_ng = ["channels", "1"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_contrast_mono_default]
 input = "effects/contrast_mono.wav"
 corpus_id = "l0/step_mono_16"

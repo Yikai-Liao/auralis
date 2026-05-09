@@ -38,6 +38,7 @@ use std::{
 use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
+use crate::command_channels::{parse_channels, render_channels};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_fade::{parse_fade, render_fade};
@@ -53,8 +54,8 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
-    Overdrive, Pad, Repeat, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
+    Channels, Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade,
+    Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation, SoftVol, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -70,6 +71,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
+    /// SoX-ng-style explicit channel-count conversion.
+    Channels(Channels),
+
     /// SoX-ng-style phase contrast enhancement.
     Contrast(Contrast),
 
@@ -127,6 +131,7 @@ impl EffectCommand {
         let effect = descriptor.canonical_name();
 
         match descriptor.kind() {
+            EffectKind::Channels => parse_channels(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
@@ -148,6 +153,7 @@ impl EffectCommand {
     #[must_use]
     pub const fn kind(&self) -> EffectKind {
         match self {
+            Self::Channels(_) => EffectKind::Channels,
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Fade(_) => EffectKind::Fade,
@@ -175,6 +181,7 @@ impl EffectCommand {
     #[must_use]
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
+            Self::Channels(channels) => render_channels(*channels),
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Fade(fade) => render_fade(*fade),
@@ -461,10 +468,10 @@ pub(super) fn render_f32(value: f32) -> String {
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
-        Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
-        Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, TrimPosition,
+        Channels, Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad,
+        PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Tremolo, Trim, TrimPosition,
     };
-    use auralis_core::{Decibels, FrameCount};
+    use auralis_core::{ChannelCount, Decibels, FrameCount};
 
     #[test]
     fn parses_supported_effect_commands_into_typed_configs() {
@@ -472,6 +479,10 @@ mod tests {
             (
                 &["contrast", "25"][..],
                 EffectCommand::Contrast(Contrast::new(25.0).unwrap()),
+            ),
+            (
+                &["channels", "2"][..],
+                EffectCommand::Channels(Channels::new(ChannelCount::new(2).unwrap())),
             ),
             (
                 &["gain", "-3"][..],

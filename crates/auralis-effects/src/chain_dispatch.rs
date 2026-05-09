@@ -15,6 +15,13 @@ pub(crate) fn apply_command(
     gain_headroom: &mut GainHeadroomState,
 ) -> std::result::Result<(), (&'static str, EffectError)> {
     match command {
+        EffectCommand::Channels(channels) => {
+            let converted = channels
+                .process_buffer_with_backend(audio, requested_backend)
+                .map_err(|source| ("channels", source))?;
+            *audio = converted;
+            Ok(())
+        }
         EffectCommand::Contrast(contrast) => {
             contrast.process_buffer(audio);
             Ok(())
@@ -93,6 +100,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     let args_start = command_start + 1;
 
     match kind {
+        EffectKind::Channels => optional_arg_end(tokens, args_start, 1),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {

@@ -102,4 +102,8 @@ pub enum EffectError {
     /// A buffer with an invalid shape was produced while applying an effect.
     #[error(transparent)]
     Core(#[from] auralis_core::AuralisError),
+
+    /// A backend-dispatched channel downmix kernel rejected channel slices.
+    #[error(transparent)]
+    ChannelMix(#[from] auralis_simd::MixError),
 }

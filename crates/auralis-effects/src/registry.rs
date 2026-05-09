@@ -24,6 +24,9 @@ const MAX_SUGGESTIONS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EffectKind {
+    /// SoX-ng-style explicit channel-count conversion.
+    Channels,
+
     /// SoX-ng-style phase contrast enhancement.
     Contrast,
 
@@ -149,6 +152,14 @@ impl EffectDescriptor {
 
 /// Implemented effects known to Auralis, in deterministic canonical-name order.
 pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor::new(
+        EffectKind::Channels,
+        "channels",
+        &[],
+        "Channels",
+        "channels number",
+        "convert decoded audio to an explicit channel count",
+    ),
     EffectDescriptor::new(
         EffectKind::Contrast,
         "contrast",
@@ -581,6 +592,7 @@ mod tests {
     #[test]
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
+            ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
             ("fade", EffectKind::Fade),

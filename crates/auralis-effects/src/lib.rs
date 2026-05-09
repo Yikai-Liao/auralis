@@ -26,7 +26,9 @@
 mod chain;
 mod chain_dispatch;
 mod chain_gain;
+mod channels;
 mod command;
+mod command_channels;
 mod command_contrast;
 mod command_dcshift;
 mod command_fade;
@@ -65,6 +67,7 @@ pub use chain::{
     ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,
     EffectChainParseError, parse_effect_chain,
 };
+pub use channels::Channels;
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use contrast::Contrast;
 pub use dcshift::DcShift;

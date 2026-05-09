@@ -33,6 +33,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"gain -e -3",
         b"gain -Bn 6",
         b"gain -h -6 gain -r",
+        b"channels 2",
         b"norm -6",
         b"contrast 25",
         b"overdrive 12 25",

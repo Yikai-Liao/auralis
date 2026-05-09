@@ -1,4 +1,5 @@
-use crate::{AudioBuffer, AudioSpec, BackendKind, ChannelCount};
+use crate::{AudioBuffer, BackendKind, ChannelCount};
+use auralis_effects::{Channels, EffectError};
 use thiserror::Error;
 
 /// Explicit policy for changing channel count at an output boundary.
@@ -78,6 +79,10 @@ pub enum ChannelConversionError {
     /// A backend-dispatched downmix kernel rejected channel slices.
     #[error(transparent)]
     Mix(#[from] auralis_simd::MixError),
+
+    /// Explicit channel conversion failed through the shared effect primitive.
+    #[error(transparent)]
+    Effect(#[from] EffectError),
 }
 
 /// Converts a decoded planar buffer to `target_channels` with SoX-ng `channels` semantics.
@@ -116,25 +121,9 @@ pub fn convert_audio_channels_with_backend(
     target_channels: ChannelCount,
     requested_backend: BackendKind,
 ) -> std::result::Result<AudioBuffer, ChannelConversionError> {
-    let input_channels = audio.channels();
-    if input_channels == target_channels {
-        return Ok(audio.clone());
-    }
-
-    let output_spec = AudioSpec::new(
-        audio.spec().sample_rate(),
-        target_channels,
-        audio.spec().sample_format(),
-    );
-    let mut output = AudioBuffer::zeroed(output_spec, audio.frames())?;
-
-    if input_channels < target_channels {
-        duplicate_channels(audio, &mut output)?;
-    } else {
-        downmix_channels_with_backend(audio, &mut output, requested_backend)?;
-    }
-
-    Ok(output)
+    Channels::new(target_channels)
+        .process_buffer_with_backend(audio, requested_backend)
+        .map_err(channel_effect_error)
 }
 
 pub(crate) fn apply_channel_conversion_policy_with_backend(
@@ -157,67 +146,10 @@ pub(crate) fn apply_channel_conversion_policy_with_backend(
     }
 }
 
-fn duplicate_channels(
-    input: &AudioBuffer,
-    output: &mut AudioBuffer,
-) -> std::result::Result<(), ChannelConversionError> {
-    let input_channels = input.channels().as_usize();
-    for output_channel_index in 0..output.channels().as_usize() {
-        let input_channel_index = output_channel_index % input_channels;
-        let input_channel = input
-            .channel(input_channel_index)
-            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        let output_channel = output
-            .channel_mut(output_channel_index)
-            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        output_channel.copy_from_slice(input_channel);
-    }
-
-    Ok(())
-}
-
-fn downmix_channels_with_backend(
-    input: &AudioBuffer,
-    output: &mut AudioBuffer,
-    requested_backend: BackendKind,
-) -> std::result::Result<(), ChannelConversionError> {
-    let input_channels = input.channels().as_usize();
-    let output_channels = output.channels().as_usize();
-    let selection = auralis_simd::select_backend(requested_backend);
-
-    for output_channel_index in 0..output_channels {
-        let input_channels_per_output =
-            (input_channels + output_channels - 1 - output_channel_index) / output_channels;
-        let mut channel_inputs = Vec::with_capacity(input_channels_per_output);
-        for input_group_index in 0..input_channels_per_output {
-            let input_channel_index = input_group_index * output_channels + output_channel_index;
-            channel_inputs.push(
-                input
-                    .channel(input_channel_index)
-                    .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?,
-            );
-        }
-
-        let output_channel = output
-            .channel_mut(output_channel_index)
-            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        auralis_simd::mix_f32_with_backend(
-            selection,
-            &channel_inputs,
-            output_channel,
-            reciprocal_usize(input_channels_per_output),
-        )?;
-    }
-
-    Ok(())
-}
-
-fn reciprocal_usize(value: usize) -> f32 {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "Channel conversion scales small channel groups as f32 sample arithmetic."
-    )]
-    {
-        1.0 / value as f32
+fn channel_effect_error(source: EffectError) -> ChannelConversionError {
+    match source {
+        EffectError::Core(source) => ChannelConversionError::Core(source),
+        EffectError::ChannelMix(source) => ChannelConversionError::Mix(source),
+        source => ChannelConversionError::Effect(source),
     }
 }

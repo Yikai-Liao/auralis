@@ -4,7 +4,7 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation,
+    Channels, Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation,
     SaturationType, SoftVol, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
@@ -165,6 +165,13 @@ proptest! {
         prop_assert_sample_bits_eq(repeated.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(repeated.frames(), source.frames());
         prop_assert_eq!(repeated.channels(), source.channels());
+
+        let channel_converted = Channels::new(source.channels())
+            .process_buffer(&source)
+            .expect("matching channel conversion cannot fail");
+        prop_assert_sample_bits_eq(channel_converted.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(channel_converted.frames(), source.frames());
+        prop_assert_eq!(channel_converted.channels(), source.channels());
     }
 
     #[test]
@@ -279,6 +286,11 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated repeat cannot overflow");
         prop_assert_all_finite(&repeated)?;
+
+        let converted = Channels::new(ChannelCount::new(2).expect("fixture channel count is valid"))
+            .process_buffer(&source)
+            .expect("small generated channel conversion succeeds");
+        prop_assert_all_finite(&converted)?;
 
         let mut reversed = source;
         Reverse::new().process_buffer(&mut reversed);
