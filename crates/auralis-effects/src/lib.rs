@@ -3,7 +3,10 @@
 //! Effects in this crate own validated configuration and delegate numerical
 //! work to deterministic DSP kernels. They operate on Auralis' planar `f32`
 //! audio buffers and are chunk-invariant unless their documentation says
-//! otherwise.
+//! otherwise. The crate also exposes a typed command parser for the currently
+//! implemented SoX-ng-style effect command subset; successful parses return
+//! [`EffectCommand`] variants that wrap the same typed processors used by the
+//! direct API.
 //!
 //! # Examples
 //!
@@ -28,8 +31,10 @@ use auralis_dsp::{
 use auralis_simd::{BackendKind, select_backend};
 use thiserror::Error;
 
+mod command;
 mod registry;
 
+pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,

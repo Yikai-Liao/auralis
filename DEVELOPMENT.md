@@ -1045,6 +1045,8 @@ Acceptance tests:
 
 #### Feature 5.1.2: command parser for implemented effects
 
+Status: implemented.
+
 Implement an internal command model that can represent SoX-ng-style effect
 invocations while keeping typed APIs primary.
 

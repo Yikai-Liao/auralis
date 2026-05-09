@@ -33,9 +33,10 @@ The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `DcShift
 `Trim`, `Pad`, `Reverse`, and `Fade` effect processors, the high-level library
 chain API for applying gain, dcshift, trim, pad, reverse, and fade, and the CLI
 gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
-effects crate also exposes a deterministic name registry that resolves the
-implemented effect names and aliases to typed descriptors and distinguishes
-unknown names from SoX-ng effects whose coverage has not been implemented yet.
+effects crate also exposes a deterministic name registry and typed command
+parser for the implemented effect subset; supported names and aliases resolve
+to typed descriptors, parsed command tokens become typed effect configs, and
+unknown names or unsupported SoX-ng options return stable diagnostics.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -346,12 +347,17 @@ Contains typed effect processors built from DSP primitives:
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
-The crate also owns the static effect registry used by upcoming command
-parsing: implemented SoX-ng names such as `gain`, `dcshift`, `trim`, `pad`,
-`reverse`, and `fade` resolve to typed descriptors, aliases such as `dc-shift`
-and `gain-db` resolve to their canonical names, unknown names receive
-deterministic suggestions, and known SoX-ng effects without Auralis coverage
-return a stable missing-coverage diagnostic.
+The crate also owns the static effect registry and typed command parser used by
+upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
+`trim`, `pad`, `reverse`, and `fade` resolve to typed descriptors; aliases such
+as `dc-shift` and `gain-db` resolve to their canonical names; unknown names
+receive deterministic suggestions; and known SoX-ng effects without Auralis
+coverage return a stable missing-coverage diagnostic. Tokenized commands such
+as `["gain", "-3"]`, `["trim", "48000", "96000"]`, and `["fade", "l",
+"24000", "24000"]` parse into typed `EffectCommand` variants. The parser
+currently accepts the frame-count subset implemented by Auralis and rejects
+future SoX-ng options such as gain normalization, non-linear fade curves, and
+dcshift limiter gain with effect- and option-specific diagnostics.
 
 ### `auralis-simd`
 
