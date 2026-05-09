@@ -41,6 +41,7 @@ use std::{
 
 use auralis_codec::{AudioReader, AudioWriter, CodecError, CodecKind};
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
+use auralis_simd::{BackendKind, i16_to_f32_with_backend, select_backend};
 use thiserror::Error;
 
 /// Crate-local result type using [`WavError`].
@@ -150,7 +151,28 @@ pub fn decode_pcm16<R>(reader: R) -> Result<AudioBuffer>
 where
     R: Read,
 {
-    Pcm16WavReader::new(reader)?.read_pcm16()
+    decode_pcm16_with_backend(reader, BackendKind::Scalar)
+}
+
+/// Decodes an entire PCM16 WAV stream with an explicit sample-conversion backend.
+///
+/// The decoded audio is identical to [`decode_pcm16`]. `requested_backend`
+/// controls only the PCM16-to-`f32` conversion kernel; unsupported SIMD
+/// requests fall back through `auralis-simd` backend selection metadata before
+/// decoding continues. This is intended for backend conformance tests and
+/// deterministic backend-specific validation.
+///
+/// # Errors
+///
+/// Returns the same parsing, format, and shape errors as [`decode_pcm16`].
+pub fn decode_pcm16_with_backend<R>(
+    reader: R,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    Pcm16WavReader::new(reader)?.read_pcm16_with_backend(requested_backend)
 }
 
 /// Decodes a PCM16 WAV file from disk into a planar `f32` buffer.
@@ -243,6 +265,20 @@ where
     /// Returns typed [`WavError`] values for unsupported sample formats,
     /// malformed samples, and invalid buffer shape metadata.
     pub fn read_pcm16(&mut self) -> Result<AudioBuffer> {
+        self.read_pcm16_with_backend(BackendKind::Scalar)
+    }
+
+    /// Reads the entire stream into Auralis' internal planar `f32` buffer using
+    /// an explicit sample-conversion backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed [`WavError`] values for unsupported sample formats,
+    /// malformed samples, and invalid buffer shape metadata.
+    pub fn read_pcm16_with_backend(
+        &mut self,
+        requested_backend: BackendKind,
+    ) -> Result<AudioBuffer> {
         let hound_spec = self.inner.spec();
         ensure_pcm16(hound_spec)?;
 
@@ -255,15 +291,25 @@ where
 
         let frames =
             usize::try_from(frame_count.as_u64()).map_err(|_| WavError::InvalidBufferShape)?;
-        let mut planar = vec![
-            0.0;
-            frames
-                .checked_mul(channels.as_usize())
-                .ok_or(WavError::InvalidBufferShape)?
-        ];
+        let sample_capacity = frames
+            .checked_mul(channels.as_usize())
+            .ok_or(WavError::InvalidBufferShape)?;
+        let mut planar = vec![0.0; sample_capacity];
+        let mut interleaved_pcm16 = Vec::with_capacity(sample_capacity);
 
-        for (sample_index, sample) in self.inner.samples::<i16>().enumerate() {
-            let sample = sample.map_err(|error| malformed(&error))?;
+        for sample in self.inner.samples::<i16>() {
+            interleaved_pcm16.push(sample.map_err(|error| malformed(&error))?);
+        }
+
+        let mut interleaved_f32 = vec![0.0; interleaved_pcm16.len()];
+        i16_to_f32_with_backend(
+            select_backend(requested_backend),
+            &interleaved_pcm16,
+            &mut interleaved_f32,
+        )
+        .map_err(|_| WavError::InvalidBufferShape)?;
+
+        for (sample_index, sample) in interleaved_f32.into_iter().enumerate() {
             let frame_index = sample_index / channels.as_usize();
             let channel_index = sample_index % channels.as_usize();
             let planar_index = channel_index
@@ -274,7 +320,7 @@ where
                 .get_mut(planar_index)
                 .ok_or(WavError::InvalidBufferShape)?;
 
-            *destination = f32::from(sample) / 32768.0;
+            *destination = sample;
         }
 
         AudioBuffer::from_planar_f32(spec, frame_count, planar)
@@ -462,10 +508,11 @@ mod tests {
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
     };
+    use auralis_simd::BackendKind;
 
     use super::{
         Pcm16WavReader, Pcm16WavWriter, WavError, WavSampleEncoding, decode_pcm16,
-        decode_pcm16_path, encode_pcm16_path,
+        decode_pcm16_path, decode_pcm16_with_backend, encode_pcm16_path,
     };
 
     #[test]
@@ -496,6 +543,31 @@ mod tests {
             audio.channel(1).unwrap(),
             &[f32::from(32_767_i16) / 32768.0, 0.5, 0.25]
         );
+    }
+
+    #[test]
+    fn decode_pcm16_matches_under_forced_scalar_and_requested_simd() {
+        let bytes = wav_bytes(
+            2,
+            &[
+                i16::MIN,
+                i16::MAX,
+                -16_384,
+                16_384,
+                -1,
+                1,
+                0,
+                8192,
+                -8192,
+                1234,
+            ],
+        );
+
+        let scalar =
+            decode_pcm16_with_backend(Cursor::new(bytes.clone()), BackendKind::Scalar).unwrap();
+        let simd = decode_pcm16_with_backend(Cursor::new(bytes), BackendKind::Simd).unwrap();
+
+        assert_audio_bits_eq(&simd, &scalar);
     }
 
     #[test]
@@ -836,6 +908,25 @@ mod tests {
         let path = temp_path(prefix, "wav");
         encode_pcm16_path(&path, audio).unwrap();
         path
+    }
+
+    fn assert_audio_bits_eq(actual: &AudioBuffer, expected: &AudioBuffer) {
+        assert_eq!(actual.spec(), expected.spec());
+        assert_eq!(actual.frames(), expected.frames());
+
+        for channel_index in 0..actual.channels().as_usize() {
+            let actual = actual.channel(channel_index).unwrap();
+            let expected = expected.channel(channel_index).unwrap();
+            assert_eq!(actual.len(), expected.len());
+
+            for (frame_index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+                assert_eq!(
+                    actual.to_bits(),
+                    expected.to_bits(),
+                    "channel {channel_index} frame {frame_index} differed: {actual} != {expected}"
+                );
+            }
+        }
     }
 
     fn assert_close_by_one_lsb(left: &[f32], right: &[f32]) {

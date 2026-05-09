@@ -13,6 +13,7 @@ path = "src/lib.rs"
 [dependencies]
 auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
+auralis-simd = { path = "../auralis-simd" }
 hound.workspace = true
 thiserror.workspace = true
 

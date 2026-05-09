@@ -124,6 +124,7 @@ version = "0.0.0"
 dependencies = [
  "auralis-codec",
  "auralis-core",
+ "auralis-simd",
  "hound",
  "thiserror",
 ]

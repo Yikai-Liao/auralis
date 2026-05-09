@@ -41,7 +41,7 @@ Auralis and SoX-ng command vectors for reproducible comparison reports, and
 provides backend conformance helpers for exact and tolerance-based
 scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
 backend trait skeleton with a scalar reference backend, deterministic `scalar` /
-`simd` backend selection, and an optional `rten-simd`-backed placeholder marker.
+`simd` backend selection, and scalar/SIMD PCM16-to-`f32` sample conversion.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -303,6 +303,8 @@ Initial WAV scope:
 - Mono and stereo first; multi-channel support should be designed but may be gated behind tests.
 
 The WAV module should expose decoded planar `f32` buffers to the rest of the system.
+PCM16 decode uses the Auralis sample-conversion backend boundary, with an
+explicit backend entry point for scalar-vs-SIMD decode validation.
 
 Candidate crate: `hound`, wrapped behind Auralis traits rather than exposed directly.
 
@@ -341,7 +343,9 @@ Effect implementations should be block-based and streaming-aware from the beginn
 Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
-a feature-gated placeholder SIMD backend marker.
+PCM16-to-`f32` conversion kernels. The scalar kernel is the exact reference
+implementation; the SIMD kernel uses `rten-simd` behind the `simd` feature and
+falls back through Auralis backend selection when SIMD is unavailable.
 
 Backend names are stable lowercase strings:
 

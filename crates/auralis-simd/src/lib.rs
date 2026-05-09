@@ -198,6 +198,35 @@ impl BackendSelection {
     }
 }
 
+/// Errors produced by sample conversion kernels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SampleConversionError {
+    /// The source and destination buffers did not have the same length.
+    BufferLengthMismatch {
+        /// Number of input PCM16 samples.
+        input_len: usize,
+        /// Number of output `f32` samples.
+        output_len: usize,
+    },
+}
+
+impl fmt::Display for SampleConversionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BufferLengthMismatch {
+                input_len,
+                output_len,
+            } => write!(
+                formatter,
+                "sample conversion input length {input_len} did not match output length {output_len}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SampleConversionError {}
+
 /// Compile-time backend contract for sample-processing kernels.
 ///
 /// The trait uses associated constants so kernel dispatch can stay statically
@@ -275,6 +304,67 @@ pub fn select_named_backend(name: &str) -> Option<BackendSelection> {
     BackendKind::from_name(name).map(select_backend)
 }
 
+/// Converts signed 16-bit PCM samples into normalized `f32` samples using the
+/// scalar reference backend.
+///
+/// Samples are scaled by `1.0 / 32768.0`, so `i16::MIN` maps exactly to
+/// `-1.0`, `0` maps to `0.0`, and `i16::MAX` maps to `0.9999695`. The
+/// conversion is deterministic and exact for every PCM16 input because the
+/// scale denominator is a power of two. The function allocates no memory and
+/// accepts empty buffers.
+///
+/// # Errors
+///
+/// Returns [`SampleConversionError::BufferLengthMismatch`] when `input` and
+/// `output` have different lengths.
+///
+/// # Examples
+///
+/// ```
+/// let input = [i16::MIN, 0, i16::MAX];
+/// let mut output = [0.0; 3];
+///
+/// auralis_simd::i16_to_f32_scalar(&input, &mut output)?;
+///
+/// assert_eq!(output[0].to_bits(), (-1.0_f32).to_bits());
+/// assert_eq!(output[1].to_bits(), 0.0_f32.to_bits());
+/// assert_eq!(output[2].to_bits(), (f32::from(i16::MAX) / 32768.0).to_bits());
+/// # Ok::<(), auralis_simd::SampleConversionError>(())
+/// ```
+pub fn i16_to_f32_scalar(input: &[i16], output: &mut [f32]) -> Result<(), SampleConversionError> {
+    validate_conversion_lengths(input, output)?;
+    i16_to_f32_scalar_unchecked(input, output);
+    Ok(())
+}
+
+/// Converts signed 16-bit PCM samples into normalized `f32` samples using the
+/// backend recorded by `selection`.
+///
+/// Callers that need deterministic tests can pass the result of
+/// [`select_backend`] with either [`BackendKind::Scalar`] or
+/// [`BackendKind::Simd`]. When a SIMD request falls back to scalar, this
+/// function follows the selected backend recorded in the selection metadata.
+/// The numerical mapping is identical to [`i16_to_f32_scalar`].
+///
+/// # Errors
+///
+/// Returns [`SampleConversionError::BufferLengthMismatch`] when `input` and
+/// `output` have different lengths.
+pub fn i16_to_f32_with_backend(
+    selection: BackendSelection,
+    input: &[i16],
+    output: &mut [f32],
+) -> Result<(), SampleConversionError> {
+    validate_conversion_lengths(input, output)?;
+
+    match selection.selected_kind() {
+        BackendKind::Scalar => i16_to_f32_scalar_unchecked(input, output),
+        BackendKind::Simd => i16_to_f32_selected_simd(input, output),
+    }
+
+    Ok(())
+}
+
 const fn scalar_descriptor() -> BackendDescriptor {
     BackendDescriptor::new(BackendKind::Scalar, BackendKind::Scalar.as_str(), true)
 }
@@ -338,6 +428,80 @@ enum SimdStatus {
     TargetUnsupported,
 }
 
+const PCM16_TO_F32_SCALE: f32 = 1.0 / 32768.0;
+
+fn validate_conversion_lengths(input: &[i16], output: &[f32]) -> Result<(), SampleConversionError> {
+    if input.len() == output.len() {
+        Ok(())
+    } else {
+        Err(SampleConversionError::BufferLengthMismatch {
+            input_len: input.len(),
+            output_len: output.len(),
+        })
+    }
+}
+
+#[inline]
+fn i16_to_f32_scalar_unchecked(input: &[i16], output: &mut [f32]) {
+    for (&input, output) in input.iter().zip(output) {
+        *output = f32::from(input) * PCM16_TO_F32_SCALE;
+    }
+}
+
+#[cfg(not(feature = "simd"))]
+fn i16_to_f32_selected_simd(input: &[i16], output: &mut [f32]) {
+    i16_to_f32_scalar_unchecked(input, output);
+}
+
+#[cfg(feature = "simd")]
+fn i16_to_f32_selected_simd(input: &[i16], output: &mut [f32]) {
+    use rten_simd::{
+        Isa, SimdOp,
+        ops::{Extend, NumOps, ToFloat},
+    };
+
+    struct Convert<'input, 'output> {
+        input: &'input [i16],
+        output: &'output mut [f32],
+    }
+
+    impl SimdOp for Convert<'_, '_> {
+        type Output = ();
+
+        #[expect(
+            clippy::inline_always,
+            reason = "rten-simd recommends inlining eval so target-feature intrinsics compile into the dispatched kernel body"
+        )]
+        #[inline(always)]
+        fn eval<I: Isa>(self, isa: I) -> Self::Output {
+            let i16_ops = isa.i16();
+            let i32_ops = isa.i32();
+            let f32_ops = isa.f32();
+            let scale = f32_ops.splat(PCM16_TO_F32_SCALE);
+            let input_vector_len = i16_ops.len();
+            let output_half_vector_len = i32_ops.len();
+
+            let mut input_chunks = self.input.chunks_exact(input_vector_len);
+            let mut output_chunks = self.output.chunks_exact_mut(input_vector_len);
+
+            for (input_chunk, output_chunk) in input_chunks.by_ref().zip(output_chunks.by_ref()) {
+                let input_i16 = i16_ops.load(input_chunk);
+                let (low_extended, high_extended) = i16_ops.extend(input_i16);
+                let low_scaled = f32_ops.mul(i32_ops.to_float(low_extended), scale);
+                let high_scaled = f32_ops.mul(i32_ops.to_float(high_extended), scale);
+                let (low_output, high_output) = output_chunk.split_at_mut(output_half_vector_len);
+
+                f32_ops.store(low_scaled, low_output);
+                f32_ops.store(high_scaled, high_output);
+            }
+
+            i16_to_f32_scalar_unchecked(input_chunks.remainder(), output_chunks.into_remainder());
+        }
+    }
+
+    Convert { input, output }.dispatch();
+}
+
 mod private {
     use super::ScalarBackend;
 
@@ -355,8 +519,8 @@ mod tests {
 
     use super::{
         Backend, BackendDescriptor, BackendFallbackReason, BackendKind, BackendSelection,
-        ScalarBackend, SimdStatus, backend_descriptor, select_backend, select_backend_with_status,
-        select_named_backend,
+        SampleConversionError, ScalarBackend, SimdStatus, backend_descriptor, i16_to_f32_scalar,
+        i16_to_f32_with_backend, select_backend, select_backend_with_status, select_named_backend,
     };
 
     #[test]
@@ -448,6 +612,64 @@ mod tests {
         assert_eq!(select_named_backend(""), None);
     }
 
+    #[test]
+    fn scalar_i16_to_f32_matches_known_pcm16_values_exactly() {
+        let input = [i16::MIN, -16_384, -1, 0, 1, 16_384, i16::MAX];
+        let mut output = [0.0; 7];
+
+        i16_to_f32_scalar(&input, &mut output).unwrap();
+
+        assert_sample_bits_eq(
+            &output,
+            &[
+                -1.0,
+                -0.5,
+                -1.0 / 32768.0,
+                0.0,
+                1.0 / 32768.0,
+                0.5,
+                f32::from(i16::MAX) / 32768.0,
+            ],
+        );
+    }
+
+    #[test]
+    fn i16_to_f32_rejects_mismatched_buffer_lengths() {
+        let input = [0, 1, 2];
+        let mut output = [0.0; 2];
+
+        let error = i16_to_f32_scalar(&input, &mut output).unwrap_err();
+
+        assert_eq!(
+            error,
+            SampleConversionError::BufferLengthMismatch {
+                input_len: 3,
+                output_len: 2,
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "sample conversion input length 3 did not match output length 2"
+        );
+    }
+
+    #[test]
+    fn i16_to_f32_handles_empty_one_sample_odd_and_tail_lengths() {
+        for len in [0, 1, 3, 17, 33, 65] {
+            let input = patterned_pcm16(len);
+
+            assert_scalar_and_simd_conversion_match(&input);
+        }
+    }
+
+    #[test]
+    fn i16_to_f32_random_pcm16_values_match_scalar_under_requested_simd() {
+        let mut input = seeded_pcm16(0x9e37_79b9_7f4a_7c15, 4099);
+        input.extend([i16::MIN, i16::MAX, -1, 0, 1]);
+
+        assert_scalar_and_simd_conversion_match(&input);
+    }
+
     #[cfg(all(
         feature = "simd",
         any(
@@ -478,6 +700,7 @@ mod tests {
         assert_public_type_name::<BackendFallbackReason>();
         assert_public_type_name::<BackendKind>();
         assert_public_type_name::<BackendSelection>();
+        assert_public_type_name::<SampleConversionError>();
         assert_public_type_name::<ScalarBackend>();
 
         #[cfg(feature = "simd")]
@@ -517,5 +740,75 @@ mod tests {
             !name.contains("rten"),
             "public backend type {name} must not expose rten-simd"
         );
+    }
+
+    fn assert_scalar_and_simd_conversion_match(input: &[i16]) {
+        let scalar = convert_with_backend(BackendKind::Scalar, input);
+        let simd = convert_with_backend(BackendKind::Simd, input);
+
+        assert_sample_bits_eq(&scalar, &reference_conversion(input));
+        assert_sample_bits_eq(&simd, &scalar);
+    }
+
+    fn convert_with_backend(kind: BackendKind, input: &[i16]) -> Vec<f32> {
+        let selection = select_backend(kind);
+        let mut output = vec![0.0; input.len()];
+
+        i16_to_f32_with_backend(selection, input, &mut output).unwrap();
+
+        output
+    }
+
+    fn reference_conversion(input: &[i16]) -> Vec<f32> {
+        input
+            .iter()
+            .map(|&sample| f32::from(sample) / 32768.0)
+            .collect()
+    }
+
+    fn patterned_pcm16(len: usize) -> Vec<i16> {
+        (0..len)
+            .map(|index| {
+                let value = (index.wrapping_mul(977).wrapping_add(12_345)) & 0xffff;
+
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "test values are intentionally wrapped to the full 16-bit PCM domain"
+                )]
+                {
+                    let sample_bits =
+                        u16::try_from(value).expect("masked test value should fit in u16");
+                    sample_bits.cast_signed()
+                }
+            })
+            .collect()
+    }
+
+    fn seeded_pcm16(seed: u64, len: usize) -> Vec<i16> {
+        let mut state = seed;
+
+        (0..len)
+            .map(|_| {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                let sample_bits =
+                    u16::try_from(state >> 48).expect("shifted test state should fit in u16");
+
+                sample_bits.cast_signed()
+            })
+            .collect()
+    }
+
+    fn assert_sample_bits_eq(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "sample {index} differed: {actual} != {expected}"
+            );
+        }
     }
 }
