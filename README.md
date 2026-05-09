@@ -37,7 +37,9 @@ testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
 tests. The Rust testkit also parses TOML golden manifests and renders stable
-Auralis and SoX-ng command vectors for reproducible comparison reports. Other
+Auralis and SoX-ng command vectors for reproducible comparison reports. The
+SIMD crate defines the Auralis-owned backend trait skeleton with a scalar
+reference backend and an optional `rten-simd`-backed placeholder marker. Other
 effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -335,12 +337,14 @@ Effect implementations should be block-based and streaming-aware from the beginn
 ### `auralis-simd`
 
 Contains optional SIMD acceleration. This is a backend layer, not part of the
-public API.
+high-level public API. It owns the backend trait skeleton, backend descriptors,
+the scalar reference backend marker, and a feature-gated placeholder SIMD
+backend marker.
 
 Selected future SIMD abstraction:
 
 ```toml
-rten-simd = { version = "0.24", optional = true }
+rten-simd = { version = "0.24.0", optional = true }
 ```
 
 Reasons:
@@ -351,7 +355,8 @@ Reasons:
 - supports AVX2, AVX-512, Arm Neon, and WebAssembly SIMD
 - suitable for custom 1D slice kernels
 
-`rten-simd` must not leak into the public API. Auralis should define its own kernel traits and keep SIMD as an implementation detail.
+`rten-simd` must not leak into public API types. Auralis defines its own backend
+traits and keeps SIMD as an implementation detail behind the `simd` feature.
 
 Initial SIMD targets:
 

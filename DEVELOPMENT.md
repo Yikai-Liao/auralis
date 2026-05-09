@@ -793,6 +793,8 @@ data-parallel. If SIMD is not applicable, the feature must document why.
 
 #### Feature 4.1.1: backend trait skeleton
 
+Status: implemented.
+
 Define internal backend traits without exposing `rten-simd` publicly.
 
 Acceptance tests:
