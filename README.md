@@ -18,7 +18,9 @@ Initial scope is deliberately narrow: **WAV only**. Other audio formats are repr
 
 ## Project status
 
-Auralis is currently pre-alpha. The repository starts empty except for `LICENSE`; this README defines the intended architecture and development rules.
+Auralis is currently pre-alpha. The repository contains the initial Rust
+workspace skeleton and uv-based Python test harness; the audio type vocabulary,
+WAV pipeline, DSP kernels, and CLI commands are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 

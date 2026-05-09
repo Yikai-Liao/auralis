@@ -263,6 +263,8 @@ Do not use system `pip install` in project instructions or tests.
 
 ### Feature 0.1: workspace skeleton
 
+Status: implemented.
+
 Create:
 
 ```text

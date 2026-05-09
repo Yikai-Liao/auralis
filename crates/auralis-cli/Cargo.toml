@@ -1,0 +1,15 @@
+[package]
+name = "auralis-cli"
+description = "Command-line interface for Auralis."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "auralis"
+path = "src/main.rs"
+
+[lints]
+workspace = true

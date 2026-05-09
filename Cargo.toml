@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "crates/auralis-cli",
+    "crates/auralis-codec",
+    "crates/auralis-core",
+    "crates/auralis-dsp",
+    "crates/auralis-effects",
+    "crates/auralis-simd",
+    "crates/auralis-testkit",
+    "crates/auralis-wav",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/sox-rs/auralis"
+rust-version = "1.95"
+version = "0.0.0"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = "warn"
