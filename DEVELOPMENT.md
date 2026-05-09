@@ -10,14 +10,14 @@ The core rule:
 
 ## gnhf stop condition
 
-Use this as the one-sentence stop condition for autonomous development:
+Use this as the stop condition for autonomous development:
 
-> Stop when the next unchecked feature in `DEVELOPMENT.md` is implemented as one small committed change, with formatting, clippy, Rust tests, doc tests, uv-based Python tests, SoX-ng golden tests where applicable, and README/development documentation all passing and updated; do not start the following feature in the same iteration.
+> Stop only when every feature listed in `DEVELOPMENT.md` is implemented, tested, documented, committed, and pushed; if a feature cannot be completed safely, stop after recording the blocker. For each loop iteration, implement exactly the next unchecked feature, keep it to one focused commit, run formatting, clippy, Rust tests, doc tests, uv-based Python tests, SoX-ng golden tests where applicable, update README/development documentation, commit, push, then continue to the next unchecked feature.
 
 Suggested `gnhf` objective:
 
 ```bash
-gnhf "Implement exactly the next unchecked Auralis feature in DEVELOPMENT.md. Do not skip ahead. Do not start another feature. Add complete tests first or alongside the implementation. The iteration is successful only if cargo fmt, clippy, cargo test, cargo doc tests, and uv pytest pass, and if the change is committed with a concise message."
+gnhf --current-branch --push "Repeatedly implement Auralis features from DEVELOPMENT.md in order. In each iteration, implement exactly the next unchecked feature and do not skip ahead. Add complete tests first or alongside the implementation. A feature is successful only if cargo fmt, clippy, cargo test, cargo doc tests, and uv pytest pass; SoX-ng golden tests must pass where applicable; README/development documentation must be updated; and the feature is committed with a concise message before moving to the next feature. Continue with the next unchecked feature after each successful commit. The source code of sox_ng is in /root/code/sox-rs/sox_ng" --stop-when "Stop only when every feature listed in DEVELOPMENT.md is implemented, tested, documented, committed, and pushed; if a feature cannot be completed safely, stop after recording the blocker."
 ```
 
 For parallel work, use worktrees only when features are independent. Avoid parallel work on the same module until the core API is stable.
