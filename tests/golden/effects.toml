@@ -134,6 +134,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_equalizer_mono_default]
+input = "effects/equalizer_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["equalizer", "1000", "1q", "6"]
+sox_ng = ["equalizer", "1000", "1q", "6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_equalizer_stereo_octave_width]
+input = "effects/equalizer_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["equalizer", "1000", "1o", "-3"]
+sox_ng = ["equalizer", "1000", "1o", "-3"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"

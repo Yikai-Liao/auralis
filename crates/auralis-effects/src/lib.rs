@@ -46,6 +46,7 @@ mod command_centercut;
 mod command_channels;
 mod command_contrast;
 mod command_dcshift;
+mod command_equalizer;
 mod command_fade;
 mod command_filter;
 mod command_gain;
@@ -66,6 +67,7 @@ mod command_vol;
 mod contrast;
 mod dcshift;
 mod effects_file;
+mod equalizer;
 mod error;
 mod fade;
 mod gain;
@@ -107,6 +109,7 @@ pub use effects_file::{
     EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,
     parse_effects_file, parse_effects_file_str,
 };
+pub use equalizer::Equalizer;
 pub use error::{EffectError, Result};
 pub use fade::{Fade, FadeCurve};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};

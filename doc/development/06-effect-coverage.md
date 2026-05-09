@@ -671,6 +671,23 @@ Implementation notes:
 
 ### Feature 6.4.10: `equalizer`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Equalizer` effect matching SoX-ng's RBJ peaking-EQ
+  `equalizer frequency width gain` command shape.
+- Width accepts hertz, kilohertz, Q, and octave forms; shelf slope is rejected
+  because the peaking-EQ helper does not use shelf slope semantics.
+- Processing delegates to the scalar stateful biquad primitive with independent
+  per-channel state, so chunked processing is exact when callers preserve
+  `BiquadState` per channel.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for Q-width
+  mono and octave-width stereo forms. Tolerance follows the same one-PCM16-LSB
+  filter-effect policy as the other RBJ filters.
+
 ### Feature 6.4.11: `lowpass`
 
 ### Feature 6.4.12: `highpass`

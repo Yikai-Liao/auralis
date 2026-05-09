@@ -34,6 +34,9 @@ pub(crate) fn apply_command(
         EffectCommand::Bass(bass) => bass
             .process_buffer(audio)
             .map_err(|source| ("filter-design", source)),
+        EffectCommand::Equalizer(equalizer) => equalizer
+            .process_buffer(audio)
+            .map_err(|source| ("filter-design", source)),
         EffectCommand::Treble(treble) => treble
             .process_buffer(audio)
             .map_err(|source| ("filter-design", source)),
@@ -174,6 +177,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::BandPass
         | EffectKind::BandReject
         | EffectKind::Bass
+        | EffectKind::Equalizer
         | EffectKind::Treble
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),

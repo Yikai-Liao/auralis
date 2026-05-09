@@ -54,6 +54,9 @@ pub enum EffectKind {
     /// Constant normalized full-scale offset.
     DcShift,
 
+    /// SoX-ng-style peaking equalizer filter.
+    Equalizer,
+
     /// SoX-ng-style fade-in and optional positional fade-out envelope.
     Fade,
 
@@ -264,6 +267,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "DcShift",
         "dcshift shift [limiter-gain]",
         "add a constant normalized full-scale offset",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Equalizer,
+        "equalizer",
+        &["eq"],
+        "Equalizer",
+        "equalizer frequency width gain",
+        "apply an RBJ peaking equalizer filter",
     ),
     EffectDescriptor::new(
         EffectKind::Fade,
@@ -723,6 +734,7 @@ mod tests {
             ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
+            ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
             ("norm", EffectKind::Norm),
@@ -753,6 +765,7 @@ mod tests {
         let expected = [
             ("dc-shift", "dcshift", EffectKind::DcShift),
             ("dc_shift", "dcshift", EffectKind::DcShift),
+            ("eq", "equalizer", EffectKind::Equalizer),
             ("gain-db", "gain", EffectKind::Gain),
             ("gain_db", "gain", EffectKind::Gain),
             ("normalize", "norm", EffectKind::Norm),
@@ -790,18 +803,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("equalizer").unwrap_err();
+        let error = EffectRegistry::resolve("lowpass").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "equalizer".to_owned(),
+                name: "lowpass".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `equalizer`")
+                .contains("missing SoX-ng coverage entry for `lowpass`")
         );
     }
 

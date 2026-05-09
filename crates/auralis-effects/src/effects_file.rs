@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nequalizer 3000 1q 3").unwrap_err();
+        let error = parse_effects_file_str("gain -3\nlowpass 3000 1q").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `equalizer` failed to parse: known SoX-ng effect `equalizer` is not implemented by Auralis; missing SoX-ng coverage entry for `equalizer`"
+            "effects file line 2, column 1: command `lowpass` failed to parse: known SoX-ng effect `lowpass` is not implemented by Auralis; missing SoX-ng coverage entry for `lowpass`"
         );
     }
 

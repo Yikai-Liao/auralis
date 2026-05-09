@@ -4,11 +4,11 @@ use auralis_effects::parse_effect_command;
 
 #[test]
 fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
-    let unsupported = parse_effect_command(&["equalizer"]).unwrap_err();
+    let unsupported = parse_effect_command(&["lowpass"]).unwrap_err();
     assert!(
         unsupported
             .to_string()
-            .contains("known SoX-ng effect `equalizer`")
+            .contains("known SoX-ng effect `lowpass`")
     );
 
     let unknown = parse_effect_command(&["gian"]).unwrap_err();
