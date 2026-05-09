@@ -58,6 +58,7 @@ version = "0.0.0"
 dependencies = [
  "auralis-core",
  "auralis-effects",
+ "auralis-simd",
  "auralis-wav",
  "thiserror",
 ]
@@ -91,6 +92,7 @@ name = "auralis-dsp"
 version = "0.0.0"
 dependencies = [
  "auralis-core",
+ "auralis-simd",
 ]
 
 [[package]]
@@ -99,6 +101,7 @@ version = "0.0.0"
 dependencies = [
  "auralis-core",
  "auralis-dsp",
+ "auralis-simd",
  "thiserror",
 ]
 

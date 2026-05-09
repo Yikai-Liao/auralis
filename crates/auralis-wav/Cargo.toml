@@ -10,10 +10,14 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+simd = ["auralis-simd/simd"]
+
 [dependencies]
 auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
-auralis-simd = { path = "../auralis-simd" }
+auralis-simd = { path = "../auralis-simd", default-features = false }
 hound.workspace = true
 thiserror.workspace = true
 

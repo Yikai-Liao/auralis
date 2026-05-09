@@ -185,11 +185,29 @@ where
 /// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
 /// same parsing and format errors as [`decode_pcm16`].
 pub fn decode_pcm16_path(path: impl AsRef<Path>) -> Result<AudioBuffer> {
+    decode_pcm16_path_with_backend(path, BackendKind::Scalar)
+}
+
+/// Decodes a PCM16 WAV file from disk with an explicit sample-conversion backend.
+///
+/// The decoded audio is identical to [`decode_pcm16_path`]. `requested_backend`
+/// controls only the PCM16-to-`f32` conversion kernel; unsupported SIMD
+/// requests fall back through `auralis-simd` backend selection metadata before
+/// decoding continues.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_pcm16_with_backend`].
+pub fn decode_pcm16_path_with_backend(
+    path: impl AsRef<Path>,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer> {
     let file = File::open(path).map_err(|error| WavError::OpenFailed {
         message: error.to_string(),
     })?;
 
-    decode_pcm16(BufReader::new(file))
+    decode_pcm16_with_backend(BufReader::new(file), requested_backend)
 }
 
 /// Encodes a planar `f32` buffer as a PCM16 WAV stream.

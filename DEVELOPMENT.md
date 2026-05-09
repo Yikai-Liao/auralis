@@ -878,6 +878,8 @@ Acceptance tests:
 
 #### Feature 4.3.1: SIMD `gain` retrofit
 
+Status: implemented.
+
 Add backend-dispatched kernels for implemented `gain`.
 
 Acceptance tests:

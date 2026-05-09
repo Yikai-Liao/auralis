@@ -41,7 +41,8 @@ Auralis and SoX-ng command vectors for reproducible comparison reports, and
 provides backend conformance helpers for exact and tolerance-based
 scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
 backend trait skeleton with a scalar reference backend, deterministic `scalar` /
-`simd` backend selection, and scalar/SIMD PCM16-to-`f32` sample conversion.
+`simd` backend selection, scalar/SIMD PCM16/`f32` sample conversion in both
+directions, and a backend-dispatched linear `gain_f32` kernel.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -323,6 +324,8 @@ Contains scalar DSP primitives and reference implementations:
 - metrics used by tests where appropriate
 
 Scalar implementations are the source of truth for SIMD differential tests.
+`gain` has an explicit backend-dispatched entry point that keeps scalar as the
+default and uses the Auralis SIMD backend only when requested.
 
 ### `auralis-effects`
 
@@ -343,10 +346,10 @@ Effect implementations should be block-based and streaming-aware from the beginn
 Contains optional SIMD acceleration. This is a backend layer, not part of the
 high-level public API. It owns the backend trait skeleton, backend descriptors,
 deterministic named backend selection, the scalar reference backend marker, and
-PCM16/`f32` conversion kernels in both directions. The scalar kernels are the
-exact reference implementations; the SIMD kernels use `rten-simd` behind the
-`simd` feature and fall back through Auralis backend selection when SIMD is
-unavailable.
+PCM16/`f32` conversion kernels in both directions plus the linear `gain_f32`
+kernel. The scalar kernels are the exact reference implementations; the SIMD
+kernels use `rten-simd` behind the `simd` feature and fall back through Auralis
+backend selection when SIMD is unavailable.
 
 Backend names are stable lowercase strings:
 
@@ -389,7 +392,11 @@ Initial SIMD targets:
 requires finite input samples, clips to `[-1.0, 1.0]`, scales by `32768.0`,
 rounds halfway cases away from zero, and clips the final integer to the PCM16
 range. WAV decode and encode expose explicit backend hooks for scalar-vs-SIMD
-conformance tests while preserving scalar defaults.
+conformance tests while preserving scalar defaults. `gain_f32` accepts a linear
+amplitude multiplier from the DSP `gain` decibel conversion, preserves signed
+zero for infinite-gain edge cases, and is covered by scalar-vs-SIMD parity
+tests for deterministic fixtures, tails, near-clipping values, silence, NaN,
+and infinity behavior.
 
 Do not prioritize SIMD for state-machine-heavy or recursive algorithms at first.
 Do not implement SIMD before scalar correctness tests and differential tests
@@ -406,6 +413,7 @@ auralis --version
 auralis inspect input.wav
 auralis run input.wav output.wav
 auralis run input.wav output.wav --gain-db -3
+auralis run input.wav output.wav --backend simd --gain-db -3
 auralis run input.wav output.wav --dc-shift 0.125
 auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0

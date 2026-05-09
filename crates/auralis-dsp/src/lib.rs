@@ -20,6 +20,7 @@
 //! ```
 
 use auralis_core::Decibels;
+use auralis_simd::{BackendKind, BackendSelection, gain_f32_in_place_with_backend, select_backend};
 
 /// Applies constant gain to each sample in place.
 ///
@@ -32,20 +33,21 @@ use auralis_core::Decibels;
 /// transformed independently. It allocates no memory and runs in `O(n)` time.
 #[inline]
 pub fn gain_in_place(samples: &mut [f32], db: Decibels) {
+    gain_in_place_with_backend(select_backend(BackendKind::Scalar), samples, db);
+}
+
+/// Applies constant gain to each sample in place using the selected backend.
+///
+/// `db` uses the same decibel-to-linear conversion and numerical behavior as
+/// [`gain_in_place`]. Callers can pass [`auralis_simd::select_backend`] with
+/// either [`BackendKind::Scalar`] or [`BackendKind::Simd`] to force deterministic
+/// scalar-vs-SIMD conformance runs. Unsupported SIMD requests follow the
+/// fallback recorded in `selection`.
+#[inline]
+pub fn gain_in_place_with_backend(selection: BackendSelection, samples: &mut [f32], db: Decibels) {
     let multiplier = linear_gain(db);
 
-    if multiplier.is_infinite() {
-        for sample in samples {
-            if *sample != 0.0 {
-                *sample = sample.signum() * f32::INFINITY;
-            }
-        }
-        return;
-    }
-
-    for sample in samples {
-        *sample *= multiplier;
-    }
+    gain_f32_in_place_with_backend(selection, samples, multiplier);
 }
 
 /// Returns the linear amplitude multiplier for a decibel value.
@@ -145,8 +147,11 @@ fn ratio(numerator: u64, denominator: u64) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{dc_shift_in_place, fade_in_place, gain_in_place, linear_gain};
+    use super::{
+        dc_shift_in_place, fade_in_place, gain_in_place, gain_in_place_with_backend, linear_gain,
+    };
     use auralis_core::Decibels;
+    use auralis_simd::{BackendKind, select_backend};
 
     #[test]
     fn zero_db_is_identity() {
@@ -253,6 +258,29 @@ mod tests {
     }
 
     #[test]
+    fn gain_matches_under_forced_scalar_and_requested_simd() {
+        let source = [
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -1.0 / 32768.0,
+            -0.0,
+            0.0,
+            1.0 / 32768.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+        ];
+        let mut scalar = source;
+        let mut simd = source;
+
+        gain_in_place_with_backend(select_backend(BackendKind::Scalar), &mut scalar, db(6.0));
+        gain_in_place_with_backend(select_backend(BackendKind::Simd), &mut simd, db(6.0));
+
+        assert_sample_bits_eq(&simd, &scalar);
+    }
+
+    #[test]
     fn linear_gain_matches_decibel_formula() {
         assert_close(linear_gain(db(-6.0)), 10.0_f32.powf(-6.0 / 20.0));
         assert_close(linear_gain(db(6.0)), 10.0_f32.powf(6.0 / 20.0));
@@ -352,6 +380,18 @@ mod tests {
 
         for (actual, expected) in actual.iter().zip(expected) {
             assert_close(*actual, *expected);
+        }
+    }
+
+    fn assert_sample_bits_eq(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "sample {index} differed: {actual} != {expected}"
+            );
         }
     }
 

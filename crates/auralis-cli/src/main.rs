@@ -32,6 +32,10 @@ enum Command {
         /// PCM16 WAV output file to create.
         output: PathBuf,
 
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -94,6 +98,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
         Command::Run {
             input,
             output,
+            backend,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -109,6 +114,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &input,
             &output,
             RunOptions {
+                backend,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -146,7 +152,10 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
     let trim = options.trim_mode()?;
-    let pipeline = auralis::AudioFile::open_wav(input)?.into_pipeline();
+    let backend = options.backend;
+    let pipeline = auralis::AudioFile::open_wav_with_backend(input, backend)?
+        .into_pipeline()
+        .with_backend(backend);
     let pipeline = if let Some(gain_db) = options.gain_db {
         pipeline.gain_db(gain_db)
     } else {
@@ -187,6 +196,7 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
 
 #[derive(Debug, Clone, Copy)]
 struct RunOptions {
+    backend: auralis::BackendKind,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -248,6 +258,11 @@ fn format_duration_seconds(frames: u64, sample_rate: u32) -> String {
     let fractional = remainder * 1_000_000_000 / sample_rate;
 
     format!("{whole}.{fractional:09}")
+}
+
+fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
+    auralis::BackendKind::from_name(value)
+        .ok_or_else(|| "backend must be `scalar` or `simd`".to_owned())
 }
 
 #[derive(Debug)]

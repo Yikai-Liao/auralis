@@ -21,7 +21,8 @@
 //! ```
 
 use auralis_core::{AudioBuffer, Decibels, FrameCount};
-use auralis_dsp::{dc_shift_in_place, fade_in_place, gain_in_place};
+use auralis_dsp::{dc_shift_in_place, fade_in_place, gain_in_place, gain_in_place_with_backend};
+use auralis_simd::{BackendKind, select_backend};
 use thiserror::Error;
 
 /// Crate-local result type using [`EffectError`].
@@ -55,10 +56,12 @@ pub enum EffectError {
 /// Constant-gain effect processor.
 ///
 /// `Gain` multiplies every sample by `10^(db / 20)` using the scalar
-/// [`auralis_dsp::gain_in_place`] reference kernel. The processor does not
-/// clip, normalize, allocate, or inspect channel boundaries, so processing a
-/// whole buffer and processing the same samples in chunks produce identical
-/// results.
+/// [`auralis_dsp::gain_in_place`] reference kernel by default. Explicit backend
+/// methods can request SIMD through Auralis' backend selection layer while
+/// preserving the same numerical behavior and scalar fallback rules. The
+/// processor does not clip, normalize, allocate, or inspect channel boundaries,
+/// so processing a whole buffer and processing the same samples in chunks
+/// produce identical results.
 ///
 /// # Examples
 ///
@@ -102,12 +105,34 @@ impl Gain {
         self.process_samples(audio.as_planar_f32_mut());
     }
 
+    /// Applies gain to all samples in an audio buffer using the requested backend.
+    ///
+    /// Requesting [`BackendKind::Scalar`] forces the scalar reference path.
+    /// Requesting [`BackendKind::Simd`] uses SIMD when the build and target
+    /// support it, otherwise it follows the documented scalar fallback.
+    pub fn process_buffer_with_backend(
+        self,
+        audio: &mut AudioBuffer,
+        requested_backend: BackendKind,
+    ) {
+        self.process_samples_with_backend(audio.as_planar_f32_mut(), requested_backend);
+    }
+
     /// Applies gain to a planar sample slice.
     ///
     /// This method is suitable for streaming or chunked processing because each
     /// sample is transformed independently.
     pub fn process_samples(self, samples: &mut [f32]) {
         gain_in_place(samples, self.db);
+    }
+
+    /// Applies gain to a planar sample slice using the requested backend.
+    ///
+    /// This method is suitable for streaming or chunked processing because each
+    /// sample is transformed independently. Unsupported SIMD requests follow
+    /// Auralis backend fallback metadata before processing continues.
+    pub fn process_samples_with_backend(self, samples: &mut [f32], requested_backend: BackendKind) {
+        gain_in_place_with_backend(select_backend(requested_backend), samples, self.db);
     }
 }
 
@@ -549,6 +574,7 @@ mod tests {
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
     };
     use auralis_dsp::gain_in_place;
+    use auralis_simd::BackendKind;
 
     #[test]
     fn gain_effect_output_matches_scalar_kernel() {
@@ -575,6 +601,19 @@ mod tests {
         }
 
         assert_samples_close(whole.as_planar_f32(), &chunked);
+    }
+
+    #[test]
+    fn gain_effect_matches_under_forced_scalar_and_requested_simd() {
+        let source = vec![-1.0, -0.999_984_74, -0.5, -0.0, 0.0, 0.5, 0.999_984_74, 1.0];
+        let mut scalar = audio_buffer(source.clone());
+        let mut simd = audio_buffer(source);
+        let gain = Gain::new(db(-3.0));
+
+        gain.process_buffer_with_backend(&mut scalar, BackendKind::Scalar);
+        gain.process_buffer_with_backend(&mut simd, BackendKind::Simd);
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
     }
 
     #[test]
@@ -902,6 +941,18 @@ mod tests {
             assert!(
                 difference <= tolerance,
                 "expected {actual} to be within {tolerance} of {expected}, difference was {difference}"
+            );
+        }
+    }
+
+    fn assert_sample_bits_eq(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "sample {index} differed: {actual} != {expected}"
             );
         }
     }

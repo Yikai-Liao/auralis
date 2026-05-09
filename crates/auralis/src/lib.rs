@@ -25,6 +25,7 @@
 use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
+pub use auralis_simd::BackendKind;
 
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 use thiserror::Error;
@@ -72,6 +73,7 @@ impl PartialEq for Error {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioFile {
     audio: AudioBuffer,
+    requested_backend: BackendKind,
 }
 
 impl AudioFile {
@@ -82,8 +84,27 @@ impl AudioFile {
     /// Returns [`Error::Wav`] when the path cannot be opened, the input is not
     /// a well-formed WAV stream, or the sample format is not supported.
     pub fn open_wav(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_wav_with_backend(path, BackendKind::Scalar)
+    }
+
+    /// Opens a PCM16 WAV file using the requested sample-conversion backend.
+    ///
+    /// The decoded audio is identical to [`Self::open_wav`]. `requested_backend`
+    /// controls only backend-aware decode, later backend-aware effect kernels,
+    /// and WAV encoding after [`Self::into_pipeline`]. Unsupported SIMD requests
+    /// follow Auralis' documented scalar fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] when the path cannot be opened, the input is not
+    /// a well-formed WAV stream, or the sample format is not supported.
+    pub fn open_wav_with_backend(
+        path: impl AsRef<Path>,
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
         Ok(Self {
-            audio: auralis_wav::decode_pcm16_path(path)?,
+            audio: auralis_wav::decode_pcm16_path_with_backend(path, requested_backend)?,
+            requested_backend,
         })
     }
 
@@ -93,7 +114,10 @@ impl AudioFile {
     /// through a lower-level crate but still want to use the pipeline builder.
     #[must_use]
     pub const fn from_audio_buffer(audio: AudioBuffer) -> Self {
-        Self { audio }
+        Self {
+            audio,
+            requested_backend: BackendKind::Scalar,
+        }
     }
 
     /// Returns the decoded audio buffer.
@@ -102,10 +126,16 @@ impl AudioFile {
         &self.audio
     }
 
+    /// Returns the backend requested for backend-aware processing.
+    #[must_use]
+    pub const fn requested_backend(&self) -> BackendKind {
+        self.requested_backend
+    }
+
     /// Converts the file into a chainable effect pipeline.
     #[must_use]
     pub fn into_pipeline(self) -> Pipeline {
-        Pipeline::from_audio_buffer(self.audio)
+        Pipeline::from_audio_buffer_with_backend(self.audio, self.requested_backend)
     }
 }
 
@@ -119,21 +149,50 @@ impl AudioFile {
 #[derive(Debug)]
 pub struct Pipeline {
     audio: Result<AudioBuffer>,
+    requested_backend: BackendKind,
 }
 
 impl Pipeline {
     /// Creates a pipeline from an in-memory audio buffer.
     #[must_use]
     pub fn from_audio_buffer(audio: AudioBuffer) -> Self {
-        Self { audio: Ok(audio) }
+        Self::from_audio_buffer_with_backend(audio, BackendKind::Scalar)
+    }
+
+    /// Creates a pipeline from an in-memory audio buffer with a requested backend.
+    ///
+    /// The backend is used by backend-aware effect kernels and WAV boundary
+    /// conversions. Current scalar-only effects keep their scalar behavior until
+    /// their own SIMD retrofit features are implemented.
+    #[must_use]
+    pub fn from_audio_buffer_with_backend(
+        audio: AudioBuffer,
+        requested_backend: BackendKind,
+    ) -> Self {
+        Self {
+            audio: Ok(audio),
+            requested_backend,
+        }
+    }
+
+    /// Sets the requested backend for later backend-aware pipeline stages.
+    ///
+    /// Requesting [`BackendKind::Scalar`] forces the scalar reference path.
+    /// Requesting [`BackendKind::Simd`] uses SIMD where supported and falls back
+    /// to scalar through Auralis backend selection metadata otherwise.
+    #[must_use]
+    pub const fn with_backend(mut self, requested_backend: BackendKind) -> Self {
+        self.requested_backend = requested_backend;
+        self
     }
 
     /// Applies constant gain measured in decibels.
     ///
     /// The gain multiplier is `10^(db / 20)`. Processing is deterministic,
-    /// in-place, non-allocating, and uses the scalar reference `Gain` effect.
-    /// Output is not clipped until a boundary writer, such as PCM16 WAV
-    /// encoding, applies its documented conversion rules.
+    /// in-place, non-allocating, and uses the requested backend for the
+    /// backend-aware `Gain` effect. Scalar remains the default. Output is not
+    /// clipped until a boundary writer, such as PCM16 WAV encoding, applies its
+    /// documented conversion rules.
     #[must_use]
     pub fn gain_db(mut self, db: f64) -> Self {
         let Ok(audio) = &mut self.audio else {
@@ -141,7 +200,7 @@ impl Pipeline {
         };
 
         match Decibels::new(db) {
-            Ok(db) => Gain::new(db).process_buffer(audio),
+            Ok(db) => Gain::new(db).process_buffer_with_backend(audio, self.requested_backend),
             Err(error) => self.audio = Err(error.into()),
         }
 
@@ -311,7 +370,7 @@ impl Pipeline {
     /// finalization fails.
     pub fn write_wav(self, path: impl AsRef<Path>) -> Result<()> {
         let audio = self.audio?;
-        auralis_wav::encode_pcm16_path(path, &audio)?;
+        auralis_wav::encode_pcm16_path_with_backend(path, &audio, self.requested_backend)?;
 
         Ok(())
     }
@@ -340,7 +399,7 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 
 #[cfg(test)]
 mod tests {
-    use super::{AudioFile, Error};
+    use super::{AudioFile, BackendKind, Error};
     use std::{
         fs,
         path::PathBuf,
@@ -366,6 +425,35 @@ mod tests {
             .unwrap();
 
         assert_samples_close(actual.as_planar_f32(), expected.as_planar_f32());
+    }
+
+    #[test]
+    fn chain_gain_matches_under_forced_scalar_and_requested_simd() {
+        let source = audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+        ]);
+
+        let scalar = AudioFile::from_audio_buffer(source.clone())
+            .into_pipeline()
+            .with_backend(BackendKind::Scalar)
+            .gain_db(-3.0)
+            .into_audio_buffer()
+            .unwrap();
+        let simd = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_backend(BackendKind::Simd)
+            .gain_db(-3.0)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
     }
 
     #[test]
@@ -582,6 +670,18 @@ mod tests {
             assert!(
                 difference <= tolerance,
                 "expected {actual} to be within {tolerance} of {expected}, difference was {difference}"
+            );
+        }
+    }
+
+    fn assert_sample_bits_eq(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+
+        for (index, (&actual, &expected)) in actual.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "sample {index} differed: {actual} != {expected}"
             );
         }
     }

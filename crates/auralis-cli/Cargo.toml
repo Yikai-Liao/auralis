@@ -11,6 +11,10 @@ version.workspace = true
 name = "auralis"
 path = "src/main.rs"
 
+[features]
+default = []
+simd = ["auralis/simd", "auralis-wav/simd"]
+
 [lints]
 workspace = true
 
