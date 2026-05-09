@@ -775,6 +775,7 @@ mod tests {
                 | EffectCommand::Band(_)
                 | EffectCommand::BandPass(_)
                 | EffectCommand::BandReject(_)
+                | EffectCommand::Bass(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)

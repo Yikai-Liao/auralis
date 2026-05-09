@@ -627,6 +627,26 @@ Implementation notes:
 
 ### Feature 6.4.8: `bass`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Bass` effect matching SoX-ng's RBJ low-shelf `bass gain
+  [frequency [width]]` command family, including the 100 Hz and `0.5s` command
+  defaults.
+- Width accepts shelf slope plus hertz, kilohertz, Q, and octave forms; invalid
+  slope widths above 1, non-positive frequencies, and frequencies at or above
+  Nyquist are rejected as invalid biquad designs.
+- Processing delegates to the scalar stateful biquad primitive with independent
+  per-channel state, so chunked processing is exact when callers preserve
+  `BiquadState` per channel.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for the
+  default and explicit-Q forms. Tolerance follows the existing one-PCM16-LSB
+  filter-effect policy because the RBJ coefficients match SoX-ng and residual
+  differences are from sample quantization.
+
 ### Feature 6.4.9: `treble`
 
 ### Feature 6.4.10: `equalizer`

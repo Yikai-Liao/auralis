@@ -31,6 +31,9 @@ pub(crate) fn apply_command(
         EffectCommand::BandReject(band_reject) => band_reject
             .process_buffer(audio)
             .map_err(|source| ("filter-design", source)),
+        EffectCommand::Bass(bass) => bass
+            .process_buffer(audio)
+            .map_err(|source| ("filter-design", source)),
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio),
         EffectCommand::Channels(channels) => {
             let converted = channels
@@ -167,6 +170,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Band
         | EffectKind::BandPass
         | EffectKind::BandReject
+        | EffectKind::Bass
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }

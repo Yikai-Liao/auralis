@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nbass 100 200").unwrap_err();
+        let error = parse_effects_file_str("gain -3\ntreble 3 3000").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `bass` failed to parse: known SoX-ng effect `bass` is not implemented by Auralis; missing SoX-ng coverage entry for `bass`"
+            "effects file line 2, column 1: command `treble` failed to parse: known SoX-ng effect `treble` is not implemented by Auralis; missing SoX-ng coverage entry for `treble`"
         );
     }
 

@@ -4,7 +4,7 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    AllPass, Band, BandPass, BandReject, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
+    AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec,
     RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
 };
@@ -275,6 +275,13 @@ proptest! {
             .process_buffer(&mut band_rejected)
             .expect("fixture sample rate keeps frequency below Nyquist");
         prop_assert_all_finite(&band_rejected)?;
+
+        let mut bass_filtered = source.clone();
+        Bass::with_width(6.0, 100.0, BiquadWidth::slope(0.5))
+            .expect("fixture bass design is valid")
+            .process_buffer(&mut bass_filtered)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        prop_assert_all_finite(&bass_filtered)?;
 
         let mut normalized = source.clone();
         Norm::new(Decibels::new(db).expect("generated dB is finite"))

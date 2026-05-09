@@ -12,6 +12,18 @@ pub(super) fn parse_frequency_hz(effect: &'static str, value: &str) -> CommandRe
 }
 
 pub(super) fn parse_width(effect: &'static str, value: &str) -> CommandResult<BiquadWidth> {
+    parse_width_with_units(effect, value, false)
+}
+
+pub(super) fn parse_shelf_width(effect: &'static str, value: &str) -> CommandResult<BiquadWidth> {
+    parse_width_with_units(effect, value, true)
+}
+
+fn parse_width_with_units(
+    effect: &'static str,
+    value: &str,
+    allow_slope: bool,
+) -> CommandResult<BiquadWidth> {
     if is_option_like(value) {
         return Err(EffectCommandParseError::UnsupportedOption {
             effect,
@@ -27,6 +39,7 @@ pub(super) fn parse_width(effect: &'static str, value: &str) -> CommandResult<Bi
         'k' => Ok(BiquadWidth::kilohertz(width)),
         'q' => Ok(BiquadWidth::q(width)),
         'o' => Ok(BiquadWidth::octaves(width)),
+        's' if allow_slope => Ok(BiquadWidth::slope(width)),
         _ => Err(EffectCommandParseError::InvalidEffectConfig {
             effect,
             argument: "width",

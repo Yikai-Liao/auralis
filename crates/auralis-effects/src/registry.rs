@@ -36,6 +36,9 @@ pub enum EffectKind {
     /// SoX-ng-style RBJ band-reject filter.
     BandReject,
 
+    /// SoX-ng-style bass tone control.
+    Bass,
+
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad,
 
@@ -210,6 +213,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "BandReject",
         "bandreject frequency width",
         "apply an RBJ band-reject filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Bass,
+        "bass",
+        &[],
+        "Bass",
+        "bass gain [frequency [width]]",
+        "apply a low-shelf bass tone control",
     ),
     EffectDescriptor::new(
         EffectKind::Biquad,
@@ -695,6 +706,7 @@ mod tests {
             ("band", EffectKind::Band),
             ("bandpass", EffectKind::BandPass),
             ("bandreject", EffectKind::BandReject),
+            ("bass", EffectKind::Bass),
             ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
@@ -766,18 +778,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("bass").unwrap_err();
+        let error = EffectRegistry::resolve("treble").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "bass".to_owned(),
+                name: "treble".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `bass`")
+                .contains("missing SoX-ng coverage entry for `treble`")
         );
     }
 
