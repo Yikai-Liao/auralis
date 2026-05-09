@@ -1,0 +1,49 @@
+[package]
+name = "auralis-fuzz"
+edition = "2024"
+publish = false
+version = "0.0.0"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+auralis-fuzz-targets = { path = "../crates/auralis-fuzz-targets" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "wav_parser"
+path = "fuzz_targets/wav_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "unsupported_wav_format"
+path = "fuzz_targets/unsupported_wav_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "effect_command"
+path = "fuzz_targets/effect_command.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "effects_file"
+path = "fuzz_targets/effects_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "golden_manifest"
+path = "fuzz_targets/golden_manifest.rs"
+test = false
+doc = false
+bench = false

@@ -108,6 +108,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "auralis-fuzz-targets"
+version = "0.0.0"
+dependencies = [
+ "auralis-effects",
+ "auralis-testkit",
+ "auralis-wav",
+]
+
+[[package]]
 name = "auralis-simd"
 version = "0.0.0"
 dependencies = [

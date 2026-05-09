@@ -1028,6 +1028,68 @@ Rust reduces many memory risks, but fuzzing is still required for:
 
 Coverage gates should focus on touched code and DSP modules, not a misleading whole-repository percentage.
 
+The L7 baseline is checked in as two layers:
+
+- `crates/auralis-fuzz-targets` provides stable-Rust fuzz target drivers and
+  deterministic smoke tests.
+- `fuzz/` provides cargo-fuzz-compatible wrappers and seed corpus files for
+  local libFuzzer runs.
+
+Current fuzz target names are:
+
+```text
+wav_parser
+unsupported_wav_format
+effect_command
+effects_file
+golden_manifest
+```
+
+Run the stable smoke check after changing parser, codec, or manifest
+boundaries:
+
+```bash
+cargo test -p auralis-fuzz-targets --all-features
+cargo check --manifest-path fuzz/Cargo.toml --bins
+cargo run --manifest-path fuzz/Cargo.toml --bin effect_command -- \
+  fuzz/corpus/effect_command -runs=1
+```
+
+Run local libFuzzer campaigns with `cargo-fuzz` installed:
+
+```bash
+cargo +nightly fuzz run wav_parser -- -max_total_time=60
+cargo +nightly fuzz run unsupported_wav_format -- -max_total_time=60
+cargo +nightly fuzz run effect_command -- -max_total_time=60
+cargo +nightly fuzz run effects_file -- -max_total_time=60
+cargo +nightly fuzz run golden_manifest -- -max_total_time=60
+```
+
+Cargo-fuzz writes reproducible crash inputs under `fuzz/artifacts/<target>/`
+and can minimize them with:
+
+```bash
+cargo +nightly fuzz tmin <target> fuzz/artifacts/<target>/<crash-file>
+```
+
+For Linux sanitizer checks, use nightly Rust because sanitizer flags are still
+unstable:
+
+```bash
+RUSTFLAGS="-Z sanitizer=address" \
+  cargo +nightly test -Z build-std --target x86_64-unknown-linux-gnu \
+  -p auralis-wav -p auralis-effects -p auralis-testkit -p auralis-fuzz-targets
+```
+
+For touched-module coverage, use `cargo-llvm-cov` and keep the package list
+focused on modules affected by the change:
+
+```bash
+cargo llvm-cov --workspace --all-features \
+  -p auralis-wav -p auralis-effects -p auralis-testkit -p auralis-fuzz-targets \
+  --lcov --output-path target/llvm-cov/l7-touched.info
+```
+
 ---
 
 ## Numerical metrics

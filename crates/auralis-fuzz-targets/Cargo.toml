@@ -1,0 +1,20 @@
+[package]
+name = "auralis-fuzz-targets"
+description = "Reusable fuzz target drivers for Auralis parsers and rejection paths."
+edition.workspace = true
+license.workspace = true
+publish = false
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+auralis-effects = { path = "../auralis-effects" }
+auralis-testkit = { path = "../auralis-testkit" }
+auralis-wav = { path = "../auralis-wav" }
+
+[lints]
+workspace = true

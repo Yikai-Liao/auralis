@@ -1,0 +1,8 @@
+[id.case]
+input = "in.wav"
+corpus_id = "sine_1k_mono_480"
+auralis = ["run"]
+sox_ng = ["gain", "-3"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

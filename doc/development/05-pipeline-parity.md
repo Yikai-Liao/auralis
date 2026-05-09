@@ -454,7 +454,7 @@ Audit summary:
 | L4 property/metamorphic tests | partial | add systematic property-test framework and core properties |
 | L5 chunk invariance | basic | implement the required chunk-size matrix and seeded random chunks |
 | L6 scalar-vs-SIMD differential | strong | keep as a required gate for data-parallel kernels |
-| L7 fuzzing/sanitizers/coverage | absent | add harnesses and documented commands |
+| L7 fuzzing/sanitizers/coverage | baseline | keep fuzz targets current and expand coverage as new parser boundaries land |
 
 ### Feature 5.7.1: L0 deterministic corpus library
 
@@ -634,7 +634,7 @@ Implementation notes:
 
 ### Feature 5.7.6: L7 fuzzing, sanitizers, and coverage baseline
 
-Status: planned.
+Status: implemented.
 
 Add the missing README L7 infrastructure.
 
@@ -653,6 +653,21 @@ Acceptance tests:
 - coverage command is documented and scoped to touched code/DSP modules rather
   than a misleading repository-wide percentage;
 - failures produce minimized or reproducible inputs where the tool supports it.
+
+Implementation notes:
+
+- `crates/auralis-fuzz-targets` contains reusable stable-Rust drivers for WAV
+  parser behavior, unsupported WAV format rejection, effect command parsing,
+  effects-file parsing, and TOML golden-manifest parsing.
+- `fuzz/` contains cargo-fuzz-compatible wrappers and seed corpus entries for
+  those drivers. A future pipeline-manifest fuzz target remains not applicable
+  until pipeline manifests are implemented.
+- Stable smoke validation uses
+  `cargo test -p auralis-fuzz-targets --all-features`; target compilation uses
+  `cargo check --manifest-path fuzz/Cargo.toml --bins`; short target execution
+  uses `cargo run --manifest-path fuzz/Cargo.toml --bin <target> -- fuzz/corpus/<target> -runs=1`.
+- Linux sanitizer and touched-module coverage commands are documented in the
+  README L7 section.
 
 ### Feature 5.7.7: layered coverage report and feature gate
 
