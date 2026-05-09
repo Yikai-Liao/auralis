@@ -419,6 +419,8 @@ Do not implement effects yet.
 
 ### Feature 1.4: CLI `inspect`
 
+Status: implemented.
+
 Implement:
 
 ```bash

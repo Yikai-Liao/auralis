@@ -13,3 +13,7 @@ path = "src/main.rs"
 
 [lints]
 workspace = true
+
+[dependencies]
+auralis-wav = { path = "../auralis-wav" }
+clap = { workspace = true, features = ["derive"] }
