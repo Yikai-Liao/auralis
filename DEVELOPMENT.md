@@ -326,6 +326,8 @@ Do not implement WAV or DSP yet.
 
 ### Feature 0.3: internal audio buffer
 
+Status: implemented.
+
 Implement:
 
 - `AudioBuffer`

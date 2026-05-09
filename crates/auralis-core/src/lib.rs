@@ -51,6 +51,10 @@ pub enum AuralisError {
     /// A non-finite or negative time value was provided.
     #[error("time in seconds must be finite and non-negative")]
     InvalidTimeSeconds,
+
+    /// Planar audio data length did not match its declared shape.
+    #[error("audio buffer data length does not match channel and frame count")]
+    InvalidAudioBufferShape,
 }
 
 /// Audio sample rate in frames per second.
@@ -368,11 +372,172 @@ impl AudioSpec {
     }
 }
 
+/// Internal planar `f32` audio storage.
+///
+/// Samples are stored by channel, then by frame: all frames for channel `0`,
+/// followed by all frames for channel `1`, and so on. This layout is
+/// deterministic and exact; construction only validates shape and never
+/// normalizes sample values.
+///
+/// # Examples
+///
+/// ```
+/// use auralis_core::{
+///     AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
+/// };
+///
+/// let spec = AudioSpec::new(
+///     SampleRate::new(48_000)?,
+///     ChannelCount::new(2)?,
+///     SampleFormat::Float32,
+/// );
+/// let mut buffer = AudioBuffer::zeroed(spec, FrameCount::new(3))?;
+/// buffer.channel_mut(1).unwrap()[2] = 0.5;
+///
+/// assert_eq!(buffer.sample(1, 2), Some(0.5));
+/// # Ok::<(), auralis_core::AuralisError>(())
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct AudioBuffer {
+    spec: AudioSpec,
+    frames: FrameCount,
+    data: Vec<f32>,
+}
+
+impl AudioBuffer {
+    /// Creates a buffer from already-planar `f32` data.
+    ///
+    /// The expected data length is `channels * frames`, with each channel
+    /// occupying one contiguous `frames`-sample region. Zero frames are valid
+    /// and require an empty data vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuralisError::InvalidAudioBufferShape`] when `frames` cannot
+    /// be represented as `usize`, when `channels * frames` overflows, or when
+    /// `data.len()` does not match the declared shape.
+    pub fn from_planar_f32(spec: AudioSpec, frames: FrameCount, data: Vec<f32>) -> Result<Self> {
+        let expected_len = planar_sample_count(spec.channels(), frames)?;
+
+        if data.len() == expected_len {
+            Ok(Self { spec, frames, data })
+        } else {
+            Err(AuralisError::InvalidAudioBufferShape)
+        }
+    }
+
+    /// Creates a zero-initialized planar buffer for `spec` and `frames`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuralisError::InvalidAudioBufferShape`] when `frames` cannot
+    /// be represented as `usize` or when `channels * frames` overflows.
+    pub fn zeroed(spec: AudioSpec, frames: FrameCount) -> Result<Self> {
+        let sample_count = planar_sample_count(spec.channels(), frames)?;
+
+        Ok(Self {
+            spec,
+            frames,
+            data: vec![0.0; sample_count],
+        })
+    }
+
+    /// Returns the buffer audio specification.
+    #[must_use]
+    pub const fn spec(&self) -> AudioSpec {
+        self.spec
+    }
+
+    /// Returns the number of frames in each channel.
+    #[must_use]
+    pub const fn frames(&self) -> FrameCount {
+        self.frames
+    }
+
+    /// Returns the number of channels.
+    #[must_use]
+    pub const fn channels(&self) -> ChannelCount {
+        self.spec.channels()
+    }
+
+    /// Returns the planar sample data.
+    #[must_use]
+    pub fn as_planar_f32(&self) -> &[f32] {
+        &self.data
+    }
+
+    /// Returns the mutable planar sample data.
+    #[must_use]
+    pub fn as_planar_f32_mut(&mut self) -> &mut [f32] {
+        &mut self.data
+    }
+
+    /// Returns a read-only view of one channel.
+    #[must_use]
+    pub fn channel(&self, channel_index: usize) -> Option<&[f32]> {
+        self.channel_range(channel_index)
+            .map(|range| &self.data[range])
+    }
+
+    /// Returns a mutable view of one channel.
+    #[must_use]
+    pub fn channel_mut(&mut self, channel_index: usize) -> Option<&mut [f32]> {
+        self.channel_range(channel_index)
+            .map(|range| &mut self.data[range])
+    }
+
+    /// Returns one sample by channel and frame index.
+    #[must_use]
+    pub fn sample(&self, channel_index: usize, frame_index: usize) -> Option<f32> {
+        self.sample_index(channel_index, frame_index)
+            .map(|index| self.data[index])
+    }
+
+    /// Returns a mutable reference to one sample by channel and frame index.
+    #[must_use]
+    pub fn sample_mut(&mut self, channel_index: usize, frame_index: usize) -> Option<&mut f32> {
+        self.sample_index(channel_index, frame_index)
+            .map(|index| &mut self.data[index])
+    }
+
+    fn channel_range(&self, channel_index: usize) -> Option<std::ops::Range<usize>> {
+        let frames = usize::try_from(self.frames.as_u64()).ok()?;
+
+        if channel_index >= self.channels().as_usize() {
+            return None;
+        }
+
+        let start = channel_index.checked_mul(frames)?;
+        let end = start.checked_add(frames)?;
+        Some(start..end)
+    }
+
+    fn sample_index(&self, channel_index: usize, frame_index: usize) -> Option<usize> {
+        let range = self.channel_range(channel_index)?;
+
+        if frame_index < range.len() {
+            Some(range.start + frame_index)
+        } else {
+            None
+        }
+    }
+}
+
+fn planar_sample_count(channels: ChannelCount, frames: FrameCount) -> Result<usize> {
+    let frames =
+        usize::try_from(frames.as_u64()).map_err(|_| AuralisError::InvalidAudioBufferShape)?;
+
+    channels
+        .as_usize()
+        .checked_mul(frames)
+        .ok_or(AuralisError::InvalidAudioBufferShape)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        AudioSpec, AuralisError, ChannelCount, Decibels, FrameCount, Hertz, SampleFormat,
-        SampleRate, TimeSeconds,
+        AudioBuffer, AudioSpec, AuralisError, ChannelCount, Decibels, FrameCount, Hertz,
+        SampleFormat, SampleRate, TimeSeconds,
     };
 
     #[test]
@@ -502,5 +667,87 @@ mod tests {
             AuralisError::InvalidChannelCount.to_string(),
             "channel count must be greater than zero"
         );
+        assert_eq!(
+            AuralisError::InvalidAudioBufferShape.to_string(),
+            "audio buffer data length does not match channel and frame count"
+        );
+    }
+
+    #[test]
+    fn mono_audio_buffer_preserves_planar_layout() {
+        let buffer = AudioBuffer::from_planar_f32(
+            test_spec(1),
+            FrameCount::new(4),
+            vec![0.0, 0.25, -0.5, 1.0],
+        )
+        .unwrap();
+
+        assert_eq!(buffer.spec(), test_spec(1));
+        assert_eq!(buffer.frames().as_u64(), 4);
+        assert_eq!(buffer.channels().as_u16(), 1);
+        assert_eq!(buffer.as_planar_f32(), &[0.0, 0.25, -0.5, 1.0]);
+        assert_eq!(buffer.channel(0), Some([0.0, 0.25, -0.5, 1.0].as_slice()));
+        assert_eq!(buffer.sample(0, 3), Some(1.0));
+        assert_eq!(buffer.sample(1, 0), None);
+    }
+
+    #[test]
+    fn stereo_audio_buffer_uses_channel_major_storage() {
+        let buffer = AudioBuffer::from_planar_f32(
+            test_spec(2),
+            FrameCount::new(3),
+            vec![1.0, 2.0, 3.0, -1.0, -2.0, -3.0],
+        )
+        .unwrap();
+
+        assert_eq!(buffer.channel(0), Some([1.0, 2.0, 3.0].as_slice()));
+        assert_eq!(buffer.channel(1), Some([-1.0, -2.0, -3.0].as_slice()));
+        assert_eq!(buffer.sample(0, 2), Some(3.0));
+        assert_eq!(buffer.sample(1, 2), Some(-3.0));
+        assert_eq!(buffer.sample(1, 3), None);
+    }
+
+    #[test]
+    fn channel_views_can_mutate_one_channel_without_touching_others() {
+        let mut buffer = AudioBuffer::zeroed(test_spec(2), FrameCount::new(2)).unwrap();
+
+        buffer.channel_mut(1).unwrap().copy_from_slice(&[0.5, -0.5]);
+        *buffer.sample_mut(0, 1).unwrap() = 0.25;
+
+        assert_eq!(buffer.channel(0), Some([0.0, 0.25].as_slice()));
+        assert_eq!(buffer.channel(1), Some([0.5, -0.5].as_slice()));
+        assert_eq!(buffer.as_planar_f32_mut(), &mut [0.0, 0.25, 0.5, -0.5]);
+    }
+
+    #[test]
+    fn invalid_audio_buffer_data_length_is_rejected() {
+        assert_eq!(
+            AudioBuffer::from_planar_f32(test_spec(2), FrameCount::new(3), vec![0.0; 5]),
+            Err(AuralisError::InvalidAudioBufferShape)
+        );
+        assert_eq!(
+            AudioBuffer::from_planar_f32(test_spec(1), FrameCount::new(u64::MAX), Vec::new()),
+            Err(AuralisError::InvalidAudioBufferShape)
+        );
+    }
+
+    #[test]
+    fn zero_length_audio_buffer_has_empty_channel_views() {
+        let mut buffer = AudioBuffer::zeroed(test_spec(2), FrameCount::new(0)).unwrap();
+
+        assert_eq!(buffer.as_planar_f32(), &[]);
+        assert_eq!(buffer.channel(0), Some([].as_slice()));
+        assert_eq!(buffer.channel(1), Some([].as_slice()));
+        assert_eq!(buffer.channel(2), None);
+        assert_eq!(buffer.channel_mut(0), Some([].as_mut_slice()));
+        assert_eq!(buffer.sample(0, 0), None);
+    }
+
+    fn test_spec(channels: u16) -> AudioSpec {
+        AudioSpec::new(
+            SampleRate::new(48_000).unwrap(),
+            ChannelCount::new(channels).unwrap(),
+            SampleFormat::Float32,
+        )
     }
 }
