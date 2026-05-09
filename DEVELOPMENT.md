@@ -377,6 +377,8 @@ Do not decode WAV yet.
 
 ### Feature 1.2: PCM16 WAV decode
 
+Status: implemented.
+
 Implement `auralis-wav` PCM16 WAV reading into planar `f32`.
 
 Acceptance tests:

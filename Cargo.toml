@@ -19,6 +19,7 @@ rust-version = "1.95"
 version = "0.0.0"
 
 [workspace.dependencies]
+hound = "3.5.1"
 thiserror = "2.0.17"
 
 [workspace.lints.rust]

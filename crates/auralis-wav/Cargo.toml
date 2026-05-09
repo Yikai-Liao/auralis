@@ -10,5 +10,11 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+auralis-codec = { path = "../auralis-codec" }
+auralis-core = { path = "../auralis-core" }
+hound.workspace = true
+thiserror.workspace = true
+
 [lints]
 workspace = true

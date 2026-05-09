@@ -33,6 +33,15 @@ pub enum CodecError {
     /// codec set.
     #[error("{0}")]
     UnsupportedFormat(UnsupportedFormat),
+
+    /// A concrete decoder failed to read the requested stream.
+    #[error("{kind} decode failed: {message}")]
+    DecodeFailed {
+        /// Codec kind that failed while decoding.
+        kind: CodecKind,
+        /// Human-readable failure detail from the concrete codec.
+        message: String,
+    },
 }
 
 /// Description of an unsupported codec request.
