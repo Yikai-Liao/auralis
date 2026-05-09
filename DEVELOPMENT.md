@@ -1307,6 +1307,8 @@ Acceptance tests:
 
 #### Feature 5.5.4: automatic dither insertion policy
 
+Status: blocked until Feature 6.8.7 implements the `dither` effect.
+
 Implement only after the `dither` effect exists.
 
 Acceptance tests:

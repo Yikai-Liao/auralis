@@ -639,7 +639,9 @@ final buffer only when its absolute peak exceeds full scale. They can use
 `OutputLevelPolicy::Normalize(Decibels)` to scale non-silent output to a target
 peak before writing. The CLI exposes these policies as `--guard` and
 `--norm[=DB]`; `--norm` defaults to 0 dBFS, and `--guard` cannot be combined
-with `--norm`.
+with `--norm`. Automatic dither insertion remains blocked until the `dither`
+effect itself is implemented, so current Auralis output never adds hidden
+dither noise.
 
 Selected crates:
 
