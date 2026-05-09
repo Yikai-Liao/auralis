@@ -22,7 +22,10 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use std::num::{ParseFloatError, ParseIntError};
+use std::{
+    fmt,
+    num::{ParseFloatError, ParseIntError},
+};
 
 use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
@@ -133,6 +136,12 @@ impl EffectCommand {
                 trim.end.as_u64().to_string(),
             ],
         }
+    }
+}
+
+impl fmt::Display for EffectCommand {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.render_tokens().join(" "))
     }
 }
 

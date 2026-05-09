@@ -25,6 +25,7 @@
 use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
+pub use auralis_effects::{EffectChain, EffectChainError, EffectCommand};
 pub use auralis_simd::BackendKind;
 
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
@@ -49,6 +50,10 @@ pub enum Error {
     #[error(transparent)]
     Effect(#[from] auralis_effects::EffectError),
 
+    /// A sequential effect chain failed while applying one command.
+    #[error(transparent)]
+    Chain(#[from] auralis_effects::EffectChainError),
+
     /// A seconds-based trim range could not be represented as frames.
     #[error("trim seconds range cannot be represented as frame positions")]
     InvalidTrimSecondsRange,
@@ -60,6 +65,7 @@ impl PartialEq for Error {
             (Self::Core(left), Self::Core(right)) => left == right,
             (Self::Wav(left), Self::Wav(right)) => left == right,
             (Self::Effect(left), Self::Effect(right)) => left == right,
+            (Self::Chain(left), Self::Chain(right)) => left == right,
             (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }
@@ -352,6 +358,28 @@ impl Pipeline {
         self
     }
 
+    /// Applies a typed in-memory effect chain in its stored command order.
+    ///
+    /// This is the command-model counterpart to the fluent methods such as
+    /// [`Self::gain_db`] and [`Self::reverse`]. Backend-aware effects inside
+    /// the chain use the pipeline's requested backend; structural effects keep
+    /// their deterministic scalar behavior. If one command fails, later
+    /// commands are skipped and the deferred [`Error::Chain`] identifies the
+    /// failing command index, canonical command tokens, argument family, and
+    /// typed source error.
+    #[must_use]
+    pub fn apply_effect_chain(mut self, chain: &EffectChain) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        if let Err(error) = chain.process_buffer_with_backend(audio, self.requested_backend) {
+            self.audio = Err(error.into());
+        }
+
+        self
+    }
+
     /// Returns the processed audio buffer.
     ///
     /// # Errors
@@ -403,7 +431,7 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 
 #[cfg(test)]
 mod tests {
-    use super::{AudioFile, BackendKind, Error};
+    use super::{AudioFile, BackendKind, EffectChain, EffectCommand, Error};
     use std::{
         fs,
         path::PathBuf,
@@ -413,7 +441,7 @@ mod tests {
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
     };
-    use auralis_effects::Gain;
+    use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
 
     #[test]
     fn chain_gain_matches_direct_effect_execution() {
@@ -614,6 +642,107 @@ mod tests {
 
         assert_eq!(actual.frames(), FrameCount::new(3));
         assert_eq!(actual.as_planar_f32(), &[0.5, 0.25, 0.0, -0.5, -0.25, 1.0]);
+    }
+
+    #[test]
+    fn apply_effect_chain_matches_repeated_fluent_pipeline_calls() {
+        let source = stereo_audio_buffer(vec![0.25, -0.5, 0.75, 1.0, -0.25, 0.5, -0.75, -1.0]);
+        let chain = EffectChain::new(vec![
+            EffectCommand::Gain(Gain::new(Decibels::new(-3.0).unwrap())),
+            EffectCommand::DcShift(DcShift::new(0.125).unwrap()),
+            EffectCommand::Fade(Fade::new(FrameCount::new(2), FrameCount::new(2))),
+            EffectCommand::Trim(Trim::new(FrameCount::new(1), FrameCount::new(3)).unwrap()),
+            EffectCommand::Reverse(Reverse::new()),
+        ]);
+
+        let actual = AudioFile::from_audio_buffer(source.clone())
+            .into_pipeline()
+            .apply_effect_chain(&chain)
+            .into_audio_buffer()
+            .unwrap();
+        let expected = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .gain_db(-3.0)
+            .dc_shift(0.125)
+            .fade_frames(2, 2)
+            .trim_frames(1, 3)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_samples_close(actual.as_planar_f32(), expected.as_planar_f32());
+        assert_eq!(actual.frames(), expected.frames());
+        assert_eq!(actual.channels(), expected.channels());
+    }
+
+    #[test]
+    fn apply_effect_chain_matches_under_forced_scalar_and_requested_simd() {
+        let source = stereo_audio_buffer(vec![
+            -1.0,
+            -0.999_984_74,
+            -0.5,
+            -0.0,
+            0.0,
+            0.5,
+            0.999_984_74,
+            1.0,
+            1.0,
+            0.999_984_74,
+            0.5,
+            0.0,
+            -0.0,
+            -0.5,
+            -0.999_984_74,
+            -1.0,
+        ]);
+        let chain = EffectChain::new(vec![
+            EffectCommand::Gain(Gain::new(Decibels::new(-3.0).unwrap())),
+            EffectCommand::DcShift(DcShift::new(0.125).unwrap()),
+            EffectCommand::Fade(Fade::new(FrameCount::new(5), FrameCount::new(7))),
+            EffectCommand::Reverse(Reverse::new()),
+        ]);
+
+        let scalar = AudioFile::from_audio_buffer(source.clone())
+            .into_pipeline()
+            .with_backend(BackendKind::Scalar)
+            .apply_effect_chain(&chain)
+            .into_audio_buffer()
+            .unwrap();
+        let simd = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_backend(BackendKind::Simd)
+            .apply_effect_chain(&chain)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+    }
+
+    #[test]
+    fn apply_effect_chain_errors_include_failing_command_context() {
+        let chain = EffectChain::new(vec![EffectCommand::Trim(
+            Trim::new(FrameCount::new(0), FrameCount::new(3)).unwrap(),
+        )]);
+
+        let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25, -0.5]))
+            .into_pipeline()
+            .apply_effect_chain(&chain)
+            .into_audio_buffer()
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            Error::Chain(auralis_effects::EffectChainError::CommandFailed {
+                index: 0,
+                command: EffectCommand::Trim(_),
+                argument: "frame-range",
+                source: auralis_effects::EffectError::TrimRangeOutOfBounds,
+            })
+        ));
+        assert_eq!(
+            error.to_string(),
+            "effect chain command 0 (`trim 0 3`) failed while applying `frame-range`: trim frame range must be within the input duration"
+        );
     }
 
     #[test]

@@ -1077,6 +1077,8 @@ Acceptance tests:
 
 #### Feature 5.2.1: in-memory sequential chain
 
+Status: implemented.
+
 Implement sequential chains in the library.
 
 Acceptance tests:

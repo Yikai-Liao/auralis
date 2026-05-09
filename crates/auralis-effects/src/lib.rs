@@ -31,9 +31,11 @@ use auralis_dsp::{
 use auralis_simd::{BackendKind, select_backend};
 use thiserror::Error;
 
+mod chain;
 mod command;
 mod registry;
 
+pub use chain::{ChainResult, EffectChain, EffectChainError};
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,

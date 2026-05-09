@@ -36,7 +36,9 @@ gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
-unknown names or unsupported SoX-ng options return stable diagnostics.
+unknown names or unsupported SoX-ng options return stable diagnostics. Parsed
+commands can be grouped into an in-memory `EffectChain` and executed in order
+with indexed command-context errors and forced scalar/SIMD backend selection.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -267,6 +269,7 @@ Provides the high-level library facade:
 - `Pipeline::pad_frames`
 - `Pipeline::fade_frames`
 - `Pipeline::reverse`
+- `Pipeline::apply_effect_chain`
 - `Pipeline::write_wav`
 
 This crate wires together core buffers, WAV I/O, and typed effects while keeping
@@ -361,7 +364,11 @@ dcshift limiter gain with effect- and option-specific diagnostics.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
-`gain-db 0.0` produce the same manifest representation.
+`gain-db 0.0` produce the same manifest representation. `EffectChain` groups
+typed commands into an in-memory sequential chain, applies them in caller order,
+supports forced scalar/SIMD backend selection for backend-aware effects, and
+reports processing failures with the zero-based command index, canonical command
+tokens, failed argument family, and typed source error.
 
 ### `auralis-simd`
 
