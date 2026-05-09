@@ -1,0 +1,135 @@
+# Standalone implemented-effect golden cases. These isolate one effect per case:
+# output rate/channel conversion is absent, guard/norm are absent, and the
+# Python runner invokes SoX-ng with `-R -D` so automatic dither is disabled.
+
+[id.effect_gain_mono_minus_3]
+input = "effects/gain_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-3"]
+sox_ng = ["gain", "-3"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_gain_stereo_minus_6]
+input = "effects/gain_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-6"]
+sox_ng = ["gain", "-6"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_dcshift_mono_positive]
+input = "effects/dcshift_mono.wav"
+corpus_id = "l0/step_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["dcshift", "0.125"]
+sox_ng = ["dcshift", "0.125"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_dcshift_stereo_negative]
+input = "effects/dcshift_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["dcshift", "-0.0625"]
+sox_ng = ["dcshift", "-0.0625"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_trim_mono_middle]
+input = "effects/trim_mono.wav"
+corpus_id = "l0/odd_length_mono_17"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["trim", "3", "13"]
+sox_ng = ["trim", "3s", "10s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_trim_stereo_middle]
+input = "effects/trim_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["trim", "4", "28"]
+sox_ng = ["trim", "4s", "24s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_pad_mono_both_sides]
+input = "effects/pad_mono.wav"
+corpus_id = "l0/short_mono_3"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pad", "2", "1"]
+sox_ng = ["pad", "2s", "1s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_pad_stereo_both_sides]
+input = "effects/pad_stereo.wav"
+corpus_id = "l0/short_stereo_2"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pad", "1", "2"]
+sox_ng = ["pad", "1s", "2s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_reverse_mono_odd_length]
+input = "effects/reverse_mono.wav"
+corpus_id = "l0/odd_length_mono_17"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_reverse_stereo]
+input = "effects/reverse_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_fade_mono_linear_in]
+input = "effects/fade_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["fade", "5", "0"]
+sox_ng = ["fade", "t", "5s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_fade_stereo_linear_in]
+input = "effects/fade_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["fade", "4", "0"]
+sox_ng = ["fade", "t", "4s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

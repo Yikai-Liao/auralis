@@ -530,7 +530,7 @@ Implementation notes:
 
 ### Feature 5.7.3: L2 standalone golden coverage for implemented effects
 
-Status: planned.
+Status: implemented.
 
 Ensure every implemented effect has direct SoX-ng golden coverage, not only
 chain coverage.
@@ -552,6 +552,18 @@ Acceptance tests:
   guard, norm, or dither was disabled, absent, or explicitly tested;
 - chain golden tests remain as integration coverage, not a substitute for
   standalone effect coverage.
+
+Implementation notes:
+
+- `tests/golden/effects.toml` now records standalone mono and stereo L2 golden
+  cases for `gain`, `dcshift`, `trim`, `pad`, `reverse`, and linear `fade`.
+- `crates/auralis-testkit/tests/golden_effects.rs` validates that the manifest
+  covers every implemented effect directly, preserves deterministic command
+  rendering, and keeps automatic rate/channel conversion absent for each case.
+- `tools/pytest/tests/test_effect_golden_manifest.py` executes the standalone
+  cases against SoX-ng and writes the shared `auralis.golden.failure.v1` report
+  on drift; the runner invokes SoX-ng with `-R -D`, so dither is explicitly
+  disabled while guard and norm remain absent from these effect-isolation cases.
 
 ### Feature 5.7.4: L4 property and metamorphic test framework
 

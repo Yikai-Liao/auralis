@@ -42,8 +42,9 @@ with indexed command-context errors and forced scalar/SIMD backend selection.
 `auralis run <input.wav> <output.wav> gain -3 dcshift 0.125 reverse` exposes
 the same typed chain model at the CLI, preserving positional user order while
 the earlier single-effect flags remain available for compatibility. The golden
-suite now includes a `tests/golden/chains.toml` manifest for representative
-editing, level, and fade/gain filter-style positional chains against SoX-ng.
+suite now includes standalone effect coverage in `tests/golden/effects.toml`
+plus a `tests/golden/chains.toml` manifest for representative editing, level,
+and fade/gain filter-style positional chains against SoX-ng.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -684,9 +685,10 @@ Contains test utilities shared by Rust tests and Python tests:
 - raw f32 helpers
 - WAV decode helpers
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
-- golden test manifest handling, including output-channel and output-rate
-  metadata for cases where SoX-ng auto-inserts `channels` or `rate` conversion
-  plus output-level guard and normalization comparison manifests
+- golden test manifest handling, including standalone effect coverage,
+  output-channel and output-rate metadata for cases where SoX-ng auto-inserts
+  `channels` or `rate` conversion, plus output-level guard and normalization
+  comparison manifests
 - scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
@@ -730,6 +732,11 @@ implemented fade/gain filter-style chain. `tests/golden/concat.toml`,
 `tests/golden/mix_power.toml`, `tests/golden/merge.toml`, and
 `tests/golden/multiply.toml` record combiner coverage for mismatched mono input
 lengths and stereo combine-before-reverse chains.
+`tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
+for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`, and
+linear `fade`. Those standalone effect cases isolate effect behavior: output
+rate/channel conversion is absent, guard and norm are absent, and SoX-ng
+automatic dithering is disabled by the runner's `-D` flag.
 `tests/golden/auto_channels.toml` records output-channel policy coverage where
 SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
 records output-rate policy coverage where SoX-ng auto-inserts `rate`
