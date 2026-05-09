@@ -112,20 +112,30 @@ impl GoldenManifest {
 /// One golden comparison case from a manifest.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoldenCase {
-    input: PathBuf,
+    inputs: Vec<PathBuf>,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     tolerance: GoldenTolerance,
 }
 
 impl GoldenCase {
-    /// Returns the input fixture path recorded by the manifest.
+    /// Returns the first input fixture path recorded by the manifest.
     ///
     /// The path is usually relative to the test corpus root. Callers choose
     /// whether to join it to a temporary fixture directory or use it directly.
     #[must_use]
     pub fn input(&self) -> &Path {
-        &self.input
+        &self.inputs[0]
+    }
+
+    /// Returns all input fixture paths recorded by the manifest.
+    ///
+    /// Single-input cases use the legacy `input = "..."` TOML field and
+    /// multi-input combiner cases use `inputs = ["...", "..."]`. This accessor
+    /// normalizes both forms into a deterministic non-empty list.
+    #[must_use]
+    pub fn inputs(&self) -> &[PathBuf] {
+        &self.inputs
     }
 
     /// Returns the Auralis argument fragment recorded by the manifest.
@@ -164,12 +174,43 @@ impl GoldenCase {
         input_path: impl AsRef<Path>,
         output_path: impl AsRef<Path>,
     ) -> Vec<String> {
-        let mut command = vec![
-            executable.as_ref().to_owned(),
-            "run".to_owned(),
-            path_to_command_arg(input_path.as_ref()),
-            path_to_command_arg(output_path.as_ref()),
-        ];
+        self.render_auralis_command_with_inputs(executable, [input_path], output_path)
+    }
+
+    /// Renders a deterministic Auralis command vector for one or more inputs.
+    ///
+    /// Multi-input cases render through Auralis' current concatenate CLI shape:
+    /// the first input remains positional, later inputs are passed as repeated
+    /// `--input <FILE>` options, and `--combine concatenate` is emitted before
+    /// recorded effect arguments.
+    #[must_use]
+    pub fn render_auralis_command_with_inputs<I, P>(
+        &self,
+        executable: impl AsRef<str>,
+        input_paths: I,
+        output_path: impl AsRef<Path>,
+    ) -> Vec<String>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let input_paths = input_paths
+            .into_iter()
+            .map(|path| path_to_command_arg(path.as_ref()))
+            .collect::<Vec<_>>();
+        let mut command = vec![executable.as_ref().to_owned(), "run".to_owned()];
+        if let Some(first_input) = input_paths.first() {
+            command.push(first_input.clone());
+        }
+        command.push(path_to_command_arg(output_path.as_ref()));
+        if input_paths.len() > 1 {
+            command.push("--combine".to_owned());
+            command.push("concatenate".to_owned());
+            for input in input_paths.iter().skip(1) {
+                command.push("--input".to_owned());
+                command.push(input.clone());
+            }
+        }
         command.extend(self.auralis.iter().cloned());
         command
     }
@@ -190,6 +231,28 @@ impl GoldenCase {
         render_command_line(self.render_auralis_command(executable, input_path, output_path))
     }
 
+    /// Renders a deterministic display form of a multi-input Auralis command.
+    ///
+    /// This is intended for failure reports and logs and follows the same
+    /// stable quoting rules as [`Self::render_auralis_command_line`].
+    #[must_use]
+    pub fn render_auralis_command_line_with_inputs<I, P>(
+        &self,
+        executable: impl AsRef<str>,
+        input_paths: I,
+        output_path: impl AsRef<Path>,
+    ) -> String
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        render_command_line(self.render_auralis_command_with_inputs(
+            executable,
+            input_paths,
+            output_path,
+        ))
+    }
+
     /// Renders a deterministic SoX-ng command vector.
     ///
     /// The `-R` and `-D` flags are always included to match Auralis' repeatable
@@ -202,13 +265,40 @@ impl GoldenCase {
         input_path: impl AsRef<Path>,
         output_path: impl AsRef<Path>,
     ) -> Vec<String> {
+        self.render_sox_ng_command_with_inputs(executable, [input_path], output_path)
+    }
+
+    /// Renders a deterministic SoX-ng command vector for one or more inputs.
+    ///
+    /// Multi-input cases include `--combine concatenate` before the input
+    /// paths. The `-R` and `-D` flags are always included to match Auralis'
+    /// repeatable golden-test policy.
+    #[must_use]
+    pub fn render_sox_ng_command_with_inputs<I, P>(
+        &self,
+        executable: impl AsRef<str>,
+        input_paths: I,
+        output_path: impl AsRef<Path>,
+    ) -> Vec<String>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let input_paths = input_paths
+            .into_iter()
+            .map(|path| path_to_command_arg(path.as_ref()))
+            .collect::<Vec<_>>();
         let mut command = vec![
             executable.as_ref().to_owned(),
             "-R".to_owned(),
             "-D".to_owned(),
-            path_to_command_arg(input_path.as_ref()),
-            path_to_command_arg(output_path.as_ref()),
         ];
+        if input_paths.len() > 1 {
+            command.push("--combine".to_owned());
+            command.push("concatenate".to_owned());
+        }
+        command.extend(input_paths);
+        command.push(path_to_command_arg(output_path.as_ref()));
         command.extend(self.sox_ng.iter().cloned());
         command
     }
@@ -228,10 +318,30 @@ impl GoldenCase {
         render_command_line(self.render_sox_ng_command(executable, input_path, output_path))
     }
 
+    /// Renders a deterministic display form of a multi-input SoX-ng command.
+    ///
+    /// This is intended for failure reports and logs and follows the same
+    /// repeatability and quoting rules as [`Self::render_sox_ng_command_line`].
+    #[must_use]
+    pub fn render_sox_ng_command_line_with_inputs<I, P>(
+        &self,
+        executable: impl AsRef<str>,
+        input_paths: I,
+        output_path: impl AsRef<Path>,
+    ) -> String
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        render_command_line(self.render_sox_ng_command_with_inputs(
+            executable,
+            input_paths,
+            output_path,
+        ))
+    }
+
     fn from_raw(id: &str, raw: RawGoldenCase) -> Result<Self> {
-        if raw.input.is_empty() {
-            return Err(GoldenManifestError::EmptyInput { id: id.to_owned() });
-        }
+        let inputs = validate_inputs(id, raw.input, raw.inputs)?;
 
         validate_args(id, GoldenCommand::Auralis, &raw.auralis)?;
         validate_args(id, GoldenCommand::SoxNg, &raw.sox_ng)?;
@@ -240,7 +350,7 @@ impl GoldenCase {
         validate_tolerance(id, GoldenMetric::SnrDb, raw.snr_db)?;
 
         Ok(Self {
-            input: raw.input.into(),
+            inputs,
             auralis: raw.auralis,
             sox_ng: raw.sox_ng,
             tolerance: GoldenTolerance {
@@ -348,6 +458,18 @@ pub enum GoldenManifestError {
         id: String,
     },
 
+    /// A case did not define either `input` or `inputs`.
+    MissingInput {
+        /// Case identifier missing input fields.
+        id: String,
+    },
+
+    /// A case defined both `input` and `inputs`.
+    AmbiguousInput {
+        /// Case identifier containing both input fields.
+        id: String,
+    },
+
     /// A command argument was an empty string.
     EmptyArgument {
         /// Case identifier containing the invalid argument.
@@ -386,6 +508,18 @@ impl fmt::Display for GoldenManifestError {
                     "golden manifest case `{id}` must define a non-empty input"
                 )
             }
+            Self::MissingInput { id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` must define `input` or `inputs`"
+                )
+            }
+            Self::AmbiguousInput { id } => {
+                write!(
+                    formatter,
+                    "golden manifest case `{id}` must not define both `input` and `inputs`"
+                )
+            }
             Self::EmptyArgument { id, command } => {
                 write!(
                     formatter,
@@ -409,6 +543,8 @@ impl Error for GoldenManifestError {
             Self::EmptyManifest
             | Self::InvalidCaseId { .. }
             | Self::EmptyInput { .. }
+            | Self::MissingInput { .. }
+            | Self::AmbiguousInput { .. }
             | Self::EmptyArgument { .. }
             | Self::InvalidTolerance { .. } => None,
         }
@@ -466,7 +602,8 @@ struct RawManifest {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawGoldenCase {
-    input: String,
+    input: Option<String>,
+    inputs: Option<Vec<String>>,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     max_abs: f64,
@@ -489,6 +626,31 @@ fn validate_args(id: &str, command: GoldenCommand, args: &[String]) -> Result<()
         })
     } else {
         Ok(())
+    }
+}
+
+fn validate_inputs(
+    id: &str,
+    input: Option<String>,
+    inputs: Option<Vec<String>>,
+) -> Result<Vec<PathBuf>> {
+    match (input, inputs) {
+        (Some(_), Some(_)) => Err(GoldenManifestError::AmbiguousInput { id: id.to_owned() }),
+        (None, None) => Err(GoldenManifestError::MissingInput { id: id.to_owned() }),
+        (Some(input), None) => {
+            if input.is_empty() {
+                Err(GoldenManifestError::EmptyInput { id: id.to_owned() })
+            } else {
+                Ok(vec![input.into()])
+            }
+        }
+        (None, Some(inputs)) => {
+            if inputs.is_empty() || inputs.iter().any(String::is_empty) {
+                Err(GoldenManifestError::EmptyInput { id: id.to_owned() })
+            } else {
+                Ok(inputs.into_iter().map(PathBuf::from).collect())
+            }
+        }
     }
 }
 
@@ -518,6 +680,8 @@ fn is_unquoted_command_byte(byte: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::{
         GoldenCommand, GoldenManifest, GoldenManifestError, GoldenMetric, quote_command_arg,
         render_command_line,
@@ -557,6 +721,7 @@ mod tests {
         let case = manifest.get("gain_minus_3_mono").unwrap();
 
         assert_eq!(case.input().to_string_lossy(), "mono/sine.wav");
+        assert_eq!(case.inputs(), [PathBuf::from("mono/sine.wav")]);
         assert_eq!(case.auralis_args(), ["--gain-db", "-3"]);
         assert_eq!(case.sox_ng_args(), ["gain", "-3"]);
         assert_float_eq(case.tolerance().max_abs, 0.000_1);
@@ -623,6 +788,85 @@ mod tests {
                 id,
                 command: GoldenCommand::Auralis,
             } if id == "gain_minus_3"
+        ));
+    }
+
+    #[test]
+    fn manifest_parse_preserves_multi_input_cases() {
+        let manifest = GoldenManifest::parse_toml(
+            r#"
+            [id.concat_then_gain]
+            inputs = ["combine/first.wav", "combine/second.wav"]
+            auralis = ["gain", "-3"]
+            sox_ng = ["gain", "-3"]
+            max_abs = 0.0001
+            rms = 0.000001
+            snr_db = 90.0
+            "#,
+        )
+        .unwrap();
+        let case = manifest.get("concat_then_gain").unwrap();
+
+        assert_eq!(case.input().to_string_lossy(), "combine/first.wav");
+        assert_eq!(
+            case.inputs(),
+            [
+                PathBuf::from("combine/first.wav"),
+                PathBuf::from("combine/second.wav")
+            ]
+        );
+        assert_eq!(
+            case.render_auralis_command_line_with_inputs(
+                "auralis",
+                ["first file.wav", "second file.wav"],
+                "out.wav",
+            ),
+            "auralis run \"first file.wav\" out.wav --combine concatenate --input \"second file.wav\" gain -3"
+        );
+        assert_eq!(
+            case.render_sox_ng_command_line_with_inputs(
+                "sox_ng",
+                ["first.wav", "second.wav"],
+                "out.wav",
+            ),
+            "sox_ng -R -D --combine concatenate first.wav second.wav out.wav gain -3"
+        );
+    }
+
+    #[test]
+    fn invalid_manifest_is_rejected_for_missing_or_ambiguous_input_fields() {
+        let missing = GoldenManifest::parse_toml(
+            r#"
+            [id.missing_input]
+            auralis = ["gain", "-3"]
+            sox_ng = ["gain", "-3"]
+            max_abs = 0.0001
+            rms = 0.000001
+            snr_db = 90.0
+            "#,
+        )
+        .unwrap_err();
+        let ambiguous = GoldenManifest::parse_toml(
+            r#"
+            [id.ambiguous_input]
+            input = "mono/sine.wav"
+            inputs = ["mono/sine.wav", "mono/other.wav"]
+            auralis = ["gain", "-3"]
+            sox_ng = ["gain", "-3"]
+            max_abs = 0.0001
+            rms = 0.000001
+            snr_db = 90.0
+            "#,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            missing,
+            GoldenManifestError::MissingInput { id } if id == "missing_input"
+        ));
+        assert!(matches!(
+            ambiguous,
+            GoldenManifestError::AmbiguousInput { id } if id == "ambiguous_input"
         ));
     }
 

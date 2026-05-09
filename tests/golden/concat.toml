@@ -1,0 +1,18 @@
+# Representative concatenate-combiner golden cases. Tolerances are normalized
+# full-scale decoded-sample metrics; structural concatenation cases are exact.
+
+[id.concat_mono_mismatched_lengths]
+inputs = ["combine/mono_short.wav", "combine/mono_long.wav"]
+auralis = []
+sox_ng = []
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.concat_stereo_reverse_chain]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+auralis = ["reverse"]
+sox_ng = ["reverse"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

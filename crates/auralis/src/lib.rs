@@ -24,7 +24,10 @@
 
 use std::path::Path;
 
-pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
+pub use auralis_core::{
+    AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
+    TimeSeconds,
+};
 pub use auralis_effects::{
     EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError, EffectCommand,
     EffectsFileParseError, EffectsFileReadError, parse_effect_chain, parse_effects_file,
@@ -58,6 +61,10 @@ pub enum Error {
     #[error(transparent)]
     Chain(#[from] auralis_effects::EffectChainError),
 
+    /// Input combination failed before effects were applied.
+    #[error(transparent)]
+    InputCombine(#[from] InputCombineError),
+
     /// A seconds-based trim range could not be represented as frames.
     #[error("trim seconds range cannot be represented as frame positions")]
     InvalidTrimSecondsRange,
@@ -70,10 +77,188 @@ impl PartialEq for Error {
             (Self::Wav(left), Self::Wav(right)) => left == right,
             (Self::Effect(left), Self::Effect(right)) => left == right,
             (Self::Chain(left), Self::Chain(right)) => left == right,
+            (Self::InputCombine(left), Self::InputCombine(right)) => left == right,
             (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }
     }
+}
+
+/// Input-combiner method selected before any effects are applied.
+///
+/// Only SoX-ng-style `concatenate` is implemented in the current feature. Later
+/// combine modes remain absent from this enum until their own DEVELOPMENT.md
+/// leaf features add tests and documented semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CombineMethod {
+    /// Append every input in order, preserving channels and sample values.
+    Concatenate,
+}
+
+impl CombineMethod {
+    /// Returns the canonical command-line name for this method.
+    #[must_use]
+    pub const fn as_name(self) -> &'static str {
+        match self {
+            Self::Concatenate => "concatenate",
+        }
+    }
+
+    /// Resolves a supported combine-method name.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "concatenate" => Some(Self::Concatenate),
+            _ => None,
+        }
+    }
+}
+
+/// Errors produced while combining multiple decoded inputs.
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum InputCombineError {
+    /// The caller supplied no input buffers.
+    #[error("concatenate requires at least one input")]
+    EmptyInputList,
+
+    /// One input's sample rate did not match the first input.
+    #[error(
+        "input {input_index} sample rate {actual} does not match first input sample rate {expected}"
+    )]
+    MismatchedSampleRate {
+        /// Zero-based input index that failed validation.
+        input_index: usize,
+
+        /// Sample rate from the first input.
+        expected: SampleRate,
+
+        /// Sample rate from the mismatched input.
+        actual: SampleRate,
+    },
+
+    /// One input's channel count did not match the first input.
+    #[error(
+        "input {input_index} channel count {actual} does not match first input channel count {expected}"
+    )]
+    MismatchedChannelCount {
+        /// Zero-based input index that failed validation.
+        input_index: usize,
+
+        /// Channel count from the first input.
+        expected: ChannelCount,
+
+        /// Channel count from the mismatched input.
+        actual: ChannelCount,
+    },
+
+    /// One input's internal sample format did not match the first input.
+    #[error(
+        "input {input_index} sample format {actual} does not match first input sample format {expected}"
+    )]
+    MismatchedSampleFormat {
+        /// Zero-based input index that failed validation.
+        input_index: usize,
+
+        /// Sample format from the first input.
+        expected: SampleFormat,
+
+        /// Sample format from the mismatched input.
+        actual: SampleFormat,
+    },
+
+    /// The combined frame count cannot be represented by Auralis.
+    #[error("concatenated frame count cannot be represented")]
+    FrameCountOverflow,
+
+    /// The combined planar buffer shape was rejected by the core buffer model.
+    #[error(transparent)]
+    Core(#[from] auralis_core::AuralisError),
+}
+
+/// Concatenates already-decoded planar audio buffers.
+///
+/// Inputs are appended in caller order. All inputs must have the same sample
+/// rate, channel count, and internal sample format as the first input. Frame
+/// lengths may differ; the output frame count is the sum of all input frame
+/// counts. Samples stay channel-major, so each output channel contains that
+/// channel from input 0, followed by the same channel from input 1, and so on.
+///
+/// # Errors
+///
+/// Returns [`InputCombineError::EmptyInputList`] for no inputs, a mismatch
+/// variant when an input's stream shape is incompatible with the first input,
+/// or an overflow/shape error if the combined buffer cannot be represented.
+pub fn concatenate_audio_buffers(
+    inputs: &[AudioBuffer],
+) -> std::result::Result<AudioBuffer, InputCombineError> {
+    let Some(first) = inputs.first() else {
+        return Err(InputCombineError::EmptyInputList);
+    };
+
+    let spec = first.spec();
+    let mut total_frames = 0_u64;
+    for (input_index, input) in inputs.iter().enumerate() {
+        validate_concatenate_input(input_index, spec, input)?;
+        total_frames = total_frames
+            .checked_add(input.frames().as_u64())
+            .ok_or(InputCombineError::FrameCountOverflow)?;
+    }
+
+    let total_frames = FrameCount::new(total_frames);
+    let total_frame_capacity = usize::try_from(total_frames.as_u64())
+        .map_err(|_| InputCombineError::FrameCountOverflow)?;
+    let sample_capacity = spec
+        .channels()
+        .as_usize()
+        .checked_mul(total_frame_capacity)
+        .ok_or(InputCombineError::FrameCountOverflow)?;
+    let mut data = Vec::with_capacity(sample_capacity);
+
+    for channel_index in 0..spec.channels().as_usize() {
+        for input in inputs {
+            data.extend_from_slice(
+                input
+                    .channel(channel_index)
+                    .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?,
+            );
+        }
+    }
+
+    AudioBuffer::from_planar_f32(spec, total_frames, data).map_err(InputCombineError::from)
+}
+
+fn validate_concatenate_input(
+    input_index: usize,
+    expected: AudioSpec,
+    input: &AudioBuffer,
+) -> std::result::Result<(), InputCombineError> {
+    let actual = input.spec();
+
+    if actual.sample_rate() != expected.sample_rate() {
+        return Err(InputCombineError::MismatchedSampleRate {
+            input_index,
+            expected: expected.sample_rate(),
+            actual: actual.sample_rate(),
+        });
+    }
+    if actual.channels() != expected.channels() {
+        return Err(InputCombineError::MismatchedChannelCount {
+            input_index,
+            expected: expected.channels(),
+            actual: actual.channels(),
+        });
+    }
+    if actual.sample_format() != expected.sample_format() {
+        return Err(InputCombineError::MismatchedSampleFormat {
+            input_index,
+            expected: expected.sample_format(),
+            actual: actual.sample_format(),
+        });
+    }
+
+    Ok(())
 }
 
 /// Decoded audio file ready to enter an effect pipeline.
@@ -118,6 +303,58 @@ impl AudioFile {
         })
     }
 
+    /// Opens multiple PCM16 WAV files and concatenates them in caller order.
+    ///
+    /// This is the library counterpart to `auralis run --combine concatenate`.
+    /// Each input is decoded into planar `f32`, then the buffers are
+    /// concatenated before any later pipeline effects are applied. All inputs
+    /// must have the same sample rate and channel count; frame lengths may
+    /// differ.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty or stream metadata
+    /// is incompatible.
+    pub fn open_wavs_concatenated<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        Self::open_wavs_concatenated_with_backend(paths, BackendKind::Scalar)
+    }
+
+    /// Opens multiple PCM16 WAV files and concatenates them with a requested backend.
+    ///
+    /// `requested_backend` controls decode conversion, later backend-aware
+    /// effects, and output encoding after [`Self::into_pipeline`]. The
+    /// concatenate combiner itself is a structural copy and does not select a
+    /// SIMD kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Wav`] for decode failures or
+    /// [`Error::InputCombine`] when the input list is empty or stream metadata
+    /// is incompatible.
+    pub fn open_wavs_concatenated_with_backend<I, P>(
+        paths: I,
+        requested_backend: BackendKind,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut inputs = Vec::new();
+        for path in paths {
+            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+                path,
+                requested_backend,
+            )?);
+        }
+
+        Self::from_audio_buffers_concatenated_with_backend(&inputs, requested_backend)
+    }
+
     /// Wraps an existing audio buffer in the high-level file type.
     ///
     /// This is primarily useful for tests and applications that decoded audio
@@ -128,6 +365,42 @@ impl AudioFile {
             audio,
             requested_backend: BackendKind::Scalar,
         }
+    }
+
+    /// Concatenates existing audio buffers into the high-level file type.
+    ///
+    /// Inputs are combined before the returned value enters the effect
+    /// pipeline. All inputs must share sample rate, channel count, and internal
+    /// sample format. Mismatched frame counts are accepted and appended in
+    /// caller order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, stream
+    /// metadata is incompatible, or the combined buffer shape cannot be
+    /// represented.
+    pub fn from_audio_buffers_concatenated(inputs: &[AudioBuffer]) -> Result<Self> {
+        Self::from_audio_buffers_concatenated_with_backend(inputs, BackendKind::Scalar)
+    }
+
+    /// Concatenates existing audio buffers with a requested processing backend.
+    ///
+    /// The backend is recorded for later pipeline stages. Concatenation itself
+    /// is a deterministic structural copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InputCombine`] when the input list is empty, stream
+    /// metadata is incompatible, or the combined buffer shape cannot be
+    /// represented.
+    pub fn from_audio_buffers_concatenated_with_backend(
+        inputs: &[AudioBuffer],
+        requested_backend: BackendKind,
+    ) -> Result<Self> {
+        Ok(Self {
+            audio: concatenate_audio_buffers(inputs)?,
+            requested_backend,
+        })
     }
 
     /// Returns the decoded audio buffer.
@@ -435,7 +708,10 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 
 #[cfg(test)]
 mod tests {
-    use super::{AudioFile, BackendKind, EffectChain, EffectCommand, Error};
+    use super::{
+        AudioFile, BackendKind, EffectChain, EffectCommand, Error, InputCombineError,
+        concatenate_audio_buffers,
+    };
     use std::{
         fs,
         path::PathBuf,
@@ -750,6 +1026,123 @@ mod tests {
     }
 
     #[test]
+    fn concatenate_audio_buffers_accepts_mismatched_mono_lengths() {
+        let first = audio_buffer(vec![0.25, -0.5, 0.75]);
+        let second = audio_buffer(vec![1.0]);
+
+        let actual = concatenate_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(4));
+        assert_eq!(actual.channels(), ChannelCount::new(1).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[0.25, -0.5, 0.75, 1.0]);
+    }
+
+    #[test]
+    fn concatenate_audio_buffers_preserves_stereo_channel_grouping() {
+        let first = stereo_audio_buffer(vec![1.0, 2.0, -1.0, -2.0]);
+        let second = stereo_audio_buffer(vec![3.0, -3.0]);
+
+        let actual = concatenate_audio_buffers(&[first, second]).unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.channels(), ChannelCount::new(2).unwrap());
+        assert_eq!(actual.as_planar_f32(), &[1.0, 2.0, 3.0, -1.0, -2.0, -3.0]);
+    }
+
+    #[test]
+    fn concatenate_audio_buffers_rejects_mismatched_channel_count() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = stereo_audio_buffer(vec![1.0, 2.0, -1.0, -2.0]);
+
+        let error = concatenate_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedChannelCount {
+                input_index: 1,
+                expected: ChannelCount::new(1).unwrap(),
+                actual: ChannelCount::new(2).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn concatenate_audio_buffers_rejects_mismatched_sample_rate() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 44_100, 1, SampleFormat::Float32);
+
+        let error = concatenate_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleRate {
+                input_index: 1,
+                expected: SampleRate::new(48_000).unwrap(),
+                actual: SampleRate::new(44_100).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn concatenate_audio_buffers_rejects_mismatched_sample_format() {
+        let first = audio_buffer(vec![0.25]);
+        let second = audio_buffer_with_spec(vec![-0.25], 48_000, 1, SampleFormat::Pcm16);
+
+        let error = concatenate_audio_buffers(&[first, second]).unwrap_err();
+
+        assert_eq!(
+            error,
+            InputCombineError::MismatchedSampleFormat {
+                input_index: 1,
+                expected: SampleFormat::Float32,
+                actual: SampleFormat::Pcm16,
+            }
+        );
+    }
+
+    #[test]
+    fn concatenated_audio_enters_effect_pipeline_before_effects() {
+        let first = audio_buffer(vec![0.25, -0.5]);
+        let second = audio_buffer(vec![0.75]);
+
+        let actual = AudioFile::from_audio_buffers_concatenated(&[first, second])
+            .unwrap()
+            .into_pipeline()
+            .gain_db(6.0)
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        let multiplier = 10.0_f32.powf(6.0 / 20.0);
+        assert_samples_close(
+            actual.as_planar_f32(),
+            &[0.75 * multiplier, -0.5 * multiplier, 0.25 * multiplier],
+        );
+    }
+
+    #[test]
+    fn open_wavs_concatenated_round_trips_through_file_boundary() {
+        let tempdir = temp_dir();
+        fs::create_dir(&tempdir).unwrap();
+        let first = tempdir.join("first.wav");
+        let second = tempdir.join("second.wav");
+        let output = tempdir.join("output.wav");
+
+        auralis_wav::encode_pcm16_path(&first, &audio_buffer(vec![0.25, -0.5])).unwrap();
+        auralis_wav::encode_pcm16_path(&second, &audio_buffer(vec![0.75])).unwrap();
+
+        AudioFile::open_wavs_concatenated([&first, &second])
+            .unwrap()
+            .into_pipeline()
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+        assert_samples_close(decoded.as_planar_f32(), &[0.25, -0.5, 0.75]);
+        fs::remove_dir_all(tempdir).unwrap();
+    }
+
+    #[test]
     fn invalid_trim_range_propagates_without_panic() {
         let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25]))
             .into_pipeline()
@@ -856,10 +1249,33 @@ mod tests {
     fn stereo_audio_buffer(samples: Vec<f32>) -> AudioBuffer {
         assert_eq!(samples.len() % 2, 0);
         let frames = u64::try_from(samples.len() / 2).unwrap();
+
+        audio_buffer_with_shape(samples, frames, 48_000, 2, SampleFormat::Float32)
+    }
+
+    fn audio_buffer_with_spec(
+        samples: Vec<f32>,
+        sample_rate: u32,
+        channels: u16,
+        sample_format: SampleFormat,
+    ) -> AudioBuffer {
+        assert_eq!(samples.len() % usize::from(channels), 0);
+        let frames = u64::try_from(samples.len() / usize::from(channels)).unwrap();
+
+        audio_buffer_with_shape(samples, frames, sample_rate, channels, sample_format)
+    }
+
+    fn audio_buffer_with_shape(
+        samples: Vec<f32>,
+        frames: u64,
+        sample_rate: u32,
+        channels: u16,
+        sample_format: SampleFormat,
+    ) -> AudioBuffer {
         let spec = AudioSpec::new(
-            SampleRate::new(48_000).unwrap(),
-            ChannelCount::new(2).unwrap(),
-            SampleFormat::Float32,
+            SampleRate::new(sample_rate).unwrap(),
+            ChannelCount::new(channels).unwrap(),
+            sample_format,
         );
 
         AudioBuffer::from_planar_f32(spec, FrameCount::new(frames), samples).unwrap()

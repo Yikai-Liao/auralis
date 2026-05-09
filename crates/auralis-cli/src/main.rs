@@ -37,6 +37,14 @@ enum Command {
         #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
         backend: auralis::BackendKind,
 
+        /// Input-combiner method to apply before effects.
+        #[arg(long, value_name = "METHOD", default_value = "concatenate", value_parser = parse_combine_method)]
+        combine: auralis::CombineMethod,
+
+        /// Additional PCM16 WAV input files to combine after the first input.
+        #[arg(long = "input", value_name = "FILE")]
+        additional_inputs: Vec<PathBuf>,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -108,6 +116,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             input,
             output,
             backend,
+            combine,
+            additional_inputs,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -124,6 +134,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
         } => {
             let options = RunOptions {
                 backend,
+                combine,
+                additional_inputs,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -164,11 +176,12 @@ fn inspect(input: &Path) -> Result<(), CliError> {
 fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
+    for input in &options.additional_inputs {
+        ensure_wav_extension(input, PathRole::Input)?;
+    }
     let backend = options.backend;
     let effect_chain = options.effect_chain()?;
-    let pipeline = auralis::AudioFile::open_wav_with_backend(input, backend)?
-        .into_pipeline()
-        .with_backend(backend);
+    let pipeline = open_pipeline(input, options)?.with_backend(backend);
 
     if let Some(effect_chain) = effect_chain {
         pipeline
@@ -219,6 +232,8 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
 #[derive(Debug)]
 struct RunOptions {
     backend: auralis::BackendKind,
+    combine: auralis::CombineMethod,
+    additional_inputs: Vec<PathBuf>,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -304,6 +319,24 @@ impl RunOptions {
     }
 }
 
+fn open_pipeline(input: &Path, options: &RunOptions) -> Result<auralis::Pipeline, CliError> {
+    let audio = match options.combine {
+        auralis::CombineMethod::Concatenate if options.additional_inputs.is_empty() => {
+            auralis::AudioFile::open_wav_with_backend(input, options.backend)?
+        }
+        auralis::CombineMethod::Concatenate => {
+            let mut inputs = Vec::with_capacity(options.additional_inputs.len() + 1);
+            inputs.push(input);
+            inputs.extend(options.additional_inputs.iter().map(PathBuf::as_path));
+
+            auralis::AudioFile::open_wavs_concatenated_with_backend(inputs, options.backend)?
+        }
+        _ => unreachable!("the CLI parser only accepts implemented combine methods"),
+    };
+
+    Ok(audio.into_pipeline())
+}
+
 #[derive(Debug, Clone, Copy)]
 enum TrimMode {
     Frames { start: u64, end: u64 },
@@ -333,6 +366,11 @@ fn format_duration_seconds(frames: u64, sample_rate: u32) -> String {
 fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
     auralis::BackendKind::from_name(value)
         .ok_or_else(|| "backend must be `scalar` or `simd`".to_owned())
+}
+
+fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
+    auralis::CombineMethod::from_name(value)
+        .ok_or_else(|| "combine method must be `concatenate`".to_owned())
 }
 
 #[derive(Debug)]

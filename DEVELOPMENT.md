@@ -1174,6 +1174,8 @@ Implement multi-input pipeline combiners before more codecs:
 
 #### Feature 5.4.1: concatenate combiner
 
+Status: implemented.
+
 Implement the concatenate combiner.
 
 Acceptance tests:

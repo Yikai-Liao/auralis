@@ -45,3 +45,33 @@ def run_sox_ng(
         *effect_args,
     ]
     return subprocess.run(command, check=True, capture_output=True)
+
+
+def run_sox_ng_with_inputs(
+    input_paths: Sequence[Path],
+    output_path: Path,
+    effect_args: Sequence[str],
+    *,
+    combine: str = "concatenate",
+    output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
+) -> subprocess.CompletedProcess[bytes]:
+    """Run SoX-ng with multiple inputs and deterministic combine settings."""
+
+    executable = find_sox_ng()
+    if executable is None:
+        raise SoxNgUnavailable("sox_ng is not available in PATH")
+    if not input_paths:
+        raise ValueError("input_paths must not be empty")
+
+    command = [
+        executable,
+        "-R",
+        "-D",
+        "--combine",
+        combine,
+        *(str(path) for path in input_paths),
+        *output_encoding,
+        str(output_path),
+        *effect_args,
+    ]
+    return subprocess.run(command, check=True, capture_output=True)
