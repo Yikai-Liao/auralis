@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{DcShift, EffectChain, EffectCommand, Fade, Gain, Vol};
+use auralis_effects::{Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Vol};
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
 #[test]
@@ -57,6 +57,25 @@ fn vol_matches_whole_buffer_for_l5_chunk_matrix() {
         vol.process_buffer(&mut whole);
         process_chunks_mut(chunked.as_planar_f32_mut(), schedule, |chunk, _offset| {
             vol.process_samples(chunk);
+        });
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
+fn contrast_matches_whole_buffer_for_l5_chunk_matrix() {
+    let contrast = Contrast::new(75.0).expect("fixture contrast amount is valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(source.as_planar_f32().len());
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        contrast.process_buffer(&mut whole);
+        process_chunks_mut(chunked.as_planar_f32_mut(), schedule, |chunk, _offset| {
+            contrast.process_samples(chunk);
         });
 
         assert_same_audio(&chunked, &whole, schedule);
@@ -126,6 +145,11 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::Vol(vol) => {
                 process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
                     vol.process_samples(chunk);
+                });
+            }
+            EffectCommand::Contrast(contrast) => {
+                process_chunks_mut(audio.as_planar_f32_mut(), schedule, |chunk, _offset| {
+                    contrast.process_samples(chunk);
                 });
             }
             EffectCommand::Norm(_)

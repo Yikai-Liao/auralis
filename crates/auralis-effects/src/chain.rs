@@ -387,6 +387,10 @@ fn apply_command(
     gain_headroom: &mut GainHeadroomState,
 ) -> std::result::Result<(), (&'static str, EffectError)> {
     match command {
+        EffectCommand::Contrast(contrast) => {
+            contrast.process_buffer(audio);
+            Ok(())
+        }
         EffectCommand::DcShift(dc_shift) => {
             dc_shift.process_buffer_with_backend(audio, requested_backend);
             Ok(())
@@ -440,7 +444,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Contrast | EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
         EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
@@ -904,7 +908,8 @@ mod tests {
                         vol.process_samples(chunk);
                     }
                 }
-                EffectCommand::Norm(_)
+                EffectCommand::Contrast(_)
+                | EffectCommand::Norm(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Reverse(_)
                 | EffectCommand::Trim(_) => {

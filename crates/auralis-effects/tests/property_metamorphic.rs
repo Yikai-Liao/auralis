@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{DcShift, Fade, Gain, Norm, Pad, Reverse, Trim, Vol};
+use auralis_effects::{Contrast, DcShift, Fade, Gain, Norm, Pad, Reverse, Trim, Vol};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 
@@ -201,6 +201,11 @@ proptest! {
         let mut shifted = source.clone();
         DcShift::new(shift).expect("generated shift is valid").process_buffer(&mut shifted);
         prop_assert_all_finite(&shifted)?;
+
+        let mut contrasted = source.clone();
+        Contrast::new(75.0).expect("default contrast amount is valid")
+            .process_buffer(&mut contrasted);
+        prop_assert_all_finite(&contrasted)?;
 
         let mut faded = source.clone();
         let fade_in = FrameCount::new(u64::try_from(audio.frames / 2).expect("frame strategy fits u64"));

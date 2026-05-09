@@ -26,11 +26,14 @@
 mod chain;
 mod chain_gain;
 mod command;
+mod command_contrast;
+mod command_fade;
 mod command_gain;
 mod command_norm;
 mod command_pad;
 mod command_trim;
 mod command_vol;
+mod contrast;
 mod dcshift;
 mod effects_file;
 mod error;
@@ -50,6 +53,7 @@ pub use chain::{
     EffectChainParseError, parse_effect_chain,
 };
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
+pub use contrast::Contrast;
 pub use dcshift::DcShift;
 pub use effects_file::{
     EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,

@@ -12,6 +12,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
     assert_eq!(
         ids,
         [
+            "effect_contrast_mono_default",
+            "effect_contrast_stereo_amount_25",
             "effect_dcshift_limiter_mono_positive",
             "effect_dcshift_mono_positive",
             "effect_dcshift_stereo_negative",
@@ -56,7 +58,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
 
     for effect in [
-        "gain", "dcshift", "trim", "pad", "reverse", "fade", "vol", "norm",
+        "gain", "dcshift", "trim", "pad", "reverse", "fade", "vol", "norm", "contrast",
     ] {
         let mono = manifest
             .iter()

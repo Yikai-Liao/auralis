@@ -24,6 +24,9 @@ const MAX_SUGGESTIONS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EffectKind {
+    /// SoX-ng-style phase contrast enhancement.
+    Contrast,
+
     /// Constant normalized full-scale offset.
     DcShift,
 
@@ -131,6 +134,14 @@ impl EffectDescriptor {
 
 /// Implemented effects known to Auralis, in deterministic canonical-name order.
 pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor::new(
+        EffectKind::Contrast,
+        "contrast",
+        &[],
+        "Contrast",
+        "contrast [amount]",
+        "apply phase contrast enhancement",
+    ),
     EffectDescriptor::new(
         EffectKind::DcShift,
         "dcshift",

@@ -7,6 +7,21 @@
 schema_version = 1
 
 [[subject]]
+id = "effect.contrast"
+kind = "effect"
+name = "contrast"
+summary = "SoX-ng-style phase contrast enhancement with optional amount."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone default and explicit-amount SoX-ng golden cases cover the implemented contrast command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check SoX-ng's base sine curve, default amount formula, command defaults, parser syntax, and amount validation.", tests = ["crates/auralis-effects/src/contrast.rs", "crates/auralis-effects/src/command_contrast.rs", "crates/auralis-effects/tests/contrast.rs"] }
+l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded finite contrast input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers contrast whole-buffer versus chunked processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "not_applicable", reason = "Contrast is a scalar transcendental sine transform and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers contrast argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/contrast"] }
+
+[[subject]]
 id = "effect.dcshift"
 kind = "effect"
 name = "dcshift"

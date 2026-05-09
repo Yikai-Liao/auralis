@@ -226,7 +226,21 @@ Implementation notes:
 
 ### Feature 6.2.3: `contrast`
 
+Status: implemented.
+
 Implement contrast enhancement with analytical and golden coverage.
+
+Implementation notes:
+
+- Added a typed `Contrast` effect implementing SoX-ng's phase contrast formula
+  with the documented `0..=100` amount range and default amount `75`.
+- The effect command parser accepts `contrast` and `contrast AMOUNT`, renders
+  the default explicitly as `contrast 75`, and rejects invalid amounts with a
+  typed error.
+- Golden coverage includes standalone mono default and stereo explicit-amount
+  cases against SoX-ng, with L4 finite-output coverage, L5 chunk invariance,
+  and an L7 fuzz seed. L6 SIMD is documented as not applicable because the
+  processor is a scalar transcendental sine transform.
 
 ### Feature 6.2.4: `softvol`
 

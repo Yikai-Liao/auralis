@@ -59,6 +59,10 @@ pub enum EffectError {
     )]
     InvalidVolLimiterGain,
 
+    /// A `contrast` amount was not finite or outside SoX-ng's supported range.
+    #[error("contrast amount must be finite and in the range 0..=100")]
+    InvalidContrastAmount,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

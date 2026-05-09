@@ -38,13 +38,15 @@ use std::{
 use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
+use crate::command_contrast::{parse_contrast, render_contrast};
+use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Norm,
+    Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
     Pad, Reverse, Trim, Vol,
 };
 
@@ -61,6 +63,9 @@ pub type CommandResult<T> = std::result::Result<T, EffectCommandParseError>;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum EffectCommand {
+    /// SoX-ng-style phase contrast enhancement.
+    Contrast(Contrast),
+
     /// Constant normalized full-scale offset.
     DcShift(DcShift),
 
@@ -100,6 +105,7 @@ impl EffectCommand {
         let effect = descriptor.canonical_name();
 
         match descriptor.kind() {
+            EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
@@ -115,6 +121,7 @@ impl EffectCommand {
     #[must_use]
     pub const fn kind(&self) -> EffectKind {
         match self {
+            Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
@@ -136,6 +143,7 @@ impl EffectCommand {
     #[must_use]
     pub fn render_tokens(&self) -> Vec<String> {
         match self {
+            Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => {
                 let mut tokens = vec!["dcshift".to_owned(), render_f32(dc_shift.shift)];
                 if let Some(limiter_gain) = dc_shift.limiter_gain {
@@ -326,60 +334,6 @@ fn parse_reverse(effect: &'static str, args: &[&str]) -> CommandResult<EffectCom
     Ok(EffectCommand::Reverse(Reverse::new()))
 }
 
-fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
-    let (curve, args) = match args.first().and_then(|token| FadeCurve::from_token(token)) {
-        Some(curve) => (curve, &args[1..]),
-        None => (FadeCurve::Logarithmic, args),
-    };
-
-    let fade_in = required_arg(effect, args, "fade-in-frame")?;
-    let fade_in = parse_frame_count(effect, "fade-in-frame", fade_in)?;
-    let fade = if let Some(stop_position) = args.get(1).copied() {
-        let stop_position = parse_fade_stop_position(effect, stop_position)?;
-        let fade_out = match args.get(2).copied() {
-            Some(fade_out) => parse_frame_count(effect, "fade-out-frame", fade_out)?,
-            None => fade_in,
-        };
-        reject_extra_arguments(effect, args.get(3..).unwrap_or_default())?;
-        Fade::with_stop_position(curve, fade_in, stop_position, fade_out)
-    } else {
-        reject_extra_arguments(effect, args.get(1..).unwrap_or_default())?;
-        Fade::with_curve(curve, fade_in, FrameCount::new(0))
-    };
-
-    Ok(EffectCommand::Fade(fade))
-}
-
-fn render_fade(fade: Fade) -> Vec<String> {
-    let mut tokens = vec![
-        "fade".to_owned(),
-        fade.curve.token().to_owned(),
-        fade.fade_in.as_u64().to_string(),
-    ];
-
-    match fade.stop_position {
-        Some(stop_position) => {
-            tokens.push(stop_position.as_u64().to_string());
-            tokens.push(fade.fade_out.as_u64().to_string());
-        }
-        None if fade.fade_out.as_u64() != 0 => {
-            tokens.push("0".to_owned());
-            tokens.push(fade.fade_out.as_u64().to_string());
-        }
-        None => {}
-    }
-
-    tokens
-}
-
-fn parse_fade_stop_position(effect: &'static str, value: &str) -> CommandResult<FrameCount> {
-    if value == "-0" {
-        return Ok(FrameCount::new(0));
-    }
-
-    parse_frame_count(effect, "stop-position", value)
-}
-
 pub(super) fn required_arg<'args>(
     effect: &'static str,
     args: &'args [&'args str],
@@ -508,14 +462,18 @@ pub(super) fn render_f32(value: f32) -> String {
 mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
-        DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad, Reverse,
-        Trim, TrimPosition,
+        Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
+        Reverse, Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
     #[test]
     fn parses_supported_effect_commands_into_typed_configs() {
         let expected = [
+            (
+                &["contrast", "25"][..],
+                EffectCommand::Contrast(Contrast::new(25.0).unwrap()),
+            ),
             (
                 &["gain", "-3"][..],
                 EffectCommand::Gain(Gain::new(Decibels::new(-3.0).unwrap())),
@@ -578,6 +536,10 @@ mod tests {
         assert_eq!(
             parse_effect_command(&["gain"]).unwrap(),
             EffectCommand::Gain(Gain::new(Decibels::new(0.0).unwrap()))
+        );
+        assert_eq!(
+            parse_effect_command(&["contrast"]).unwrap(),
+            EffectCommand::Contrast(Contrast::default_amount())
         );
         assert_eq!(
             parse_effect_command(&["pad"]).unwrap(),
@@ -928,6 +890,11 @@ mod tests {
                 &["gain", "-h"][..],
                 &["gain", "-h", "0"][..],
                 &["gain", "-h", "0"][..],
+            ),
+            (
+                &["contrast"][..],
+                &["contrast", "75"][..],
+                &["contrast", "75"][..],
             ),
             (
                 &["gain-db", "1e0"][..],
