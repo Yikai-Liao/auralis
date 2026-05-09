@@ -277,6 +277,77 @@ fn run_trim_seconds_output_matches_library_pipeline() {
 }
 
 #[test]
+fn run_pad_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-run-pad-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-pad-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-pad-frame-library-output", "wav");
+    write_pcm16_wav(&input, 2, &[-1000, 1000, -2000, 2000]);
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .pad_frames(1, 2)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--pad-start-frame",
+            "1",
+            "--pad-end-frame",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+    assert_eq!(
+        read_pcm16_wav(&cli_output),
+        (2, vec![0, 0, -1000, 1000, -2000, 2000, 0, 0, 0, 0])
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
+fn run_single_sided_pad_defaults_other_side_to_zero() {
+    let input = temp_path("auralis-cli-run-pad-single-input", "wav");
+    let output = temp_path("auralis-cli-run-pad-single-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--pad-end-frame",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -1000, 0, 0]));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
 fn run_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
@@ -380,6 +451,8 @@ fn run_help_documents_gain_and_trim_units() {
         "{stdout}"
     );
     assert!(stdout.contains("--trim-end-seconds <SECONDS>"), "{stdout}");
+    assert!(stdout.contains("--pad-start-frame <FRAMES>"), "{stdout}");
+    assert!(stdout.contains("--pad-end-frame <FRAMES>"), "{stdout}");
 }
 
 #[test]

@@ -173,3 +173,63 @@ def test_cli_trim_matches_sox_ng_golden(tmp_path: Path) -> None:
 
     assert auralis_rate == sox_rate == 48_000
     np.testing.assert_array_equal(auralis_samples, sox_samples)
+
+
+@pytest.mark.golden
+def test_cli_pad_matches_sox_ng_golden(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    sox_ng = environ.get("AURALIS_SOX_NG_BIN") or which("sox_ng")
+    if sox_ng is None:
+        pytest.skip("sox_ng is not available in PATH")
+
+    input_path = tmp_path / "input.wav"
+    auralis_output = tmp_path / "auralis.wav"
+    sox_output = tmp_path / "sox.wav"
+    samples = np.array(
+        [[-20_000, 20_000], [-12_000, 12_000], [0, 4096]],
+        dtype=np.int16,
+    )
+    wavfile.write(input_path, 48_000, samples)
+
+    subprocess.run(
+        [
+            "cargo",
+            "run",
+            "--quiet",
+            "--package",
+            "auralis-cli",
+            "--",
+            "run",
+            str(input_path),
+            str(auralis_output),
+            "--pad-start-frame",
+            "2",
+            "--pad-end-frame",
+            "1",
+        ],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        [
+            sox_ng,
+            "-R",
+            "-D",
+            str(input_path),
+            "-b",
+            "16",
+            "-e",
+            "signed-integer",
+            str(sox_output),
+            "pad",
+            "0.000041666666666666667",
+            "0.000020833333333333333",
+        ],
+        check=True,
+    )
+
+    auralis_rate, auralis_samples = wavfile.read(auralis_output)
+    sox_rate, sox_samples = wavfile.read(sox_output)
+
+    assert auralis_rate == sox_rate == 48_000
+    np.testing.assert_array_equal(auralis_samples, sox_samples)

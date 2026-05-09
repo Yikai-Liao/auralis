@@ -13,6 +13,7 @@
 //! AudioFile::open_wav("input.wav")?
 //!     .into_pipeline()
 //!     .gain_db(-3.0)
+//!     .pad_frames(0, 48_000)
 //!     .write_wav("output.wav")?;
 //!
 //! # Ok::<(), auralis::Error>(())
@@ -22,7 +23,7 @@ use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 
-use auralis_effects::{Gain, Trim};
+use auralis_effects::{Gain, Pad, Trim};
 use thiserror::Error;
 
 /// Crate-local result type using [`Error`].
@@ -207,6 +208,26 @@ impl Pipeline {
         self
     }
 
+    /// Adds zero-valued frames before and after every channel.
+    ///
+    /// Padding lengths are measured in audio frames, not individual samples.
+    /// The transform preserves channel grouping and returns the original audio
+    /// unchanged when both lengths are zero. Processing is deterministic and
+    /// allocates a new planar buffer for the padded output.
+    #[must_use]
+    pub fn pad_frames(mut self, start: u64, end: u64) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        match Pad::new(FrameCount::new(start), FrameCount::new(end)).process_buffer(audio) {
+            Ok(padded) => *audio = padded,
+            Err(error) => self.audio = Err(error.into()),
+        }
+
+        self
+    }
+
     /// Returns the processed audio buffer.
     ///
     /// # Errors
@@ -310,6 +331,23 @@ mod tests {
 
         assert_eq!(actual.frames(), FrameCount::new(2));
         assert_eq!(actual.as_planar_f32(), &[0.25, 0.5]);
+    }
+
+    #[test]
+    fn chain_pad_frames_preserves_stereo_frame_grouping() {
+        let source = stereo_audio_buffer(vec![0.25, 0.5, -0.25, -0.5]);
+
+        let actual = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .pad_frames(1, 1)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(4));
+        assert_eq!(
+            actual.as_planar_f32(),
+            &[0.0, 0.25, 0.5, 0.0, 0.0, -0.25, -0.5, 0.0]
+        );
     }
 
     #[test]

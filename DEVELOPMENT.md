@@ -595,6 +595,8 @@ Do not implement `pad` until `trim` is complete.
 
 ### Feature 2.6: `pad`
 
+Status: implemented.
+
 Implement zero padding at start and end.
 
 Acceptance tests:

@@ -51,6 +51,14 @@ enum Command {
         /// End time in seconds for a seconds-based trim.
         #[arg(long, value_name = "SECONDS", allow_hyphen_values = true)]
         trim_end_seconds: Option<f64>,
+
+        /// Silent frames to add before the input audio.
+        #[arg(long, value_name = "FRAMES")]
+        pad_start_frame: Option<u64>,
+
+        /// Silent frames to add after the input audio.
+        #[arg(long, value_name = "FRAMES")]
+        pad_end_frame: Option<u64>,
     },
 }
 
@@ -75,6 +83,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             trim_end_frame,
             trim_start_seconds,
             trim_end_seconds,
+            pad_start_frame,
+            pad_end_frame,
         } => run_pipeline(
             &input,
             &output,
@@ -84,6 +94,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 trim_end_frame,
                 trim_start_seconds,
                 trim_end_seconds,
+                pad_start_frame,
+                pad_end_frame,
             },
         ),
     }
@@ -121,6 +133,12 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
         Some(TrimMode::Seconds { start, end }) => pipeline.trim_seconds(start, end),
         None => pipeline,
     };
+    let pipeline = match (options.pad_start_frame, options.pad_end_frame) {
+        (Some(start), Some(end)) => pipeline.pad_frames(start, end),
+        (Some(start), None) => pipeline.pad_frames(start, 0),
+        (None, Some(end)) => pipeline.pad_frames(0, end),
+        (None, None) => pipeline,
+    };
 
     pipeline.write_wav(output)?;
 
@@ -134,6 +152,8 @@ struct RunOptions {
     trim_end_frame: Option<u64>,
     trim_start_seconds: Option<f64>,
     trim_end_seconds: Option<f64>,
+    pad_start_frame: Option<u64>,
+    pad_end_frame: Option<u64>,
 }
 
 impl RunOptions {
