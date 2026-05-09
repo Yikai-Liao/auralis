@@ -771,7 +771,8 @@ mod tests {
                         vol.process_samples(chunk);
                     }
                 }
-                EffectCommand::Centercut(_)
+                EffectCommand::AllPass(_)
+                | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Norm(_)

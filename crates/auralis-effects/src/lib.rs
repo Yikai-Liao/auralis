@@ -23,6 +23,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod allpass;
 mod biquad;
 mod biquad_design;
 mod centercut;
@@ -31,6 +32,7 @@ mod chain_dispatch;
 mod chain_gain;
 mod channels;
 mod command;
+mod command_allpass;
 mod command_biquad;
 mod command_centercut;
 mod command_channels;
@@ -74,6 +76,7 @@ mod tremolo;
 mod trim;
 mod vol;
 
+pub use allpass::{AllPass, AllPassMode};
 pub use biquad::{Biquad, BiquadCoefficients, BiquadState};
 pub use biquad_design::BiquadWidth;
 pub use centercut::Centercut;

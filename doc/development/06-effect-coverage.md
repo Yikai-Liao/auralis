@@ -552,6 +552,24 @@ Implementation notes:
 
 ### Feature 6.4.4: `allpass`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `AllPass` effect with SoX-ng-compatible default RBJ
+  `allpass frequency width`, `allpass -1 frequency`, and `allpass -2
+  frequency` forms.
+- Command parsing supports hertz, kilohertz, Q, and octave width suffixes,
+  including SoX-ng-style hertz default for unsuffixed width values and
+  kilohertz frequency shorthand.
+- Processing delegates to the scalar biquad primitive with independent
+  per-channel state; runtime validation rejects frequencies at or above
+  Nyquist for the input sample rate.
+- Coverage includes analytical coefficient tests, command and chain integration
+  tests, L4 finite-output property coverage, L5 state-preserving chunk
+  invariance, parser fuzz seeds, and standalone SoX-ng golden cases for the
+  default RBJ and `-1` forms.
+
 ### Feature 6.4.5: `band`
 
 ### Feature 6.4.6: `bandpass`

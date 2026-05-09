@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nallpass 100").unwrap_err();
+        let error = parse_effects_file_str("gain -3\nband 100").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `allpass` failed to parse: known SoX-ng effect `allpass` is not implemented by Auralis; missing SoX-ng coverage entry for `allpass`"
+            "effects file line 2, column 1: command `band` failed to parse: known SoX-ng effect `band` is not implemented by Auralis; missing SoX-ng coverage entry for `band`"
         );
     }
 

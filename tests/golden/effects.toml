@@ -2,6 +2,28 @@
 # output rate/channel conversion is absent, guard/norm are absent, and the
 # Python runner invokes SoX-ng with `-R -D` so automatic dither is disabled.
 
+[id.effect_allpass_mono_rbj]
+input = "effects/allpass_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["allpass", "1000", "0.707q"]
+sox_ng = ["allpass", "1000", "0.707q"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_allpass_stereo_one_pole]
+input = "effects/allpass_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["allpass", "-1", "500"]
+sox_ng = ["allpass", "-1", "500"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"

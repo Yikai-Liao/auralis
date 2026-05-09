@@ -12,6 +12,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
     assert_eq!(
         ids,
         [
+            "effect_allpass_mono_rbj",
+            "effect_allpass_stereo_one_pole",
             "effect_biquad_mono_one_pole",
             "effect_biquad_stereo_one_pole",
             "effect_centercut_stereo_default",
@@ -81,6 +83,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
 
     for effect in [
+        "allpass",
         "biquad",
         "gain",
         "centercut",

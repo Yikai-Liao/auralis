@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Biquad, BiquadCoefficients, BiquadState, Contrast, DcShift, EffectChain, EffectCommand, Fade,
-    Gain, Saturation, SaturationType, Tremolo, Vol,
+    AllPass, Biquad, BiquadCoefficients, BiquadState, BiquadWidth, Contrast, DcShift, EffectChain,
+    EffectCommand, Fade, Gain, Saturation, SaturationType, Tremolo, Vol,
 };
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
@@ -142,6 +142,26 @@ fn biquad_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
 }
 
 #[test]
+fn allpass_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
+    let all_pass =
+        AllPass::new(1_000.0, BiquadWidth::q(0.707)).expect("fixture all-pass design is valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        all_pass
+            .process_buffer(&mut whole)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        process_allpass_by_channel_chunks(&mut chunked, all_pass, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -199,6 +219,9 @@ fn process_streaming_safe_chain_by_chunks(
 ) {
     for command in chain.commands() {
         match command {
+            EffectCommand::AllPass(all_pass) => {
+                process_allpass_by_channel_chunks(audio, *all_pass, schedule);
+            }
             EffectCommand::Biquad(biquad) => {
                 process_biquad_by_channel_chunks(audio, biquad.coefficients(), schedule);
             }
@@ -248,6 +271,17 @@ fn process_streaming_safe_chain_by_chunks(
             _ => panic!("L5 streaming-safe chain fixture contained an unknown command"),
         }
     }
+}
+
+fn process_allpass_by_channel_chunks(
+    audio: &mut AudioBuffer,
+    all_pass: AllPass,
+    schedule: &ChunkSchedule,
+) {
+    let coefficients = all_pass
+        .coefficients(audio.spec().sample_rate())
+        .expect("fixture sample rate keeps frequency below Nyquist");
+    process_biquad_by_channel_chunks(audio, coefficients, schedule);
 }
 
 fn process_biquad_by_channel_chunks(

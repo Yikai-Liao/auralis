@@ -24,6 +24,9 @@ const MAX_SUGGESTIONS: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum EffectKind {
+    /// SoX-ng-style all-pass filter family.
+    AllPass,
+
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad,
 
@@ -167,6 +170,14 @@ impl EffectDescriptor {
 
 /// Implemented effects known to Auralis, in deterministic canonical-name order.
 pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor::new(
+        EffectKind::AllPass,
+        "allpass",
+        &[],
+        "AllPass",
+        "allpass [-1|-2] frequency width",
+        "apply a phase-shifting all-pass filter",
+    ),
     EffectDescriptor::new(
         EffectKind::Biquad,
         "biquad",
@@ -647,6 +658,7 @@ mod tests {
     #[test]
     fn supported_canonical_names_resolve_to_descriptors() {
         let expected = [
+            ("allpass", EffectKind::AllPass),
             ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
@@ -718,18 +730,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("allpass").unwrap_err();
+        let error = EffectRegistry::resolve("band").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "allpass".to_owned(),
+                name: "band".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `allpass`")
+                .contains("missing SoX-ng coverage entry for `band`")
         );
     }
 
