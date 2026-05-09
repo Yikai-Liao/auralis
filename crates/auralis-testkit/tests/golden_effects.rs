@@ -31,6 +31,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_gain_mono_minus_3",
             "effect_gain_normalize_mono_minus_3",
             "effect_gain_stereo_minus_6",
+            "effect_norm_mono_minus_3",
+            "effect_norm_stereo_default",
             "effect_pad_mono_both_sides",
             "effect_pad_mono_positioned",
             "effect_pad_stereo_both_sides",
@@ -53,7 +55,9 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
 fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
 
-    for effect in ["gain", "dcshift", "trim", "pad", "reverse", "fade", "vol"] {
+    for effect in [
+        "gain", "dcshift", "trim", "pad", "reverse", "fade", "vol", "norm",
+    ] {
         let mono = manifest
             .iter()
             .any(|(id, case)| id.contains(effect) && case.corpus_id().unwrap().contains("mono"));

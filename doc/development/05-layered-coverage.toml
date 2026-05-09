@@ -52,6 +52,21 @@ l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are 
 l7 = { status = "covered", reason = "Effect command fuzzing covers gain argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/gain"] }
 
 [[subject]]
+id = "effect.norm"
+kind = "effect"
+name = "norm"
+summary = "SoX-ng-style effect-level peak normalization with optional target dBFS."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone default and target-level SoX-ng golden cases cover the implemented norm command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check whole-buffer peak normalization, target dB scaling, silence preservation, command positioning, parser syntax, and non-finite scan errors.", tests = ["crates/auralis-effects/src/norm.rs", "crates/auralis-effects/src/command_norm.rs", "crates/auralis-effects/tests/norm.rs"] }
+l4 = { status = "covered", reason = "Property tests include silence preservation and finite-output coverage for norm.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "Norm is a whole-buffer peak scan whose result depends on the complete effect input, so chunk-invariance is intentionally not claimed.", tests = [] }
+l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are compared for norm command execution; the scan is scalar and the multiply pass uses backend selection.", tests = ["crates/auralis-effects/tests/norm.rs"] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers norm argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/norm"] }
+
+[[subject]]
 id = "effect.pad"
 kind = "effect"
 name = "pad"

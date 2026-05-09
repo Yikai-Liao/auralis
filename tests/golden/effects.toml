@@ -90,6 +90,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_norm_mono_minus_3]
+input = "effects/norm_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["norm", "-3"]
+sox_ng = ["norm", "-3"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_norm_stereo_default]
+input = "effects/norm_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["norm"]
+sox_ng = ["norm"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_vol_mono_half_amplitude]
 input = "effects/vol_mono.wav"
 corpus_id = "l0/sine_mono_32"

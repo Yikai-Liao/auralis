@@ -33,6 +33,9 @@ pub enum EffectKind {
     /// Constant gain in decibels.
     Gain,
 
+    /// Whole-buffer peak normalization.
+    Norm,
+
     /// Zero padding before and after the input.
     Pad,
 
@@ -151,6 +154,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Gain",
         "gain [options] [gain-dB]",
         "apply gain with optional SoX-ng level management",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Norm,
+        "norm",
+        &["normalize", "normalise"],
+        "Norm",
+        "norm [level]",
+        "normalize peak level at this point in the effect chain",
     ),
     EffectDescriptor::new(
         EffectKind::Pad,
@@ -507,6 +518,7 @@ mod tests {
             ("dcshift", EffectKind::DcShift),
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
+            ("norm", EffectKind::Norm),
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
             ("trim", EffectKind::Trim),
@@ -528,6 +540,8 @@ mod tests {
             ("dc_shift", "dcshift", EffectKind::DcShift),
             ("gain-db", "gain", EffectKind::Gain),
             ("gain_db", "gain", EffectKind::Gain),
+            ("normalize", "norm", EffectKind::Norm),
+            ("normalise", "norm", EffectKind::Norm),
             ("volume", "vol", EffectKind::Vol),
         ];
 

@@ -42,6 +42,13 @@ pub enum EffectError {
         sample_index: usize,
     },
 
+    /// A norm scan encountered a non-finite sample.
+    #[error("norm scan encountered non-finite sample at flattened sample {sample_index}")]
+    NonFiniteNormSample {
+        /// Zero-based flattened sample index in planar channel order.
+        sample_index: usize,
+    },
+
     /// A `vol` gain value was not finite.
     #[error("vol gain must be finite")]
     InvalidVolGain,

@@ -406,6 +406,9 @@ fn apply_command(
             apply_gain_command(*gain, audio, requested_backend, gain_headroom)?;
             Ok(())
         }
+        EffectCommand::Norm(norm) => norm
+            .process_buffer_with_backend(audio, requested_backend)
+            .map_err(|source| ("level", source)),
         EffectCommand::Pad(pad) => {
             let padded = pad
                 .process_buffer(audio)
@@ -437,6 +440,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
+        EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
         EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
@@ -900,7 +904,10 @@ mod tests {
                         vol.process_samples(chunk);
                     }
                 }
-                EffectCommand::Pad(_) | EffectCommand::Reverse(_) | EffectCommand::Trim(_) => {
+                EffectCommand::Norm(_)
+                | EffectCommand::Pad(_)
+                | EffectCommand::Reverse(_)
+                | EffectCommand::Trim(_) => {
                     panic!("test helper only supports streaming-safe commands")
                 }
             }

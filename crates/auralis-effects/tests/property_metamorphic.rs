@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim, Vol};
+use auralis_effects::{DcShift, Fade, Gain, Norm, Pad, Reverse, Trim, Vol};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 
@@ -110,6 +110,15 @@ proptest! {
             .process_buffer(&mut volume_scaled);
         prop_assert_sample_bits_eq(volume_scaled.as_planar_f32(), source.as_planar_f32())?;
 
+        let mut normalized_silence = zero_audio_like(&source);
+        Norm::zero_db().expect("zero dB is valid")
+            .process_buffer(&mut normalized_silence)
+            .expect("finite silence normalizes successfully");
+        prop_assert_sample_bits_eq(
+            normalized_silence.as_planar_f32(),
+            zero_audio_like(&source).as_planar_f32(),
+        )?;
+
         let mut shifted = source.clone();
         DcShift::new(0.0).expect("zero shift is valid").process_buffer(&mut shifted);
         prop_assert_sample_bits_eq(shifted.as_planar_f32(), source.as_planar_f32())?;
@@ -183,6 +192,12 @@ proptest! {
             .process_buffer(&mut volume_scaled);
         prop_assert_all_finite(&volume_scaled)?;
 
+        let mut normalized = source.clone();
+        Norm::new(Decibels::new(db).expect("generated dB is finite"))
+            .process_buffer(&mut normalized)
+            .expect("generated samples are finite");
+        prop_assert_all_finite(&normalized)?;
+
         let mut shifted = source.clone();
         DcShift::new(shift).expect("generated shift is valid").process_buffer(&mut shifted);
         prop_assert_all_finite(&shifted)?;
@@ -210,4 +225,13 @@ proptest! {
         Reverse::new().process_buffer(&mut reversed);
         prop_assert_all_finite(&reversed)?;
     }
+}
+
+fn zero_audio_like(source: &AudioBuffer) -> AudioBuffer {
+    AudioBuffer::from_planar_f32(
+        source.spec(),
+        source.frames(),
+        vec![0.0; source.as_planar_f32().len()],
+    )
+    .expect("zero samples match source shape")
 }

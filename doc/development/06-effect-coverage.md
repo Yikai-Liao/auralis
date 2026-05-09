@@ -204,7 +204,25 @@ Implementation notes:
 
 ### Feature 6.2.2: `norm`
 
+Status: implemented.
+
 Implement effect-level normalization semantics separately from output `--norm`.
+
+Implementation notes:
+
+- Added a typed `Norm` effect with optional target dBFS level, defaulting to
+  0 dBFS, and wired it through command parsing, registry resolution, and
+  effect-chain execution.
+- `norm [level]` follows SoX-ng's current shim semantics for `gain -n [level]`:
+  scan the whole effect input, leave silence unchanged, reject non-finite
+  samples with a typed error, and scale the peak to the requested target.
+- The effect is intentionally separate from output `--norm`; `Norm` runs at its
+  position in an `EffectChain`, while output normalization remains a final
+  write policy.
+- Golden coverage includes standalone default and target-level norm cases
+  against SoX-ng, with L4 finite/silence coverage, L6 scalar-vs-SIMD parity for
+  the multiply pass, and an L7 fuzz seed for norm command parsing. L5 chunk
+  invariance is not applicable because norm is a whole-buffer scan.
 
 ### Feature 6.2.3: `contrast`
 

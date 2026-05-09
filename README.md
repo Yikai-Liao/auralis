@@ -30,10 +30,10 @@ multi-range trim positions, zero padding with frame counts and insertion
 positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
-The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `DcShift`,
-`Trim`, `Pad`, `Reverse`, `Fade`, and `Vol` effect processors, the high-level
-library chain API for applying gain, dcshift, trim, pad, reverse, fade, and vol,
-and the CLI gain/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Norm`,
+`DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`, and `Vol` effect processors, the high-level
+library chain API for applying gain, norm, dcshift, trim, pad, reverse, fade, and vol,
+and the CLI gain/norm/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -45,8 +45,9 @@ The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata,
 `gain -B`, and `gain -b` scans: `gain -h DB` applies the fixed attenuation and
 records reclaimable headroom, and a later `gain -r` restores as much as
 possible without clipping. The chain path also supports SoX-ng-style `vol`
-amplitude, power, dB, and limiter-gain forms. `auralis run <input.wav> <output.wav> gain -3
-dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+amplitude, power, dB, and limiter-gain forms, plus effect-level `norm [level]`
+as a positioned normalization command distinct from final output `--norm`.
+`auralis run <input.wav> <output.wav> gain -3 norm -6 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -439,22 +440,24 @@ when requested.
 Contains typed effect processors built from DSP primitives:
 
 - `Gain`
+- `Norm`
 - `DcShift`
 - `Trim`
 - `Pad`
 - `Reverse`
 - `Fade`
+- `Vol`
 - later: `Remix`
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `norm`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `reverse`, `fade`, and `vol` resolve to typed descriptors; aliases such
-as `dc-shift`, `gain-db`, and `volume` resolve to their canonical names; unknown names
+`trim`, `pad`, `reverse`, `fade`, `vol`, and `norm` resolve to typed descriptors; aliases such
+as `dc-shift`, `gain-db`, `volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
@@ -472,6 +475,9 @@ the simple limiter with `gain -l`, plus channel peak equalization with
 through `gain -b`. The implemented `vol` command accepts amplitude, power, and
 dB gain types, suffix forms such as `vol -6dB`, and SoX-ng limiter gain such as
 `vol 2 amplitude 0.05`; unlike plain `gain`, `vol` clips inside the effect.
+The implemented `norm` command accepts an optional dBFS level and performs
+SoX-ng-style whole-buffer peak normalization at its chain position, separate
+from Auralis' final output `--norm` policy.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -761,14 +767,15 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, and `vol`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, and `norm`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
 positioned `pad LENGTH@POSITION` cases for mid-stream silence insertion, plus
 fade-in cases for the SoX-ng `q`, `h`, `l`, `t`, and `p` curve families plus
 linear fade-out-at-end and explicit stop-position fade-out cases. `vol` coverage
-includes amplitude, dB, power, and limiter-gain forms.
+includes amplitude, dB, power, and limiter-gain forms; `norm` coverage includes
+default and target-level normalization.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.
@@ -982,6 +989,8 @@ Where the effect has a mathematical model, test that model directly.
 Examples:
 
 - `gain`: multiply by `10^(db / 20)`
+- `norm`: scan the whole effect input, then scale non-silent audio to the target
+  peak level
 - `vol`: amplitude, power, or dB scaling with immediate effect-level clipping
   and optional SoX-ng limiter-gain shaping
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
@@ -1014,6 +1023,7 @@ Examples:
 - `trim` over the full range is identity
 - `pad 0` is identity and `pad length@position` preserves surrounding frames
 - `vol 1` is identity
+- `norm` preserves silence and finite bounded input stays finite
 - `gain +6 dB` followed by `gain -6 dB` approximately returns the original signal within tolerance
 
 ### L5: chunk invariance
@@ -1030,7 +1040,8 @@ The Rust helper `auralis_testkit::chunk_invariance` is the shared source for
 that matrix. It injects empty chunks and a final empty call for flush-path
 coverage, and it reports the deterministic random seed in schedule labels.
 Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, `Vol`, and
-streaming-safe `EffectChain` execution.
+streaming-safe `EffectChain` execution. `Norm` is documented as a whole-buffer
+scan and is not chunk-invariant.
 
 ### L6: scalar vs SIMD differential tests
 

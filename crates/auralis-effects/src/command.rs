@@ -39,12 +39,13 @@ use auralis_core::{AuralisError, Decibels, FrameCount};
 use thiserror::Error;
 
 use crate::command_gain::{parse_gain, render_gain};
+use crate::command_norm::{parse_norm, render_norm};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Pad,
-    Reverse, Trim, Vol,
+    DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, FadeCurve, Gain, Norm,
+    Pad, Reverse, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -68,6 +69,9 @@ pub enum EffectCommand {
 
     /// Constant gain in decibels.
     Gain(Gain),
+
+    /// SoX-ng-style whole-buffer peak normalization.
+    Norm(Norm),
 
     /// Zero padding measured in frames, including optional positioned insertions.
     Pad(Pad),
@@ -99,6 +103,7 @@ impl EffectCommand {
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
+            EffectKind::Norm => parse_norm(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
@@ -113,6 +118,7 @@ impl EffectCommand {
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
+            Self::Norm(_) => EffectKind::Norm,
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Trim(_) => EffectKind::Trim,
@@ -139,6 +145,7 @@ impl EffectCommand {
             }
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
+            Self::Norm(norm) => render_norm(*norm),
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Trim(trim) => render_trim(trim),
