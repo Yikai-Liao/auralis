@@ -451,6 +451,22 @@ Implementation notes:
 
 Implement the core center-cut algorithm.
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Centercut` processor that requires exactly stereo input and
+  emits three planar output channels: left residual, right residual, and
+  extracted center.
+- The core processor uses overlapping spectral windows to estimate the shared
+  center component from left/right sum and difference energy, then subtracts
+  that estimate from the decoded stereo input.
+- This feature intentionally does not expose the `centercut` command parser or
+  SoX-ng options yet; Feature 6.3.7 owns `-a`, `-b`, `-w`, command integration,
+  and standalone golden coverage.
+- Analytical tests cover channel shape, centered stereo extraction,
+  opposite-phase side preservation, and non-stereo rejection.
+
 ### Feature 6.3.7: `centercut` options
 
 Complete exposed options and golden coverage.

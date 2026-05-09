@@ -31,7 +31,7 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Channels`, `Norm`,
-`Contrast`, `SoftVol`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Centercut`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
 fade, and vol, and the CLI gain/channels/norm/contrast/softvol/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
@@ -463,13 +463,14 @@ Contains typed effect processors built from DSP primitives:
 - `Saturation`
 - `Repeat`
 - `Remix`
+- `Centercut`
 - `Oops`
 - `Swap`
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `channels`, `norm`, `contrast`, `softvol`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `channels`, `norm`, `contrast`, `softvol`, `centercut`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
@@ -523,6 +524,10 @@ left-minus-right output in both channels; input must contain at least two
 channels, and extra input channels are ignored.
 The implemented `swap` command accepts no arguments and swaps adjacent decoded
 channel pairs, leaving mono input and an odd trailing channel unchanged.
+The typed `Centercut` processor implements the core spectral center-cut
+separation path and returns left residual, right residual, and extracted center
+channels from stereo input. The `centercut` command name and its `-a`, `-b`,
+and `-w` options remain reserved for the follow-up command/golden feature.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -908,7 +913,7 @@ wrappers, `libopusenc`, FDK-AAC, or other native codec-library bindings.
 | Area | Choice | Rule |
 |---|---|---|
 | SIMD | `rten-simd` behind `simd` | optional backend only; scalar remains the reference |
-| Frequency-domain tests | `realfft`, `rustfft` | add to testkit/dev dependencies when spectral tests begin |
+| Frequency-domain effects and tests | `realfft`, `rustfft` | add behind focused crates when spectral processing or spectral tests begin |
 | Batch parallelism | `rayon` behind `parallel` | for many files, test cases, stems, or render jobs; not the initial single-stream effect chain |
 | Byte casting | `bytemuck` behind `pod` | only after normal parsing is correct and profiling justifies it |
 | Small allocation optimization | `smallvec` behind `smallvec` | only for proven small-vector pressure |
@@ -1059,6 +1064,8 @@ Examples:
 - `repeat`: finite output count and planar channel grouping
 - `remix`: channel out-spec routing, silent channels, default-scaled
   multi-input mixdown, source gain modifiers, and level-scaling options
+- `centercut`: overlapping spectral center estimation that emits left
+  residual, right residual, and center channels from stereo input
 - `oops`: left-minus-right stereo extraction duplicated to both output
   channels, with mono input rejected and extra channels ignored
 - `swap`: adjacent channel pairs exchange positions, with odd trailing channels
@@ -1103,6 +1110,8 @@ Examples:
 - `repeat 0` is identity and finite bounded input stays finite
 - `remix` identity routing preserves samples and finite bounded input stays
   finite
+- `centercut` finite stereo input emits finite three-channel output and rejects
+  non-stereo input
 - `oops` finite multichannel input stays finite and emits stereo output
 - `swap` twice returns the original signal and finite bounded input stays finite
 - `channels` with the current channel count is identity and channel-converted
@@ -1124,9 +1133,10 @@ that matrix. It injects empty chunks and a final empty call for flush-path
 coverage, and it reports the deterministic random seed in schedule labels.
 Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, `Vol`, `Tremolo`,
 stateful `Overdrive`, and streaming-safe `EffectChain` execution. `Norm` is documented as a
-whole-buffer scan, `Repeat` and `Remix` are documented as whole-buffer structural
-transforms, and `Channels` is documented as an explicit shape-changing
-structural transform; these are not chunk-invariant under the current API.
+whole-buffer scan, `Repeat`, `Remix`, and `Centercut` are documented as
+whole-buffer structural or spectral transforms, and `Channels` is documented as
+an explicit shape-changing structural transform; these are not chunk-invariant
+under the current API.
 
 ### L6: scalar vs SIMD differential tests
 

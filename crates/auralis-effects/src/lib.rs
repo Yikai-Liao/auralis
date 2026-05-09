@@ -23,6 +23,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod centercut;
 mod chain;
 mod chain_dispatch;
 mod chain_gain;
@@ -69,6 +70,7 @@ mod tremolo;
 mod trim;
 mod vol;
 
+pub use centercut::Centercut;
 pub use chain::{
     ChainParseResult, ChainResult, EffectChain, EffectChainBoundary, EffectChainError,
     EffectChainParseError, parse_effect_chain,

@@ -47,6 +47,10 @@ pub enum EffectError {
     #[error("remix input channel is outside the input channel count")]
     RemixInputChannelOutOfBounds,
 
+    /// A centercut command received anything other than stereo input.
+    #[error("centercut can only process stereo input")]
+    CentercutRequiresStereo,
+
     /// A DC shift amount was not finite or not in the supported normalized range.
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,
