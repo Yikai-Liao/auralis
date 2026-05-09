@@ -34,8 +34,9 @@ The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `DcShift
 chain API for applying gain, dcshift, trim, pad, reverse, and fade, and the CLI
 gain/dcshift/trim/pad/reverse/fade transforms are implemented. The Rust
 testkit includes deterministic sample comparison metrics for max absolute
-error, RMS error, SNR, peak, and DC offset. Other effect transform CLI options
-are still intentionally unimplemented.
+error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
+shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
+tests. Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 

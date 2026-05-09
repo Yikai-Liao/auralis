@@ -9,6 +9,9 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
+pythonpath = [
+    ".",
+]
 markers = [
     "golden: tests that compare Auralis output with an external reference implementation",
 ]

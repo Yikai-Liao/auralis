@@ -690,6 +690,8 @@ Acceptance tests:
 
 ### Feature 3.2: Python testkit under uv
 
+Status: implemented.
+
 Create `tools/pytest` with:
 
 - `pyproject.toml`
