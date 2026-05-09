@@ -59,6 +59,10 @@ enum Command {
         /// Silent frames to add after the input audio.
         #[arg(long, value_name = "FRAMES")]
         pad_end_frame: Option<u64>,
+
+        /// Reverse frame order within each channel.
+        #[arg(long)]
+        reverse: bool,
     },
 }
 
@@ -85,6 +89,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             trim_end_seconds,
             pad_start_frame,
             pad_end_frame,
+            reverse,
         } => run_pipeline(
             &input,
             &output,
@@ -96,6 +101,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 trim_end_seconds,
                 pad_start_frame,
                 pad_end_frame,
+                reverse,
             },
         ),
     }
@@ -139,6 +145,11 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
         (None, Some(end)) => pipeline.pad_frames(0, end),
         (None, None) => pipeline,
     };
+    let pipeline = if options.reverse {
+        pipeline.reverse()
+    } else {
+        pipeline
+    };
 
     pipeline.write_wav(output)?;
 
@@ -154,6 +165,7 @@ struct RunOptions {
     trim_end_seconds: Option<f64>,
     pad_start_frame: Option<u64>,
     pad_end_frame: Option<u64>,
+    reverse: bool,
 }
 
 impl RunOptions {

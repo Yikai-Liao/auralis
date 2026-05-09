@@ -13,6 +13,7 @@
 //! AudioFile::open_wav("input.wav")?
 //!     .into_pipeline()
 //!     .gain_db(-3.0)
+//!     .reverse()
 //!     .pad_frames(0, 48_000)
 //!     .write_wav("output.wav")?;
 //!
@@ -23,7 +24,7 @@ use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 
-use auralis_effects::{Gain, Pad, Trim};
+use auralis_effects::{Gain, Pad, Reverse, Trim};
 use thiserror::Error;
 
 /// Crate-local result type using [`Error`].
@@ -228,6 +229,23 @@ impl Pipeline {
         self
     }
 
+    /// Reverses the frame order within each channel.
+    ///
+    /// This transform is deterministic, in-place, and non-allocating. It is
+    /// measured in frames rather than individual interleaved samples, so stereo
+    /// and larger channel layouts keep their channel grouping. Applying
+    /// `reverse` twice restores the original audio exactly.
+    #[must_use]
+    pub fn reverse(mut self) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        Reverse::new().process_buffer(audio);
+
+        self
+    }
+
     /// Returns the processed audio buffer.
     ///
     /// # Errors
@@ -348,6 +366,20 @@ mod tests {
             actual.as_planar_f32(),
             &[0.0, 0.25, 0.5, 0.0, 0.0, -0.25, -0.5, 0.0]
         );
+    }
+
+    #[test]
+    fn chain_reverse_preserves_stereo_frame_grouping() {
+        let source = stereo_audio_buffer(vec![0.0, 0.25, 0.5, 1.0, -0.25, -0.5]);
+
+        let actual = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .reverse()
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(3));
+        assert_eq!(actual.as_planar_f32(), &[0.5, 0.25, 0.0, -0.5, -0.25, 1.0]);
     }
 
     #[test]

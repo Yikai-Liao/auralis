@@ -26,11 +26,12 @@ decoding into planar `f32` buffers and encoding back to PCM16 WAV are
 implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
 pipeline and can apply constant gain with `--gain-db <DB>`, an end-exclusive
-trim with frame or seconds ranges, or zero padding with frame counts. The scalar
-`gain` DSP kernel, the typed `Gain`, `Trim`, and `Pad` effect processors, the
-high-level library chain API for applying gain, trim, and pad, and the CLI
-gain/trim/pad transforms are implemented. Other effect transform CLI options are
-still intentionally unimplemented.
+trim with frame or seconds ranges, zero padding with frame counts, or
+frame-level reversal with `--reverse`. The scalar `gain` DSP kernel, the typed
+`Gain`, `Trim`, `Pad`, and `Reverse` effect processors, the high-level library
+chain API for applying gain, trim, pad, and reverse, and the CLI
+gain/trim/pad/reverse transforms are implemented. Other effect transform CLI
+options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 

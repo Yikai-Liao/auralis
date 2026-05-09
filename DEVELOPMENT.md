@@ -612,6 +612,8 @@ Acceptance tests:
 
 ### Feature 2.7: `reverse`
 
+Status: implemented.
+
 Implement frame-level reverse.
 
 Acceptance tests:
