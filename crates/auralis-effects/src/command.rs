@@ -60,13 +60,14 @@ use crate::command_reverse::parse_reverse;
 use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_swap::parse_swap;
+use crate::command_treble::{parse_treble, render_treble};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
     EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm, Oops, Overdrive,
-    Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Tremolo, Trim, Vol,
+    Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -148,6 +149,9 @@ pub enum EffectCommand {
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap(Swap),
 
+    /// SoX-ng-style treble tone control.
+    Treble(Treble),
+
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo(Tremolo),
 
@@ -194,6 +198,7 @@ impl EffectCommand {
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
+            EffectKind::Treble => parse_treble(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
             EffectKind::Vol => parse_vol(effect, args),
@@ -226,6 +231,7 @@ impl EffectCommand {
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Swap(_) => EffectKind::Swap,
+            Self::Treble(_) => EffectKind::Treble,
             Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
             Self::Vol(_) => EffectKind::Vol,
@@ -264,6 +270,7 @@ impl EffectCommand {
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Swap(_) => vec!["swap".to_owned()],
+            Self::Treble(treble) => render_treble(*treble),
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),
             Self::Vol(vol) => render_vol(*vol),
@@ -791,22 +798,6 @@ mod tests {
                 .unwrap()
                 .render_tokens(),
             ["gain", "-rh", "-3"]
-        );
-    }
-
-    #[test]
-    fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
-        let unsupported = parse_effect_command(&["treble"]).unwrap_err();
-        assert!(
-            unsupported
-                .to_string()
-                .contains("known SoX-ng effect `treble`")
-        );
-
-        let unknown = parse_effect_command(&["gian"]).unwrap_err();
-        assert_eq!(
-            unknown.to_string(),
-            "unknown effect `gian`; did you mean `gain`?"
         );
     }
 

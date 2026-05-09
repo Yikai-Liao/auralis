@@ -4,7 +4,7 @@ use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
     Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels,
     Contrast, DcShift, EffectCommand, Fade, FadeCurve, Gain, Oops, Pad, PositionedPad, Reverse,
-    Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, parse_effect_command,
+    Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, parse_effect_command,
 };
 
 #[test]
@@ -105,4 +105,12 @@ fn parses_supported_effect_commands_into_typed_configs() {
         assert_eq!(parse_effect_command(tokens).unwrap(), command);
         assert_eq!(parse_effect_command(tokens).unwrap().kind(), command.kind());
     }
+}
+
+#[test]
+fn parses_treble_command_into_typed_config() {
+    assert_eq!(
+        parse_effect_command(&["treble", "-6", "3000", "0.5s"]).unwrap(),
+        EffectCommand::Treble(Treble::with_width(-6.0, 3000.0, BiquadWidth::slope(0.5)).unwrap())
+    );
 }

@@ -90,6 +90,9 @@ pub enum EffectKind {
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap,
 
+    /// SoX-ng-style treble tone control.
+    Treble,
+
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo,
 
@@ -357,6 +360,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Swap",
         "swap",
         "swap adjacent decoded channel pairs",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Treble,
+        "treble",
+        &[],
+        "Treble",
+        "treble gain [frequency [width]]",
+        "apply a high-shelf treble tone control",
     ),
     EffectDescriptor::new(
         EffectKind::Tremolo,
@@ -723,6 +734,7 @@ mod tests {
             ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),
             ("swap", EffectKind::Swap),
+            ("treble", EffectKind::Treble),
             ("tremolo", EffectKind::Tremolo),
             ("trim", EffectKind::Trim),
             ("vol", EffectKind::Vol),
@@ -778,18 +790,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("treble").unwrap_err();
+        let error = EffectRegistry::resolve("equalizer").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "treble".to_owned(),
+                name: "equalizer".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `treble`")
+                .contains("missing SoX-ng coverage entry for `equalizer`")
         );
     }
 

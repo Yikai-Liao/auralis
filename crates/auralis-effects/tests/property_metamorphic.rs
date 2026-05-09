@@ -6,7 +6,8 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Contrast, DcShift, Fade, Gain, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Tremolo, Trim, Vol,
+    RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim,
+    Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -282,6 +283,13 @@ proptest! {
             .process_buffer(&mut bass_filtered)
             .expect("fixture sample rate keeps frequency below Nyquist");
         prop_assert_all_finite(&bass_filtered)?;
+
+        let mut treble_filtered = source.clone();
+        Treble::with_width(-6.0, 3000.0, BiquadWidth::slope(0.5))
+            .expect("fixture treble design is valid")
+            .process_buffer(&mut treble_filtered)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        prop_assert_all_finite(&treble_filtered)?;
 
         let mut normalized = source.clone();
         Norm::new(Decibels::new(db).expect("generated dB is finite"))

@@ -6,7 +6,7 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadState,
     BiquadWidth, Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Saturation,
-    SaturationType, Tremolo, Vol,
+    SaturationType, Treble, Tremolo, Vol,
 };
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
@@ -241,6 +241,26 @@ fn bass_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
 }
 
 #[test]
+fn treble_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
+    let treble =
+        Treble::with_width(-6.0, 3000.0, BiquadWidth::slope(0.5)).expect("fixture design is valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        treble
+            .process_buffer(&mut whole)
+            .expect("fixture sample rate keeps frequency below Nyquist");
+        process_treble_by_channel_chunks(&mut chunked, treble, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -312,6 +332,9 @@ fn process_streaming_safe_chain_by_chunks(
             }
             EffectCommand::Bass(bass) => {
                 process_bass_by_channel_chunks(audio, *bass, schedule);
+            }
+            EffectCommand::Treble(treble) => {
+                process_treble_by_channel_chunks(audio, *treble, schedule);
             }
             EffectCommand::Biquad(biquad) => {
                 process_biquad_by_channel_chunks(audio, biquad.coefficients(), schedule);
@@ -406,6 +429,17 @@ fn process_bandreject_by_channel_chunks(
 
 fn process_bass_by_channel_chunks(audio: &mut AudioBuffer, bass: Bass, schedule: &ChunkSchedule) {
     let coefficients = bass
+        .coefficients(audio.spec().sample_rate())
+        .expect("fixture sample rate keeps frequency below Nyquist");
+    process_biquad_by_channel_chunks(audio, coefficients, schedule);
+}
+
+fn process_treble_by_channel_chunks(
+    audio: &mut AudioBuffer,
+    treble: Treble,
+    schedule: &ChunkSchedule,
+) {
+    let coefficients = treble
         .coefficients(audio.spec().sample_rate())
         .expect("fixture sample rate keeps frequency below Nyquist");
     process_biquad_by_channel_chunks(audio, coefficients, schedule);
