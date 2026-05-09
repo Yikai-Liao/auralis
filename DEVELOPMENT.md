@@ -1108,6 +1108,8 @@ Acceptance tests:
 
 #### Feature 5.2.3: SoX-ng golden tests for chains
 
+Status: implemented.
+
 Add golden manifest cases for representative chains.
 
 Acceptance tests:

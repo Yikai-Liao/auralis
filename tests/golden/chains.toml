@@ -1,0 +1,26 @@
+# Representative positional-chain golden cases. Tolerances are normalized
+# full-scale decoded-sample metrics; exact structural edits use zero tolerance.
+
+[id.chain_editing_trim_reverse_pad]
+input = "chains/stereo_steps.wav"
+auralis = ["trim", "2", "9", "reverse", "pad", "1", "2"]
+sox_ng = ["trim", "2s", "7s", "reverse", "pad", "1s", "2s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.chain_level_gain_dcshift_gain]
+input = "chains/stereo_multitone.wav"
+auralis = ["gain", "-3", "dcshift", "0.125", "gain", "-1"]
+sox_ng = ["gain", "-3", "dcshift", "0.125", "gain", "-1"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.chain_filter_fade_gain]
+input = "chains/stereo_ramp_tone.wav"
+auralis = ["fade", "5", "gain", "-2"]
+sox_ng = ["fade", "t", "5s", "gain", "-2"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0

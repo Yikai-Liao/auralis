@@ -41,7 +41,9 @@ commands can be grouped into an in-memory `EffectChain` and executed in order
 with indexed command-context errors and forced scalar/SIMD backend selection.
 `auralis run <input.wav> <output.wav> gain -3 dcshift 0.125 reverse` exposes
 the same typed chain model at the CLI, preserving positional user order while
-the earlier single-effect flags remain available for compatibility.
+the earlier single-effect flags remain available for compatibility. The golden
+suite now includes a `tests/golden/chains.toml` manifest for representative
+editing, level, and fade/gain filter-style positional chains against SoX-ng.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
@@ -520,6 +522,13 @@ can rely on deterministic command rendering. The testkit also renders command
 vectors as display strings for reports with stable double-quote escaping for
 spaces, quotes, backslashes, and control characters while keeping the original
 argument vectors available for process execution.
+
+The root `tests/golden/chains.toml` manifest records positional-chain coverage
+for a structural editing chain, a level-processing chain, and the currently
+implemented fade/gain filter-style chain. The Python golden runner generates the
+deterministic PCM16 fixtures, executes both command lines, compares decoded
+sample metadata plus max-abs/RMS/SNR/peak metrics, and writes a JSON failure
+report when a chain drifts outside its manifest tolerance.
 
 ### `auralis-python` future placeholder
 
