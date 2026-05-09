@@ -73,6 +73,10 @@ pub enum Error {
     #[error(transparent)]
     SampleRateConversion(#[from] SampleRateConversionError),
 
+    /// Output level adjustment failed before encoding.
+    #[error(transparent)]
+    OutputLevel(#[from] OutputLevelError),
+
     /// A seconds-based trim range could not be represented as frames.
     #[error("trim seconds range cannot be represented as frame positions")]
     InvalidTrimSecondsRange,
@@ -88,6 +92,7 @@ impl PartialEq for Error {
             (Self::InputCombine(left), Self::InputCombine(right)) => left == right,
             (Self::ChannelConversion(left), Self::ChannelConversion(right)) => left == right,
             (Self::SampleRateConversion(left), Self::SampleRateConversion(right)) => left == right,
+            (Self::OutputLevel(left), Self::OutputLevel(right)) => left == right,
             (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }
@@ -262,6 +267,52 @@ impl SampleRateConversionPolicy {
     }
 }
 
+/// Explicit policy for changing sample levels at an output boundary.
+///
+/// Auralis library APIs never adjust final level implicitly. The default
+/// [`Self::Preserve`] policy lets the PCM16 encoder apply its documented
+/// clipping. [`Self::Guard`] attenuates the final buffer only when its absolute
+/// peak would exceed full scale. [`Self::Normalize`] scales non-silent audio so
+/// its absolute peak reaches the requested level before encoding.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub enum OutputLevelPolicy {
+    /// Preserve current sample levels and let the encoder clip if needed.
+    Preserve,
+
+    /// Attenuate only when the output peak exceeds full scale.
+    Guard,
+
+    /// Scale non-silent output so its peak reaches the requested level.
+    Normalize(Decibels),
+}
+
+impl OutputLevelPolicy {
+    /// Returns the default policy: preserve current sample levels.
+    #[must_use]
+    pub const fn preserve() -> Self {
+        Self::Preserve
+    }
+
+    /// Returns a policy that attenuates output only when clipping would occur.
+    #[must_use]
+    pub const fn guard() -> Self {
+        Self::Guard
+    }
+
+    /// Returns a policy that normalizes output to `target`.
+    #[must_use]
+    pub const fn normalize(target: Decibels) -> Self {
+        Self::Normalize(target)
+    }
+
+    /// Returns whether this policy may change sample values.
+    #[must_use]
+    pub const fn adjustment_enabled(self) -> bool {
+        !matches!(self, Self::Preserve)
+    }
+}
+
 /// Errors produced by explicit output channel conversion.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
@@ -313,6 +364,34 @@ pub enum SampleRateConversionError {
     },
 
     /// The converted buffer shape was rejected by the core buffer model.
+    #[error(transparent)]
+    Core(#[from] auralis_core::AuralisError),
+}
+
+/// Errors produced by explicit output level adjustment.
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum OutputLevelError {
+    /// A non-finite sample prevented deterministic peak scanning.
+    #[error(
+        "output level policy encountered non-finite sample at channel {channel_index}, frame {frame_index}"
+    )]
+    NonFiniteSample {
+        /// Zero-based channel index containing the non-finite sample.
+        channel_index: usize,
+
+        /// Zero-based frame index containing the non-finite sample.
+        frame_index: u64,
+    },
+
+    /// A target level was too large to become a finite `f32` multiplier.
+    #[error("normalization target {target} is too large for finite f32 sample scaling")]
+    TargetLevelOverflow {
+        /// Requested normalization target.
+        target: Decibels,
+    },
+
+    /// The adjusted buffer shape was rejected by the core buffer model.
     #[error(transparent)]
     Core(#[from] auralis_core::AuralisError),
 }
@@ -611,6 +690,159 @@ fn resample_channel_linear(
         let right = input[source_floor_index + 1];
         *output_sample = left.mul_add(1.0 - fraction, right * fraction);
     }
+}
+
+/// Attenuates a decoded planar buffer only when its absolute peak exceeds full scale.
+///
+/// This is the library counterpart to `auralis run --guard`. It scans finite
+/// samples, clones the input when the peak is already within `[-1.0, 1.0]`, and
+/// otherwise applies a deterministic `1 / peak` linear scale to every channel
+/// using the scalar backend.
+///
+/// # Errors
+///
+/// Returns [`OutputLevelError::NonFiniteSample`] when a sample is NaN or
+/// infinite, or [`OutputLevelError::Core`] if the cloned buffer shape is
+/// rejected while applying the adjustment.
+pub fn guard_audio_level(
+    audio: &AudioBuffer,
+) -> std::result::Result<AudioBuffer, OutputLevelError> {
+    guard_audio_level_with_backend(audio, BackendKind::Scalar)
+}
+
+/// Attenuates a decoded planar buffer only when its absolute peak exceeds full scale.
+///
+/// `requested_backend` selects the scalar/SIMD gain kernel used for any
+/// required attenuation. When no attenuation is needed, no backend kernel runs.
+///
+/// # Errors
+///
+/// Returns the same errors as [`guard_audio_level`].
+pub fn guard_audio_level_with_backend(
+    audio: &AudioBuffer,
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, OutputLevelError> {
+    let peak = absolute_peak(audio)?;
+    if peak <= 1.0 {
+        return Ok(audio.clone());
+    }
+
+    let mut output = audio.clone();
+    apply_output_level_multiplier(&mut output, 1.0 / peak, requested_backend)?;
+    Ok(output)
+}
+
+/// Normalizes a decoded planar buffer to a target full-scale peak.
+///
+/// This is the library counterpart to `auralis run --norm[=DB]`. Silent input
+/// is returned unchanged because there is no finite multiplier that can create
+/// a peak from silence. Non-silent input is scaled so its absolute peak reaches
+/// `target`.
+///
+/// # Errors
+///
+/// Returns [`OutputLevelError::NonFiniteSample`] when a sample is NaN or
+/// infinite, [`OutputLevelError::TargetLevelOverflow`] when `target` is too
+/// large to become a finite `f32` scale, or [`OutputLevelError::Core`] if the
+/// cloned buffer shape is rejected while applying the adjustment.
+pub fn normalize_audio_level(
+    audio: &AudioBuffer,
+    target: Decibels,
+) -> std::result::Result<AudioBuffer, OutputLevelError> {
+    normalize_audio_level_with_backend(audio, target, BackendKind::Scalar)
+}
+
+/// Normalizes a decoded planar buffer to a target full-scale peak with a requested backend.
+///
+/// `requested_backend` selects the scalar/SIMD gain kernel used for non-silent
+/// normalization. Unsupported SIMD requests follow the same deterministic
+/// fallback metadata as other backend-aware sample processing.
+///
+/// # Errors
+///
+/// Returns the same errors as [`normalize_audio_level`].
+pub fn normalize_audio_level_with_backend(
+    audio: &AudioBuffer,
+    target: Decibels,
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, OutputLevelError> {
+    let peak = absolute_peak(audio)?;
+    if peak == 0.0 {
+        return Ok(audio.clone());
+    }
+
+    let target = output_level_target_linear(target)?;
+    let mut output = audio.clone();
+    apply_output_level_multiplier(&mut output, target / peak, requested_backend)?;
+    Ok(output)
+}
+
+fn apply_output_level_policy_with_backend(
+    audio: AudioBuffer,
+    policy: OutputLevelPolicy,
+    requested_backend: BackendKind,
+) -> std::result::Result<AudioBuffer, OutputLevelError> {
+    match policy {
+        OutputLevelPolicy::Preserve => Ok(audio),
+        OutputLevelPolicy::Guard => guard_audio_level_with_backend(&audio, requested_backend),
+        OutputLevelPolicy::Normalize(target) => {
+            normalize_audio_level_with_backend(&audio, target, requested_backend)
+        }
+    }
+}
+
+fn absolute_peak(audio: &AudioBuffer) -> std::result::Result<f32, OutputLevelError> {
+    let mut peak = 0.0_f32;
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        for (frame_index, &sample) in channel.iter().enumerate() {
+            if !sample.is_finite() {
+                return Err(OutputLevelError::NonFiniteSample {
+                    channel_index,
+                    frame_index: u64::try_from(frame_index)
+                        .map_err(|_| auralis_core::AuralisError::InvalidAudioBufferShape)?,
+                });
+            }
+            peak = peak.max(sample.abs());
+        }
+    }
+
+    Ok(peak)
+}
+
+fn output_level_target_linear(target: Decibels) -> std::result::Result<f32, OutputLevelError> {
+    let linear = 10.0_f64.powf(target.as_f64() / 20.0);
+    if !linear.is_finite() || linear > f64::from(f32::MAX) {
+        return Err(OutputLevelError::TargetLevelOverflow { target });
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the public DSP sample format is f32, so the f64 unit value is intentionally rounded once"
+    )]
+    Ok(linear as f32)
+}
+
+fn apply_output_level_multiplier(
+    audio: &mut AudioBuffer,
+    multiplier: f32,
+    requested_backend: BackendKind,
+) -> std::result::Result<(), OutputLevelError> {
+    if multiplier.to_bits() == 1.0_f32.to_bits() {
+        return Ok(());
+    }
+
+    let selection = auralis_simd::select_backend(requested_backend);
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel_mut(channel_index)
+            .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+        auralis_simd::gain_f32_in_place_with_backend(selection, channel, multiplier);
+    }
+
+    Ok(())
 }
 
 /// Errors produced while combining multiple decoded inputs.
@@ -1868,6 +2100,7 @@ pub struct Pipeline {
     requested_backend: BackendKind,
     sample_rate_conversion_policy: SampleRateConversionPolicy,
     channel_conversion_policy: ChannelConversionPolicy,
+    output_level_policy: OutputLevelPolicy,
 }
 
 impl Pipeline {
@@ -1892,6 +2125,7 @@ impl Pipeline {
             requested_backend,
             sample_rate_conversion_policy: SampleRateConversionPolicy::Preserve,
             channel_conversion_policy: ChannelConversionPolicy::Preserve,
+            output_level_policy: OutputLevelPolicy::Preserve,
         }
     }
 
@@ -1956,6 +2190,40 @@ impl Pipeline {
     #[must_use]
     pub const fn with_output_channels(mut self, channels: ChannelCount) -> Self {
         self.channel_conversion_policy = ChannelConversionPolicy::Automatic(channels);
+        self
+    }
+
+    /// Sets the explicit output level policy for later writes.
+    ///
+    /// The default policy is [`OutputLevelPolicy::Preserve`], which means
+    /// `write_wav` leaves current sample levels unchanged and relies on the
+    /// PCM16 encoder's documented clipping. Use [`OutputLevelPolicy::Guard`]
+    /// to attenuate only when the final buffer exceeds full scale, or
+    /// [`OutputLevelPolicy::Normalize`] to scale non-silent output to a target
+    /// peak level.
+    #[must_use]
+    pub const fn with_output_level_policy(mut self, policy: OutputLevelPolicy) -> Self {
+        self.output_level_policy = policy;
+        self
+    }
+
+    /// Requests full-scale clipping guard before writing.
+    ///
+    /// This is a convenience wrapper around [`Self::with_output_level_policy`]
+    /// using [`OutputLevelPolicy::Guard`].
+    #[must_use]
+    pub const fn with_output_guard(mut self) -> Self {
+        self.output_level_policy = OutputLevelPolicy::Guard;
+        self
+    }
+
+    /// Requests peak normalization before writing.
+    ///
+    /// This is a convenience wrapper around [`Self::with_output_level_policy`]
+    /// using [`OutputLevelPolicy::Normalize`].
+    #[must_use]
+    pub const fn with_output_normalization(mut self, target: Decibels) -> Self {
+        self.output_level_policy = OutputLevelPolicy::Normalize(target);
         self
     }
 
@@ -2167,13 +2435,19 @@ impl Pipeline {
     /// Returns the first deferred configuration error from the chain, or a WAV
     /// write error if output creation, sample validation, sample writing, or
     /// finalization fails. Explicit output sample-rate and channel-conversion
-    /// policies are applied only here and can also return typed policy errors.
+    /// policies plus explicit output level policy are applied only here and can
+    /// also return typed policy errors.
     pub fn write_wav(self, path: impl AsRef<Path>) -> Result<()> {
         let audio = self.audio?;
         let audio = apply_sample_rate_conversion_policy(audio, self.sample_rate_conversion_policy)?;
         let audio = apply_channel_conversion_policy_with_backend(
             audio,
             self.channel_conversion_policy,
+            self.requested_backend,
+        )?;
+        let audio = apply_output_level_policy_with_backend(
+            audio,
+            self.output_level_policy,
             self.requested_backend,
         )?;
         auralis_wav::encode_pcm16_path_with_backend(path, &audio, self.requested_backend)?;
@@ -2207,12 +2481,14 @@ fn seconds_to_frame(seconds: TimeSeconds, sample_rate: u32) -> Option<FrameCount
 mod tests {
     use super::{
         AudioFile, BackendKind, ChannelConversionError, ChannelConversionPolicy, EffectChain,
-        EffectCommand, Error, InputCombineError, SampleRateConversionError,
+        EffectCommand, Error, InputCombineError, OutputLevelError, SampleRateConversionError,
         SampleRateConversionPolicy, concatenate_audio_buffers, convert_audio_channels,
-        convert_audio_channels_with_backend, convert_audio_sample_rate, merge_audio_buffers,
-        mix_audio_buffers, mix_audio_buffers_with_backend, mix_power_audio_buffers,
+        convert_audio_channels_with_backend, convert_audio_sample_rate, guard_audio_level,
+        guard_audio_level_with_backend, merge_audio_buffers, mix_audio_buffers,
+        mix_audio_buffers_with_backend, mix_power_audio_buffers,
         mix_power_audio_buffers_with_backend, multiply_audio_buffers,
-        multiply_audio_buffers_with_backend, sequence_audio_buffers,
+        multiply_audio_buffers_with_backend, normalize_audio_level,
+        normalize_audio_level_with_backend, sequence_audio_buffers,
     };
     use std::{
         fs,
@@ -3424,6 +3700,143 @@ mod tests {
             SampleRate::new(48_000).unwrap()
         );
         assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_samples_close(actual.as_planar_f32(), &[0.25, -0.5]);
+    }
+
+    #[test]
+    fn guard_audio_level_attenuates_only_when_peak_exceeds_full_scale() {
+        let source = audio_buffer(vec![0.5, 2.0, -1.0]);
+
+        let actual = guard_audio_level(&source).unwrap();
+
+        assert_samples_close(actual.as_planar_f32(), &[0.25, 1.0, -0.5]);
+    }
+
+    #[test]
+    fn guard_audio_level_preserves_full_scale_or_quieter_audio() {
+        let source = audio_buffer(vec![0.5, 1.0, -0.25]);
+
+        let actual = guard_audio_level(&source).unwrap();
+
+        assert_eq!(actual, source);
+    }
+
+    #[test]
+    fn normalize_audio_level_scales_non_silent_audio_to_target_peak() {
+        let source = audio_buffer(vec![0.25, -0.5, 0.0]);
+
+        let actual = normalize_audio_level(&source, Decibels::new(0.0).unwrap()).unwrap();
+
+        assert_samples_close(actual.as_planar_f32(), &[0.5, -1.0, 0.0]);
+    }
+
+    #[test]
+    fn normalize_audio_level_preserves_silence() {
+        let source = audio_buffer(vec![0.0, -0.0]);
+
+        let actual = normalize_audio_level(&source, Decibels::new(0.0).unwrap()).unwrap();
+
+        assert_sample_bits_eq(actual.as_planar_f32(), source.as_planar_f32());
+    }
+
+    #[test]
+    fn output_level_policy_rejects_non_finite_samples_before_encoding() {
+        let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25, f32::NAN]))
+            .into_pipeline()
+            .with_output_guard()
+            .write_wav(temp_path("auralis-output-level-non-finite", "wav"))
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            Error::OutputLevel(OutputLevelError::NonFiniteSample {
+                channel_index: 0,
+                frame_index: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn output_level_policy_normalize_rejects_overflowing_target() {
+        let error = normalize_audio_level(
+            &audio_buffer(vec![0.25, -0.5]),
+            Decibels::new(f64::MAX).unwrap(),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            OutputLevelError::TargetLevelOverflow {
+                target: Decibels::new(f64::MAX).unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn output_level_policy_matches_under_forced_scalar_and_requested_simd() {
+        let source = audio_buffer(vec![-2.0, -1.0, -0.5, -0.0, 0.0, 0.25, 0.999_984_74, 2.0]);
+
+        let scalar = guard_audio_level_with_backend(&source, BackendKind::Scalar).unwrap();
+        let simd = guard_audio_level_with_backend(&source, BackendKind::Simd).unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+
+        let scalar = normalize_audio_level_with_backend(
+            &source,
+            Decibels::new(-6.0).unwrap(),
+            BackendKind::Scalar,
+        )
+        .unwrap();
+        let simd = normalize_audio_level_with_backend(
+            &source,
+            Decibels::new(-6.0).unwrap(),
+            BackendKind::Simd,
+        )
+        .unwrap();
+
+        assert_sample_bits_eq(simd.as_planar_f32(), scalar.as_planar_f32());
+    }
+
+    #[test]
+    fn pipeline_write_wav_applies_explicit_output_guard_policy() {
+        let output = temp_path("auralis-output-guard-policy", "wav");
+        let source = audio_buffer(vec![2.0, -1.0]);
+
+        AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_output_guard()
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(&output).unwrap();
+        assert_samples_close(decoded.as_planar_f32(), &[1.0, -0.5]);
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn pipeline_write_wav_applies_explicit_output_normalization_policy() {
+        let output = temp_path("auralis-output-normalize-policy", "wav");
+        let source = audio_buffer(vec![0.25, -0.5]);
+
+        AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .with_output_normalization(Decibels::new(0.0).unwrap())
+            .write_wav(&output)
+            .unwrap();
+
+        let decoded = auralis_wav::decode_pcm16_path(&output).unwrap();
+        assert_samples_close(decoded.as_planar_f32(), &[0.5, -1.0]);
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn pipeline_into_audio_buffer_does_not_apply_output_level_policy() {
+        let actual = AudioFile::from_audio_buffer(audio_buffer(vec![0.25, -0.5]))
+            .into_pipeline()
+            .with_output_normalization(Decibels::new(0.0).unwrap())
+            .into_audio_buffer()
+            .unwrap();
+
         assert_samples_close(actual.as_planar_f32(), &[0.25, -0.5]);
     }
 

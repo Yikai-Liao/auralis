@@ -1,0 +1,28 @@
+# Explicit output level-policy golden cases. These cover Auralis' `--guard`
+# and `--norm` output-boundary behavior against SoX-ng level-normalization
+# references for cases where the current non-clipping Auralis pipeline can
+# exceed PCM16 full scale before writing.
+
+[id.auto_guard_gain_clipping]
+input = "auto/level_headroom.wav"
+auralis = ["--guard", "--gain-db", "6"]
+sox_ng = ["norm"]
+max_abs = 0.0001
+rms = 0.000001
+snr_db = 90.0
+
+[id.auto_norm_default]
+input = "auto/level_headroom.wav"
+auralis = ["--norm"]
+sox_ng = ["norm"]
+max_abs = 0.0001
+rms = 0.000001
+snr_db = 90.0
+
+[id.auto_norm_minus_6]
+input = "auto/level_headroom.wav"
+auralis = ["--norm=-6"]
+sox_ng = ["norm", "-6"]
+max_abs = 0.0001
+rms = 0.000001
+snr_db = 90.0

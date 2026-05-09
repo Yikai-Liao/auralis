@@ -61,6 +61,14 @@ enum Command {
         #[arg(long)]
         no_auto_rate: bool,
 
+        /// Attenuate final output only if it would clip.
+        #[arg(short = 'G', long)]
+        guard: bool,
+
+        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
+        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
+        norm: Option<f64>,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -138,6 +146,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             no_auto_channels,
             output_sample_rate,
             no_auto_rate,
+            guard,
+            norm,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -160,6 +170,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 no_auto_channels,
                 output_sample_rate,
                 no_auto_rate,
+                guard: OutputGuard::from(guard),
+                norm,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -206,11 +218,13 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     let backend = options.backend;
     let channel_conversion_policy = options.channel_conversion_policy()?;
     let sample_rate_conversion_policy = options.sample_rate_conversion_policy()?;
+    let output_level_policy = options.output_level_policy()?;
     let effect_chain = options.effect_chain()?;
     let pipeline = open_pipeline(input, options)?
         .with_backend(backend)
         .with_sample_rate_conversion_policy(sample_rate_conversion_policy)
-        .with_channel_conversion_policy(channel_conversion_policy);
+        .with_channel_conversion_policy(channel_conversion_policy)
+        .with_output_level_policy(output_level_policy);
 
     if let Some(effect_chain) = effect_chain {
         pipeline
@@ -267,6 +281,8 @@ struct RunOptions {
     no_auto_channels: bool,
     output_sample_rate: Option<auralis::SampleRate>,
     no_auto_rate: bool,
+    guard: OutputGuard,
+    norm: Option<f64>,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -350,6 +366,18 @@ impl RunOptions {
                 Ok(auralis::SampleRateConversionPolicy::require(sample_rate))
             }
             (None, true) => Err(CliError::NoAutoRateWithoutOutputRate),
+        }
+    }
+
+    fn output_level_policy(&self) -> Result<auralis::OutputLevelPolicy, CliError> {
+        match (self.guard, self.norm) {
+            (OutputGuard::Disabled, None) => Ok(auralis::OutputLevelPolicy::Preserve),
+            (OutputGuard::Enabled, None) => Ok(auralis::OutputLevelPolicy::guard()),
+            (OutputGuard::Disabled, Some(target)) => auralis::Decibels::new(target)
+                .map(auralis::OutputLevelPolicy::normalize)
+                .map_err(auralis::Error::from)
+                .map_err(CliError::from),
+            (OutputGuard::Enabled, Some(_)) => Err(CliError::MixedGuardAndNorm),
         }
     }
 
@@ -437,6 +465,18 @@ enum TrimMode {
     Seconds { start: f64, end: f64 },
 }
 
+#[derive(Debug, Clone, Copy)]
+enum OutputGuard {
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for OutputGuard {
+    fn from(value: bool) -> Self {
+        if value { Self::Enabled } else { Self::Disabled }
+    }
+}
+
 fn ensure_wav_extension(path: &Path, role: PathRole) -> Result<(), CliError> {
     if path.extension().and_then(OsStr::to_str) == Some("wav") {
         Ok(())
@@ -498,6 +538,7 @@ enum CliError {
     MixedEffectSyntax,
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
+    MixedGuardAndNorm,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
     UnsupportedFormat { path: PathBuf, role: PathRole },
@@ -546,6 +587,9 @@ impl std::fmt::Display for CliError {
                 .write_str("effects files cannot be combined with positional effect chain tokens"),
             Self::MixedEffectsFileAndLegacyEffectFlags => {
                 formatter.write_str("effects files cannot be combined with legacy effect flags")
+            }
+            Self::MixedGuardAndNorm => {
+                formatter.write_str("--guard cannot be combined with --norm")
             }
             Self::NoAutoChannelsWithoutOutputChannels => {
                 formatter.write_str("--no-auto-channels requires --channels")

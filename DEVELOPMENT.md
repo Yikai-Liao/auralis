@@ -1295,6 +1295,8 @@ Acceptance tests:
 
 #### Feature 5.5.3: guard and norm pipeline behavior
 
+Status: implemented.
+
 Acceptance tests:
 
 - guard behavior is explicit in library APIs.

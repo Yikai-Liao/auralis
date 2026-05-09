@@ -1571,6 +1571,89 @@ fn run_single_sided_pad_defaults_other_side_to_zero() {
 }
 
 #[test]
+fn run_guard_attenuates_output_that_would_clip() {
+    let input = temp_path("auralis-cli-run-guard-input", "wav");
+    let output = temp_path("auralis-cli-run-guard-output", "wav");
+    write_pcm16_wav(&input, 1, &[24_576, 8_192]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--guard",
+            "--gain-db",
+            "6",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![32_767, 10_923]));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_norm_without_value_normalizes_output_to_full_scale() {
+    let input = temp_path("auralis-cli-run-norm-input", "wav");
+    let output = temp_path("auralis-cli-run-norm-output", "wav");
+    write_pcm16_wav(&input, 1, &[8_192, -16_384]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--norm",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![16_384, -32_768]));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_rejects_mixed_guard_and_norm() {
+    let input = temp_path("auralis-cli-run-mixed-guard-norm-input", "wav");
+    let output = temp_path("auralis-cli-run-mixed-guard-norm-output", "wav");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--guard",
+            "--norm",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --guard cannot be combined with --norm"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_reverse_output_matches_library_pipeline() {
     let input = temp_path("auralis-cli-run-reverse-input", "wav");
     let cli_output = temp_path("auralis-cli-run-reverse-cli-output", "wav");
@@ -2313,6 +2396,16 @@ fn run_help_documents_gain_and_trim_units() {
     assert!(stdout.contains("--no-auto-rate"), "{stdout}");
     assert!(
         stdout.contains("Fail instead of automatically converting sample rate"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--guard"), "{stdout}");
+    assert!(
+        stdout.contains("Attenuate final output only if it would clip"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--norm [<DB>]"), "{stdout}");
+    assert!(
+        stdout.contains("Normalize final output to a peak level"),
         "{stdout}"
     );
     assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");

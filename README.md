@@ -84,7 +84,14 @@ uses the same explicit output-boundary policy for sample rate: the CLI
 preserves the pipeline rate by default, applies Auralis' deterministic scalar
 linear resampler only when requested, and `--no-auto-rate` turns the request
 into a strict sample-rate check. The fuller user-visible `rate` effect and
-quality modes remain future DEVELOPMENT.md work. The SIMD crate defines the
+quality modes remain future DEVELOPMENT.md work. `auralis run --guard` applies
+an explicit final output-level policy that attenuates only when the processed
+buffer would exceed full scale before PCM16 encoding, while `--norm[=DB]`
+normalizes non-silent output to a requested peak level, defaulting to 0 dBFS.
+The high-level library exposes the same behavior through `OutputLevelPolicy`,
+`Pipeline::with_output_guard`, and `Pipeline::with_output_normalization`;
+`Pipeline::into_audio_buffer` remains free of output-boundary level changes.
+The SIMD crate defines the
 Auralis-owned backend trait skeleton with a scalar reference backend,
 deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
 sample conversion in both directions, and backend-dispatched linear
@@ -623,6 +630,17 @@ exposed in the CLI as `--rate N --no-auto-rate`, to fail if conversion would
 have been inserted. SIMD is currently not used for this boundary resampler; the
 later `rate` effect features own the broader quality and optimization work.
 
+Output level control is explicit as well. The high-level library defaults to
+preserving sample levels, so PCM16 writing performs the same documented clipping
+as before. Callers can use `Pipeline::with_output_guard` or
+`Pipeline::with_output_level_policy(OutputLevelPolicy::Guard)` to attenuate the
+final buffer only when its absolute peak exceeds full scale. They can use
+`Pipeline::with_output_normalization` or
+`OutputLevelPolicy::Normalize(Decibels)` to scale non-silent output to a target
+peak before writing. The CLI exposes these policies as `--guard` and
+`--norm[=DB]`; `--norm` defaults to 0 dBFS, and `--guard` cannot be combined
+with `--norm`.
+
 Selected crates:
 
 - `clap` for the parser.
@@ -639,6 +657,7 @@ Contains test utilities shared by Rust tests and Python tests:
 - metric calculation for max absolute error, RMS error, SNR, peak, and DC offset
 - golden test manifest handling, including output-channel and output-rate
   metadata for cases where SoX-ng auto-inserts `channels` or `rate` conversion
+  plus output-level guard and normalization comparison manifests
 - scalar-vs-SIMD backend conformance helpers
 - SoX-ng command wrapper
 - tolerance definitions
@@ -680,7 +699,9 @@ lengths and stereo combine-before-reverse chains.
 `tests/golden/auto_channels.toml` records output-channel policy coverage where
 SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
 records output-rate policy coverage where SoX-ng auto-inserts `rate`
-conversion. The Python golden runners
+conversion. `tests/golden/auto_level.toml` records output-level guard and
+normalization coverage for representative clipping and peak-normalization
+cases. The Python golden runners
 generate the deterministic PCM16 fixtures, execute both command lines, compare decoded
 sample metadata plus max-abs/RMS/SNR/peak metrics, and write a JSON failure
 report when output drifts outside its manifest tolerance.
