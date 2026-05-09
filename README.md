@@ -50,11 +50,14 @@ shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden
 tests. The Rust testkit also parses TOML golden manifests, renders stable
 Auralis and SoX-ng command vectors for reproducible comparison reports, and
 provides backend conformance helpers for exact and tolerance-based
-scalar-vs-SIMD differential tests. The SIMD crate defines the Auralis-owned
-backend trait skeleton with a scalar reference backend, deterministic `scalar` /
-`simd` backend selection, scalar/SIMD PCM16/`f32` sample conversion in both
-directions, and backend-dispatched linear `gain_f32`, `dc_shift_f32`, and
-`fade_f32` kernels.
+scalar-vs-SIMD differential tests. The effects crate also parses
+SoX-ng-inspired effects files into typed `EffectChain` values with blank-line,
+comment, quote, escape, and line/column diagnostic handling; CLI wiring for
+effects files is intentionally left for the next feature. The SIMD crate defines
+the Auralis-owned backend trait skeleton with a scalar reference backend,
+deterministic `scalar` / `simd` backend selection, scalar/SIMD PCM16/`f32`
+sample conversion in both directions, and backend-dispatched linear
+`gain_f32`, `dc_shift_f32`, and `fade_f32` kernels.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
@@ -381,6 +384,25 @@ tokens, failed argument family, and typed source error. Flat token streams can
 also be parsed into an `EffectChain`, which is how `auralis run <input>
 <output> gain -3 reverse` shares the same ordering and diagnostics as the
 library API.
+
+Effects files use the same token and command model as positional chains while
+remaining a library-level parser until CLI integration lands. A `#` outside
+quotes starts a comment, blank lines are ignored, single and double quotes group
+whitespace into one token, and a backslash escapes the next character outside
+single quotes. Each non-comment line may contain one or more commands:
+
+```text
+# level and editing chain
+gain -3
+dcshift 0.125 reverse
+fade l 24000 24000
+```
+
+Parsing this text with `parse_effects_file_str` or `parse_effects_file`
+produces the same typed `EffectChain` as the flat CLI-style token stream `gain
+-3 dcshift 0.125 reverse fade l 24000 24000`. Malformed quotes, dangling
+escapes, unknown effects, unsupported SoX-ng effects, and invalid command
+arguments report one-based line and column positions.
 
 ### `auralis-simd`
 

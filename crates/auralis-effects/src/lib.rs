@@ -33,6 +33,7 @@ use thiserror::Error;
 
 mod chain;
 mod command;
+mod effects_file;
 mod registry;
 
 pub use chain::{
@@ -40,6 +41,10 @@ pub use chain::{
     parse_effect_chain,
 };
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
+pub use effects_file::{
+    EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,
+    parse_effects_file, parse_effects_file_str,
+};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,

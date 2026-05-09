@@ -1124,6 +1124,8 @@ Acceptance tests:
 
 #### Feature 5.3.1: effects file parser
 
+Status: implemented.
+
 Implement a parser for SoX-ng-inspired effects files.
 
 Acceptance tests:

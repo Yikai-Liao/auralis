@@ -276,7 +276,7 @@ fn apply_command(
     }
 }
 
-fn command_end(kind: EffectKind, tokens: &[&str], command_start: usize) -> usize {
+pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usize) -> usize {
     let args_start = command_start + 1;
 
     match kind {
