@@ -44,11 +44,12 @@ use crate::command_gain::{parse_gain, render_gain};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_softvol::{parse_softvol, render_softvol};
+use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     Contrast, DcShift, EffectError, EffectKind, EffectNameError, EffectRegistry, Fade, Gain, Norm,
-    Pad, Reverse, SoftVol, Trim, Vol,
+    Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -88,6 +89,9 @@ pub enum EffectCommand {
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
 
+    /// SoX-ng-style sinusoidal tremolo modulation.
+    Tremolo(Tremolo),
+
     /// End-exclusive frame range selection.
     Trim(Trim),
 
@@ -117,6 +121,7 @@ impl EffectCommand {
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
+            EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
             EffectKind::Vol => parse_vol(effect, args),
         }
@@ -134,6 +139,7 @@ impl EffectCommand {
             Self::Pad(_) => EffectKind::Pad,
             Self::Reverse(_) => EffectKind::Reverse,
             Self::SoftVol(_) => EffectKind::SoftVol,
+            Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
             Self::Vol(_) => EffectKind::Vol,
         }
@@ -163,6 +169,7 @@ impl EffectCommand {
             Self::Pad(pad) => render_pad(pad),
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::SoftVol(softvol) => render_softvol(*softvol),
+            Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),
             Self::Vol(vol) => render_vol(*vol),
         }
@@ -470,7 +477,7 @@ mod tests {
     use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
     use crate::{
         Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad, PositionedPad,
-        Reverse, SoftVol, Trim, TrimPosition,
+        Reverse, SoftVol, Tremolo, Trim, TrimPosition,
     };
     use auralis_core::{Decibels, FrameCount};
 
@@ -512,6 +519,10 @@ mod tests {
             (
                 &["softvol", "2", "10", "0.1"][..],
                 EffectCommand::SoftVol(SoftVol::new(2.0, 10.0, 0.1).unwrap()),
+            ),
+            (
+                &["tremolo", "5", "75"][..],
+                EffectCommand::Tremolo(Tremolo::new(5.0, 75.0).unwrap()),
             ),
             (
                 &["fade", "t", "4", "2"][..],

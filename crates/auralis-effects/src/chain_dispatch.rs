@@ -56,6 +56,10 @@ pub(crate) fn apply_command(
             softvol.process_buffer(audio);
             Ok(())
         }
+        EffectCommand::Tremolo(tremolo) => {
+            tremolo.process_buffer(audio);
+            Ok(())
+        }
         EffectCommand::Trim(trim) => {
             let trimmed = trim
                 .process_buffer(audio)
@@ -77,7 +81,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
-        EffectKind::DcShift => optional_arg_end(tokens, args_start, 2),
+        EffectKind::DcShift | EffectKind::Tremolo => optional_arg_end(tokens, args_start, 2),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Reverse => no_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),

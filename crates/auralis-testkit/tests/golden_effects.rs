@@ -43,6 +43,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_reverse_stereo",
             "effect_softvol_mono_gain_1_5",
             "effect_softvol_stereo_recovery_headroom",
+            "effect_tremolo_mono_default_depth",
+            "effect_tremolo_stereo_depth_75",
             "effect_trim_mono_middle",
             "effect_trim_mono_multiple_ranges",
             "effect_trim_stereo_absolute_resume",
@@ -61,6 +63,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
 
     for effect in [
         "gain", "dcshift", "trim", "pad", "reverse", "fade", "vol", "norm", "contrast", "softvol",
+        "tremolo",
     ] {
         let mono = manifest
             .iter()

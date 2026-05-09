@@ -3,7 +3,7 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Vol};
+use auralis_effects::{Contrast, DcShift, EffectChain, EffectCommand, Fade, Gain, Tremolo, Vol};
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
 #[test]
@@ -83,6 +83,23 @@ fn contrast_matches_whole_buffer_for_l5_chunk_matrix() {
 }
 
 #[test]
+fn tremolo_matches_whole_buffer_for_l5_chunk_matrix() {
+    let tremolo = Tremolo::new(7.0, 75.0).expect("fixture tremolo settings are valid");
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        tremolo.process_buffer(&mut whole);
+        process_tremolo_by_channel_chunks(&mut chunked, tremolo, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -105,6 +122,9 @@ fn streaming_safe_chain_matches_whole_buffer_for_l5_chunk_matrix() {
         EffectCommand::Gain(Gain::new(Decibels::new(-6.0).expect("fixture dB is valid"))),
         EffectCommand::DcShift(DcShift::new(0.125).expect("fixture shift is valid")),
         EffectCommand::Fade(Fade::new(FrameCount::new(257), FrameCount::new(383))),
+        EffectCommand::Tremolo(
+            Tremolo::new(7.0, 75.0).expect("fixture tremolo settings are valid"),
+        ),
     ]);
     let source = stereo_source(1_105);
     let schedules = l5_chunk_schedules(frames_len(&source));
@@ -152,6 +172,9 @@ fn process_streaming_safe_chain_by_chunks(
                     contrast.process_samples(chunk);
                 });
             }
+            EffectCommand::Tremolo(tremolo) => {
+                process_tremolo_by_channel_chunks(audio, *tremolo, schedule);
+            }
             EffectCommand::Norm(_)
             | EffectCommand::Pad(_)
             | EffectCommand::Reverse(_)
@@ -174,6 +197,26 @@ fn process_fade_by_channel_chunks(audio: &mut AudioBuffer, fade: Fade, schedule:
             fade.process_channel_segment(
                 chunk,
                 total_frames,
+                FrameCount::new(u64::try_from(start_frame).expect("fixture offset fits u64")),
+            );
+        });
+    }
+}
+
+fn process_tremolo_by_channel_chunks(
+    audio: &mut AudioBuffer,
+    tremolo: Tremolo,
+    schedule: &ChunkSchedule,
+) {
+    let sample_rate = audio.spec().sample_rate();
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel_mut(channel_index)
+            .expect("channel index is within the audio shape");
+        process_chunks_mut(channel, schedule, |chunk, start_frame| {
+            tremolo.process_mono_samples(
+                chunk,
+                sample_rate,
                 FrameCount::new(u64::try_from(start_frame).expect("fixture offset fits u64")),
             );
         });

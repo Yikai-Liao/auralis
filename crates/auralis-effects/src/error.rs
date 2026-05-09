@@ -67,6 +67,12 @@ pub enum EffectError {
     #[error("softvol volume, double-time, and headroom must be finite and non-negative")]
     InvalidSoftVol,
 
+    /// A `tremolo` value was not finite or outside SoX-ng's supported range.
+    #[error(
+        "tremolo speed must be finite and non-negative, and depth must be finite and in the range 0<depth<=100"
+    )]
+    InvalidTremolo,
+
     /// A SoX-ng positional fade requested overlapping fade-in and fade-out regions.
     #[error("fade-out overlaps fade-in")]
     FadeRegionsOverlap,

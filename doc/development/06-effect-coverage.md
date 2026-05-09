@@ -267,7 +267,24 @@ Implementation notes:
 
 ### Feature 6.2.5: `tremolo`
 
+Status: implemented.
+
 Implement deterministic tremolo modulation.
+
+Implementation notes:
+
+- Added a typed `Tremolo` effect matching SoX-ng's `tremolo speed [depth]`
+  command shape, with speed in hertz and depth in `(0, 100]`, defaulting to
+  `40`.
+- Processing follows SoX-ng's `synth sine fmod` mapping: the envelope starts at
+  full volume and ranges from `1 - depth / 100` to `1`, with the frame phase
+  derived from the input sample rate.
+- The effect command parser accepts required speed plus optional depth, renders
+  explicit defaults, and rejects negative, zero-depth, over-100, or non-finite
+  values with a typed error.
+- Golden coverage includes standalone mono default-depth and stereo
+  explicit-depth cases against SoX-ng, with L4 finite-output coverage, L5
+  frame-offset chunk coverage, and an L7 fuzz seed for tremolo command parsing.
 
 ### Feature 6.2.6: `overdrive`
 

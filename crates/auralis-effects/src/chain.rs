@@ -768,6 +768,7 @@ mod tests {
                 | EffectCommand::Pad(_)
                 | EffectCommand::Reverse(_)
                 | EffectCommand::SoftVol(_)
+                | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_) => {
                     panic!("test helper only supports streaming-safe commands")
                 }

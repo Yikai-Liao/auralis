@@ -3,7 +3,9 @@
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
-use auralis_effects::{Contrast, DcShift, Fade, Gain, Norm, Pad, Reverse, SoftVol, Trim, Vol};
+use auralis_effects::{
+    Contrast, DcShift, Fade, Gain, Norm, Pad, Reverse, SoftVol, Tremolo, Trim, Vol,
+};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 
@@ -117,6 +119,12 @@ proptest! {
             source.as_planar_f32(),
         )?;
 
+        let mut unmodulated = source.clone();
+        Tremolo::new(0.0, 40.0)
+            .expect("zero-speed tremolo is valid")
+            .process_buffer(&mut unmodulated);
+        prop_assert_sample_bits_eq(unmodulated.as_planar_f32(), source.as_planar_f32())?;
+
         let mut normalized_silence = zero_audio_like(&source);
         Norm::zero_db().expect("zero dB is valid")
             .process_buffer(&mut normalized_silence)
@@ -219,6 +227,12 @@ proptest! {
             .expect("generated softvol settings are valid")
             .process_buffer(&mut soft_volume_scaled);
         prop_assert_all_finite(&soft_volume_scaled)?;
+
+        let mut tremolo_modulated = source.clone();
+        Tremolo::new(5.0, 75.0)
+            .expect("generated tremolo settings are valid")
+            .process_buffer(&mut tremolo_modulated);
+        prop_assert_all_finite(&tremolo_modulated)?;
 
         let mut faded = source.clone();
         let fade_in = FrameCount::new(u64::try_from(audio.frames / 2).expect("frame strategy fits u64"));

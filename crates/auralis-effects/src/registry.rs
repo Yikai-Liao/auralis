@@ -48,6 +48,9 @@ pub enum EffectKind {
     /// SoX-ng-style soft volume control.
     SoftVol,
 
+    /// SoX-ng-style sinusoidal tremolo modulation.
+    Tremolo,
+
     /// End-exclusive frame range selection.
     Trim,
 
@@ -200,6 +203,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "SoftVol",
         "softvol [volume [double-time [headroom]]]",
         "apply soft volume scaling that avoids clipping",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Tremolo,
+        "tremolo",
+        &[],
+        "Tremolo",
+        "tremolo speed [depth]",
+        "apply sinusoidal low-frequency amplitude modulation",
     ),
     EffectDescriptor::new(
         EffectKind::Trim,
@@ -544,6 +555,7 @@ mod tests {
             ("pad", EffectKind::Pad),
             ("reverse", EffectKind::Reverse),
             ("softvol", EffectKind::SoftVol),
+            ("tremolo", EffectKind::Tremolo),
             ("trim", EffectKind::Trim),
             ("vol", EffectKind::Vol),
         ];

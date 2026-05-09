@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, and `fade` DSP kernels, the typed `Gain`, `Norm`,
-`Contrast`, `SoftVol`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`, and `Vol` effect
-processors, the high-level library chain API for applying gain, norm, contrast,
-softvol, dcshift, trim, pad, reverse, fade, and vol, and the CLI
-gain/norm/contrast/softvol/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
+`Contrast`, `SoftVol`, `Tremolo`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+and `Vol` effect processors, the high-level library chain API for applying
+gain, norm, contrast, softvol, tremolo, dcshift, trim, pad, reverse, fade, and
+vol, and the CLI gain/norm/contrast/softvol/tremolo/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -48,9 +48,10 @@ records reclaimable headroom, and a later `gain -r` restores as much as
 possible without clipping. The chain path also supports SoX-ng-style `vol`
 amplitude, power, dB, and limiter-gain forms, effect-level `norm [level]` as a
 positioned normalization command distinct from final output `--norm`, and
-SoX-ng-style `contrast [amount]` phase contrast enhancement, plus `softvol`
-clipping-avoidant volume control with optional recovery and headroom.
-`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+SoX-ng-style `contrast [amount]` phase contrast enhancement, `softvol`
+clipping-avoidant volume control with optional recovery and headroom, and
+`tremolo speed [depth]` sinusoidal amplitude modulation.
+`auralis run <input.wav> <output.wav> gain -3 norm -6 contrast softvol 2 tremolo 5 dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -450,16 +451,17 @@ Contains typed effect processors built from DSP primitives:
 - `Reverse`
 - `Fade`
 - `Vol`
+- `Tremolo`
 - later: `Remix`
 - later: `Lowpass`, `Highpass`, `Biquad`, `Rate`, `Compand`, `Delay`, `Reverb`, `Silence`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `norm`, `contrast`, `softvol`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `norm`, `contrast`, `softvol`, `tremolo`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, `contrast`, and `softvol` resolve to typed descriptors; aliases such
+`trim`, `pad`, `reverse`, `fade`, `vol`, `norm`, `contrast`, `softvol`, and `tremolo` resolve to typed descriptors; aliases such
 as `dc-shift`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -485,6 +487,8 @@ accepts an optional amount in SoX-ng's `0..=100` range and defaults to `75`.
 The implemented `softvol` command accepts `volume`, `double-time`, and
 `headroom` arguments, lowers its current multiplier before any frame that would
 clip, and optionally recovers upward according to the input sample rate.
+The implemented `tremolo` command accepts a required speed in hertz and an
+optional depth percentage, defaulting to SoX-ng's `40`.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -774,7 +778,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, and `softvol`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, and `tremolo`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -784,7 +788,8 @@ linear fade-out-at-end and explicit stop-position fade-out cases. `vol` coverage
 includes amplitude, dB, power, and limiter-gain forms; `norm` coverage includes
 default and target-level normalization; `contrast` coverage includes default
 and explicit-amount forms; `softvol` coverage includes fixed volume plus
-recovery/headroom forms.
+recovery/headroom forms; `tremolo` coverage includes default-depth mono and
+explicit-depth stereo modulation forms.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.
@@ -1005,6 +1010,7 @@ Examples:
 - `contrast`: SoX-ng phase contrast enhancement with an optional amount
 - `softvol`: per-frame soft volume control that lowers the current multiplier
   before clipping and can recover upward over a configured doubling time
+- `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `dcshift`: add a constant normalized full-scale offset; the effect itself
   does not clip unless SoX-ng's optional limiter gain is configured, while
   PCM16 WAV output clips plain shifted samples to the representable range
@@ -1039,6 +1045,7 @@ Examples:
 - `contrast` preserves finite bounded input as finite output
 - `softvol` default settings preserve bounded input and configured recovery
   stays finite
+- `tremolo 0` is identity and finite bounded input stays finite
 - `gain +6 dB` followed by `gain -6 dB` approximately returns the original signal within tolerance
 
 ### L5: chunk invariance
@@ -1054,9 +1061,9 @@ Required chunk sizes:
 The Rust helper `auralis_testkit::chunk_invariance` is the shared source for
 that matrix. It injects empty chunks and a final empty call for flush-path
 coverage, and it reports the deterministic random seed in schedule labels.
-Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, `Vol`, and
-streaming-safe `EffectChain` execution. `Norm` is documented as a whole-buffer
-scan and is not chunk-invariant.
+Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, `Vol`, `Tremolo`,
+and streaming-safe `EffectChain` execution. `Norm` is documented as a
+whole-buffer scan and is not chunk-invariant.
 
 ### L6: scalar vs SIMD differential tests
 

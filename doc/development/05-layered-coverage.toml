@@ -142,6 +142,21 @@ l6 = { status = "not_applicable", reason = "Trim is a structural slice and curre
 l7 = { status = "covered", reason = "Effect command fuzzing covers trim argument parsing through the shared command parser and a multi-position seed.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/trim_multi"] }
 
 [[subject]]
+id = "effect.tremolo"
+kind = "effect"
+name = "tremolo"
+summary = "SoX-ng-style sinusoidal low-frequency amplitude modulation."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono default-depth and stereo explicit-depth SoX-ng golden cases cover the implemented tremolo command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests check SoX-ng's sine fmod envelope, default depth, parser syntax, stereo phase sharing, and validation.", tests = ["crates/auralis-effects/src/tremolo.rs", "crates/auralis-effects/src/command_tremolo.rs", "crates/auralis-effects/tests/tremolo.rs"] }
+l4 = { status = "covered", reason = "Property tests include zero-speed identity and finite-output coverage for tremolo.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "The shared chunk-invariance matrix covers frame-offset-aware tremolo processing.", tests = ["crates/auralis-effects/tests/chunk_invariance.rs"] }
+l6 = { status = "not_applicable", reason = "Tremolo is a scalar phase-dependent cosine transform and currently has no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers tremolo argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/tremolo"] }
+
+[[subject]]
 id = "effect.vol"
 kind = "effect"
 name = "vol"

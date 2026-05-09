@@ -33,6 +33,7 @@ mod command_gain;
 mod command_norm;
 mod command_pad;
 mod command_softvol;
+mod command_tremolo;
 mod command_trim;
 mod command_vol;
 mod contrast;
@@ -48,6 +49,7 @@ mod reverse;
 mod softvol;
 #[cfg(test)]
 mod test_support;
+mod tremolo;
 mod trim;
 mod vol;
 
@@ -73,5 +75,6 @@ pub use registry::{
 };
 pub use reverse::Reverse;
 pub use softvol::SoftVol;
+pub use tremolo::Tremolo;
 pub use trim::{Trim, TrimPosition};
 pub use vol::{Vol, VolGainType};
