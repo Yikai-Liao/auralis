@@ -629,6 +629,8 @@ Acceptance tests:
 
 ### Feature 2.8: `dcshift`
 
+Status: implemented.
+
 Implement constant DC offset.
 
 Acceptance tests:

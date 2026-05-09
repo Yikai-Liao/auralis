@@ -190,6 +190,47 @@ fn run_gain_output_matches_library_pipeline() {
 }
 
 #[test]
+fn run_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
+    let input = temp_path("auralis-cli-run-dc-shift-input", "wav");
+    let cli_output = temp_path("auralis-cli-run-dc-shift-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-run-dc-shift-library-output", "wav");
+    write_pcm16_wav(&input, 2, &[-32768, 0, 8192, 30_000]);
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .dc_shift(0.25)
+        .write_wav(&library_output)
+        .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            cli_output.to_str().unwrap(),
+            "--dc-shift",
+            "0.25",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
+    assert_eq!(
+        read_pcm16_wav(&cli_output),
+        (2, vec![-24576, 8192, 16384, 32767])
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(cli_output).unwrap();
+    fs::remove_file(library_output).unwrap();
+}
+
+#[test]
 fn run_trim_frames_output_matches_library_pipeline() {
     let input = temp_path("auralis-cli-run-trim-frame-input", "wav");
     let cli_output = temp_path("auralis-cli-run-trim-frame-cli-output", "wav");
@@ -415,6 +456,33 @@ fn run_invalid_gain_argument_returns_clear_error() {
 }
 
 #[test]
+fn run_invalid_dc_shift_argument_returns_clear_error() {
+    let input = temp_path("auralis-cli-run-invalid-dc-shift-input", "wav");
+    let output = temp_path("auralis-cli-run-invalid-dc-shift-output", "wav");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--dc-shift",
+            "2.1",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: dc shift must be finite and in the range -2.0..=2.0"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_invalid_trim_range_returns_clear_error() {
     let input = temp_path("auralis-cli-run-invalid-trim-input", "wav");
     let output = temp_path("auralis-cli-run-invalid-trim-output", "wav");
@@ -482,6 +550,11 @@ fn run_help_documents_gain_and_trim_units() {
     assert!(stdout.contains("--gain-db <DB>"), "{stdout}");
     assert!(
         stdout.contains("Constant gain to apply, in decibels"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");
+    assert!(
+        stdout.contains("Constant normalized DC offset to add"),
         "{stdout}"
     );
     assert!(stdout.contains("--trim-start-frame <FRAME>"), "{stdout}");

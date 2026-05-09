@@ -36,6 +36,10 @@ enum Command {
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
 
+        /// Constant normalized DC offset to add, in full-scale sample units.
+        #[arg(long, value_name = "SHIFT", allow_hyphen_values = true)]
+        dc_shift: Option<f32>,
+
         /// First frame to keep for an end-exclusive trim.
         #[arg(long, value_name = "FRAME")]
         trim_start_frame: Option<u64>,
@@ -83,6 +87,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             input,
             output,
             gain_db,
+            dc_shift,
             trim_start_frame,
             trim_end_frame,
             trim_start_seconds,
@@ -95,6 +100,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             RunOptions {
                 gain_db,
+                dc_shift,
                 trim_start_frame,
                 trim_end_frame,
                 trim_start_seconds,
@@ -134,6 +140,11 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
     } else {
         pipeline
     };
+    let pipeline = if let Some(dc_shift) = options.dc_shift {
+        pipeline.dc_shift(dc_shift)
+    } else {
+        pipeline
+    };
     let pipeline = match trim {
         Some(TrimMode::Frames { start, end }) => pipeline.trim_frames(start, end),
         Some(TrimMode::Seconds { start, end }) => pipeline.trim_seconds(start, end),
@@ -159,6 +170,7 @@ fn run_pipeline(input: &Path, output: &Path, options: RunOptions) -> Result<(), 
 #[derive(Debug, Clone, Copy)]
 struct RunOptions {
     gain_db: Option<f64>,
+    dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
     trim_end_frame: Option<u64>,
     trim_start_seconds: Option<f64>,

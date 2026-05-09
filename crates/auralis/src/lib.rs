@@ -13,6 +13,7 @@
 //! AudioFile::open_wav("input.wav")?
 //!     .into_pipeline()
 //!     .gain_db(-3.0)
+//!     .dc_shift(0.125)
 //!     .reverse()
 //!     .pad_frames(0, 48_000)
 //!     .write_wav("output.wav")?;
@@ -24,7 +25,7 @@ use std::path::Path;
 
 pub use auralis_core::{AudioBuffer, Decibels, FrameCount, TimeSeconds};
 
-use auralis_effects::{Gain, Pad, Reverse, Trim};
+use auralis_effects::{DcShift, Gain, Pad, Reverse, Trim};
 use thiserror::Error;
 
 /// Crate-local result type using [`Error`].
@@ -140,6 +141,28 @@ impl Pipeline {
 
         match Decibels::new(db) {
             Ok(db) => Gain::new(db).process_buffer(audio),
+            Err(error) => self.audio = Err(error.into()),
+        }
+
+        self
+    }
+
+    /// Applies a constant normalized DC offset.
+    ///
+    /// `shift` is measured in full-scale sample units, where `0.25` adds one
+    /// quarter of full scale and `0.0` is identity. The valid range is
+    /// `-2.0..=2.0`, matching SoX-ng's single-argument `dcshift` command.
+    /// Processing is deterministic, in-place, non-allocating, and does not
+    /// clip; samples outside `[-1.0, 1.0]` are clipped by boundary writers such
+    /// as PCM16 WAV encoding.
+    #[must_use]
+    pub fn dc_shift(mut self, shift: f32) -> Self {
+        let Ok(audio) = &mut self.audio else {
+            return self;
+        };
+
+        match DcShift::new(shift) {
+            Ok(dc_shift) => dc_shift.process_buffer(audio),
             Err(error) => self.audio = Err(error.into()),
         }
 
@@ -326,6 +349,20 @@ mod tests {
     }
 
     #[test]
+    fn chain_dc_shift_preserves_stereo_frame_grouping() {
+        let source = stereo_audio_buffer(vec![0.75, 1.0, -0.75, -1.0]);
+
+        let actual = AudioFile::from_audio_buffer(source)
+            .into_pipeline()
+            .dc_shift(0.5)
+            .into_audio_buffer()
+            .unwrap();
+
+        assert_eq!(actual.frames(), FrameCount::new(2));
+        assert_eq!(actual.as_planar_f32(), &[1.25, 1.5, -0.25, -0.5]);
+    }
+
+    #[test]
     fn chain_trim_frames_preserves_stereo_frame_grouping() {
         let source = stereo_audio_buffer(vec![0.0, 0.25, 0.5, 0.75, 1.0, -0.25, -0.5, -0.75]);
 
@@ -421,6 +458,20 @@ mod tests {
         assert_eq!(
             error,
             Error::Core(auralis_core::AuralisError::InvalidDecibels)
+        );
+    }
+
+    #[test]
+    fn invalid_dc_shift_propagates_without_panic() {
+        let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25]))
+            .into_pipeline()
+            .dc_shift(f32::NAN)
+            .into_audio_buffer()
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            Error::Effect(auralis_effects::EffectError::InvalidDcShift)
         );
     }
 

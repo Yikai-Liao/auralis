@@ -26,12 +26,13 @@ decoding into planar `f32` buffers and encoding back to PCM16 WAV are
 implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
 pipeline and can apply constant gain with `--gain-db <DB>`, an end-exclusive
-trim with frame or seconds ranges, zero padding with frame counts, or
-frame-level reversal with `--reverse`. The scalar `gain` DSP kernel, the typed
-`Gain`, `Trim`, `Pad`, and `Reverse` effect processors, the high-level library
-chain API for applying gain, trim, pad, and reverse, and the CLI
-gain/trim/pad/reverse transforms are implemented. Other effect transform CLI
-options are still intentionally unimplemented.
+trim with frame or seconds ranges, zero padding with frame counts, frame-level
+reversal with `--reverse`, or constant DC offset with `--dc-shift <SHIFT>`.
+The scalar `gain` and `dcshift` DSP kernels, the typed `Gain`, `DcShift`,
+`Trim`, `Pad`, and `Reverse` effect processors, the high-level library chain
+API for applying gain, dcshift, trim, pad, and reverse, and the CLI
+gain/dcshift/trim/pad/reverse transforms are implemented. Other effect
+transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
@@ -78,6 +79,7 @@ fn main() -> auralis::Result<()> {
     AudioFile::open_wav("input.wav")?
         .into_pipeline()
         .gain_db(-3.0)
+        .dc_shift(0.125)
         .trim_seconds(0.0..10.0)
         .fade_out_seconds(0.25)
         .write_wav("output.wav")?;
@@ -243,9 +245,11 @@ Provides the high-level library facade:
 - `AudioFile::open_wav`
 - `AudioFile::into_pipeline`
 - `Pipeline::gain_db`
+- `Pipeline::dc_shift`
 - `Pipeline::trim_frames`
 - `Pipeline::trim_seconds`
 - `Pipeline::pad_frames`
+- `Pipeline::reverse`
 - `Pipeline::write_wav`
 
 This crate wires together core buffers, WAV I/O, and typed effects while keeping
@@ -366,9 +370,11 @@ auralis --version
 auralis inspect input.wav
 auralis run input.wav output.wav
 auralis run input.wav output.wav --gain-db -3
+auralis run input.wav output.wav --dc-shift 0.125
 auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
 auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
 auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
+auralis run input.wav output.wav --reverse
 auralis run pipeline.toml
 auralis completions zsh
 ```
@@ -570,7 +576,8 @@ Where the effect has a mathematical model, test that model directly.
 Examples:
 
 - `gain`: multiply by `10^(db / 20)`
-- `dcshift`: add constant offset
+- `dcshift`: add a constant normalized full-scale offset; the effect itself
+  does not clip, while PCM16 WAV output clips to the representable range
 - `trim`: exact frame interval
 - `reverse`: exact frame order, including stereo frame grouping
 - `fade`: expected envelope shape
