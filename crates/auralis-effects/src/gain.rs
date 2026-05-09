@@ -12,10 +12,11 @@ use auralis_simd::{BackendKind, select_backend};
 /// Plain gain does not clip, normalize, allocate, or inspect channel
 /// boundaries, so processing a whole buffer and processing the same samples in
 /// chunks produce identical results. SoX-ng whole-buffer options are represented
-/// by [`GainHeadroom`], [`Self::normalize`], and [`Self::limiter`]; direct
-/// sample processing still applies only the configured fixed gain, while
+/// by [`GainHeadroom`], [`GainChannelMode`], [`Self::normalize`], and
+/// [`Self::limiter`]; direct sample processing still applies only the configured fixed gain, while
 /// [`crate::EffectChain`] uses those flags to implement command semantics such
-/// as `gain -n`, `gain -l`, `gain -h`, and `gain -r`.
+/// as `gain -n`, `gain -l`, `gain -h`, `gain -r`, `gain -e`, `gain -B`,
+/// and `gain -b`.
 ///
 /// # Examples
 ///
@@ -56,6 +57,9 @@ pub struct Gain {
     /// Whether command-chain execution should apply SoX-ng's simple limiter
     /// curve after the fixed-gain multiplier.
     pub limiter: bool,
+
+    /// SoX-ng channel-aware gain mode for command-chain execution.
+    pub channel_mode: GainChannelMode,
 }
 
 /// SoX-ng `gain` headroom/reclaim mode.
@@ -75,6 +79,26 @@ pub enum GainHeadroom {
     ReclaimAndReserve,
 }
 
+/// SoX-ng channel-aware `gain` scan mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum GainChannelMode {
+    /// Plain fixed gain with no per-channel scan.
+    None,
+
+    /// `gain -e`: scale each channel peak to the maximum channel peak.
+    Equalize,
+
+    /// `gain -B`: scale each channel RMS to the maximum channel RMS without
+    /// clip protection.
+    Balance,
+
+    /// `gain -b`: scale each channel RMS to the maximum channel RMS, then
+    /// attenuate all channels if needed to keep the balanced peak within full
+    /// scale.
+    BalanceNoClip,
+}
+
 impl Gain {
     /// Creates a gain processor from a validated decibel value.
     #[must_use]
@@ -84,6 +108,7 @@ impl Gain {
             headroom: GainHeadroom::None,
             normalize: false,
             limiter: false,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -95,6 +120,7 @@ impl Gain {
             headroom: GainHeadroom::None,
             normalize: true,
             limiter: false,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -106,6 +132,7 @@ impl Gain {
             headroom: GainHeadroom::None,
             normalize: false,
             limiter: true,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -117,6 +144,7 @@ impl Gain {
             headroom: GainHeadroom::Reserve,
             normalize: false,
             limiter: false,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -128,6 +156,7 @@ impl Gain {
             headroom: GainHeadroom::Reclaim,
             normalize: false,
             limiter: false,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -139,6 +168,7 @@ impl Gain {
             headroom: GainHeadroom::ReclaimAndReserve,
             normalize: false,
             limiter: false,
+            channel_mode: GainChannelMode::None,
         }
     }
 
@@ -163,6 +193,13 @@ impl Gain {
 
     pub(crate) const fn with_limiter_if(mut self, limiter: bool) -> Self {
         self.limiter = limiter;
+        self
+    }
+
+    /// Returns this processor with a channel-aware SoX-ng scan mode.
+    #[must_use]
+    pub const fn with_channel_mode(mut self, channel_mode: GainChannelMode) -> Self {
+        self.channel_mode = channel_mode;
         self
     }
 

@@ -40,12 +40,13 @@ unknown names or unsupported SoX-ng options return stable diagnostics. Parsed
 commands can be grouped into an in-memory `EffectChain` and executed in order
 with indexed command-context errors and forced scalar/SIMD backend selection.
 The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata,
-`gain -n` peak normalization, and `gain -l` limiting: `gain -h DB` applies the
-fixed attenuation and records reclaimable headroom, and a later `gain -r`
-restores as much as possible without clipping. `auralis run <input.wav>
-<output.wav> gain -3 dcshift 0.125 reverse` exposes the same typed chain model
-at the CLI, preserving positional user order while the earlier single-effect
-flags remain available for compatibility. The golden
+`gain -n` peak normalization, `gain -l` limiting, and channel-aware `gain -e`,
+`gain -B`, and `gain -b` scans: `gain -h DB` applies the fixed attenuation and
+records reclaimable headroom, and a later `gain -r` restores as much as
+possible without clipping. `auralis run <input.wav> <output.wav> gain -3
+dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+preserving positional user order while the earlier single-effect flags remain
+available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
 plus a `tests/golden/chains.toml` manifest for representative editing, level,
 gain headroom/reclaim, and fade/gain filter-style positional chains against
@@ -461,7 +462,9 @@ future SoX-ng options such as non-linear fade curves and dcshift limiter gain
 with effect- and option-specific diagnostics. The implemented `gain` command
 forms include plain fixed gain, `gain -h`, `gain -r`, combined
 `gain -rh`/`gain -hr` headroom reclaim, peak normalization with `gain -n`, and
-the simple limiter with `gain -l`.
+the simple limiter with `gain -l`, plus channel peak equalization with
+`gain -e`, RMS balancing with `gain -B`, and RMS balancing with clip protection
+through `gain -b`.
 Parsed `EffectCommand` values render back to canonical SoX-ng-style token
 vectors using stable effect names, explicit default arguments, and deterministic
 numeric formatting, so equivalent values such as `gain`, `gain 0`, and
@@ -750,7 +753,9 @@ lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`, and
 linear `fade`, including standalone `gain -h`, `gain -n`, and `gain -l` cases
-for headroom attenuation, peak normalization, and limiting.
+for headroom attenuation, peak normalization, and limiting, plus stereo
+`gain -e`, `gain -B`, and `gain -b` cases for channel equalization and
+balancing.
 Those standalone effect cases isolate effect behavior: output rate/channel
 conversion is absent, guard and norm are absent, and SoX-ng automatic dithering
 is disabled by the runner's `-D` flag.

@@ -1,3 +1,5 @@
 gain -3
 gain -n -3
 gain -l 6
+gain -e -3
+gain -Bn 6

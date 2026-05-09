@@ -767,16 +767,16 @@ mod tests {
 
     #[test]
     fn chain_token_parser_keeps_option_like_values_with_current_command() {
-        let error = parse_effect_chain(&["gain", "-e", "reverse"]).unwrap_err();
+        let error = parse_effect_chain(&["gain", "-q", "reverse"]).unwrap_err();
 
         assert_eq!(
             error,
             EffectChainParseError::CommandParseFailed {
                 index: 0,
-                command: "gain -e".to_owned(),
+                command: "gain -q".to_owned(),
                 source: crate::EffectCommandParseError::UnsupportedOption {
                     effect: "gain",
-                    option: "-e".to_owned(),
+                    option: "-q".to_owned(),
                 },
             }
         );

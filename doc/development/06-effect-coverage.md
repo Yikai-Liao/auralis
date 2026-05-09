@@ -58,8 +58,30 @@ Implementation notes:
 
 ### Feature 6.1.3: `gain` channel equalize and balance options
 
+Status: implemented.
+
 Implement channel-aware gain semantics and document differences from output
 channel policies.
+
+Implementation notes:
+
+- The effect command parser accepts `gain -e`, `gain -B`, and `gain -b`,
+  including combined forms such as `gain -Bn`.
+- `gain -e DB` scans each channel peak and scales quieter channels to the
+  largest channel peak before applying the fixed gain.
+- `gain -B DB` scans per-channel RMS and balances quieter channels to the
+  largest channel RMS without clip protection.
+- `gain -b DB` uses the same RMS balancing but attenuates all balanced channels
+  if needed to keep the pre-fixed-gain balanced peak within full scale; a
+  positive fixed gain can still exceed full scale, matching SoX-ng.
+- `gain -B -n DB` normalizes the balanced result before applying fixed gain and
+  matches SoX-ng's `-Bn`/`-bn` behavior.
+- These modes are channel-local `gain` effects and do not change channel count,
+  unlike output channel policies or future explicit channel-routing effects.
+- SoX-ng's mutually exclusive mode group is rejected: only one of `-e`, `-B`,
+  `-b`, and `-r` may be given.
+- Golden coverage includes standalone `gain -e`, `gain -B`, and `gain -b`
+  stereo cases against SoX-ng.
 
 ### Feature 6.1.4: `fade` curve types
 

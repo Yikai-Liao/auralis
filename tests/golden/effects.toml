@@ -57,6 +57,39 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_gain_equalize_stereo_minus_6]
+input = "effects/gain_equalize_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-e", "-6"]
+sox_ng = ["gain", "-e", "-6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_gain_balance_stereo_plus_6]
+input = "effects/gain_balance_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-B", "6"]
+sox_ng = ["gain", "-B", "6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_gain_balance_no_clip_stereo_plus_6]
+input = "effects/gain_balance_no_clip_stereo.wav"
+corpus_id = "chains/stereo_steps"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["gain", "-b", "6"]
+sox_ng = ["gain", "-b", "6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_dcshift_mono_positive]
 input = "effects/dcshift_mono.wav"
 corpus_id = "l0/step_mono_16"
