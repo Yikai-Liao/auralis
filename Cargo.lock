@@ -102,6 +102,7 @@ dependencies = [
  "auralis-core",
  "auralis-dsp",
  "auralis-simd",
+ "auralis-testkit",
  "proptest",
  "thiserror",
 ]

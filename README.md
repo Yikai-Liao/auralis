@@ -100,8 +100,10 @@ sample conversion in both directions, and backend-dispatched linear
 L4 property and metamorphic coverage now uses Rust-side `proptest` checks for
 the implemented effect set, including identity parameters, reverse-twice
 invariance, gain/inverse-gain round trips for non-clipping input, and
-finite-output behavior for bounded finite samples. Source modularization debt
-is scoped by a checked-in file-size audit and module
+finite-output behavior for bounded finite samples. L5 chunk-invariance coverage
+uses a shared Rust testkit matrix over fixed chunk sizes and deterministic
+seeded random chunks for `Gain`, `DcShift`, `Fade`, and streaming-safe chains.
+Source modularization debt is scoped by a checked-in file-size audit and module
 ownership map in `doc/development/05-source-module-map.md`. The high-level
 `auralis` facade has been split into ownership modules while keeping its public
 re-exports stable, and `auralis-simd` now keeps backend metadata, selection,
@@ -984,7 +986,11 @@ Required chunk sizes:
 1, 2, 7, 15, 16, 17, 31, 32, 33, 64, 255, 1024, random seeded chunks
 ```
 
-This layer is mandatory for stateful effects and useful even for simple effects.
+The Rust helper `auralis_testkit::chunk_invariance` is the shared source for
+that matrix. It injects empty chunks and a final empty call for flush-path
+coverage, and it reports the deterministic random seed in schedule labels.
+Current L5 integration tests cover `Gain`, `DcShift`, `Fade`, and
+streaming-safe `EffectChain` execution.
 
 ### L6: scalar vs SIMD differential tests
 

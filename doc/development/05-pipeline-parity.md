@@ -601,7 +601,7 @@ Implementation notes:
 
 ### Feature 5.7.5: L5 chunk invariance matrix
 
-Status: planned.
+Status: implemented.
 
 Replace scattered chunk tests with a shared matrix.
 
@@ -620,6 +620,17 @@ Acceptance tests:
 - `Gain`, `DcShift`, `Fade`, chain execution, and future stateful effects use
   the same matrix;
 - empty chunks and final flush behavior are covered where relevant.
+
+Implementation notes:
+
+- `auralis-testkit::chunk_invariance` now exposes the shared L5 matrix with
+  fixed chunk sizes `1, 2, 7, 15, 16, 17, 31, 32, 33, 64, 255, 1024` plus a
+  deterministic seeded random schedule.
+- The shared runner injects empty chunks before, between, and after real chunks
+  so current tests also exercise empty-input and final-flush paths.
+- `crates/auralis-effects/tests/chunk_invariance.rs` applies the same matrix
+  to `Gain`, `DcShift`, frame-position-aware `Fade`, and streaming-safe
+  `EffectChain` execution.
 
 ### Feature 5.7.6: L7 fuzzing, sanitizers, and coverage baseline
 

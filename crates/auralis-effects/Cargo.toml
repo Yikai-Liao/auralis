@@ -21,6 +21,7 @@ auralis-simd = { path = "../auralis-simd", default-features = false }
 thiserror.workspace = true
 
 [dev-dependencies]
+auralis-testkit = { path = "../auralis-testkit" }
 proptest.workspace = true
 
 [lints]

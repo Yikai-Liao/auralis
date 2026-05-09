@@ -7,6 +7,7 @@
 //! separately.
 
 pub mod backend_conformance;
+pub mod chunk_invariance;
 pub mod corpus;
 pub mod golden;
 pub mod golden_report;
