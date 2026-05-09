@@ -26,7 +26,8 @@ decoding into planar `f32` buffers and encoding back to PCM16 WAV are
 implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
 pipeline. The scalar `gain` DSP kernel is implemented; effect processors and
-effect transform CLI options are still intentionally unimplemented.
+the typed `Gain` effect processor are implemented. Effect transform CLI options
+are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 

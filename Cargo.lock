@@ -85,6 +85,10 @@ dependencies = [
 [[package]]
 name = "auralis-effects"
 version = "0.0.0"
+dependencies = [
+ "auralis-core",
+ "auralis-dsp",
+]
 
 [[package]]
 name = "auralis-simd"

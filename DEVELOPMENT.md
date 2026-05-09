@@ -502,6 +502,8 @@ Do not add CLI effect yet.
 
 ### Feature 2.2: `Gain` effect processor
 
+Status: implemented.
+
 Implement typed effect:
 
 ```rust
