@@ -34,6 +34,7 @@ mod command_gain;
 mod command_norm;
 mod command_overdrive;
 mod command_pad;
+mod command_repeat;
 mod command_reverse;
 mod command_saturation;
 mod command_softvol;
@@ -50,6 +51,7 @@ mod norm;
 mod overdrive;
 mod pad;
 mod registry;
+mod repeat;
 mod reverse;
 mod saturation;
 mod softvol;
@@ -80,6 +82,7 @@ pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,
 };
+pub use repeat::Repeat;
 pub use reverse::Reverse;
 pub use saturation::{Saturation, SaturationType};
 pub use softvol::SoftVol;

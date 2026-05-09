@@ -329,7 +329,24 @@ Implementation notes:
 
 ### Feature 6.2.8: `repeat`
 
+Status: implemented.
+
 Implement deterministic repeat semantics and output-length validation.
+
+Implementation notes:
+
+- Added a typed `Repeat` effect matching SoX-ng's finite `repeat [count]`
+  command shape: output contains the original input plus `count` additional
+  copies, the default count is `1`, and count `0` is an identity transform.
+- `Repeat` rejects counts above SoX-ng's finite `UINT_MAX - 1` range and
+  deliberately rejects SoX-ng's indefinite `repeat -` form because Auralis'
+  current in-memory processing requires bounded output.
+- Processing preserves planar channel grouping and validates output frame and
+  sample allocation sizes before constructing the repeated buffer.
+- Golden coverage includes standalone mono explicit-count and stereo default
+  repeat cases against SoX-ng, with L4 identity/finite-output coverage and an
+  L7 fuzz seed for repeat command parsing. L5 and L6 are not applicable because
+  repeat is a whole-buffer structural duplication without a SIMD kernel.
 
 ## Milestone 6.3: channel and mixing effects
 

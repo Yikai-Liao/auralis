@@ -52,6 +52,13 @@ pub(crate) fn apply_command(
             *audio = padded;
             Ok(())
         }
+        EffectCommand::Repeat(repeat) => {
+            let repeated = repeat
+                .process_buffer(audio)
+                .map_err(|source| ("count", source))?;
+            *audio = repeated;
+            Ok(())
+        }
         EffectCommand::Reverse(reverse) => {
             reverse.process_buffer(audio);
             Ok(())
@@ -88,7 +95,9 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Contrast | EffectKind::Norm => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {
+            optional_arg_end(tokens, args_start, 1)
+        }
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
         }

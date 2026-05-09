@@ -321,6 +321,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_repeat_mono_count_2]
+input = "effects/repeat_mono.wav"
+corpus_id = "l0/short_mono_3"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["repeat", "2"]
+sox_ng = ["repeat", "2"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_repeat_stereo_default]
+input = "effects/repeat_stereo.wav"
+corpus_id = "l0/short_stereo_2"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["repeat"]
+sox_ng = ["repeat"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_reverse_mono_odd_length]
 input = "effects/reverse_mono.wav"
 corpus_id = "l0/odd_length_mono_17"

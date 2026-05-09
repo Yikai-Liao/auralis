@@ -41,6 +41,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_pad_mono_positioned",
             "effect_pad_stereo_both_sides",
             "effect_pad_stereo_positioned",
+            "effect_repeat_mono_count_2",
+            "effect_repeat_stereo_default",
             "effect_reverse_mono_odd_length",
             "effect_reverse_stereo",
             "effect_saturation_mono_default",
@@ -79,6 +81,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "tremolo",
         "overdrive",
         "saturation",
+        "repeat",
     ] {
         let mono = manifest
             .iter()

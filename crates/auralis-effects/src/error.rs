@@ -27,6 +27,14 @@ pub enum EffectError {
     #[error("pad position must be within the input duration")]
     PadPositionOutOfBounds,
 
+    /// A repeat count was outside SoX-ng's finite supported range.
+    #[error("repeat count must be in the finite SoX-ng range 0..=4294967294")]
+    InvalidRepeatCount,
+
+    /// A repeat command would create a buffer shape that cannot be represented.
+    #[error("repeat output frame count exceeds representable audio buffer length")]
+    RepeatLengthOverflow,
+
     /// A DC shift amount was not finite or not in the supported normalized range.
     #[error("dc shift must be finite and in the range -2.0..=2.0")]
     InvalidDcShift,

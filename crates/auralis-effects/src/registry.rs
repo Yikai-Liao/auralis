@@ -45,6 +45,9 @@ pub enum EffectKind {
     /// Zero padding before and after the input.
     Pad,
 
+    /// SoX-ng-style finite output repetition.
+    Repeat,
+
     /// Frame-order reversal within each channel.
     Reverse,
 
@@ -201,6 +204,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Pad",
         "pad {length[@position]}",
         "add zero-valued frames before, after, or inside the input",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Repeat,
+        "repeat",
+        &[],
+        "Repeat",
+        "repeat [count]",
+        "append finite copies of the input audio",
     ),
     EffectDescriptor::new(
         EffectKind::Reverse,
@@ -577,6 +588,7 @@ mod tests {
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
+            ("repeat", EffectKind::Repeat),
             ("reverse", EffectKind::Reverse),
             ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),

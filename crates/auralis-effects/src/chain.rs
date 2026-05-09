@@ -767,6 +767,7 @@ mod tests {
                 | EffectCommand::Norm(_)
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
+                | EffectCommand::Repeat(_)
                 | EffectCommand::Reverse(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)

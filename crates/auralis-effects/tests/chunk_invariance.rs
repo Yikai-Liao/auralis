@@ -209,6 +209,7 @@ fn process_streaming_safe_chain_by_chunks(
             }
             EffectCommand::Norm(_)
             | EffectCommand::Pad(_)
+            | EffectCommand::Repeat(_)
             | EffectCommand::Reverse(_)
             | EffectCommand::SoftVol(_)
             | EffectCommand::Trim(_) => {

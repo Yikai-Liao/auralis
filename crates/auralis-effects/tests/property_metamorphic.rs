@@ -4,8 +4,8 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Reverse, Saturation, SaturationType,
-    SoftVol, Tremolo, Trim, Vol,
+    Contrast, DcShift, Fade, Gain, Norm, Overdrive, Pad, Repeat, Reverse, Saturation,
+    SaturationType, SoftVol, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -157,6 +157,14 @@ proptest! {
         prop_assert_sample_bits_eq(padded.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(padded.frames(), source.frames());
         prop_assert_eq!(padded.channels(), source.channels());
+
+        let repeated = Repeat::new(0)
+            .expect("zero repeat count is valid")
+            .process_buffer(&source)
+            .expect("zero repeat cannot overflow generated buffers");
+        prop_assert_sample_bits_eq(repeated.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(repeated.frames(), source.frames());
+        prop_assert_eq!(repeated.channels(), source.channels());
     }
 
     #[test]
@@ -265,6 +273,12 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated padding cannot overflow");
         prop_assert_all_finite(&padded)?;
+
+        let repeated = Repeat::new(2)
+            .expect("small repeat count is valid")
+            .process_buffer(&source)
+            .expect("small generated repeat cannot overflow");
+        prop_assert_all_finite(&repeated)?;
 
         let mut reversed = source;
         Reverse::new().process_buffer(&mut reversed);
