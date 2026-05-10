@@ -824,6 +824,7 @@ mod tests {
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Speed(_)
                 | EffectCommand::Splice(_)
+                | EffectCommand::Stat(_)
                 | EffectCommand::Stretch(_)
                 | EffectCommand::Swap(_)
                 | EffectCommand::Tempo(_)

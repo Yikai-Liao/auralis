@@ -124,6 +124,8 @@ pub enum EffectKind {
     Speed,
     #[doc = "SoX-ng-style cross-faded audio splice."]
     Splice,
+    #[doc = "SoX-ng-style sample statistics analyzer."]
+    Stat,
     #[doc = "SoX-ng-style basic time stretcher."]
     Stretch,
     #[doc = "SoX-ng-style adjacent channel-pair swapping."]
@@ -633,6 +635,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Splice",
         "splice [-h|-t|-q] {position[,excess[,leeway]]}",
         "remove excess audio around splice points and cross-fade the joins",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Stat,
+        "stat",
+        &[],
+        "Stat",
+        "stat [-s scale] [-rms] [-v] [-j]",
+        "collect SoX-ng-style sample statistics while passing audio through",
     ),
     EffectDescriptor::new(
         EffectKind::Stretch,

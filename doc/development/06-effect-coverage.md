@@ -1625,6 +1625,27 @@ Implementation notes:
 
 ### Feature 6.8.10: `stat`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Stat` analyzer and `StatReport` artifact model for
+  SoX-ng-style sample statistics over decoded audio.
+- Registered `stat [-s scale] [-rms] [-v] [-j]` across command parsing,
+  rendering, registry resolution, effect-chain grouping and dispatch, CLI
+  positional-chain execution, L7 fuzz seed coverage, standalone pass-through
+  SoX-ng golden rows, and the L0-L7 coverage matrix.
+- The analyzer computes statistics in frame-major stream order, matching
+  SoX-ng's interleaved processing order while preserving Auralis' planar buffer
+  layout. Chain execution passes audio through unchanged; callers can collect
+  deterministic text, JSON, or volume-adjustment renderings through the typed
+  report API.
+- Coverage includes parser/rendering tests, chain pass-through execution,
+  frame-major multichannel statistics, report rendering, invalid scale
+  rejection, non-finite sample rejection, mono/stereo standalone goldens, and a
+  fuzz corpus seed. `-freq`, `-a`, `-d`, `-e`, and `-h` remain explicit
+  unsupported options pending dedicated spectrum/EBU artifact support.
+
 ### Feature 6.8.11: `stats`
 
 ### Feature 6.8.12: `synth` basic waveforms

@@ -592,6 +592,21 @@ l6 = { status = "not_applicable", reason = "Noisered uses scalar FFT-domain proc
 l7 = { status = "covered", reason = "Effect command fuzzing covers noisered profile path and amount parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/noisered"] }
 
 [[subject]]
+id = "effect.stat"
+kind = "effect"
+name = "stat"
+summary = "SoX-ng-style pass-through sample statistics analyzer."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs for pass-through command coverage.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed analyzer operates on decoded AudioBuffer samples; rendered reports are analysis artifacts rather than WAV I/O.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono and stereo pass-through audio behavior for stat command forms.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover command parsing, command rendering, frame-major statistics, no-op chain execution, report rendering, invalid scale rejection, and non-finite sample rejection.", tests = ["crates/auralis-effects/src/stat.rs", "crates/auralis-effects/src/command_stat.rs", "crates/auralis-effects/tests/stat.rs"] }
+l4 = { status = "not_applicable", reason = "stat collects analysis statistics and does not transform samples; pass-through behavior is covered by exact integration assertions.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current Stat API is a whole-buffer analyzer; chunk-exact streaming belongs to a future API that exposes accumulated statistic state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Stat is scalar analysis over decoded samples and has no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers stat option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/stat"] }
+
+[[subject]]
 id = "effect.contrast"
 kind = "effect"
 name = "contrast"

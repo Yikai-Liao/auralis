@@ -217,6 +217,10 @@ pub enum EffectError {
     #[error("noisered output frame count exceeds representable audio buffer length")]
     NoiseReductionLengthOverflow,
 
+    /// A stat analyzer had invalid scale or sample data.
+    #[error("stat scale and analyzed samples must be finite, and scale must be nonzero")]
+    InvalidStat,
+
     /// A loudness command had invalid gain, reference level, or filter length.
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,

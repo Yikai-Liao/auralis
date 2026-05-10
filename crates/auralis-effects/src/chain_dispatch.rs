@@ -60,6 +60,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Sinc(_)
         | EffectCommand::Speed(_)
         | EffectCommand::Splice(_)
+        | EffectCommand::Stat(_)
         | EffectCommand::Stretch(_)
         | EffectCommand::Tempo(_)
         | EffectCommand::Trim(_)
@@ -238,6 +239,7 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("splice", source))?;
         }
+        EffectCommand::Stat(stat) => stat.process_buffer(audio),
         EffectCommand::Stretch(stretch) => {
             *audio = stretch
                 .process_buffer(audio)
@@ -384,6 +386,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
         EffectKind::NoiseRed => optional_arg_end(tokens, args_start, 2),
         EffectKind::Splice => splice_arg_end(tokens, args_start),
+        EffectKind::Stat => stat_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Compand | EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::MCompand => mcompand_arg_end(tokens, args_start),
@@ -419,6 +422,30 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn stat_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-s" => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+            }
+            "-rms" | "-v" | "-j" | "-freq" | "-d" | "-a" | "-e" | "-h" => end += 1,
+            token if is_option_like(token) => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+                return include_unexpected_argument(tokens, end);
+            }
+            _ => return include_unexpected_argument(tokens, end + 1),
+        }
+    }
+    end
 }
 
 fn dither_arg_end(tokens: &[&str], args_start: usize) -> usize {
