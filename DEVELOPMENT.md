@@ -207,9 +207,9 @@ The source modularization plan is Feature 5.6.x.
 Auralis dependency choices are split into three groups:
 
 - add now: `clap`, `clap_complete`, `clap_mangen`, `thiserror`, `miette`,
-  `anyhow`, `serde`, `toml`, `serde_json`, `hound`, `tracing`,
+  `anyhow`, `serde`, `toml`, `serde_json`, `hound`, `rustfft`, `tracing`,
   `tracing-subscriber`, and the first test/bench tools
-- selected but optional or later: `rten-simd`, `realfft`, `rustfft`, `rayon`,
+- selected but optional or later: `rten-simd`, `realfft`, `rayon`,
   `bytemuck`, `smallvec`, `pyo3`, `maturin`, and `numpy`
 - do not introduce now: `rubato`, `symphonia`, `ndarray` in core public APIs,
   `serde_yaml`, and `tokio`

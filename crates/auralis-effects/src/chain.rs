@@ -773,6 +773,7 @@ mod tests {
                 }
                 EffectCommand::AllPass(_)
                 | EffectCommand::Band(_)
+                | EffectCommand::Bend(_)
                 | EffectCommand::BandPass(_)
                 | EffectCommand::BandReject(_)
                 | EffectCommand::Bass(_)

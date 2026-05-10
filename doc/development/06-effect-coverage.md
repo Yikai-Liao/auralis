@@ -1172,6 +1172,26 @@ Implementation notes:
 
 ### Feature 6.6.12: `bend`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Bend` effect with `BendSegment`, `BendPosition`,
+  frame-rate `-f`, and oversampling `-o` support. Positions accept SoX-ng-style
+  seconds and `s`-suffixed frame counts, including `+` relative segment ends.
+- Processing preserves duration and sample-rate metadata through a channel-local
+  scalar phase-vocoder path backed by `rustfft`. SIMD is documented as N/A
+  because the current transform is stateful STFT/overlap processing rather than
+  a data-parallel sample kernel.
+- Wired `bend [-f frame-rate] [-o oversample] {start(+),cents,end(+)}` through
+  the typed command parser, effect registry, effect-chain dispatch, CLI
+  positional chain path, parser fuzz corpus, L0-L7 coverage metadata, and
+  standalone SoX-ng golden manifest.
+- Coverage includes parser/rendering tests, chain integration tests, typed
+  validation tests, zero-duration identity, finite-output property coverage,
+  invalid option/position checks, and standalone mono/stereo zero-duration
+  command-shape golden cases.
+
 ### Feature 6.6.13: `splice`
 
 Resampling and time-domain features require output-length tests, spectral tests

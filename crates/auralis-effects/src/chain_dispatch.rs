@@ -30,6 +30,7 @@ pub(crate) fn apply_command(
             Ok(())
         }
         EffectCommand::Centercut(_)
+        | EffectCommand::Bend(_)
         | EffectCommand::Channels(_)
         | EffectCommand::Chorus(_)
         | EffectCommand::Delay(_)
@@ -76,6 +77,10 @@ pub(crate) fn apply_command(
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "central effect-chain dispatch keeps one explicit arm per buffer-level command"
+)]
 fn apply_buffer_command(
     command: &EffectCommand,
     audio: &mut AudioBuffer,
@@ -86,6 +91,11 @@ fn apply_buffer_command(
     }
 
     match command {
+        EffectCommand::Bend(bend) => {
+            *audio = bend
+                .process_buffer(audio)
+                .map_err(|source| ("bend", source))?;
+        }
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio)?,
         EffectCommand::Channels(channels) => {
             *audio = channels
@@ -282,6 +292,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
 
     match kind {
         EffectKind::Biquad => optional_arg_end(tokens, args_start, 6),
+        EffectKind::Bend => bend_arg_end(tokens, args_start),
         EffectKind::Centercut => centercut_arg_end(tokens, args_start),
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
@@ -366,6 +377,35 @@ fn pitch_arg_end(tokens: &[&str], args_start: usize) -> usize {
     }
 
     optional_arg_end(tokens, end, 4)
+}
+
+fn bend_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-f" | "-o" => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+            }
+            token if is_option_like(token) => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+                return include_unexpected_argument(tokens, end);
+            }
+            _ => break,
+        }
+    }
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    end
 }
 
 fn rate_arg_end(tokens: &[&str], args_start: usize) -> usize {

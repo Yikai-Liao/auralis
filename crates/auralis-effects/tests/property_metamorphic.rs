@@ -4,12 +4,13 @@ use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
 };
 use auralis_effects::{
-    AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Downsample, Echo, EchoTap,
-    Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
-    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate,
-    Remix, RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
-    SoftVol, Speed, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
+    AllPass, Band, BandPass, BandReject, Bass, Bend, BendPosition, BendSegment, Biquad,
+    BiquadCoefficients, BiquadWidth, Centercut, Channels, Chorus, ChorusStage, Contrast, DcShift,
+    Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
+    FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Phaser,
+    PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec, RemixSource, Repeat,
+    Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Stretch, Swap, Tempo,
+    Treble, Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -220,6 +221,19 @@ proptest! {
         prop_assert_sample_bits_eq(same_pitch.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(same_pitch.frames(), source.frames());
         prop_assert_eq!(same_pitch.channels(), source.channels());
+
+        let same_bend = Bend::new([BendSegment::new(
+            BendPosition::frames(FrameCount::new(0)),
+            0.0,
+            BendPosition::frames(FrameCount::new(0)),
+        )
+        .expect("zero-duration bend segment is valid")])
+        .expect("zero-duration bend is valid")
+        .process_buffer(&source)
+        .expect("zero-duration bend cannot fail");
+        prop_assert_sample_bits_eq(same_bend.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(same_bend.frames(), source.frames());
+        prop_assert_eq!(same_bend.channels(), source.channels());
 
         let same_rate = Rate::new(source.spec().sample_rate())
             .process_buffer(&source)
@@ -486,6 +500,18 @@ proptest! {
             .process_buffer(&source)
             .expect("fixture pitch state is representable");
         prop_assert_all_finite(&pitch_shifted)?;
+
+        let bend_end = FrameCount::new(source.frames().as_u64().min(32));
+        let bent = Bend::new([BendSegment::new(
+            BendPosition::frames(FrameCount::new(0)),
+            100.0,
+            BendPosition::frames(bend_end),
+        )
+        .expect("fixture bend segment is valid")])
+        .expect("fixture bend is valid")
+        .process_buffer(&source)
+        .expect("fixture bend state is representable");
+        prop_assert_all_finite(&bent)?;
 
         let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
             .expect("echo fixture is valid")

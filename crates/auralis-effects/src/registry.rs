@@ -28,6 +28,8 @@ pub enum EffectKind {
     AllPass,
     /// SoX-ng-style resonator band-pass filter.
     Band,
+    /// SoX-ng-style phase-vocoder pitch bend.
+    Bend,
     /// SoX-ng-style RBJ band-pass filter.
     BandPass,
     /// SoX-ng-style RBJ band-reject filter.
@@ -213,6 +215,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Band",
         "band [-n] frequency [width]",
         "apply a resonator band-pass filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Bend,
+        "bend",
+        &[],
+        "Bend",
+        "bend [-f frame-rate] [-o oversample] {start(+),cents,end(+)}",
+        "apply a phase-vocoder pitch bend while preserving duration",
     ),
     EffectDescriptor::new(
         EffectKind::BandPass,
@@ -560,80 +570,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
     ),
 ];
 
-/// SoX-ng effect names tracked by the Auralis coverage plan.
-///
-/// Names in this list that do not appear in [`SUPPORTED_EFFECTS`] return a
-/// stable missing-coverage diagnostic instead of being treated as arbitrary
-/// unknown user input.
-pub const KNOWN_SOX_NG_EFFECTS: &[&str] = &[
-    "allpass",
-    "band",
-    "bandpass",
-    "bandreject",
-    "bass",
-    "bend",
-    "biquad",
-    "centercut",
-    "channels",
-    "chorus",
-    "compand",
-    "contrast",
-    "dcshift",
-    "deemph",
-    "delay",
-    "dither",
-    "dolbyb",
-    "dop",
-    "downsample",
-    "earwax",
-    "echo",
-    "echos",
-    "equalizer",
-    "fade",
-    "fir",
-    "firfit",
-    "flanger",
-    "gain",
-    "highpass",
-    "hilbert",
-    "ladspa",
-    "loudness",
-    "lowpass",
-    "mcompand",
-    "noiseprof",
-    "noisered",
-    "norm",
-    "oops",
-    "overdrive",
-    "pad",
-    "phaser",
-    "pitch",
-    "rate",
-    "remix",
-    "repeat",
-    "reverb",
-    "reverse",
-    "riaa",
-    "saturation",
-    "sdm",
-    "silence",
-    "sinc",
-    "softvol",
-    "speed",
-    "splice",
-    "stat",
-    "stats",
-    "stretch",
-    "swap",
-    "synth",
-    "tempo",
-    "treble",
-    "tremolo",
-    "trim",
-    "upsample",
-    "vad",
-    "vol",
-];
+pub use crate::registry_known::KNOWN_SOX_NG_EFFECTS;
 
 /// Registry namespace for effect name resolution.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

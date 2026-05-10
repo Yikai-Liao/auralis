@@ -520,6 +520,7 @@ Contains typed effect processors built from DSP primitives:
 - `Speed`
 - `Stretch`
 - `Tempo`
+- `Bend`
 - `Echo`
 - `Echos`
 - `Flanger`
@@ -532,11 +533,11 @@ Contains typed effect processors built from DSP primitives:
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `channels`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `channels`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
+`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `reverse`, `fade`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `eq`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -599,6 +600,9 @@ The implemented `pitch` command accepts SoX-ng's `[-q] shift [segment [search
 [overlap]]]` surface, interprets shift in cents, preserves approximate
 duration by reusing the inverse-factor tempo path, and updates sample-rate
 metadata to `round(input_rate * 2^(shift / 1200))`.
+The implemented `bend` command accepts SoX-ng's `[-f frame-rate] [-o oversample]
+{start(+),cents,end(+)}` surface, preserves duration and sample-rate metadata,
+and applies a channel-local scalar phase-vocoder path for linear pitch bends.
 The implemented `rate` scaffold accepts a required target frequency such as
 `rate 44100` or `rate 44.1k`, plus SoX-ng quality selectors `-q`, `-l`, `-m`,
 `-g`, `-h`, `-e`, `-v`, `-u`, and equivalent `-Q 0` through `-Q 7` forms.
@@ -938,7 +942,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -1042,7 +1046,7 @@ wrappers, `libopusenc`, FDK-AAC, or other native codec-library bindings.
 | Area | Choice | Rule |
 |---|---|---|
 | SIMD | `rten-simd` behind `simd` | optional backend only; scalar remains the reference |
-| Frequency-domain effects and tests | `realfft`, `rustfft` | add behind focused crates when spectral processing or spectral tests begin |
+| Frequency-domain effects and tests | `rustfft`, later `realfft` if needed | `rustfft` is used inside `auralis-effects` for `bend`; do not expose FFT crates through public core APIs |
 | Batch parallelism | `rayon` behind `parallel` | for many files, test cases, stems, or render jobs; not the initial single-stream effect chain |
 | Byte casting | `bytemuck` behind `pod` | only after normal parsing is correct and profiling justifies it |
 | Small allocation optimization | `smallvec` behind `smallvec` | only for proven small-vector pressure |

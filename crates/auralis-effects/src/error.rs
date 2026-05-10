@@ -169,6 +169,16 @@ pub enum EffectError {
     #[error("pitch output sample rate must round into the representable positive rate range")]
     PitchRateOutOfRange,
 
+    /// A bend command had invalid options, positions, or pitch shift.
+    #[error(
+        "bend options must be in SoX-ng ranges -f 10..=80 and -o 4..=32, positions must be ordered, and cents must map to factor 0.01..=10"
+    )]
+    InvalidBend,
+
+    /// A bend command would create an unrepresentable STFT state or position.
+    #[error("bend STFT state or resolved position exceeds representable audio buffer length")]
+    BendLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

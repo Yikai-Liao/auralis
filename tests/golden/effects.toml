@@ -112,6 +112,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_bend_mono_zero_duration]
+input = "effects/bend_mono.wav"
+corpus_id = "l0/sine_mono_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["bend", "0s,0,0s"]
+sox_ng = ["bend", "0s,0,0s"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_bend_stereo_custom_options]
+input = "effects/bend_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["bend", "-f", "40", "-o", "8", "0s,-50,0s"]
+sox_ng = ["bend", "-f", "40", "-o", "8", "0s,-50,0s"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_treble_mono_default]
 input = "effects/treble_mono.wav"
 corpus_id = "l0/sine_mono_32"

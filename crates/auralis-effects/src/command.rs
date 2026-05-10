@@ -13,6 +13,7 @@ use crate::command_band::{parse_band, render_band};
 use crate::command_bandpass::{parse_bandpass, render_bandpass};
 use crate::command_bandreject::{parse_bandreject, render_bandreject};
 use crate::command_bass::{parse_bass, render_bass};
+use crate::command_bend::{parse_bend, render_bend};
 use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
@@ -54,7 +55,7 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_upsample::{parse_upsample, render_upsample};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
+    AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
     Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch,
@@ -74,6 +75,8 @@ pub enum EffectCommand {
     AllPass(AllPass),
     /// SoX-ng-style resonator band-pass filter.
     Band(Band),
+    /// SoX-ng-style phase-vocoder pitch bend.
+    Bend(Bend),
     /// SoX-ng-style RBJ band-pass filter.
     BandPass(BandPass),
     /// SoX-ng-style RBJ band-reject filter.
@@ -178,6 +181,7 @@ impl EffectCommand {
         match descriptor.kind() {
             EffectKind::AllPass => parse_allpass(effect, args),
             EffectKind::Band => parse_band(effect, args),
+            EffectKind::Bend => parse_bend(effect, args),
             EffectKind::BandPass => parse_bandpass(effect, args),
             EffectKind::BandReject => parse_bandreject(effect, args),
             EffectKind::Bass => parse_bass(effect, args),
@@ -230,6 +234,7 @@ impl EffectCommand {
         match self {
             Self::AllPass(_) => EffectKind::AllPass,
             Self::Band(_) => EffectKind::Band,
+            Self::Bend(_) => EffectKind::Bend,
             Self::BandPass(_) => EffectKind::BandPass,
             Self::BandReject(_) => EffectKind::BandReject,
             Self::Bass(_) => EffectKind::Bass,
@@ -288,6 +293,7 @@ impl EffectCommand {
         match self {
             Self::AllPass(all_pass) => render_allpass(*all_pass),
             Self::Band(band) => render_band(*band),
+            Self::Bend(bend) => render_bend(bend),
             Self::BandPass(band_pass) => render_bandpass(*band_pass),
             Self::BandReject(band_reject) => render_bandreject(*band_reject),
             Self::Bass(bass) => render_bass(*bass),

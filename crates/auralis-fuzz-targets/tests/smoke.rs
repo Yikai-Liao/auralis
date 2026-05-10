@@ -48,6 +48,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"tempo 1.25",
         b"tempo -q -s 1.25 35 12 10",
         b"pitch -q 1200 60 10 8",
+        b"bend -f 40 -o 8 0s,100,+200s",
         b"rate 44.1k",
         b"rate -q 24k",
         b"rate -Q 1 48000",
