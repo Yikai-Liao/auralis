@@ -81,6 +81,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_pad_stereo_positioned",
             "effect_phaser_mono_linear",
             "effect_phaser_stereo_triangle",
+            "effect_pitch_mono_octave_up",
+            "effect_pitch_stereo_quick_octave_down",
             "effect_rate_generic_custom_overrides_stereo_identity",
             "effect_rate_high_overrides_mono_to_24000",
             "effect_rate_low_stereo_identity",
@@ -164,6 +166,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "fade",
         "flanger",
         "phaser",
+        "pitch",
         "rate",
         "vol",
         "norm",
@@ -236,6 +239,7 @@ fn effects_golden_manifest_keeps_automatic_rate_and_channels_absent() {
             "{id} should not request output channel conversion"
         );
         if id.starts_with("effect_downsample_")
+            || id.starts_with("effect_pitch_")
             || id.starts_with("effect_speed_")
             || id.starts_with("effect_upsample_")
         {

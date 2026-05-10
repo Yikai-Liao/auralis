@@ -65,6 +65,7 @@ mod command_oops;
 mod command_overdrive;
 mod command_pad;
 mod command_phaser;
+mod command_pitch;
 mod command_rate;
 mod command_remix;
 mod command_repeat;
@@ -102,6 +103,7 @@ mod oops;
 mod overdrive;
 mod pad;
 mod phaser;
+mod pitch;
 mod rate;
 mod registry;
 mod remix;
@@ -161,6 +163,7 @@ pub use oops::Oops;
 pub use overdrive::{Overdrive, OverdriveState};
 pub use pad::{Pad, PositionedPad};
 pub use phaser::{Phaser, PhaserInterpolation, PhaserWave};
+pub use pitch::Pitch;
 pub use rate::{
     Rate, RateBandwidth, RateOptionFlags, RateOptions, RatePhase, RatePrecision, RateQuality,
 };

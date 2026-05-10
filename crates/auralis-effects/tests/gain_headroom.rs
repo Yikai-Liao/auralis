@@ -44,7 +44,7 @@ fn gain_reclaim_without_prior_headroom_is_an_error() {
         error,
         EffectChainError::CommandFailed {
             index: 0,
-            command: chain.commands()[0].clone(),
+            command: Box::new(chain.commands()[0].clone()),
             argument: "headroom",
             source: EffectError::MissingGainHeadroom,
         }

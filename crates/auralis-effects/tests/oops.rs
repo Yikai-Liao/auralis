@@ -57,10 +57,10 @@ fn oops_requires_at_least_two_input_channels() {
     assert!(matches!(
         error,
         auralis_effects::EffectChainError::CommandFailed {
-            command: EffectCommand::Oops(_),
+            command,
             argument: "channels",
             ..
-        }
+        } if matches!(command.as_ref(), EffectCommand::Oops(_))
     ));
 }
 

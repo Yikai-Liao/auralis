@@ -304,10 +304,10 @@ fn apply_effect_chain_errors_include_failing_command_context() {
         error,
         Error::Chain(auralis_effects::EffectChainError::CommandFailed {
             index: 0,
-            command: EffectCommand::Trim(_),
+            ref command,
             argument: "frame-range",
             source: auralis_effects::EffectError::TrimRangeOutOfBounds,
-        })
+        }) if matches!(command.as_ref(), EffectCommand::Trim(_))
     ));
     assert_eq!(
         error.to_string(),

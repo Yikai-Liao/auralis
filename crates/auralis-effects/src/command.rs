@@ -35,6 +35,7 @@ use crate::command_oops::parse_oops;
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
 use crate::command_pad::{parse_pad, render_pad};
 use crate::command_phaser::{parse_phaser, render_phaser};
+use crate::command_pitch::{parse_pitch, render_pitch};
 use crate::command_rate::{parse_rate, render_rate};
 use crate::command_remix::{parse_remix, render_remix};
 use crate::command_repeat::{parse_repeat, render_repeat};
@@ -56,8 +57,8 @@ use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
-    Phaser, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch, Swap,
-    Tempo, Treble, Tremolo, Trim, Upsample, Vol,
+    Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch,
+    Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -123,6 +124,8 @@ pub enum EffectCommand {
     Pad(Pad),
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser(Phaser),
+    /// SoX-ng-style pitch shift that preserves duration.
+    Pitch(Pitch),
     /// SoX-ng-style sample-rate conversion scaffold.
     Rate(Rate),
     /// SoX-ng-style stereo reverberation.
@@ -200,6 +203,7 @@ impl EffectCommand {
             EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Phaser => parse_phaser(effect, args),
+            EffectKind::Pitch => parse_pitch(effect, args),
             EffectKind::Rate => parse_rate(effect, args),
             EffectKind::Reverb => parse_reverb(effect, args),
             EffectKind::Repeat => parse_repeat(effect, args),
@@ -251,6 +255,7 @@ impl EffectCommand {
             Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Phaser(_) => EffectKind::Phaser,
+            Self::Pitch(_) => EffectKind::Pitch,
             Self::Rate(_) => EffectKind::Rate,
             Self::Reverb(_) => EffectKind::Reverb,
             Self::Repeat(_) => EffectKind::Repeat,
@@ -308,6 +313,7 @@ impl EffectCommand {
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Phaser(phaser) => render_phaser(*phaser),
+            Self::Pitch(pitch) => render_pitch(*pitch),
             Self::Rate(rate) => render_rate(*rate),
             Self::Reverb(reverb) => render_reverb(*reverb),
             Self::Repeat(repeat) => render_repeat(*repeat),

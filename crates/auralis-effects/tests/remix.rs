@@ -164,10 +164,10 @@ fn remix_rejects_missing_invalid_specs_bad_options_and_out_of_bounds_channels() 
     assert!(matches!(
         out_of_bounds,
         auralis_effects::EffectChainError::CommandFailed {
-            command: EffectCommand::Remix(_),
+            command,
             argument: "out-spec",
             ..
-        }
+        } if matches!(command.as_ref(), EffectCommand::Remix(_))
     ));
 }
 

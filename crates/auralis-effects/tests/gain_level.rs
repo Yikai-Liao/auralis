@@ -59,7 +59,9 @@ fn gain_normalize_reports_non_finite_samples() {
         error,
         EffectChainError::CommandFailed {
             index: 0,
-            command: EffectCommand::Gain(Gain::normalize(Decibels::new(0.0).unwrap())),
+            command: Box::new(EffectCommand::Gain(Gain::normalize(
+                Decibels::new(0.0).unwrap()
+            ))),
             argument: "normalize",
             source: EffectError::NonFiniteGainSample { sample_index: 1 },
         }

@@ -210,7 +210,7 @@ impl EffectChain {
             apply_command(command, audio, requested_backend, &mut gain_headroom).map_err(
                 |(argument, source)| EffectChainError::CommandFailed {
                     index,
-                    command: command.clone(),
+                    command: Box::new(command.clone()),
                     argument,
                     source,
                 },
@@ -331,7 +331,7 @@ pub enum EffectChainError {
         index: usize,
 
         /// Canonical typed command that failed.
-        command: EffectCommand,
+        command: Box<EffectCommand>,
 
         /// Argument family or option family that failed.
         argument: &'static str,
@@ -477,9 +477,9 @@ mod tests {
             error,
             EffectChainError::CommandFailed {
                 index: 1,
-                command: EffectCommand::Trim(
+                command: Box::new(EffectCommand::Trim(
                     Trim::new(FrameCount::new(0), FrameCount::new(3)).unwrap()
-                ),
+                )),
                 argument: "frame-range",
                 source: EffectError::TrimRangeOutOfBounds,
             }
@@ -795,6 +795,7 @@ mod tests {
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Phaser(_)
+                | EffectCommand::Pitch(_)
                 | EffectCommand::Rate(_)
                 | EffectCommand::Reverb(_)
                 | EffectCommand::Repeat(_)

@@ -78,6 +78,8 @@ pub enum EffectKind {
     Pad,
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser,
+    /// SoX-ng-style pitch shift that preserves duration.
+    Pitch,
     /// SoX-ng-style sample-rate conversion scaffold.
     Rate,
     /// SoX-ng-style stereo reverberation.
@@ -94,17 +96,17 @@ pub enum EffectKind {
     Saturation,
     /// SoX-ng-style soft volume control.
     SoftVol,
-    /// SoX-ng-style speed adjustment.
+    #[doc = "SoX-ng-style speed adjustment."]
     Speed,
-    /// SoX-ng-style basic time stretcher.
+    #[doc = "SoX-ng-style basic time stretcher."]
     Stretch,
-    /// SoX-ng-style adjacent channel-pair swapping.
+    #[doc = "SoX-ng-style adjacent channel-pair swapping."]
     Swap,
-    /// SoX-ng-style tempo adjustment that preserves pitch.
+    #[doc = "SoX-ng-style tempo adjustment that preserves pitch."]
     Tempo,
-    /// SoX-ng-style treble tone control.
+    #[doc = "SoX-ng-style treble tone control."]
     Treble,
-    /// SoX-ng-style sinusoidal tremolo modulation.
+    #[doc = "SoX-ng-style sinusoidal tremolo modulation."]
     Tremolo,
     /// End-exclusive frame range selection.
     Trim,
@@ -411,6 +413,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Phaser",
         "phaser [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay [regen [speed [-s|-t]]]]]]",
         "apply a swept-delay phaser with feedback",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Pitch,
+        "pitch",
+        &[],
+        "Pitch",
+        "pitch [-q] shift [segment [search [overlap]]]",
+        "shift pitch in cents while preserving duration",
     ),
     EffectDescriptor::new(
         EffectKind::Rate,
@@ -892,6 +902,7 @@ mod tests {
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
+            ("pitch", EffectKind::Pitch),
             ("rate", EffectKind::Rate),
             ("repeat", EffectKind::Repeat),
             ("reverb", EffectKind::Reverb),
@@ -906,10 +917,8 @@ mod tests {
             ("trim", EffectKind::Trim),
             ("vol", EffectKind::Vol),
         ];
-
         for (name, kind) in expected {
             let descriptor = EffectRegistry::resolve(name).unwrap();
-
             assert_eq!(descriptor.kind(), kind);
             assert_eq!(descriptor.canonical_name(), name);
         }
@@ -929,10 +938,8 @@ mod tests {
             ("soft_volume", "softvol", EffectKind::SoftVol),
             ("volume", "vol", EffectKind::Vol),
         ];
-
         for (alias, canonical, kind) in expected {
             let descriptor = EffectRegistry::resolve(alias).unwrap();
-
             assert_eq!(descriptor.kind(), kind);
             assert_eq!(descriptor.canonical_name(), canonical);
         }
@@ -941,7 +948,6 @@ mod tests {
     #[test]
     fn unknown_names_return_deterministic_suggestions() {
         let error = EffectRegistry::resolve("gian").unwrap_err();
-
         assert_eq!(
             error,
             EffectNameError::UnknownEffect {

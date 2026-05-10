@@ -82,10 +82,10 @@ fn gain_channel_scan_reports_non_finite_samples() {
         error,
         EffectChainError::CommandFailed {
             index: 0,
-            command: EffectCommand::Gain(
+            command: Box::new(EffectCommand::Gain(
                 Gain::new(Decibels::new(0.0).unwrap())
                     .with_channel_mode(auralis_effects::GainChannelMode::Equalize)
-            ),
+            )),
             argument: "channel",
             source: EffectError::NonFiniteGainSample { sample_index: 2 },
         }

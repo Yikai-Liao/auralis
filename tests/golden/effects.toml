@@ -1262,6 +1262,30 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 85.0
 
+[id.effect_pitch_mono_octave_up]
+input = "effects/pitch_mono.wav"
+corpus_id = "l0/sine_mono_8192"
+output_sample_rate = 96000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pitch", "1200"]
+sox_ng = ["pitch", "1200"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_pitch_stereo_quick_octave_down]
+input = "effects/pitch_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+output_sample_rate = 24000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["pitch", "-q", "-1200", "60", "10", "8"]
+sox_ng = ["pitch", "-q", "-1200", "60", "10", "8"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_reverb_mono_wet_only]
 input = "effects/reverb_mono.wav"
 corpus_id = "l0/sine_mono_8192"

@@ -155,6 +155,20 @@ pub enum EffectError {
     #[error("tempo state or output frame count exceeds representable audio buffer length")]
     TempoLengthOverflow,
 
+    /// A pitch shift was outside SoX-ng's supported cents-derived factor range.
+    #[error("pitch shift must be finite and map to a factor in the SoX-ng range 0.01..=10")]
+    InvalidPitchShift,
+
+    /// A pitch command had invalid tuning parameters.
+    #[error(
+        "pitch segment/search/overlap must be finite and in the SoX-ng ranges segment 10..=120 ms, search 0..=30 ms, and overlap 0..=30 ms"
+    )]
+    InvalidPitchTuning,
+
+    /// A pitch command would produce an unrepresentable sample rate.
+    #[error("pitch output sample rate must round into the representable positive rate range")]
+    PitchRateOutOfRange,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

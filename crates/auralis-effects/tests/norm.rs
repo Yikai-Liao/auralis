@@ -63,7 +63,7 @@ fn norm_reports_non_finite_samples() {
         error,
         EffectChainError::CommandFailed {
             index: 0,
-            command: EffectCommand::Norm(Norm::new(Decibels::new(0.0).unwrap())),
+            command: Box::new(EffectCommand::Norm(Norm::new(Decibels::new(0.0).unwrap()))),
             argument: "level",
             source: EffectError::NonFiniteNormSample { sample_index: 1 },
         }

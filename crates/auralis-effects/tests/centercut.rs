@@ -62,10 +62,10 @@ fn centercut_rejects_non_stereo_input_in_chain() {
     assert!(matches!(
         error,
         auralis_effects::EffectChainError::CommandFailed {
-            command: EffectCommand::Centercut(_),
+            command,
             argument: "channels",
             ..
-        }
+        } if matches!(command.as_ref(), EffectCommand::Centercut(_))
     ));
 }
 

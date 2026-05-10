@@ -42,6 +42,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
         | EffectCommand::Phaser(_)
+        | EffectCommand::Pitch(_)
         | EffectCommand::Rate(_)
         | EffectCommand::Reverb(_)
         | EffectCommand::Repeat(_)
@@ -129,6 +130,11 @@ fn apply_buffer_command(
             *audio = phaser
                 .process_buffer(audio)
                 .map_err(|source| ("phaser", source))?;
+        }
+        EffectCommand::Pitch(pitch) => {
+            *audio = pitch
+                .process_buffer(audio)
+                .map_err(|source| ("pitch", source))?;
         }
         EffectCommand::Reverb(reverb) => {
             *audio = reverb
@@ -281,6 +287,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
+        EffectKind::Pitch => pitch_arg_end(tokens, args_start),
         EffectKind::Reverb => reverb_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast
@@ -327,6 +334,26 @@ fn tempo_arg_end(tokens: &[&str], args_start: usize) -> usize {
     while end < tokens.len() && !is_command_boundary(tokens[end]) {
         match tokens[end] {
             "-q" | "-m" | "-s" | "-l" => end += 1,
+            token if is_option_like(token) => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+                return include_unexpected_argument(tokens, end);
+            }
+            _ => break,
+        }
+    }
+
+    optional_arg_end(tokens, end, 4)
+}
+
+fn pitch_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-q" => end += 1,
             token if is_option_like(token) => {
                 end += 1;
                 if end < tokens.len() && !is_command_boundary(tokens[end]) {

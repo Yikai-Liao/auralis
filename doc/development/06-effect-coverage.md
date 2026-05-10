@@ -1152,6 +1152,24 @@ Implementation notes:
 
 ### Feature 6.6.11: `pitch`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Pitch` effect that accepts shifts in cents, validates
+  SoX-ng's cents-derived factor range, preserves duration by reusing the scalar
+  `Tempo` overlap-search core with the inverse pitch factor, and updates output
+  sample-rate metadata to the pitch factor.
+- Wired `pitch [-q] shift [segment [search [overlap]]]` through effect
+  registry resolution, typed command parsing/rendering, effect-chain execution,
+  CLI positional chain path, and parser fuzz coverage. The SoX-ng `-m`, `-s`,
+  and `-l` tempo profiles remain `tempo`-only because SoX-ng `pitch` exposes
+  only the quick-search flag plus explicit timing values.
+- Coverage includes unit and integration tests for parsing, metadata changes,
+  stereo preservation, zero-cent identity, invalid shift/tuning rejection,
+  parser fuzz seeds, L0-L7 coverage metadata, and standalone SoX-ng golden
+  cases for octave-up mono and quick tuned octave-down stereo pitch shifting.
+
 ### Feature 6.6.12: `bend`
 
 ### Feature 6.6.13: `splice`

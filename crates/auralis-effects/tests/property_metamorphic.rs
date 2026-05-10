@@ -7,8 +7,8 @@ use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Downsample, Echo, EchoTap,
     Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
-    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Rate, Remix,
-    RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
+    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate,
+    Remix, RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
     SoftVol, Speed, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
@@ -212,6 +212,14 @@ proptest! {
         prop_assert_sample_bits_eq(same_tempo.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(same_tempo.frames(), source.frames());
         prop_assert_eq!(same_tempo.channels(), source.channels());
+
+        let same_pitch = Pitch::new(0.0)
+            .expect("zero-cent pitch is valid")
+            .process_buffer(&source)
+            .expect("zero-cent pitch cannot fail");
+        prop_assert_sample_bits_eq(same_pitch.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(same_pitch.frames(), source.frames());
+        prop_assert_eq!(same_pitch.channels(), source.channels());
 
         let same_rate = Rate::new(source.spec().sample_rate())
             .process_buffer(&source)
@@ -472,6 +480,12 @@ proptest! {
             .process_buffer(&source)
             .expect("fixture tempo state is representable");
         prop_assert_all_finite(&tempo_changed)?;
+
+        let pitch_shifted = Pitch::new(1200.0)
+            .expect("fixture pitch shift is valid")
+            .process_buffer(&source)
+            .expect("fixture pitch state is representable");
+        prop_assert_all_finite(&pitch_shifted)?;
 
         let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
             .expect("echo fixture is valid")
