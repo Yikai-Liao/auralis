@@ -5,9 +5,9 @@ use auralis_core::{
 };
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Contrast, DcShift, Deemph, Delay, Equalizer, Fade, Gain, HighPass, LowPass, Norm,
-    Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation,
-    SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    Channels, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Equalizer, Fade, Gain, HighPass,
+    LowPass, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse,
+    Riaa, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -394,6 +394,12 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated delay cannot overflow");
         prop_assert_all_finite(&delayed)?;
+
+        let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
+            .expect("echo fixture is valid")
+            .process_buffer(&source)
+            .expect("small generated echo cannot overflow");
+        prop_assert_all_finite(&echoed)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

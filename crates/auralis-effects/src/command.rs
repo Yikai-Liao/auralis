@@ -27,6 +27,7 @@ use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
 use crate::command_delay::{parse_delay, render_delay};
+use crate::command_echo::{parse_echo, render_echo};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
@@ -49,8 +50,8 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    Deemph, Delay, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain,
-    HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Riaa, Saturation,
+    Deemph, Delay, Echo, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade,
+    Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Riaa, Saturation,
     SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 
@@ -91,6 +92,8 @@ pub enum EffectCommand {
     Deemph(Deemph),
     /// SoX-ng-style per-channel delay.
     Delay(Delay),
+    /// SoX-ng-style parallel echo delay line.
+    Echo(Echo),
     /// SoX-ng-style peaking equalizer filter.
     Equalizer(Equalizer),
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
@@ -159,6 +162,7 @@ impl EffectCommand {
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
             EffectKind::Delay => parse_delay(effect, args),
+            EffectKind::Echo => parse_echo(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
@@ -198,6 +202,7 @@ impl EffectCommand {
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
             Self::Delay(_) => EffectKind::Delay,
+            Self::Echo(_) => EffectKind::Echo,
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
@@ -243,6 +248,7 @@ impl EffectCommand {
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],
             Self::Delay(delay) => render_delay(delay),
+            Self::Echo(echo) => render_echo(echo),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),

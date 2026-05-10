@@ -785,6 +785,7 @@ mod tests {
                 | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Delay(_)
+                | EffectCommand::Echo(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Oops(_)
                 | EffectCommand::Overdrive(_)

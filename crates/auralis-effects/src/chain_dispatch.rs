@@ -20,76 +20,26 @@ pub(crate) fn apply_command(
     if apply_filter_command(command, audio)? {
         return Ok(());
     }
+    if apply_buffer_command(command, audio, requested_backend)? {
+        return Ok(());
+    }
 
     match command {
-        EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio),
-        EffectCommand::Channels(channels) => {
-            let converted = channels
-                .process_buffer_with_backend(audio, requested_backend)
-                .map_err(|source| ("channels", source))?;
-            *audio = converted;
-            Ok(())
-        }
-        EffectCommand::Delay(delay) => {
-            let delayed = delay
-                .process_buffer(audio)
-                .map_err(|source| ("position", source))?;
-            *audio = delayed;
-            Ok(())
-        }
-        EffectCommand::Fade(fade) => {
-            if fade.stop_position.is_some() {
-                let faded = fade
-                    .process_buffer_to_output(audio, requested_backend)
-                    .map_err(|source| ("frame-count", source))?;
-                *audio = faded;
-            } else {
-                fade.process_buffer_with_backend(audio, requested_backend);
-            }
-            Ok(())
-        }
         EffectCommand::Gain(gain) => {
             apply_gain_command(*gain, audio, requested_backend, gain_headroom)?;
             Ok(())
         }
-        EffectCommand::Norm(norm) => norm
-            .process_buffer_with_backend(audio, requested_backend)
-            .map_err(|source| ("level", source)),
-        EffectCommand::Oops(oops) => {
-            let extracted = oops
-                .process_buffer(audio)
-                .map_err(|source| ("channels", source))?;
-            *audio = extracted;
-            Ok(())
-        }
-        EffectCommand::Pad(pad) => {
-            let padded = pad
-                .process_buffer(audio)
-                .map_err(|source| ("frame-count", source))?;
-            *audio = padded;
-            Ok(())
-        }
-        EffectCommand::Repeat(repeat) => {
-            let repeated = repeat
-                .process_buffer(audio)
-                .map_err(|source| ("count", source))?;
-            *audio = repeated;
-            Ok(())
-        }
-        EffectCommand::Remix(remix) => {
-            let remixed = remix
-                .process_buffer(audio)
-                .map_err(|source| ("out-spec", source))?;
-            *audio = remixed;
-            Ok(())
-        }
-        EffectCommand::Trim(trim) => {
-            let trimmed = trim
-                .process_buffer(audio)
-                .map_err(|source| ("frame-range", source))?;
-            *audio = trimmed;
-            Ok(())
-        }
+        EffectCommand::Centercut(_)
+        | EffectCommand::Channels(_)
+        | EffectCommand::Delay(_)
+        | EffectCommand::Echo(_)
+        | EffectCommand::Fade(_)
+        | EffectCommand::Norm(_)
+        | EffectCommand::Oops(_)
+        | EffectCommand::Pad(_)
+        | EffectCommand::Repeat(_)
+        | EffectCommand::Remix(_)
+        | EffectCommand::Trim(_) => unreachable!("buffer commands returned early"),
         EffectCommand::Biquad(_)
         | EffectCommand::Contrast(_)
         | EffectCommand::DcShift(_)
@@ -112,6 +62,71 @@ pub(crate) fn apply_command(
         | EffectCommand::Riaa(_)
         | EffectCommand::Treble(_) => unreachable!("filter commands returned early"),
     }
+}
+
+fn apply_buffer_command(
+    command: &EffectCommand,
+    audio: &mut AudioBuffer,
+    requested_backend: BackendKind,
+) -> std::result::Result<bool, (&'static str, EffectError)> {
+    match command {
+        EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio)?,
+        EffectCommand::Channels(channels) => {
+            *audio = channels
+                .process_buffer_with_backend(audio, requested_backend)
+                .map_err(|source| ("channels", source))?;
+        }
+        EffectCommand::Delay(delay) => {
+            *audio = delay
+                .process_buffer(audio)
+                .map_err(|source| ("position", source))?;
+        }
+        EffectCommand::Echo(echo) => {
+            *audio = echo
+                .process_buffer(audio)
+                .map_err(|source| ("delay-decay-pair", source))?;
+        }
+        EffectCommand::Fade(fade) => {
+            if fade.stop_position.is_some() {
+                *audio = fade
+                    .process_buffer_to_output(audio, requested_backend)
+                    .map_err(|source| ("frame-count", source))?;
+            } else {
+                fade.process_buffer_with_backend(audio, requested_backend);
+            }
+        }
+        EffectCommand::Norm(norm) => norm
+            .process_buffer_with_backend(audio, requested_backend)
+            .map_err(|source| ("level", source))?,
+        EffectCommand::Oops(oops) => {
+            *audio = oops
+                .process_buffer(audio)
+                .map_err(|source| ("channels", source))?;
+        }
+        EffectCommand::Pad(pad) => {
+            *audio = pad
+                .process_buffer(audio)
+                .map_err(|source| ("frame-count", source))?;
+        }
+        EffectCommand::Repeat(repeat) => {
+            *audio = repeat
+                .process_buffer(audio)
+                .map_err(|source| ("count", source))?;
+        }
+        EffectCommand::Remix(remix) => {
+            *audio = remix
+                .process_buffer(audio)
+                .map_err(|source| ("out-spec", source))?;
+        }
+        EffectCommand::Trim(trim) => {
+            *audio = trim
+                .process_buffer(audio)
+                .map_err(|source| ("frame-range", source))?;
+        }
+        _ => return Ok(false),
+    }
+
+    Ok(true)
 }
 
 fn apply_filter_command(
@@ -191,6 +206,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
             optional_arg_end(tokens, args_start, 2)
         }
         EffectKind::Delay => delay_arg_end(tokens, args_start),
+        EffectKind::Echo => echo_arg_end(tokens, args_start),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
         EffectKind::Deemph
@@ -237,6 +253,14 @@ fn trim_arg_end(tokens: &[&str], args_start: usize) -> usize {
 }
 
 fn delay_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+    end
+}
+
+fn echo_arg_end(tokens: &[&str], args_start: usize) -> usize {
     let mut end = args_start;
     while end < tokens.len() && !is_command_boundary(tokens[end]) {
         end += 1;

@@ -47,6 +47,16 @@ pub enum EffectError {
     #[error("delay output frame count exceeds representable audio buffer length")]
     DelayLengthOverflow,
 
+    /// An echo command had invalid gains, delay taps, or no delay taps.
+    #[error(
+        "echo gains and decays must be finite, delays must be finite and non-negative, and at least one delay-decay pair is required"
+    )]
+    InvalidEcho,
+
+    /// An echo command would create a buffer shape that cannot be represented.
+    #[error("echo output frame count exceeds representable audio buffer length")]
+    EchoLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

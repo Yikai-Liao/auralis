@@ -790,6 +790,25 @@ Implementation notes:
 
 ### Feature 6.5.2: `echo`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Echo` effect matching SoX-ng's parallel `echo gain-in
+  gain-out <delay decay>` command family. Delay values are milliseconds,
+  resolve against the input sample rate by truncating to a frame count, and
+  each delay-decay pair reads from the original input delay line rather than
+  feeding later taps.
+- Processing applies clean input gain, sums delayed tap decays, applies final
+  output gain, clips inside the effect, and extends output by the largest
+  resolved delay. Latency is the largest configured tap delay; tail flush emits
+  the remaining delayed samples with zero input. Chunked streaming would be
+  exact when a future streaming API preserves the circular delay buffer and
+  exposes an explicit tail flush.
+- Coverage includes typed processor tests, command and chain integration tests,
+  L4 finite-output property coverage, parser fuzz seeds, and standalone
+  SoX-ng golden cases for mono delayed echo and stereo zero-delay mixing.
+
 ### Feature 6.5.3: `echos`
 
 ### Feature 6.5.4: `chorus` core
