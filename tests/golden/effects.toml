@@ -976,6 +976,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_tempo_mono_speed_up]
+input = "effects/tempo_mono.wav"
+corpus_id = "l0/sine_mono_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["tempo", "1.25"]
+sox_ng = ["tempo", "1.25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_tempo_stereo_slow_down]
+input = "effects/tempo_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["tempo", "0.75"]
+sox_ng = ["tempo", "0.75"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_rate_mono_to_24000]
 input = "effects/rate_mono.wav"
 corpus_id = "l0/silence_mono_16"

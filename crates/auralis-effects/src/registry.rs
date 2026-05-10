@@ -100,6 +100,8 @@ pub enum EffectKind {
     Stretch,
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap,
+    /// SoX-ng-style tempo adjustment that preserves pitch.
+    Tempo,
     /// SoX-ng-style treble tone control.
     Treble,
     /// SoX-ng-style sinusoidal tremolo modulation.
@@ -497,6 +499,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Swap",
         "swap",
         "swap adjacent decoded channel pairs",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Tempo,
+        "tempo",
+        &[],
+        "Tempo",
+        "tempo factor",
+        "change tempo while preserving pitch with the default profile",
     ),
     EffectDescriptor::new(
         EffectKind::Treble,

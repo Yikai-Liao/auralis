@@ -1111,6 +1111,23 @@ Implementation notes:
 
 ### Feature 6.6.9: `tempo` core
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Tempo` processor for the default SoX-ng `tempo factor`
+  profile, including the required factor range `0.1..=100`, sample-rate
+  preservation, pitch-preserving scalar overlap-search processing, and
+  factor-one identity behavior.
+- Wired `tempo factor` through the effect registry, typed command parser,
+  effect-chain execution, effects-file diagnostics, CLI positional chain path,
+  and fuzz smoke corpus.
+- Coverage includes unit/integration/property tests, standalone mono/stereo
+  SoX-ng golden cases, and an L0-L7 layered coverage matrix entry. SIMD is
+  documented as N/A for this scalar stateful overlap-search implementation.
+- Tuning flags `-q`, `-m`, `-s`, and `-l`, plus explicit
+  `segment/search/overlap` arguments, remain scheduled for Feature 6.6.10.
+
 ### Feature 6.6.10: `tempo` tuning options
 
 ### Feature 6.6.11: `pitch`

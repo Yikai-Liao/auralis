@@ -46,6 +46,7 @@ use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_speed::{parse_speed, render_speed};
 use crate::command_stretch::{parse_stretch, render_stretch};
 use crate::command_swap::parse_swap;
+use crate::command_tempo::{parse_tempo, render_tempo};
 use crate::command_treble::{parse_treble, render_treble};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
@@ -56,7 +57,7 @@ use crate::{
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
     Phaser, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch, Swap,
-    Treble, Tremolo, Trim, Upsample, Vol,
+    Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -144,6 +145,8 @@ pub enum EffectCommand {
     Stretch(Stretch),
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap(Swap),
+    /// SoX-ng-style tempo adjustment that preserves pitch.
+    Tempo(Tempo),
     /// SoX-ng-style treble tone control.
     Treble(Treble),
     /// SoX-ng-style sinusoidal tremolo modulation.
@@ -208,6 +211,7 @@ impl EffectCommand {
             EffectKind::Speed => parse_speed(effect, args),
             EffectKind::Stretch => parse_stretch(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
+            EffectKind::Tempo => parse_tempo(effect, args),
             EffectKind::Treble => parse_treble(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
@@ -258,6 +262,7 @@ impl EffectCommand {
             Self::Speed(_) => EffectKind::Speed,
             Self::Stretch(_) => EffectKind::Stretch,
             Self::Swap(_) => EffectKind::Swap,
+            Self::Tempo(_) => EffectKind::Tempo,
             Self::Treble(_) => EffectKind::Treble,
             Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
@@ -314,6 +319,7 @@ impl EffectCommand {
             Self::Speed(speed) => render_speed(*speed),
             Self::Stretch(stretch) => render_stretch(*stretch),
             Self::Swap(_) => vec!["swap".to_owned()],
+            Self::Tempo(tempo) => render_tempo(*tempo),
             Self::Treble(treble) => render_treble(*treble),
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),

@@ -141,6 +141,14 @@ pub enum EffectError {
     #[error("stretch state or output frame count exceeds representable audio buffer length")]
     StretchLengthOverflow,
 
+    /// A tempo factor was outside SoX-ng's supported range.
+    #[error("tempo factor must be finite and in the SoX-ng range 0.1..=100")]
+    InvalidTempoFactor,
+
+    /// A tempo command would create an unrepresentable state or output shape.
+    #[error("tempo state or output frame count exceeds representable audio buffer length")]
+    TempoLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

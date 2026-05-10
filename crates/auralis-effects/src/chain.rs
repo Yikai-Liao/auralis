@@ -806,6 +806,7 @@ mod tests {
                 | EffectCommand::Speed(_)
                 | EffectCommand::Stretch(_)
                 | EffectCommand::Swap(_)
+                | EffectCommand::Tempo(_)
                 | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_)
                 | EffectCommand::Upsample(_) => {
