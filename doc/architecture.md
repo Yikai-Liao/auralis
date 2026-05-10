@@ -357,7 +357,10 @@ coverage return a stable missing-coverage diagnostic. `dolbyb` is a stable
 blocked exception rather than ordinary missing coverage: SoX-ng's available
 path depends on GPLv2 `libdolbyb` C code, while Auralis is MIT and pure Rust, so
 the CLI points users to `sox_ng ... dolbyb ...` or a compatible
-pure-Rust/public-domain spec. Tokenized commands such
+pure-Rust/public-domain spec. `dop` is a stable not-planned effect-registry
+exception: it is DSD-over-PCM transport packing from 1-bit DSD into 24-bit
+samples, which belongs at a future DSD/DoP format boundary rather than in the
+current PCM16 WAV effect pipeline. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
 "24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
 accepts the frame-count subset implemented by Auralis and supports SoX-ng fade

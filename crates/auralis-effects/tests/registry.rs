@@ -114,19 +114,29 @@ fn empty_names_are_rejected_without_suggestions() {
 
 #[test]
 fn blocked_known_effects_return_actionable_diagnostics() {
-    let error = EffectRegistry::resolve("dolbyb").unwrap_err();
+    let cases = [
+        (
+            "dolbyb",
+            "known SoX-ng effect `dolbyb` is blocked in Auralis: SoX-ng uses GPLv2 libdolbyb C code while Auralis is MIT and pure Rust; use `sox_ng ... dolbyb ...` for Dolby B processing or provide a compatible pure-Rust/public-domain spec",
+        ),
+        (
+            "dop",
+            "known SoX-ng effect `dop` is not planned in the Auralis effect registry: DoP is DSD-over-PCM transport packing from 1-bit DSD into 24-bit PCM samples, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... dop ...` for DoP transport or wait for future DSD/DoP format support",
+        ),
+    ];
 
-    assert_eq!(
-        error,
-        EffectNameError::UnsupportedSoxNgEffect {
-            name: "dolbyb".to_owned(),
-        }
-    );
-    assert!(error.suggestions().is_empty());
-    assert_eq!(
-        error.to_string(),
-        "known SoX-ng effect `dolbyb` is blocked in Auralis: SoX-ng uses GPLv2 libdolbyb C code while Auralis is MIT and pure Rust; use `sox_ng ... dolbyb ...` for Dolby B processing or provide a compatible pure-Rust/public-domain spec"
-    );
+    for (name, message) in cases {
+        let error = EffectRegistry::resolve(name).unwrap_err();
+
+        assert_eq!(
+            error,
+            EffectNameError::UnsupportedSoxNgEffect {
+                name: name.to_owned(),
+            }
+        );
+        assert!(error.suggestions().is_empty());
+        assert_eq!(error.to_string(), message);
+    }
 }
 
 #[test]

@@ -839,7 +839,7 @@ impl fmt::Display for EffectNameError {
             Self::EmptyName => formatter.write_str("effect name cannot be empty"),
             Self::UnsupportedSoxNgEffect { name } => {
                 if let Some(diagnostic) =
-                    crate::registry_known::blocked_sox_ng_effect_diagnostic(name)
+                    crate::registry_known::classified_sox_ng_effect_diagnostic(name)
                 {
                     write!(formatter, "known SoX-ng effect `{name}` is {diagnostic}")
                 } else {

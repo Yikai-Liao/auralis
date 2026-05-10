@@ -51,21 +51,33 @@ Status: blocked by Feature 6.9.1.
 
 Classify DoP support before implementing anything.
 
-Status: planned feasibility/classification leaf.
+Status: not planned for the Auralis effect registry.
 
-The classification pass must determine whether `dop` is an Auralis effect,
-format/transport handling, or not planned for the effect registry. A viable path
-requires MIT-compatible pure Rust logic, no native wrapper dependency, stable CLI
-and parser diagnostics, and tests that make the classification reproducible.
+SoX-ng documents `dop` as DSD over PCM: it packs 1-bit DSD data into 24-bit
+samples for transport over non-DSD-aware links. Its implementation rejects
+anything except 1-bit input, requires the input rate to be exactly 16 times the
+output rate, forces 24-bit output precision, and alternates DoP marker bytes.
+That makes `dop` format/transport handling rather than normal PCM audio DSP.
 
-Expected output:
+Auralis currently accepts PCM16 WAV input into planar `f32` audio buffers and
+writes PCM16 WAV output. It does not have a 1-bit DSD input model, a 24-bit
+transport-preserving output path, or a DSD/DoP format boundary where this
+packing can be represented without pretending it is an ordinary audio effect.
+The registry therefore keeps `dop` out of the implemented effect set and returns
+a stable not-planned diagnostic.
 
-- Record `implemented`, `partial`, `blocked`, or `not planned`.
-- Document whether SoX-ng compatibility is meaningful for this item, or whether
-  Auralis should surface a stable diagnostic that points users to format/codec
-  handling instead of effect-chain handling.
-- Add or plan tests for parser behavior, registry visibility, diagnostics, and
-  any pure-Rust sample/bitstream transform that is accepted.
+SoX-ng compatibility is not meaningful in the current golden effect harness,
+because the harness is PCM16 WAV based and cannot express DoP's required 1-bit
+DSD input plus 24-bit transport output. L2 golden coverage, scalar DSP, chunk
+invariance, and SIMD are N/A until a future DSD/DoP format feature creates the
+right bitstream boundary. Reconsideration belongs in format/transport planning,
+not in the 6.x PCM effect registry.
+
+Parser, registry visibility, and CLI diagnostics are locked by Rust tests:
+`dop` is a known SoX-ng effect, resolves to
+`UnsupportedSoxNgEffect { name: "dop" }`, and tells users to run
+`sox_ng ... dop ...` for DoP transport or wait for future DSD/DoP format
+support.
 
 ### Feature 6.9.4: `earwax`
 

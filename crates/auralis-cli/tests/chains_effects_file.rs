@@ -298,6 +298,37 @@ fn run_blocked_dolbyb_effect_returns_actionable_error() {
 }
 
 #[test]
+fn run_not_planned_dop_effect_returns_actionable_error() {
+    let input = temp_path("auralis-cli-run-dop-not-planned-input", "wav");
+    let output = temp_path("auralis-cli-run-dop-not-planned-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "dop",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("known SoX-ng effect `dop` is not planned"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("DSD-over-PCM transport packing"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("future DSD/DoP format support"), "{stderr}");
+}
+
+#[test]
 fn run_missing_effects_file_returns_clear_error() {
     let input = temp_path("auralis-cli-run-missing-effects-file-input", "wav");
     let effects_file = temp_path("auralis-cli-run-missing-effects-file", "effects");

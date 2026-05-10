@@ -71,12 +71,15 @@ pub const KNOWN_SOX_NG_EFFECTS: &[&str] = &[
     "vol",
 ];
 
-/// Returns a stable blocker diagnostic for known SoX-ng effects that Auralis
-/// must not treat as ordinary missing coverage.
-pub(crate) fn blocked_sox_ng_effect_diagnostic(name: &str) -> Option<&'static str> {
+/// Returns a stable classification diagnostic for known SoX-ng effects that
+/// Auralis must not treat as ordinary missing coverage.
+pub(crate) fn classified_sox_ng_effect_diagnostic(name: &str) -> Option<&'static str> {
     match name {
         "dolbyb" => Some(
             "blocked in Auralis: SoX-ng uses GPLv2 libdolbyb C code while Auralis is MIT and pure Rust; use `sox_ng ... dolbyb ...` for Dolby B processing or provide a compatible pure-Rust/public-domain spec",
+        ),
+        "dop" => Some(
+            "not planned in the Auralis effect registry: DoP is DSD-over-PCM transport packing from 1-bit DSD into 24-bit PCM samples, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... dop ...` for DoP transport or wait for future DSD/DoP format support",
         ),
         _ => None,
     }

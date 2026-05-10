@@ -30,4 +30,8 @@ Every effect feature must still follow the test contract in [`03-test-infrastruc
 ## Current Blockers
 
 - Feature 6.9.1 recorded `dolbyb` as blocked because SoX-ng routes it through GPLv2 `libdolbyb` C code and Auralis currently requires MIT-compatible pure Rust implementation paths. Feature 6.9.2 remains blocked by that decision.
-- The next plan adjustment should continue in Milestone 6.9 by classifying `dop`, `earwax`, `ladspa`, and `sdm` before implementation work resumes.
+- Feature 6.9.3 recorded `dop` as not planned for the effect registry because
+  it is DSD-over-PCM transport packing, not PCM16 audio DSP. Reconsider it only
+  in a future DSD/DoP format boundary.
+- The next plan adjustment should continue in Milestone 6.9 by classifying
+  `earwax`, `ladspa`, and `sdm` before implementation work resumes.
