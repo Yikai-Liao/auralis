@@ -25,8 +25,8 @@ Auralis is pre-alpha. The repository already contains:
 - a deterministic Rust testkit, SoX-ng golden manifests with complex
   chain/boundary cases, L0-L7 layered coverage metadata, fuzz/parser seeds,
   optional Python helpers for cross-tool golden execution and reporting, and a
-  7.x primitive ownership audit plus the first reusable biquad primitive
-  extraction into `auralis-dsp`.
+  7.x primitive ownership audit plus reusable biquad and FIR numeric primitive
+  extractions into `auralis-dsp`.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

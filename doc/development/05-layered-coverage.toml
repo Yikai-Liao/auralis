@@ -25,14 +25,14 @@ l7 = { status = "not_applicable", reason = "No parser or serialized command surf
 id = "primitive.fir_coefficients"
 kind = "primitive"
 name = "fir-coefficients"
-summary = "SoX-ng-style FIR coefficient source and coefficient-file parser for the future fir processor."
+summary = "Reusable FIR coefficient container plus centered scalar FIR state, with SoX-ng-style source parsing kept at the effect boundary."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "The coefficient input model parses scalar coefficients and does not consume deterministic audio corpus IDs directly.", tests = [] }
 l1 = { status = "not_applicable", reason = "The model does not read or write WAV containers; WAV behavior remains covered by WAV I/O features.", tests = [] }
 l2 = { status = "not_applicable", reason = "Feature 6.8.1 intentionally does not register an executable fir command; SoX-ng golden coverage belongs to the streaming processor feature.", tests = [] }
-l3 = { status = "covered", reason = "Unit and doc tests cover coefficient text comments, empty coefficient files, SoX-ng argument-shape parsing, canonical rendering, malformed inline input, and non-finite rejection.", tests = ["crates/auralis-effects/src/fir.rs"] }
+l3 = { status = "covered", reason = "Unit and doc tests cover reusable coefficient validation, coefficient text comments, empty coefficient files, centered alignment, SoX-ng argument-shape parsing, canonical rendering, malformed inline input, and non-finite rejection.", tests = ["crates/auralis-dsp/src/fir.rs", "crates/auralis-effects/src/fir.rs"] }
 l4 = { status = "not_applicable", reason = "Coefficient input parsing is deterministic structured input handling rather than sample processing with metamorphic audio behavior.", tests = [] }
-l5 = { status = "not_applicable", reason = "No chunked audio processing exists until Feature 6.8.2 adds the FIR processor.", tests = [] }
+l5 = { status = "covered", reason = "The reusable FIR state has analytical chunk-equivalence coverage, and effect tests compare whole-buffer FIR processing against chunked state processing.", tests = ["crates/auralis-dsp/src/fir.rs", "crates/auralis-effects/tests/fir.rs"] }
 l6 = { status = "not_applicable", reason = "The coefficient input model has no backend-dispatched sample kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "Feature 6.8.1 intentionally does not expose fir through the shared effect command parser or fuzz target.", tests = [] }
 
@@ -705,7 +705,7 @@ summary = "SoX-ng-style finite impulse response filter from inline or file coeff
 l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
 l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover inline fir coefficient commands.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
-l3 = { status = "covered", reason = "Analytical tests cover coefficient text parsing, stdin/file/inline command shapes, null empty coefficients, per-channel FIR convolution, SoX-ng impulse alignment, and file-backed chain execution.", tests = ["crates/auralis-effects/src/fir.rs", "crates/auralis-effects/tests/fir.rs"] }
+l3 = { status = "covered", reason = "Analytical tests cover DSP-level FIR state, coefficient text parsing, stdin/file/inline command shapes, null empty coefficients, per-channel FIR convolution, SoX-ng impulse alignment, and file-backed chain execution.", tests = ["crates/auralis-dsp/src/fir.rs", "crates/auralis-effects/src/fir.rs", "crates/auralis-effects/tests/fir.rs"] }
 l4 = { status = "covered", reason = "Integration coverage checks finite deterministic output for bounded FIR coefficient and sample fixtures.", tests = ["crates/auralis-effects/tests/fir.rs"] }
 l5 = { status = "covered", reason = "Chunked-state convolution coverage checks whole-buffer FIR output against chunked processing of the same coefficient state.", tests = ["crates/auralis-effects/tests/fir.rs"] }
 l6 = { status = "not_applicable", reason = "Feature 6.8.2 implements the scalar reference FIR path; SIMD remains N/A until a future vectorized convolution backend is planned.", tests = [] }

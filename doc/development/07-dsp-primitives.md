@@ -52,7 +52,7 @@ diagnostics, registry entries, and compatibility quirks remain in
 |---|---|---|---|---|---|
 | Direct-form biquad runtime state and normalized coefficients | `crates/auralis-dsp/src/biquad.rs`, re-exported by `auralis-effects` | Current users: `biquad`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `lowpass`, `highpass`, `deemph`, `riaa`, chain chunk-state tests. Likely users: more tone and filter effects. | Moved to `auralis-dsp` in Feature 7.2. `auralis-effects` keeps command parsing, diagnostics, registry entries, effect-specific presets, and public re-exports. | Scalar stateful reference exists. SIMD stays N/A because recursive IIR state is not a simple data-parallel kernel. | Preserve analytical coefficient/runtime tests, effect regressions for every biquad-backed effect, L5 chunk invariance, SoX-ng goldens for concrete effects, and doc tests for re-exports. |
 | RBJ width units and cookbook coefficient helpers | `crates/auralis-dsp/src/biquad_design.rs`, re-exported by `auralis-effects` | Current users: tone/filter effects listed above. Likely users: future EQ/filter families. | Moved with the biquad coefficient type in Feature 7.2 because inherent RBJ helper methods must live in the crate that owns `BiquadCoefficients`. Width parsing remains in command modules. | Scalar coefficient math only. SIMD not applicable. | Keep closed-form coefficient tests and invalid-design coverage; verify concrete effect command rendering and SoX-ng golden behavior do not change. |
-| FIR coefficient storage, centered convolution state, and tail flush | `crates/auralis-effects/src/fir.rs`, with coefficient generators in `sinc.rs`, `hilbert.rs`, and `loudness.rs` | Current users: `fir`, `sinc`, `hilbert`, `loudness`, `earwax` uses a separate fixed FIR state. Likely users: more FIR filter families and future resampling filters. | Move after biquad, but split parser/source handling from the numeric primitive: coefficient text/file/stdin semantics stay in `auralis-effects`; validated coefficient slices and `FirState` belong in `auralis-dsp`. | Scalar stateful reference exists for shared FIR. SIMD remains N/A until a vectorized convolution backend is deliberately added. | Preserve FIR analytical alignment tests, sinc/hilbert/loudness/effect regressions, chunk-state tests, SoX-ng goldens, and explicit tail/finish behavior tests. |
+| FIR coefficient storage, centered convolution state, and tail flush | `crates/auralis-dsp/src/fir.rs`, wrapped by `auralis-effects` command/source handling | Current users: `fir`, `sinc`, `hilbert`, `loudness`, `earwax` uses a separate fixed FIR state. Likely users: more FIR filter families and future resampling filters. | Moved to `auralis-dsp` in Feature 7.3. `auralis-effects` keeps coefficient text/file/stdin semantics, diagnostics, command parsing, registry entries, typed effect wrappers, and public compatibility wrappers. | Scalar stateful reference exists for shared FIR. SIMD remains N/A until a vectorized convolution backend is deliberately added. | Preserve FIR analytical alignment tests, sinc/hilbert/loudness/effect regressions, chunk-state tests, SoX-ng goldens, and explicit tail/finish behavior tests. |
 | Window design helpers for FIR filters | `sinc.rs`, `hilbert.rs`, `loudness.rs`, and `noisered.rs` | Current users: Kaiser windowed `sinc`, Blackman-windowed `hilbert`, equal-loudness FIR, Hann-windowed noise reduction. Likely users: future FIR/filter design features. | Keep effect-local until at least two concrete effects need the same parameterized helper. The current formulas are tightly coupled to SoX-ng command semantics and accepted ranges. | Scalar coefficient math only. SIMD not applicable. | Extraction would need analytical tests for window coefficients and unchanged SoX-ng goldens for every affected effect. |
 | Envelope followers, attack/decay smoothing, and dB transfer curves | `compand.rs` and `mcompand.rs` | Current users: `compand`, `mcompand`. Likely users: compressor/expander or limiter effects. | Candidate for later extraction after FIR. The transfer curve and follower are reusable, but current behavior is heavily SoX-ng-shaped and still easiest to review with compand tests. | Scalar stateful reference exists. SIMD N/A until a backend can process independent channels or bands without changing envelope ordering. | Preserve transfer-curve analytical tests, shared/per-channel envelope tests, mcompand crossover tests, L5 chunk-invariance if a streaming state is exposed, and SoX-ng goldens. |
 | Modulation oscillators, waveform generation, and phase handling | `chorus.rs`, `flanger.rs`, `phaser.rs`, `tremolo.rs`, `synth.rs` | Current users: chorus/flanger/phaser LFOs, tremolo envelope, synth waveform/noise generation. Likely users: vibrato, more modulation effects. | Audit again after biquad/FIR. There is clear duplication pressure, but each effect currently uses slightly different phase, range, and interpolation semantics. Start by extracting only a tiny waveform helper if a future feature needs it. | Scalar math exists in effect-local code. SIMD mostly N/A for stateful LFO setup; generated sample loops might later get differential tests. | Need waveform analytical tests, phase-wrap tests, effect regressions, SoX-ng goldens, and fuzz seeds for waveform option parsing where command surfaces are touched. |
@@ -70,9 +70,9 @@ diagnostics, registry entries, and compatibility quirks remain in
    `BiquadWidth`, and generic RBJ coefficient helpers into `auralis-dsp`, with
    `auralis-effects` re-exporting the public names and preserving command
    parsing.
-2. Split the FIR numeric primitive from command-style coefficient sources, then
-   move the validated coefficient container and centered `FirState` into
-   `auralis-dsp`.
+2. Completed: split the FIR numeric primitive from command-style coefficient
+   sources, then move the reusable validated coefficient container and centered
+   `FirState` into `auralis-dsp`.
 3. Revisit dither/noise state or compand transfer state only after the first
    two extraction commits prove the crate-boundary pattern.
 4. Keep spectral/FFT, time-scale, resampling, and analyzer report primitives in
@@ -129,7 +129,7 @@ Required tests:
 
 ### Feature 7.3: FIR numeric primitive extraction
 
-Status: planned.
+Status: completed.
 
 Split the FIR numeric primitive from command-style coefficient sources. Move
 the validated coefficient container and centered `FirState` into `auralis-dsp`,
@@ -139,6 +139,36 @@ diagnostics, and registry entries in `auralis-effects`.
 Each extraction must be small enough to review independently and must preserve
 the effect command surface, typed effect APIs, diagnostics, and golden-test
 expectations.
+
+The implementation added `auralis_dsp::FirCoefficients` and
+`auralis_dsp::FirState` as the owner of reusable finite-coefficient validation,
+centered convolution, chunk-preserving state, and tail flushing.
+`auralis-effects` now keeps a compatibility `FirCoefficients` wrapper so
+`FirCoefficients::parse_text`, file/stdin source semantics, diagnostics, and
+typed effect construction remain at the command/effect boundary. Its public
+`FirState` wrapper delegates to the DSP primitive, preserving existing
+chunk-state call sites without exposing command parsing through `auralis-dsp`.
+
+Required tests:
+
+- analytical primitive tests in `auralis-dsp` for non-finite rejection, empty
+  null streams, SoX-ng-centered impulse alignment, and chunk equivalence;
+- effect-level regression tests proving command parsing, file-backed loading,
+  typed processing, and existing diagnostics are unchanged;
+- existing SoX-ng golden cases for `fir`, `sinc`, `hilbert`, `loudness`, and
+  other concrete FIR-backed effects remain the behavior oracle;
+- SIMD status remains N/A until a deliberate vectorized convolution backend is
+  introduced.
+
+### Feature 7.4: next reusable primitive family selection
+
+Status: planned.
+
+Choose the next primitive family after the successful biquad and FIR boundary
+moves. The next leaf should narrow whether deterministic dither/noise state or
+compand envelope/transfer state has the lower-risk extraction path, then record
+the selected owner, public compatibility strategy, and required tests before
+moving code.
 
 If an audited primitive has only one effect user, no foreseeable reuse, no
 backend-dispatch need, and no independent analytical-test value, leave it

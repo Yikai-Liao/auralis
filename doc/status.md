@@ -191,9 +191,10 @@ the no-thousand-line Rust source policy locally.
 The 7.x DSP primitive audit in `doc/development/07-dsp-primitives.md` records
 shared-kernel ownership across biquad, FIR, modulation, delay-line, time-scale,
 spectral, dither, resampling, mixing, and analyzer primitives. The first
-extraction moved the direct-form biquad runtime, normalized coefficient type,
-and generic RBJ helper ownership into `auralis-dsp` while preserving
-`auralis-effects` re-exports and command parsing.
+extractions moved the direct-form biquad runtime, normalized coefficient type,
+generic RBJ helper ownership, reusable FIR coefficient validation, and centered
+FIR state into `auralis-dsp` while preserving `auralis-effects` command parsing
+and public compatibility wrappers.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

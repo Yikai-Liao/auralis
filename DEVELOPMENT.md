@@ -37,10 +37,10 @@ The current order is:
    only after the above planning and test-gate corrections are in place.
 5. Continue
    [`7.x reusable DSP primitive extraction`](doc/development/07-dsp-primitives.md)
-   after the completed biquad runtime extraction. The next 7.x leaf should
-   continue one primitive family at a time, preserving `auralis-effects`
-   command parsing and public re-exports while moving only broadly reusable
-   DSP kernels into `auralis-dsp`.
+   after the completed biquad and FIR numeric primitive extractions. The next
+   7.x leaf should select the next reusable primitive family before moving
+   code, preserving `auralis-effects` command parsing and public compatibility
+   wrappers while moving only broadly reusable DSP kernels into `auralis-dsp`.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.

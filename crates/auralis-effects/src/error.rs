@@ -12,6 +12,12 @@ impl From<auralis_dsp::BiquadError> for EffectError {
     }
 }
 
+impl From<auralis_dsp::FirError> for EffectError {
+    fn from(_: auralis_dsp::FirError) -> Self {
+        Self::InvalidFirCoefficients
+    }
+}
+
 /// Errors produced by typed effect processors.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

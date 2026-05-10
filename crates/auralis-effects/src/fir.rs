@@ -1,6 +1,7 @@
-use std::{collections::VecDeque, fs, path::Path};
+use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, FrameCount};
+use auralis_dsp::{FirCoefficients as DspFirCoefficients, FirState as DspFirState};
 
 use crate::{EffectError, Result};
 
@@ -21,7 +22,7 @@ use crate::{EffectError, Result};
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct FirCoefficients {
-    values: Vec<f64>,
+    inner: DspFirCoefficients,
 }
 
 impl FirCoefficients {
@@ -35,12 +36,9 @@ impl FirCoefficients {
     where
         I: IntoIterator<Item = f64>,
     {
-        let values = values.into_iter().collect::<Vec<_>>();
-        if values.iter().all(|value| value.is_finite()) {
-            Ok(Self { values })
-        } else {
-            Err(EffectError::InvalidFirCoefficients)
-        }
+        DspFirCoefficients::new(values)
+            .map(Self::from)
+            .map_err(EffectError::from)
     }
 
     /// Parses whitespace-separated coefficients from SoX-ng-style text.
@@ -84,19 +82,29 @@ impl FirCoefficients {
     /// Returns the coefficients in command/file order.
     #[must_use]
     pub fn as_slice(&self) -> &[f64] {
-        &self.values
+        self.inner.as_slice()
     }
 
     /// Returns the number of coefficients.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.values.len()
+        self.inner.len()
     }
 
     /// Returns `true` when no coefficients were supplied.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.values.is_empty()
+        self.inner.is_empty()
+    }
+
+    fn into_dsp(self) -> DspFirCoefficients {
+        self.inner
+    }
+}
+
+impl From<DspFirCoefficients> for FirCoefficients {
+    fn from(inner: DspFirCoefficients) -> Self {
+        Self { inner }
     }
 }
 
@@ -270,98 +278,36 @@ impl Fir {
 
 /// Stateful scalar FIR processor for one mono sample stream.
 ///
-/// The state emits samples with SoX-ng-compatible alignment. For coefficient
-/// lists longer than two taps, this means output for the newest input sample is
-/// delayed until enough look-ahead is available; callers must invoke
+/// This is a compatibility wrapper around the reusable `auralis-dsp` FIR
+/// primitive. The state emits samples with SoX-ng-compatible alignment. For
+/// coefficient lists longer than two taps, output for the newest input sample
+/// is delayed until enough look-ahead is available; callers must invoke
 /// [`Self::finish`] once at end-of-stream to flush the final aligned samples.
 #[derive(Debug, Clone)]
 pub struct FirState {
-    coefficients: FirCoefficients,
-    history: VecDeque<f32>,
-    samples_seen: usize,
-    samples_emitted: usize,
-    shift: usize,
+    inner: DspFirState,
 }
 
 impl FirState {
     /// Creates zero-initialized FIR state for one mono stream.
     #[must_use]
     pub fn new(coefficients: FirCoefficients) -> Self {
-        let shift = coefficients.len().saturating_sub(1) / 2;
         Self {
-            coefficients,
-            history: VecDeque::new(),
-            samples_seen: 0,
-            samples_emitted: 0,
-            shift,
+            inner: DspFirState::new(coefficients.into_dsp()),
         }
     }
 
     /// Processes one chunk of mono samples, appending available output samples.
     pub fn process_mono_samples(&mut self, input: &[f32], output: &mut Vec<f32>) {
-        if self.coefficients.is_empty() {
-            output.extend_from_slice(input);
-            self.samples_seen += input.len();
-            return;
-        }
-
-        for sample in input {
-            self.push_sample(*sample);
-            if self.samples_seen > self.shift {
-                output.push(self.current_output_sample());
-                self.samples_emitted += 1;
-            }
-        }
+        self.inner.process_mono_samples(input, output);
     }
 
     /// Flushes delayed end-of-stream samples by appending the remaining output.
     ///
     /// This method consumes the state so a stream cannot accidentally be
     /// flushed twice.
-    pub fn finish(mut self, output: &mut Vec<f32>) {
-        if self.coefficients.is_empty() {
-            return;
-        }
-
-        let target_samples = self.samples_seen;
-        for _ in 0..self.shift {
-            self.push_sample(0.0);
-            if self.samples_seen > self.shift && self.samples_emitted < target_samples {
-                output.push(self.current_output_sample());
-                self.samples_emitted += 1;
-            }
-        }
-    }
-
-    fn push_sample(&mut self, sample: f32) {
-        self.history.push_back(sample);
-        if self.history.len() > self.coefficients.len() {
-            self.history.pop_front();
-        }
-        self.samples_seen += 1;
-    }
-
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Auralis stores decoded samples as f32 after deterministic f64 FIR accumulation"
-    )]
-    fn current_output_sample(&self) -> f32 {
-        let newest_index = self.samples_seen - 1;
-        let oldest_index = self.samples_seen - self.history.len();
-        let mut value = 0.0;
-        for (coefficient_index, coefficient) in
-            self.coefficients.as_slice().iter().copied().enumerate()
-        {
-            if newest_index >= coefficient_index {
-                let input_index = newest_index - coefficient_index;
-                if input_index >= oldest_index {
-                    let history_index = input_index - oldest_index;
-                    value += f64::from(self.history[history_index]) * coefficient;
-                }
-            }
-        }
-
-        value as f32
+    pub fn finish(self, output: &mut Vec<f32>) {
+        self.inner.finish(output);
     }
 }
 
