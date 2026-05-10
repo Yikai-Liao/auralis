@@ -17,7 +17,11 @@ from auralis_testkit.golden_report import (
     golden_metrics,
     write_golden_failure_report,
 )
-from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng
+from auralis_testkit.sox_ng import (
+    SoxNgUnavailable,
+    run_sox_ng,
+    run_sox_ng_with_inputs,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_PATH = REPO_ROOT / "tests" / "golden" / "chains.toml"
@@ -44,7 +48,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
     case: dict[str, Any],
     tmp_path: Path,
 ) -> None:
-    input_path = _write_fixture(case["corpus_id"], tmp_path / case["input"])
+    input_paths = _write_fixtures(case, tmp_path)
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     auralis_effects_file = tmp_path / f"{case_id}.effects"
     auralis_effects_file_output = tmp_path / f"{case_id}.auralis.effects-file.wav"
@@ -62,8 +66,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         "auralis-cli",
         "--",
         "run",
-        str(input_path),
-        str(auralis_output),
+        *_auralis_pipeline_args(input_paths, auralis_output, case),
         *case["auralis"],
     ]
     auralis_effects_file_command = [
@@ -74,8 +77,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         "auralis-cli",
         "--",
         "run",
-        str(input_path),
-        str(auralis_effects_file_output),
+        *_auralis_pipeline_args(input_paths, auralis_effects_file_output, case),
         "--effects-file",
         str(auralis_effects_file),
     ]
@@ -95,7 +97,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
     )
 
     try:
-        sox_result = run_sox_ng(input_path, sox_output, case["sox_ng"])
+        sox_result = _run_sox_ng_pipeline(input_paths, sox_output, case)
     except SoxNgUnavailable as error:
         pytest.skip(str(error))
 
@@ -131,6 +133,8 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
             failures=failures,
         )
         report["auralis_effects_file_command"] = auralis_effects_file_result.args
+        if "combine" in case:
+            report["combine"] = case["combine"]
         write_golden_failure_report(report_path, report)
         pytest.fail(_failure_summary(failures) + f"; report={report_path}")
 
@@ -141,9 +145,56 @@ def _effects_file_source(args: list[str]) -> str:
     ) + "\n"
 
 
+def _write_fixtures(case: dict[str, Any], tmp_path: Path) -> list[Path]:
+    if "inputs" in case:
+        return [
+            _write_fixture(corpus_id, tmp_path / input_name)
+            for input_name, corpus_id in zip(case["inputs"], case["corpus_ids"], strict=True)
+        ]
+    return [_write_fixture(case["corpus_id"], tmp_path / case["input"])]
+
+
 def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return pcm16_corpus_fixture(path, corpus_id)
+
+
+def _auralis_pipeline_args(
+    input_paths: list[Path],
+    output_path: Path,
+    case: dict[str, Any],
+) -> list[str]:
+    args = [str(input_paths[0]), str(output_path)]
+    if len(input_paths) > 1:
+        args.extend(["--combine", case.get("combine", "concatenate")])
+        for input_path in input_paths[1:]:
+            args.extend(["--input", str(input_path)])
+    if "output_channels" in case:
+        args.extend(["--channels", str(case["output_channels"])])
+    if "output_sample_rate" in case:
+        args.extend(["--rate", str(case["output_sample_rate"])])
+    return args
+
+
+def _run_sox_ng_pipeline(
+    input_paths: list[Path],
+    output_path: Path,
+    case: dict[str, Any],
+) -> subprocess.CompletedProcess[bytes]:
+    kwargs = {
+        "output_channels": case.get("output_channels"),
+        "output_sample_rate": case.get("output_sample_rate"),
+        "disable_auto_dither": not case.get("sox_ng_auto_dither", False),
+    }
+    if len(input_paths) > 1:
+        return run_sox_ng_with_inputs(
+            input_paths,
+            output_path,
+            case["sox_ng"],
+            combine=case.get("combine", "concatenate"),
+            **kwargs,
+        )
+    return run_sox_ng(input_paths[0], output_path, case["sox_ng"], **kwargs)
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:

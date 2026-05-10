@@ -26,8 +26,9 @@ The current order is:
 2. Strengthen the test gates before more effect implementation: missing
    `sox_ng` now fails explicit release/gnhf golden checks through the Rust
    `golden` test filter and pytest `-m golden` gate; complex pipeline goldens
-   must still be covered, and coverage artifacts must still be produced by the
-   applicable gate.
+   now include the first multi-input combine-plus-effects case, while output
+   policy and boundary stress coverage remain pending, and coverage artifacts
+   must still be produced by the applicable gate.
 3. Continue Rust-first migration of critical SoX-ng golden and complex pipeline
    coverage. Python/pytest may remain as helper tooling, but key behavior gates
    should move into Rust/testkit where feasible.

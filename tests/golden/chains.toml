@@ -28,6 +28,16 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.chain_multi_input_mix_gain_reverse]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]
+combine = "mix"
+auralis = ["gain", "-3", "reverse"]
+sox_ng = ["gain", "-3", "reverse"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.chain_filter_fade_gain]
 input = "chains/stereo_ramp_tone.wav"
 corpus_id = "chains/stereo_ramp_tone"
