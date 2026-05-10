@@ -27,8 +27,8 @@ The current order is:
    `sox_ng` now fails explicit release/gnhf golden checks through the Rust
    `golden` test filter and pytest `-m golden` gate; complex pipeline goldens
    now include multi-input combine-plus-effects, output-channel policy plus
-   user-effects, and explicit `:` boundary stress cases, while coverage
-   artifacts must still be produced by the applicable gate.
+   user-effects, and explicit `:` boundary stress cases; the layered coverage
+   gate now writes a deterministic JSON artifact with `--report`.
 3. Continue Rust-first migration of critical SoX-ng golden and complex pipeline
    coverage. Python/pytest may remain as helper tooling, but key behavior gates
    should move into Rust/testkit where feasible.

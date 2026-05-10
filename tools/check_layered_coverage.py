@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
 import sys
 import tomllib
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -21,13 +24,34 @@ STATUSES = ("covered", "not_applicable")
 
 
 def main() -> int:
+    args = parse_args()
     errors = validate()
     if errors:
         for error in errors:
             print(f"layered coverage: {error}", file=sys.stderr)
         return 1
+    if args.report is not None:
+        report = build_report()
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(f"layered coverage: wrote report ({args.report})")
     print(f"layered coverage: ok ({COVERAGE_MATRIX.relative_to(REPO_ROOT)})")
     return 0
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate the checked-in L0-L7 layered coverage matrix.",
+    )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="write a deterministic JSON coverage-gate artifact",
+    )
+    return parser.parse_args()
 
 
 def validate() -> list[str]:
@@ -96,6 +120,44 @@ def validate() -> list[str]:
         )
 
     return errors
+
+
+def build_report() -> dict[str, Any]:
+    matrix = load_toml(COVERAGE_MATRIX, [])
+    subjects = matrix["subject"]
+    kind_counts: Counter[str] = Counter()
+    layer_totals: dict[str, Counter[str]] = {layer: Counter() for layer in LAYERS}
+    subject_reports: list[dict[str, Any]] = []
+
+    for subject in subjects:
+        kind_counts[subject["kind"]] += 1
+        layers = subject["layers"]
+        layer_statuses: dict[str, str] = {}
+        for layer in LAYERS:
+            status = layers[layer]["status"]
+            layer_statuses[layer] = status
+            layer_totals[layer][status] += 1
+        subject_reports.append(
+            {
+                "id": subject["id"],
+                "kind": subject["kind"],
+                "layers": layer_statuses,
+                "name": subject["name"],
+            }
+        )
+
+    return {
+        "schema": "auralis.layered_coverage.report.v1",
+        "matrix": str(COVERAGE_MATRIX.relative_to(REPO_ROOT)),
+        "schema_version": matrix["schema_version"],
+        "subject_count": len(subjects),
+        "kind_counts": dict(sorted(kind_counts.items())),
+        "layer_totals": {
+            layer: {status: layer_totals[layer][status] for status in STATUSES}
+            for layer in LAYERS
+        },
+        "subjects": sorted(subject_reports, key=lambda subject: subject["id"]),
+    }
 
 
 def validate_layers(subject: dict[str, Any], subject_id: str, errors: list[str]) -> None:

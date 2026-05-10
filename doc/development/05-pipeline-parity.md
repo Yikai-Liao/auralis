@@ -708,8 +708,11 @@ Implementation notes:
   tests for covered layers, requires narrow reasons for N/A layers, and checks
   that effect and combiner rows match the currently implemented registry and
   `CombineMethod` surface.
+- `tools/check_layered_coverage.py --report target/layered-coverage/report.json`
+  writes a deterministic JSON coverage-gate artifact summarizing subject
+  counts, kind counts, layer totals, and per-subject L0-L7 statuses.
 - `tools/pytest/tests/test_layered_coverage.py` runs the validator as part of
-  the uv-managed Python suite, making matrix updates a gate for future effect
-  and pipeline work.
+  the uv-managed Python suite and verifies report artifact generation, making
+  matrix updates a gate for future effect and pipeline work.
 - `DEVELOPMENT.md` now includes the matrix-update requirement in the feature
   acceptance checklist.

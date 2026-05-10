@@ -24,7 +24,9 @@ The checked-in coverage gate is
 tests, and N/A reason for each implemented effect and pipeline primitive. Run
 `python3 tools/check_layered_coverage.py` after changing effect, combiner,
 policy, parser, or test coverage so future feature work cannot drift away from
-the matrix.
+the matrix. Use
+`python3 tools/check_layered_coverage.py --report target/layered-coverage/report.json`
+when the validation run needs a durable coverage-gate artifact.
 
 This matrix is a coverage contract, not a line-coverage report. It must not be
 used as a substitute for `cargo llvm-cov` output when a feature changes
@@ -356,10 +358,11 @@ summary or LCOV path in the validation notes. The repository does not require a
 global percentage gate yet; touched-package coverage reports are the expected
 first step.
 
-Coverage report artifacts are a later acceptance requirement for milestones
-that change shared behavior, parser surfaces, or DSP modules. Until that gate
-is wired into CI, validation notes should name the generated summary or LCOV
-artifact explicitly when coverage was required.
+Coverage report artifacts are an acceptance requirement for milestones that
+change shared behavior, parser surfaces, or DSP modules. The layered coverage
+gate can write `target/layered-coverage/report.json`; line/module coverage can
+write `target/llvm-cov/l7-touched.info`. Validation notes should name the
+generated artifact explicitly when coverage was required.
 
 ---
 

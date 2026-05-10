@@ -45,7 +45,12 @@ oracle check during a broader test invocation.
 Pipeline-sensitive milestones should grow complex pipeline golden manifests in
 Rust/testkit first. Coverage report artifacts are expected for later milestones
 that touch shared behavior, parser surfaces, or DSP modules; record the summary
-or LCOV path in validation notes when that gate applies.
+or LCOV path in validation notes when that gate applies. The layered coverage
+gate can emit its artifact directly:
+
+```bash
+python3 tools/check_layered_coverage.py --report target/layered-coverage/report.json
+```
 
 ---
 
