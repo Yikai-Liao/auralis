@@ -810,6 +810,17 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_earwax_stereo_44100]
+input = "effects/earwax_stereo_44100.wav"
+corpus_id = "l0/sine_stereo_44100_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["earwax"]
+sox_ng = ["earwax"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
 [id.effect_chorus_mono_linear]
 input = "effects/chorus_mono.wav"
 corpus_id = "l0/sine_mono_32"

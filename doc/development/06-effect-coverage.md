@@ -33,5 +33,8 @@ Every effect feature must still follow the test contract in [`03-test-infrastruc
 - Feature 6.9.3 recorded `dop` as not planned for the effect registry because
   it is DSD-over-PCM transport packing, not PCM16 audio DSP. Reconsider it only
   in a future DSD/DoP format boundary.
+- Feature 6.9.4 classified and implemented `earwax` as a pure-Rust,
+  no-argument, stereo 44.1 kHz headphone-cue FIR with SoX-ng golden coverage and
+  stable invalid-shape diagnostics.
 - The next plan adjustment should continue in Milestone 6.9 by classifying
-  `earwax`, `ladspa`, and `sdm` before implementation work resumes.
+  `ladspa` and `sdm` before implementation work resumes.

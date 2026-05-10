@@ -83,22 +83,28 @@ support.
 
 Classify `earwax` as a pure-Rust effect candidate before implementation.
 
-Status: planned feasibility/classification leaf.
+Status: implemented.
 
-The classification pass must confirm whether the SoX-ng behavior can be derived
-from MIT-compatible documentation or clean-room analysis without copying GPL or
-native implementation code. If feasible, implementation planning must name the
-scalar reference behavior, SIMD applicability, golden comparison strategy, and
-L0-L7 coverage. If not feasible, the parser and CLI must expose a stable,
-actionable block diagnostic.
+The classification pass found a safe implementation path: SoX-ng implements
+`earwax` as a no-argument 64-tap interleaved stereo FIR for CD audio, and the
+effect source carries a file-local permissive notice allowing redistribution and
+use for any purpose. It does not require a native wrapper, GPL-derived external
+library, plugin host, or format-specific transport boundary.
 
-Expected output:
+Auralis now implements the same restricted surface:
 
-- Record `implemented`, `partial`, `blocked`, or `not planned`.
-- Keep native wrappers out of the implementation path.
-- Require tests for option parsing, channel-shape behavior, numerical bounds,
-  SoX-ng golden output where comparable, and scalar-vs-SIMD parity if the core
-  loop is data-parallel.
+- `earwax` is registered as a typed no-argument effect command.
+- Valid input must be stereo 44.1 kHz audio; other channel counts or sample
+  rates return a stable `earwax requires stereo audio sampled at 44100 Hz`
+  diagnostic.
+- The scalar reference path processes samples in SoX-ng's interleaved left/right
+  order, preserves the input frame count, and keeps explicit `EarwaxState` for
+  chunk-preserving tests.
+- L2 golden coverage compares Auralis and SoX-ng on a deterministic stereo
+  44.1 kHz corpus fixture.
+- SIMD is N/A for this leaf because the accepted behavior is a stateful
+  interleaved FIR reference path; vectorized FIR backend planning remains a
+  future shared primitive concern.
 
 ### Feature 6.9.5: `ladspa` host or stable block
 

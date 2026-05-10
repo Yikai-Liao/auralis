@@ -37,6 +37,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Compand(_)
         | EffectCommand::Delay(_)
         | EffectCommand::Downsample(_)
+        | EffectCommand::Earwax(_)
         | EffectCommand::Echo(_)
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
@@ -159,6 +160,11 @@ fn apply_buffer_command(
             *audio = echos
                 .process_buffer(audio)
                 .map_err(|source| ("delay-decay-pair", source))?;
+        }
+        EffectCommand::Earwax(earwax) => {
+            earwax
+                .process_buffer(audio)
+                .map_err(|source| ("input", source))?;
         }
         EffectCommand::Fade(fade) => {
             if fade.stop_position.is_some() {
@@ -411,6 +417,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
         EffectKind::Deemph
+        | EffectKind::Earwax
         | EffectKind::Oops
         | EffectKind::Reverse
         | EffectKind::Riaa

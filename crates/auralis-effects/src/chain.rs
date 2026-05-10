@@ -801,6 +801,7 @@ mod tests {
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Delay(_)
                 | EffectCommand::Downsample(_)
+                | EffectCommand::Earwax(_)
                 | EffectCommand::Echo(_)
                 | EffectCommand::Echos(_)
                 | EffectCommand::Fir(_)

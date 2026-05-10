@@ -24,6 +24,7 @@ CORPUS_IDS = (
     "l0/near_zero_mono_8",
     "l0/odd_length_mono_17",
     "l0/sine_stereo_32",
+    "l0/sine_stereo_44100_32",
     "l0/opposite_phase_stereo_32",
     "l0/opposite_phase_stereo_8192",
     "l0/short_mono_3",
@@ -94,6 +95,10 @@ def corpus_case(corpus_id: str) -> CorpusCase:
             _sine(32, 1_000.0, 0.5, 0.0),
             _sine(32, 500.0, 0.25, 0.25),
         ),
+        "l0/sine_stereo_44100_32": lambda: _stereo(
+            _sine(32, 1_000.0, 0.5, 0.0),
+            _sine(32, 500.0, 0.25, 0.25),
+        ),
         "l0/opposite_phase_stereo_32": lambda: _opposite_phase_stereo(32),
         "l0/opposite_phase_stereo_8192": lambda: _opposite_phase_stereo_8192(),
         "l0/short_mono_3": lambda: _mono(np.array([0.25, -0.25, 0.0], dtype=np.float32)),
@@ -129,7 +134,8 @@ def corpus_case(corpus_id: str) -> CorpusCase:
     except KeyError as error:
         raise ValueError(f"unknown corpus id {corpus_id!r}") from error
 
-    return CorpusCase(corpus_id, DEFAULT_SAMPLE_RATE, samples)
+    sample_rate = 44_100 if corpus_id == "l0/sine_stereo_44100_32" else DEFAULT_SAMPLE_RATE
+    return CorpusCase(corpus_id, sample_rate, samples)
 
 
 def pcm16_corpus_fixture(path: Path, corpus_id: str) -> Path:

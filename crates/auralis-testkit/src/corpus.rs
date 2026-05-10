@@ -27,6 +27,7 @@ pub const CORPUS_IDS: &[&str] = &[
     "l0/near_zero_mono_8",
     "l0/odd_length_mono_17",
     "l0/sine_stereo_32",
+    "l0/sine_stereo_44100_32",
     "l0/opposite_phase_stereo_32",
     "l0/opposite_phase_stereo_8192",
     "l0/short_mono_3",
@@ -192,6 +193,12 @@ pub fn corpus_case(id: &str) -> Result<CorpusCase, CorpusError> {
                 .collect(),
         ),
         "l0/sine_stereo_32" => stereo(id, sine(32, 1_000.0, 0.5, 0.0), sine(32, 500.0, 0.25, 0.25)),
+        "l0/sine_stereo_44100_32" => CorpusCase::from_planar_samples(
+            static_id(id),
+            44_100,
+            2,
+            stereo_samples(sine(32, 1_000.0, 0.5, 0.0), sine(32, 500.0, 0.25, 0.25)),
+        ),
         "l0/opposite_phase_stereo_32" => {
             let left = sine(32, 750.0, 0.5, 0.0);
             let right = left.iter().map(|sample| -*sample).collect();
@@ -232,9 +239,14 @@ fn mono(id: &str, samples: Vec<f32>) -> Result<CorpusCase, CorpusError> {
 }
 
 fn stereo(id: &str, left: Vec<f32>, right: Vec<f32>) -> Result<CorpusCase, CorpusError> {
+    let samples = stereo_samples(left, right);
+    CorpusCase::from_planar_samples(static_id(id), DEFAULT_SAMPLE_RATE, 2, samples)
+}
+
+fn stereo_samples(left: Vec<f32>, right: Vec<f32>) -> Vec<f32> {
     let mut samples = left;
     samples.extend(right);
-    CorpusCase::from_planar_samples(static_id(id), DEFAULT_SAMPLE_RATE, 2, samples)
+    samples
 }
 
 fn static_id(id: &str) -> &'static str {
@@ -340,9 +352,14 @@ mod tests {
     fn every_listed_corpus_id_generates_a_well_formed_case() {
         for &id in CORPUS_IDS {
             let case = corpus_case(id).unwrap();
+            let expected_sample_rate = if id == "l0/sine_stereo_44100_32" {
+                44_100
+            } else {
+                48_000
+            };
 
             assert_eq!(case.id(), id);
-            assert_eq!(case.sample_rate(), 48_000);
+            assert_eq!(case.sample_rate(), expected_sample_rate);
             assert_eq!(
                 case.planar_samples().len(),
                 case.channels() as usize * case.frames()

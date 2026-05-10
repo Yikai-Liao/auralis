@@ -25,6 +25,7 @@ use crate::command_deemph::parse_deemph;
 use crate::command_delay::{parse_delay, render_delay};
 use crate::command_dither::{parse_dither, render_dither};
 use crate::command_downsample::{parse_downsample, render_downsample};
+use crate::command_earwax::parse_earwax;
 use crate::command_echo::{parse_echo, render_echo};
 use crate::command_echos::{parse_echos, render_echos};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
@@ -72,11 +73,12 @@ use crate::command_vad::{parse_vad, render_vad};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Compand,
-    Contrast, DcShift, Deemph, Delay, Dither, Downsample, Echo, Echos, EffectError, EffectKind,
-    EffectNameError, EffectRegistry, Equalizer, Fade, Fir, FirFit, Flanger, Gain, HighPass,
-    Hilbert, Loudness, LowPass, MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive, Pad, Phaser,
-    Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, Silence, Sinc, SoftVol, Speed,
-    Splice, Stat, Stats, Stretch, Swap, Synth, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
+    Contrast, DcShift, Deemph, Delay, Dither, Downsample, Earwax, Echo, Echos, EffectError,
+    EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Fir, FirFit, Flanger, Gain,
+    HighPass, Hilbert, Loudness, LowPass, MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive,
+    Pad, Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, Silence, Sinc,
+    SoftVol, Speed, Splice, Stat, Stats, Stretch, Swap, Synth, Tempo, Treble, Tremolo, Trim,
+    Upsample, Vad, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -122,6 +124,8 @@ pub enum EffectCommand {
     Dither(Dither),
     /// SoX-ng-style decimating downsample.
     Downsample(Downsample),
+    /// SoX-ng-style headphone-cue FIR for CD audio.
+    Earwax(Earwax),
     /// SoX-ng-style parallel echo delay line.
     Echo(Echo),
     /// SoX-ng-style cascaded echo delay line.
@@ -245,6 +249,7 @@ impl EffectCommand {
             EffectKind::Delay => parse_delay(effect, args),
             EffectKind::Dither => parse_dither(effect, args),
             EffectKind::Downsample => parse_downsample(effect, args),
+            EffectKind::Earwax => parse_earwax(effect, args),
             EffectKind::Echo => parse_echo(effect, args),
             EffectKind::Echos => parse_echos(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
@@ -314,6 +319,7 @@ impl EffectCommand {
             Self::Delay(_) => EffectKind::Delay,
             Self::Dither(_) => EffectKind::Dither,
             Self::Downsample(_) => EffectKind::Downsample,
+            Self::Earwax(_) => EffectKind::Earwax,
             Self::Echo(_) => EffectKind::Echo,
             Self::Echos(_) => EffectKind::Echos,
             Self::Equalizer(_) => EffectKind::Equalizer,
@@ -389,6 +395,7 @@ impl EffectCommand {
             Self::Delay(delay) => render_delay(delay),
             Self::Dither(dither) => render_dither(*dither),
             Self::Downsample(downsample) => render_downsample(*downsample),
+            Self::Earwax(_) => vec!["earwax".to_owned()],
             Self::Echo(echo) => render_echo(echo),
             Self::Echos(echos) => render_echos(echos),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),

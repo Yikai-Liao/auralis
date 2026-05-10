@@ -49,6 +49,7 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_dither_stereo_sloped_p8",
             "effect_downsample_mono_default",
             "effect_downsample_stereo_factor_3",
+            "effect_earwax_stereo_44100",
             "effect_echo_mono_delay",
             "effect_echo_stereo_zero_delay",
             "effect_echos_mono_cascaded",
@@ -197,6 +198,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "delay",
         "dither",
         "downsample",
+        "earwax",
         "upsample",
         "echo",
         "echos",
@@ -248,7 +250,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
             .iter()
             .any(|(id, case)| id.contains(effect) && case.corpus_id().unwrap().contains("stereo"));
 
-        if !matches!(effect, "oops" | "centercut") {
+        if !matches!(effect, "oops" | "centercut" | "earwax") {
             assert!(mono, "missing mono standalone golden case for {effect}");
         }
         assert!(stereo, "missing stereo standalone golden case for {effect}");

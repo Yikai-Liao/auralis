@@ -56,6 +56,8 @@ pub enum EffectKind {
     Dither,
     /// SoX-ng-style decimating downsample.
     Downsample,
+    /// SoX-ng-style headphone-cue FIR for CD audio.
+    Earwax,
     /// SoX-ng-style parallel echo delay line.
     Echo,
     /// SoX-ng-style cascaded echo delay line.
@@ -383,6 +385,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Downsample",
         "downsample [factor]",
         "drop frames by a fixed integer decimation factor",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Earwax,
+        "earwax",
+        &[],
+        "Earwax",
+        "earwax",
+        "apply CD-stereo headphone spatial cues",
     ),
     EffectDescriptor::new(
         EffectKind::Echo,

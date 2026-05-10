@@ -12,10 +12,10 @@ The core rule:
 
 ## Current priority
 
-The current development queue is blocked on planning and test-gate debt, not on
-the old `18d002f` dither-order correction. Recent gnhf work reached specialized
-effects planning and exposed that `dolbyb` is not ready to proceed as the next
-implementation target without rebalancing the roadmap and golden-test gates.
+The current development queue is blocked on specialized-effect classification
+and test-gate debt, not on the old `18d002f` dither-order correction. Recent
+gnhf work classified `dolbyb`, `dop`, and `earwax`; the remaining 6.9 work must
+continue with `ladspa` and `sdm` before normal implementation planning resumes.
 
 The current order is:
 

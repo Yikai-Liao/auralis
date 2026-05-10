@@ -247,6 +247,21 @@ l6 = { status = "not_applicable", reason = "Downsample copies selected frame pos
 l7 = { status = "covered", reason = "Effect command fuzzing covers downsample factor parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/downsample"] }
 
 [[subject]]
+id = "effect.earwax"
+kind = "effect"
+name = "earwax"
+summary = "SoX-ng-style CD-stereo headphone-cue FIR filter."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden coverage uses a deterministic stereo 44.1 kHz L0 corpus ID because SoX-ng earwax rejects other rates and channel counts.", tests = ["crates/auralis-testkit/src/corpus.rs", "tools/pytest/auralis_testkit/corpus.py", "tests/golden/effects.toml"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "A standalone SoX-ng golden case covers the no-argument stereo 44.1 kHz earwax command.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover the interleaved FIR impulse response, command parsing, canonical rendering, chain execution, valid-shape preservation, clipping bounds, and invalid sample-rate/channel diagnostics.", tests = ["crates/auralis-effects/src/earwax.rs", "crates/auralis-effects/src/command_earwax.rs", "crates/auralis-effects/tests/earwax.rs"] }
+l4 = { status = "covered", reason = "Integration coverage checks finite deterministic output for a bounded stereo 44.1 kHz fixture.", tests = ["crates/auralis-effects/tests/earwax.rs"] }
+l5 = { status = "covered", reason = "EarwaxState coverage checks whole-buffer output against chunked frame processing with preserved interleaved FIR state.", tests = ["crates/auralis-effects/tests/earwax.rs"] }
+l6 = { status = "not_applicable", reason = "Feature 6.9.4 implements the scalar reference stateful FIR path; SIMD remains N/A until a future vectorized FIR backend is planned.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers earwax parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/earwax"] }
+
+[[subject]]
 id = "effect.upsample"
 kind = "effect"
 name = "upsample"

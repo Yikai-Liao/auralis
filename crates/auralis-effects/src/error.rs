@@ -71,6 +71,10 @@ pub enum EffectError {
     #[error("echos output frame count exceeds representable audio buffer length")]
     EchosLengthOverflow,
 
+    /// An earwax command was applied to non-CD-stereo input.
+    #[error("earwax requires stereo audio sampled at 44100 Hz")]
+    InvalidEarwaxInput,
+
     /// A chorus processor had invalid gains, delay parameters, or modulation settings.
     #[error(
         "chorus gains and decay must be finite in -1..=1, delay/depth must be finite and non-negative, speed must be finite and positive, and the resolved delay line must fit the output buffer"
