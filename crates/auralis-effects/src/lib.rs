@@ -35,6 +35,7 @@ mod chain;
 mod chain_dispatch;
 mod chain_gain;
 mod channels;
+mod chorus;
 mod command;
 mod command_allpass;
 mod command_band;
@@ -116,6 +117,7 @@ pub use chain::{
     EffectChainParseError, parse_effect_chain,
 };
 pub use channels::Channels;
+pub use chorus::{Chorus, ChorusStage};
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use contrast::Contrast;
 pub use dcshift::DcShift;

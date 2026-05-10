@@ -31,7 +31,7 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
-`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Echo`, `Echos`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Echo`, `Echos`, `Chorus`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 and `Vol` effect processors, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
 fade, and vol, and the CLI gain/channels/norm/contrast/softvol/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/vol transforms are implemented. The Rust
@@ -86,6 +86,10 @@ high-pass filter with optional width units and the single-pole `-1` form.
 The implemented `riaa` command covers SoX-ng's no-argument RIAA playback
 equalization filter at 44.1 kHz, 48 kHz, 88.2 kHz, 96 kHz, and 192 kHz with
 0 dB normalization at 1 kHz.
+The typed `Chorus` processor covers the scalar single-stage sinusoidal chorus
+core with gain-in/gain-out, fixed delay, decay, speed, depth, clipping, and
+explicit tail extension. The SoX-ng command surface for interpolation flags
+and multiple delay stages remains scheduled in DEVELOPMENT.md.
 The Rust testkit includes deterministic sample comparison metrics for max absolute
 error, RMS error, SNR, peak, and DC offset. The uv-based Python testkit exposes
 shared corpus, metric, and SoX-ng wrapper helpers for cross-language golden

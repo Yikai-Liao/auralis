@@ -834,6 +834,27 @@ Implementation notes:
 
 ### Feature 6.5.4: `chorus` core
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Chorus` processor and `ChorusStage` configuration for the
+  scalar single-stage sine-modulated delay core. The processor applies
+  gain-in, one delayed stage scaled by decay, gain-out, full-scale clipping,
+  and output tail extension by the maximum resolved delay.
+- Delay and depth are configured in milliseconds and resolved against the
+  input sample rate at processing time. The core rejects non-finite values,
+  out-of-range gains/decay, negative timing parameters, zero resolved delay
+  lines, and modulation speeds above the sample rate.
+- Latency is the current modulated delay, and tail behavior is explicit:
+  whole-buffer processing extends the output by `ceil(delay + depth)` frames.
+  A future streaming API can be exact only if it preserves the per-channel
+  delay line, modulation phase, and exposes a final zero-input flush.
+- Coverage includes analytical typed-processor tests and L4 finite-output
+  property coverage. The SoX-ng command parser, golden tests, interpolation
+  options, waveform selection, and multi-delay command surface remain owned by
+  Feature 6.5.5.
+
 ### Feature 6.5.5: `chorus` interpolation and multi-delay options
 
 ### Feature 6.5.6: `flanger`

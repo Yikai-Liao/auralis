@@ -5,9 +5,10 @@ use auralis_core::{
 };
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade,
-    Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource,
-    Repeat, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos,
+    EchosTap, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix,
+    RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap,
+    Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -407,6 +408,16 @@ proptest! {
                 .process_buffer(&source)
                 .expect("small generated echos cannot overflow");
         prop_assert_all_finite(&cascaded_echoed)?;
+
+        let chorused = Chorus::new(
+            0.5,
+            0.5,
+            ChorusStage::new(1.0, 0.25, 0.25, 1.0).expect("chorus stage is valid"),
+        )
+        .expect("chorus fixture is valid")
+        .process_buffer(&source)
+        .expect("small generated chorus cannot overflow");
+        prop_assert_all_finite(&chorused)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

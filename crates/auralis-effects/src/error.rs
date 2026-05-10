@@ -67,6 +67,16 @@ pub enum EffectError {
     #[error("echos output frame count exceeds representable audio buffer length")]
     EchosLengthOverflow,
 
+    /// A chorus processor had invalid gains, delay parameters, or modulation settings.
+    #[error(
+        "chorus gains and decay must be finite in -1..=1, delay/depth/speed must be finite and non-negative, and the resolved delay line must fit the output buffer"
+    )]
+    InvalidChorus,
+
+    /// A chorus processor would create a buffer shape that cannot be represented.
+    #[error("chorus output frame count exceeds representable audio buffer length")]
+    ChorusLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,
