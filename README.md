@@ -41,6 +41,9 @@ to typed descriptors, parsed command tokens become typed effect configs, and
 unknown names or unsupported SoX-ng options return stable diagnostics. Parsed
 commands can be grouped into an in-memory `EffectChain` and executed in order
 with indexed command-context errors and forced scalar/SIMD backend selection.
+The crate also includes the typed `Compand` argument parser and reusable
+SoX-ng-style companding transfer-function model; executable `compand`
+processing remains scheduled for the next dynamics feature.
 The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata,
 `gain -n` peak normalization, `gain -l` limiting, and channel-aware `gain -e`,
 `gain -B`, and `gain -b` scans: `gain -h DB` applies the fixed attenuation and

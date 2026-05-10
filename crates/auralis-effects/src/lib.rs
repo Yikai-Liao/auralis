@@ -86,6 +86,7 @@ mod command_tremolo;
 mod command_trim;
 mod command_upsample;
 mod command_vol;
+mod compand;
 mod contrast;
 mod dcshift;
 mod deemph;
@@ -146,6 +147,7 @@ pub use chain::{
 pub use channels::Channels;
 pub use chorus::{Chorus, ChorusInterpolation, ChorusStage, ChorusWave};
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
+pub use compand::{Compand, CompandAttackDecay, CompandTransfer, CompandTransferPoint};
 pub use contrast::Contrast;
 pub use dcshift::DcShift;
 pub use deemph::Deemph;

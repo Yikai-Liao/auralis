@@ -1219,6 +1219,27 @@ Implementation notes:
 
 ### Feature 6.7.1: `compand` parser and transfer function
 
+Status: implemented.
+
+Implementation notes:
+
+- Added public `Compand`, `CompandAttackDecay`, `CompandTransfer`, and
+  `CompandTransferPoint` typed APIs for the SoX-ng argument shape
+  `attack,decay{,attack,decay} [soft-knee-dB:]in-dB1[,out-dB1]{,in-dB2,out-dB2}
+  [gain [initial-volume-dB [delay]]]`.
+- The typed parser validates finite non-negative attack/decay and delay
+  values, finite post gain, initial volume at or below 0 dBFS, transfer levels
+  at or below 0 dBFS, `-inf` transfer values, and strictly increasing transfer
+  input levels.
+- The transfer-function implementation mirrors SoX-ng's dB-space gain table:
+  optional soft-knee parsing, the 0.01 dB minimum effective knee, automatic
+  0,0 endpoint insertion, colinear point joining, quadratic knee segments, and
+  post-gain application are covered by analytical unit tests.
+- This feature intentionally does not register `compand` as an executable
+  effect command and does not add L2 golden rows yet; Feature 6.7.2 owns the
+  stateful envelope follower, delay handling, effect registry integration,
+  CLI/chain dispatch, L0-L7 matrix row, fuzz seed, and SoX-ng golden coverage.
+
 ### Feature 6.7.2: `compand` processor
 
 ### Feature 6.7.3: `mcompand`

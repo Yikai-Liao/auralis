@@ -189,6 +189,12 @@ pub enum EffectError {
     #[error("splice state or output frame count exceeds representable audio buffer length")]
     SpliceLengthOverflow,
 
+    /// A compand command had invalid timing, transfer, gain, volume, or delay parameters.
+    #[error(
+        "compand attack/decay times, transfer points, gain, initial volume, and delay must be finite SoX-ng-compatible values"
+    )]
+    InvalidCompand,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,
