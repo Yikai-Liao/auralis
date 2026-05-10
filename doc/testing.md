@@ -66,9 +66,10 @@ pipeline-sensitive milestones; do not treat standalone effect golden coverage
 as sufficient once behavior depends on ordering, boundaries, combine modes, or
 output policies.
 The current chain golden gate includes a multi-input `mix` pipeline followed by
-user effects and validates both positional CLI arguments and the equivalent
-effects-file path against SoX-ng. Output-policy and chain-boundary stress cases
-remain future complex-pipeline coverage work.
+user effects and an explicit output-channel policy case after user effects. It
+validates both positional CLI arguments and the equivalent effects-file path
+against SoX-ng. Chain-boundary stress cases remain future complex-pipeline
+coverage work.
 
 ### L0: deterministic corpus
 

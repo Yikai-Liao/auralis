@@ -38,6 +38,17 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.chain_output_channels_gain_reverse]
+input = "auto/stereo_channels.wav"
+corpus_id = "auto/stereo_channels"
+output_channels = 1
+sox_ng_auto_channels = true
+auralis = ["gain", "-3", "reverse"]
+sox_ng = ["gain", "-3", "reverse"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.chain_filter_fade_gain]
 input = "chains/stereo_ramp_tone.wav"
 corpus_id = "chains/stereo_ramp_tone"

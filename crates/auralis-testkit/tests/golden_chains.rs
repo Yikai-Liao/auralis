@@ -16,7 +16,8 @@ fn chain_golden_manifest_records_representative_chain_cases() {
             "chain_filter_fade_gain",
             "chain_gain_headroom_reclaim",
             "chain_level_gain_dcshift_gain",
-            "chain_multi_input_mix_gain_reverse"
+            "chain_multi_input_mix_gain_reverse",
+            "chain_output_channels_gain_reverse"
         ]
     );
 }
@@ -28,6 +29,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
     let level = manifest.get("chain_level_gain_dcshift_gain").unwrap();
     let filter = manifest.get("chain_filter_fade_gain").unwrap();
     let multi_input = manifest.get("chain_multi_input_mix_gain_reverse").unwrap();
+    let output_policy = manifest.get("chain_output_channels_gain_reverse").unwrap();
 
     assert_eq!(
         editing.auralis_args(),
@@ -63,6 +65,17 @@ fn chain_golden_manifest_renders_recorded_commands() {
             "out.wav",
         ),
         "sox_ng -R -D --combine mix front.wav tail.wav out.wav gain -3 reverse"
+    );
+
+    assert_eq!(output_policy.output_channels(), Some(1));
+    assert!(output_policy.sox_ng_auto_channels_inserted());
+    assert_eq!(
+        output_policy.render_auralis_command_line("auralis", "input.wav", "out.wav"),
+        "auralis run input.wav out.wav --channels 1 gain -3 reverse"
+    );
+    assert_eq!(
+        output_policy.render_sox_ng_command_line("sox_ng", "input.wav", "out.wav"),
+        "sox_ng -R -D input.wav --channels 1 out.wav gain -3 reverse"
     );
 }
 

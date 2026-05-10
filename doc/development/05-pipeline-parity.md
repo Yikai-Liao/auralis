@@ -76,11 +76,13 @@ Implementation notes:
 
 - `tests/golden/chains.toml` includes simple editing, level, and filter-style
   chains plus the first complex multi-input pipeline golden case: `mix`
-  combine followed by user `gain` and `reverse` effects.
+  combine followed by user `gain` and `reverse` effects. It also includes an
+  output-channel policy case that applies user `gain` and `reverse` effects
+  before the output boundary downmix.
 - The pytest chain runner executes both positional CLI chains and equivalent
   effects-file chains before comparing the positional output with SoX-ng, so
-  the complex case covers combine ordering and effects-file equivalence in the
-  same L2 gate.
+  the complex cases cover combine ordering, output-policy ordering, and
+  effects-file equivalence in the same L2 gate.
 
 ## Milestone 5.3: effects files and chain boundaries
 
