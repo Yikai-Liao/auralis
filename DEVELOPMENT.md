@@ -14,8 +14,8 @@ The core rule:
 
 The current development queue is blocked on specialized-effect classification
 and test-gate debt, not on the old `18d002f` dither-order correction. Recent
-gnhf work classified `dolbyb`, `dop`, and `earwax`; the remaining 6.9 work must
-continue with `ladspa` and `sdm` before normal implementation planning resumes.
+gnhf work classified `dolbyb`, `dop`, `earwax`, and `ladspa`; the remaining 6.9
+work must continue with `sdm` before normal implementation planning resumes.
 
 The current order is:
 

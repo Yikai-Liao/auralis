@@ -81,6 +81,9 @@ pub(crate) fn classified_sox_ng_effect_diagnostic(name: &str) -> Option<&'static
         "dop" => Some(
             "not planned in the Auralis effect registry: DoP is DSD-over-PCM transport packing from 1-bit DSD into 24-bit PCM samples, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... dop ...` for DoP transport or wait for future DSD/DoP format support",
         ),
+        "ladspa" => Some(
+            "blocked in Auralis: LADSPA support requires loading native external plugins through LADSPA_PATH and a plugin-host ABI, while Auralis currently accepts only MIT-compatible pure Rust effects; use `sox_ng ... ladspa ...` for LADSPA plugins or wait for a future external-host boundary",
+        ),
         _ => None,
     }
 }

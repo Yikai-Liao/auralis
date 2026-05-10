@@ -110,22 +110,29 @@ Auralis now implements the same restricted surface:
 
 Classify LADSPA before adding any host integration.
 
-Status: planned feasibility/classification leaf.
+Status: blocked.
 
-The default expectation is blocked or not planned unless Auralis deliberately
-adds an external plugin-host boundary in a later policy change. A normal effect
-implementation must not load native LADSPA plugins, link against a host library,
-or expose plugin ABI details through `auralis-core`.
+The current SoX-ng-compatible path is an external native plugin host, not a
+pure Rust DSP effect. SoX-ng enables `ladspa` only when LADSPA headers and the
+libltdl dynamic-loader path are available, accepts `-l` latency compensation and
+`-r` mono-plugin replication, searches `LADSPA_PATH`, opens a plugin module,
+resolves `ladspa_descriptor`, selects a plugin label or index, maps control
+ports, and runs plugin-provided native code. The behavior, channel count,
+latency, control defaults, and license therefore depend on the user's installed
+plugins.
 
-Expected output:
+Auralis currently has no external plugin-host boundary and must not load native
+LADSPA modules, link a host library, or expose plugin ABI details through
+`auralis-core`. `ladspa` remains outside the implemented registry until a future
+policy deliberately adds an isolated external-host layer.
 
-- Record `implemented`, `partial`, `blocked`, or `not planned`.
-- If blocked, provide stable CLI diagnostics that explain LADSPA requires an
-  external native plugin host and is outside the current MIT-compatible pure
-  Rust effect policy.
-- If a future policy creates a host boundary, keep it outside public core APIs
-  and require integration tests for discovery errors, load failures, parameter
-  validation, host isolation, and deterministic diagnostics.
+Parser, registry visibility, and CLI diagnostics are locked by Rust tests:
+`ladspa` is a known SoX-ng effect, resolves to
+`UnsupportedSoxNgEffect { name: "ladspa" }`, and tells users to run
+`sox_ng ... ladspa ...` for LADSPA plugins or wait for a future external-host
+boundary. L0 deterministic fixtures, L2 SoX-ng golden comparisons, scalar DSP,
+chunk invariance, and SIMD are N/A because Auralis intentionally does not host
+native LADSPA plugins in the current pure-Rust effect registry.
 
 ### Feature 6.9.6: `sdm` feasibility and spec
 

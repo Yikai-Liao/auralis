@@ -36,5 +36,9 @@ Every effect feature must still follow the test contract in [`03-test-infrastruc
 - Feature 6.9.4 classified and implemented `earwax` as a pure-Rust,
   no-argument, stereo 44.1 kHz headphone-cue FIR with SoX-ng golden coverage and
   stable invalid-shape diagnostics.
+- Feature 6.9.5 recorded `ladspa` as blocked because SoX-ng-compatible behavior
+  requires an external native LADSPA plugin host, dynamic module loading through
+  `LADSPA_PATH`, and plugin-dependent code, parameters, channel counts, latency,
+  and licensing.
 - The next plan adjustment should continue in Milestone 6.9 by classifying
-  `ladspa` and `sdm` before implementation work resumes.
+  `sdm` before implementation work resumes.

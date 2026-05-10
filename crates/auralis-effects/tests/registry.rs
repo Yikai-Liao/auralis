@@ -124,6 +124,10 @@ fn blocked_known_effects_return_actionable_diagnostics() {
             "dop",
             "known SoX-ng effect `dop` is not planned in the Auralis effect registry: DoP is DSD-over-PCM transport packing from 1-bit DSD into 24-bit PCM samples, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... dop ...` for DoP transport or wait for future DSD/DoP format support",
         ),
+        (
+            "ladspa",
+            "known SoX-ng effect `ladspa` is blocked in Auralis: LADSPA support requires loading native external plugins through LADSPA_PATH and a plugin-host ABI, while Auralis currently accepts only MIT-compatible pure Rust effects; use `sox_ng ... ladspa ...` for LADSPA plugins or wait for a future external-host boundary",
+        ),
     ];
 
     for (name, message) in cases {
