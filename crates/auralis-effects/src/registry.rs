@@ -413,7 +413,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "rate",
         &[],
         "Rate",
-        "rate [-q|-l] frequency",
+        "rate [-q|-l|-m|-g|-h|-e|-v|-u] frequency",
         "convert decoded audio to an explicit sample rate",
     ),
     EffectDescriptor::new(

@@ -35,23 +35,33 @@ fn parse_quality<'a>(
     args: &'a [&'a str],
 ) -> CommandResult<(RateQuality, &'a [&'a str])> {
     match args {
-        ["-q", rest @ ..] => Ok((RateQuality::Quick, rest)),
-        ["-l", rest @ ..] => Ok((RateQuality::Low, rest)),
-        ["-Q", value, rest @ ..] => match *value {
-            "0" => Ok((RateQuality::Quick, rest)),
-            "1" => Ok((RateQuality::Low, rest)),
-            _ => Err(EffectCommandParseError::UnsupportedOption {
+        ["-Q", rest @ ..] => parse_quality_number(effect, rest),
+        [option, rest @ ..] => {
+            if let Some(quality) = RateQuality::from_command_option(option) {
+                Ok((quality, rest))
+            } else {
+                Ok((RateQuality::Default, args))
+            }
+        }
+        _ => Ok((RateQuality::Default, args)),
+    }
+}
+
+fn parse_quality_number<'a>(
+    effect: &'static str,
+    args: &'a [&'a str],
+) -> CommandResult<(RateQuality, &'a [&'a str])> {
+    match args {
+        [value, rest @ ..] => RateQuality::from_quality_number(value)
+            .map(|quality| (quality, rest))
+            .ok_or_else(|| EffectCommandParseError::UnsupportedOption {
                 effect,
                 option: format!("-Q {value}"),
             }),
-        },
-        [value, ..] if matches!(*value, "-m" | "-g" | "-h" | "-e" | "-v" | "-u") => {
-            Err(EffectCommandParseError::UnsupportedOption {
-                effect,
-                option: (*value).to_owned(),
-            })
-        }
-        _ => Ok((RateQuality::Default, args)),
+        [] => Err(EffectCommandParseError::MissingArgument {
+            effect,
+            argument: "quality",
+        }),
     }
 }
 
@@ -95,11 +105,45 @@ fn parse_sample_rate(effect: &'static str, value: &str) -> CommandResult<SampleR
 }
 
 impl RateQuality {
+    fn from_command_option(option: &str) -> Option<Self> {
+        match option {
+            "-q" => Some(Self::Quick),
+            "-l" => Some(Self::Low),
+            "-m" => Some(Self::Medium),
+            "-g" => Some(Self::Generic),
+            "-h" => Some(Self::High),
+            "-e" => Some(Self::Extreme),
+            "-v" => Some(Self::VeryHigh),
+            "-u" => Some(Self::Ultra),
+            _ => None,
+        }
+    }
+
+    fn from_quality_number(value: &str) -> Option<Self> {
+        match value {
+            "0" => Some(Self::Quick),
+            "1" => Some(Self::Low),
+            "2" => Some(Self::Medium),
+            "3" => Some(Self::Generic),
+            "4" => Some(Self::High),
+            "5" => Some(Self::Extreme),
+            "6" => Some(Self::VeryHigh),
+            "7" => Some(Self::Ultra),
+            _ => None,
+        }
+    }
+
     fn command_option(self) -> Option<&'static str> {
         match self {
             Self::Default => None,
             Self::Quick => Some("-q"),
             Self::Low => Some("-l"),
+            Self::Medium => Some("-m"),
+            Self::Generic => Some("-g"),
+            Self::High => Some("-h"),
+            Self::Extreme => Some("-e"),
+            Self::VeryHigh => Some("-v"),
+            Self::Ultra => Some("-u"),
         }
     }
 }
@@ -151,6 +195,62 @@ mod tests {
     }
 
     #[test]
+    fn parses_high_quality_modes() {
+        let sample_rate = SampleRate::new(48_000).unwrap();
+        let cases = [
+            (
+                ["-m", "48k"],
+                Rate::medium(sample_rate),
+                ["rate", "-m", "48000"],
+            ),
+            (
+                ["-g", "48k"],
+                Rate::generic(sample_rate),
+                ["rate", "-g", "48000"],
+            ),
+            (
+                ["-h", "48k"],
+                Rate::high(sample_rate),
+                ["rate", "-h", "48000"],
+            ),
+            (
+                ["-e", "48k"],
+                Rate::extreme(sample_rate),
+                ["rate", "-e", "48000"],
+            ),
+            (
+                ["-v", "48k"],
+                Rate::very_high(sample_rate),
+                ["rate", "-v", "48000"],
+            ),
+            (
+                ["-u", "48k"],
+                Rate::ultra(sample_rate),
+                ["rate", "-u", "48000"],
+            ),
+        ];
+
+        for (args, expected, rendered) in cases {
+            let command = parse_rate("rate", &args).unwrap();
+            assert_eq!(command, EffectCommand::Rate(expected));
+            assert_eq!(command.render_tokens(), rendered);
+        }
+
+        assert_eq!(
+            parse_rate("rate", &["-Q", "2", "48k"])
+                .unwrap()
+                .render_tokens(),
+            ["rate", "-m", "48000"]
+        );
+        assert_eq!(
+            parse_rate("rate", &["-Q", "7", "48k"])
+                .unwrap()
+                .render_tokens(),
+            ["rate", "-u", "48000"]
+        );
+    }
+
+    #[test]
     fn rejects_missing_invalid_option_and_extra_arguments() {
         assert_eq!(
             parse_rate("rate", &[]).unwrap_err(),
@@ -183,10 +283,17 @@ mod tests {
             }
         );
         assert_eq!(
-            parse_rate("rate", &["-Q", "4", "24000"]).unwrap_err(),
+            parse_rate("rate", &["-Q"]).unwrap_err(),
+            EffectCommandParseError::MissingArgument {
+                effect: "rate",
+                argument: "quality",
+            }
+        );
+        assert_eq!(
+            parse_rate("rate", &["-Q", "8", "24000"]).unwrap_err(),
             EffectCommandParseError::UnsupportedOption {
                 effect: "rate",
-                option: "-Q 4".to_owned(),
+                option: "-Q 8".to_owned(),
             }
         );
         assert_eq!(

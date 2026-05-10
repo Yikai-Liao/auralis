@@ -4,11 +4,10 @@ use crate::{EffectError, Result};
 
 /// SoX-ng-style sample-rate conversion.
 ///
-/// `Rate` changes decoded audio to an explicit target sample rate. Quick and
-/// low-quality modes are part of the typed command model and currently share
-/// the deterministic scalar linear resampler; later `rate` features own the
-/// higher-quality filter families, override options, and sharper pass-band or
-/// aliasing behavior.
+/// `Rate` changes decoded audio to an explicit target sample rate. SoX-ng
+/// quality modes are part of the typed command model and currently share the
+/// deterministic scalar linear resampler; later `rate` features own override
+/// options and sharper pass-band or aliasing behavior.
 ///
 /// # Errors
 ///
@@ -59,6 +58,18 @@ pub enum RateQuality {
     Quick,
     /// SoX-ng `-l` / `-Q 1` low-quality mode.
     Low,
+    /// SoX-ng `-m` / `-Q 2` medium-quality mode.
+    Medium,
+    /// SoX-ng `-g` / `-Q 3` generic-quality mode.
+    Generic,
+    /// SoX-ng `-h` / `-Q 4` high-quality mode.
+    High,
+    /// SoX-ng `-e` / `-Q 5` extreme-quality mode.
+    Extreme,
+    /// SoX-ng `-v` / `-Q 6` very-high-quality mode.
+    VeryHigh,
+    /// SoX-ng `-u` / `-Q 7` ultra-quality mode.
+    Ultra,
 }
 
 impl Rate {
@@ -81,6 +92,42 @@ impl Rate {
     #[must_use]
     pub const fn low(target_sample_rate: SampleRate) -> Self {
         Self::with_quality(target_sample_rate, RateQuality::Low)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-m` medium-quality mode.
+    #[must_use]
+    pub const fn medium(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Medium)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-g` generic-quality mode.
+    #[must_use]
+    pub const fn generic(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Generic)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-h` high-quality mode.
+    #[must_use]
+    pub const fn high(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::High)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-e` extreme-quality mode.
+    #[must_use]
+    pub const fn extreme(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Extreme)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-v` very-high-quality mode.
+    #[must_use]
+    pub const fn very_high(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::VeryHigh)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-u` ultra-quality mode.
+    #[must_use]
+    pub const fn ultra(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Ultra)
     }
 
     /// Creates a sample-rate conversion with an explicit quality family.
@@ -253,26 +300,32 @@ mod tests {
     }
 
     #[test]
-    fn quick_and_low_modes_use_the_same_deterministic_scaffold() {
+    fn quality_modes_use_the_same_deterministic_scaffold() {
         let audio = audio_buffer(48_000, vec![0.0, 1.0, 0.0]);
 
-        let quick = Rate::quick(SampleRate::new(96_000).unwrap())
+        let baseline = Rate::quick(SampleRate::new(96_000).unwrap())
             .process_buffer(&audio)
             .unwrap();
-        let low = Rate::low(SampleRate::new(96_000).unwrap())
-            .process_buffer(&audio)
-            .unwrap();
+        let expected = &[0.0, 0.5, 1.0, 0.5, 0.0, 0.0];
+        assert_eq!(baseline.as_planar_f32(), expected);
 
-        assert_eq!(
-            Rate::quick(SampleRate::new(96_000).unwrap()).quality,
-            RateQuality::Quick
-        );
-        assert_eq!(
-            Rate::low(SampleRate::new(96_000).unwrap()).quality,
-            RateQuality::Low
-        );
-        assert_eq!(quick.as_planar_f32(), &[0.0, 0.5, 1.0, 0.5, 0.0, 0.0]);
-        assert_eq!(low.as_planar_f32(), quick.as_planar_f32());
+        for quality in [
+            RateQuality::Quick,
+            RateQuality::Low,
+            RateQuality::Medium,
+            RateQuality::Generic,
+            RateQuality::High,
+            RateQuality::Extreme,
+            RateQuality::VeryHigh,
+            RateQuality::Ultra,
+        ] {
+            let rate = Rate::with_quality(SampleRate::new(96_000).unwrap(), quality);
+            assert_eq!(rate.quality, quality);
+            assert_eq!(
+                rate.process_buffer(&audio).unwrap().as_planar_f32(),
+                expected
+            );
+        }
     }
 
     #[test]

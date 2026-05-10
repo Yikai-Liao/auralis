@@ -44,6 +44,36 @@ fn rate_chain_parses_quick_and_low_quality_modes() {
 }
 
 #[test]
+fn rate_chain_parses_high_quality_modes() {
+    let medium = parse_effect_chain(&["rate", "-m", "24000"]).unwrap();
+    assert_eq!(
+        medium.commands(),
+        &[EffectCommand::Rate(Rate::medium(
+            SampleRate::new(24_000).unwrap()
+        ))]
+    );
+    assert_eq!(medium.render_tokens(), ["rate", "-m", "24000"]);
+
+    let high = parse_effect_chain(&["rate", "-Q", "4", "44.1k"]).unwrap();
+    assert_eq!(
+        high.commands(),
+        &[EffectCommand::Rate(Rate::high(
+            SampleRate::new(44_100).unwrap()
+        ))]
+    );
+    assert_eq!(high.render_tokens(), ["rate", "-h", "44100"]);
+
+    let ultra = parse_effect_chain(&["rate", "-u", "48000"]).unwrap();
+    assert_eq!(
+        ultra.commands(),
+        &[EffectCommand::Rate(Rate::ultra(
+            SampleRate::new(48_000).unwrap()
+        ))]
+    );
+    assert_eq!(ultra.render_tokens(), ["rate", "-u", "48000"]);
+}
+
+#[test]
 fn rate_changes_sample_rate_and_resamples_decoded_audio() {
     let mut audio = stereo_audio(vec![0.0, 1.0, 0.0], vec![1.0, 0.0, -1.0]);
 
@@ -103,7 +133,7 @@ fn rate_rejects_missing_invalid_options() {
         }
     ));
 
-    let unsupported_quality = parse_effect_chain(&["rate", "-m", "24000"]).unwrap_err();
+    let unsupported_quality = parse_effect_chain(&["rate", "-Q", "8", "24000"]).unwrap_err();
     assert!(matches!(
         unsupported_quality,
         EffectChainParseError::CommandParseFailed {
@@ -112,9 +142,9 @@ fn rate_rejects_missing_invalid_options() {
         }
     ));
 
-    let higher_quality = parse_effect_chain(&["rate", "-Q", "4", "24000"]).unwrap_err();
+    let override_option = parse_effect_chain(&["rate", "-M", "24000"]).unwrap_err();
     assert!(matches!(
-        higher_quality,
+        override_option,
         EffectChainParseError::CommandParseFailed {
             source: EffectCommandParseError::UnsupportedOption { effect: "rate", .. },
             ..

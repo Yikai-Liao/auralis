@@ -1044,13 +1044,29 @@ Implementation notes:
   equivalent `rate -Q 0 frequency` / `rate -Q 1 frequency` forms, rendering
   them canonically as `-q` or `-l`.
 - Quick and low-quality modes currently use the same deterministic scalar
-  linear resampling scaffold as the default mode. Higher-quality modes and
-  override options remain scheduled for Features 6.6.6 and 6.6.7.
+  linear resampling scaffold as the default mode. Feature 6.6.6 later added
+  the higher-quality selectors; override options remain scheduled for Feature
+  6.6.7.
 - Coverage includes parser/rendering tests, chain integration tests, fuzz seeds,
   and narrow standalone SoX-ng golden cases for quick mono silence conversion
   and low-quality stereo identity behavior.
 
 ### Feature 6.6.6: `rate` high-quality modes
+
+Status: implemented.
+
+Implementation notes:
+
+- `RateQuality` now covers SoX-ng quality levels 2 through 7: `-m` medium,
+  `-g` generic, `-h` high, `-e` extreme, `-v` very high, and `-u` ultra.
+- The command parser accepts both shorthand options and equivalent `-Q 2`
+  through `-Q 7` forms, rendering canonical shorthand tokens.
+- These modes currently use the same deterministic scalar linear resampling
+  scaffold as the earlier default, quick, and low-quality modes. Override
+  options remain scheduled for Feature 6.6.7.
+- Coverage includes typed constructor and parser/rendering tests, chain
+  boundary tests, fuzz seeds, and narrow standalone SoX-ng golden cases for
+  medium-rate conversion on silence and ultra identity behavior.
 
 ### Feature 6.6.7: `rate` override options
 

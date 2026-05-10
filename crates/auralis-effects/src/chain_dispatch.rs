@@ -311,7 +311,7 @@ fn rate_arg_end(tokens: &[&str], args_start: usize) -> usize {
     let mut end = args_start;
 
     match tokens.get(end).copied() {
-        Some("-q" | "-l") => {
+        Some("-q" | "-l" | "-m" | "-g" | "-h" | "-e" | "-v" | "-u") => {
             end += 1;
         }
         Some("-Q") => {

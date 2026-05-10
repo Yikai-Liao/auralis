@@ -61,9 +61,9 @@ length-preserving, preserves the command-line output channel shape, and
 intentionally does not drain the delayed wet tail after the input.
 The chain path also supports explicit SoX-ng-style `channels number` conversion
 at a user-visible effect position, using the same conversion primitive as the
-output `--channels` policy, and `rate [-q|-l] frequency` conversion with a
-deterministic scalar linear scaffold for the default, quick, and low-quality
-families. `auralis run <input.wav> <output.wav> gain -3 channels 1 rate -q 44100 norm -6 contrast softvol 2 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 highpass 500 lowpass 1000 riaa chorus -l 0.5 1 1 0.25 1 0 flanger -l 0 0 0 100 1 phaser -l 0.4 0.74 3 0.4 0.5 reverb 50 50 100 0 0 0 echo 0.5 1 1 0.5 echos 0.5 1 1 0.25 biquad 0.5 0 0 1 -0.5 0 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 remix 1 oops swap dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
+output `--channels` policy, and `rate [-q|-l|-m|-g|-h|-e|-v|-u] frequency`
+conversion with a deterministic scalar linear scaffold for all implemented
+SoX-ng quality families. `auralis run <input.wav> <output.wav> gain -3 channels 1 rate -q 44100 norm -6 contrast softvol 2 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 highpass 500 lowpass 1000 riaa chorus -l 0.5 1 1 0.25 1 0 flanger -l 0 0 0 100 1 phaser -l 0.4 0.74 3 0.4 0.5 reverb 50 50 100 0 0 0 echo 0.5 1 1 0.5 echos 0.5 1 1 0.25 biquad 0.5 0 0 1 -0.5 0 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 repeat 1 remix 1 oops swap dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
 preserving positional user order while the earlier single-effect flags remain
 available for compatibility. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
@@ -586,11 +586,10 @@ argument with a `c` suffix, preserves decoded samples and frame count, updates
 sample-rate metadata to `round(input_rate * factor)`, and leaves filtering or
 resampling to later `rate` features.
 The implemented `rate` scaffold accepts a required target frequency such as
-`rate 44100` or `rate 44.1k`, plus SoX-ng quick and low-quality selectors
-`rate -q 24000`, `rate -l 24000`, `rate -Q 0 24k`, and `rate -Q 1 24k`.
+`rate 44100` or `rate 44.1k`, plus SoX-ng quality selectors `-q`, `-l`, `-m`,
+`-g`, `-h`, `-e`, `-v`, `-u`, and equivalent `-Q 0` through `-Q 7` forms.
 All implemented quality families currently use deterministic scalar linear
-resampling; higher-quality families and override options remain scheduled for
-later `rate` features.
+resampling; override options remain scheduled for a later `rate` feature.
 The implemented `remix` command accepts SoX-ng out-spec routing with
 1-based channel numbers, ranges, open ranges, `-` for all channels, and
 standalone `0` silent outputs. It supports `v` voltage, `p` power-dB, and `i`
