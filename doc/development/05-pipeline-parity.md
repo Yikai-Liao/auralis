@@ -223,7 +223,7 @@ planning error: automatic dither insertion cannot be implemented or tested
 before the `dither` effect exists. Do not implement this as a 5.5 leaf feature.
 
 The replacement feature is
-[`Feature 6.8.8`](06-effect-coverage.md#feature-688-automatic-dither-insertion-policy),
+[`Feature 6.8.8`](06-effects/06-8-fir-analysis-generation-and-dither-effects.md#feature-688-automatic-dither-insertion-policy),
 after `dither` TPDF behavior exists.
 
 ## Milestone 5.6: source modularization debt

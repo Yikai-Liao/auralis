@@ -1,4 +1,4 @@
-# 7.x Format Support Milestone
+# 8.x Format Support Milestone
 
 Additional formats are intentionally after effect and pipeline coverage. Add a
 format earlier only when it is required to test an effect that cannot be tested
@@ -25,9 +25,9 @@ native libFLAC / LAME / libopusenc / FDK-AAC wrappers
 
 Each format leaf feature uses the shared acceptance tests below.
 
-## Milestone 7.0: codec backend policy
+## Milestone 8.0: codec backend policy
 
-### Feature 7.0.1: pure Rust codec backend policy
+### Feature 8.0.1: pure Rust codec backend policy
 
 Status: planned.
 
@@ -46,7 +46,7 @@ Acceptance tests:
 - no backend crate type leaks into `auralis-core` or public high-level APIs;
 - no new lossy encoder dependency is added by this policy feature.
 
-### Feature 7.0.2: encoder trait and output format model
+### Feature 8.0.2: encoder trait and output format model
 
 Status: planned.
 
@@ -111,73 +111,73 @@ The following backend families are not planned in the current roadmap:
 - FDK-AAC wrappers;
 - any backend that requires system codec libraries at runtime or build time.
 
-## Milestone 7.1: richer WAV support
+## Milestone 8.1: richer WAV support
 
-### Feature 7.1.1: WAV PCM8
+### Feature 8.1.1: WAV PCM8
 
-### Feature 7.1.2: WAV PCM24
+### Feature 8.1.2: WAV PCM24
 
-### Feature 7.1.3: WAV PCM32
+### Feature 8.1.3: WAV PCM32
 
-### Feature 7.1.4: WAV float32
+### Feature 8.1.4: WAV float32
 
-### Feature 7.1.5: WAV float64
+### Feature 8.1.5: WAV float64
 
-### Feature 7.1.6: WAV u-law and A-law
+### Feature 8.1.6: WAV u-law and A-law
 
-### Feature 7.1.7: WAV RIFX
+### Feature 8.1.7: WAV RIFX
 
-## Milestone 7.2: raw formats
+## Milestone 8.2: raw formats
 
-### Feature 7.2.1: raw signed and unsigned PCM
+### Feature 8.2.1: raw signed and unsigned PCM
 
-### Feature 7.2.2: raw float32 and float64
+### Feature 8.2.2: raw float32 and float64
 
-### Feature 7.2.3: raw endian, bit-order, and nibble-order options
+### Feature 8.2.3: raw endian, bit-order, and nibble-order options
 
-## Milestone 7.3: AIFF formats
+## Milestone 8.3: AIFF formats
 
-### Feature 7.3.1: AIFF PCM
+### Feature 8.3.1: AIFF PCM
 
-Use a pure Rust AIFF backend candidate only after Feature 7.0.1 records the
+Use a pure Rust AIFF backend candidate only after Feature 8.0.1 records the
 dependency audit.
 
-### Feature 7.3.2: AIFC encodings
+### Feature 8.3.2: AIFC encodings
 
-Use a pure Rust AIFC backend candidate only after Feature 7.0.1 records the
+Use a pure Rust AIFC backend candidate only after Feature 8.0.1 records the
 dependency audit.
 
-## Milestone 7.4: FLAC
+## Milestone 8.4: FLAC
 
-### Feature 7.4.1: FLAC decode
+### Feature 8.4.1: FLAC decode
 
 Select a pure Rust FLAC decoder backend. Native libFLAC wrappers are not planned
 under the current policy.
 
-### Feature 7.4.2: FLAC encode
+### Feature 8.4.2: FLAC encode
 
 Select a pure Rust FLAC encoder backend. `flacenc` is a candidate to audit, but
 its API stability, maintenance, correctness coverage, and performance must be
 recorded before implementation. Native libFLAC wrappers are not planned under
 the current policy.
 
-## Milestone 7.5: AU/SND
+## Milestone 8.5: AU/SND
 
-### Feature 7.5.1: AU/SND
+### Feature 8.5.1: AU/SND
 
 Use a pure Rust AU/SND backend or a small Auralis-owned PCM container adapter
 only after the scope is documented.
 
-## Milestone 7.6: external and native codec backends
+## Milestone 8.6: external and native codec backends
 
-### Feature 7.6.1: external `ffmpeg` backend
+### Feature 8.6.1: external `ffmpeg` backend
 
 Status: not planned.
 
 External `ffmpeg` decode or encode backends are outside the current pure Rust
 policy.
 
-### Feature 7.6.2: native codec wrapper backends
+### Feature 8.6.2: native codec wrapper backends
 
 Status: not planned.
 

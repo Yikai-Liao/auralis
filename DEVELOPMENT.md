@@ -12,20 +12,30 @@ The core rule:
 
 ## Current priority
 
-The latest recorded development state is commit `18d002f`, which marked the old
-Feature 5.5.4 as blocked because automatic dither insertion was scheduled before
-the `dither` effect existed. That was a planning error.
+The current development queue is blocked on planning and test-gate debt, not on
+the old `18d002f` dither-order correction. Recent gnhf work reached specialized
+effects planning and exposed that `dolbyb` is not ready to proceed as the next
+implementation target without rebalancing the roadmap and golden-test gates.
 
-The corrected order is:
+The current order is:
 
-1. Complete the source modularization debt in
-   [`05-pipeline-parity.md`](doc/development/05-pipeline-parity.md#milestone-56-source-modularization-debt).
-2. Complete the README L0-L7 layered-test conformance work in
-   [`05-pipeline-parity.md`](doc/development/05-pipeline-parity.md#milestone-57-layered-test-conformance).
-3. Resume effect coverage from
-   [`06-effect-coverage.md`](doc/development/06-effect-coverage.md).
-4. Implement automatic dither insertion only after the `dither` effect exists;
-   it is now Feature 6.8.8, not 5.5.4.
+1. Finish the plan reshuffle for the oversized effects plan and README status
+   surface: detailed effect status belongs in
+   [`doc/development/06-effects/`](doc/development/06-effects/), while README
+   remains a short user-facing entry point.
+2. Strengthen the test gates before more effect implementation: missing
+   `sox_ng` must fail release/gnhf golden checks, complex pipeline goldens must
+   be covered, and coverage artifacts must be produced by the applicable gate.
+3. Continue Rust-first migration of critical SoX-ng golden and complex pipeline
+   coverage. Python/pytest may remain as helper tooling, but key behavior gates
+   should move into Rust/testkit where feasible.
+4. Resume
+   [`6.9 specialized and integration effects`](doc/development/06-effects/06-9-specialized-and-integration-effects.md)
+   only after the above planning and test-gate corrections are in place.
+5. After the 6.9 specialized-effect classification pass, run the
+   [`7.x reusable DSP primitives roadmap`](doc/development/07-dsp-primitives.md)
+   before adding more effect families, so shared algorithms are audited before
+   they continue accumulating in effect-local modules.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.
@@ -37,18 +47,21 @@ the 5.x plan. It must not be selected as the next gnhf implementation target.
 Use this as the stop condition for autonomous development:
 
 > Stop only when every feature listed in this file and the linked
-> `doc/development/*.md` files is implemented, tested, documented, committed,
-> and pushed. If a feature cannot be completed safely, stop after recording the
-> blocker in the relevant development-plan file. For each loop iteration,
-> implement exactly the next unchecked leaf feature, keep it to one focused
-> commit, run formatting, clippy, Rust tests, doc tests, uv-based Python tests,
-> SoX-ng golden tests where applicable, update README/development documentation,
-> commit, push, then continue to the next leaf feature.
+> `doc/development/*.md` and `doc/development/06-effects/*.md` files is
+> implemented, tested, documented, committed, and pushed. If a feature cannot be
+> completed safely, stop after recording the blocker in the relevant
+> development-plan file. For each loop iteration, implement exactly the next
+> unchecked leaf feature, keep it to one focused commit, run formatting, clippy,
+> Rust tests, doc tests, required SoX-ng golden tests, and optional/helper
+> uv-based Python tests where they exist. Missing `sox_ng` must fail
+> release/gnhf golden gates instead of silently skipping coverage. README should
+> summarize current status only; detailed implementation status belongs in
+> development-plan files.
 
 Suggested `gnhf` objective:
 
 ```bash
-gnhf --current-branch --push "Repeatedly implement Auralis features from DEVELOPMENT.md and doc/development/*.md in order. In each iteration, implement exactly the next unchecked leaf feature and do not skip ahead. Add complete tests first or alongside the implementation. A feature is successful only if cargo fmt, clippy, cargo test, cargo doc tests, and uv pytest pass; SoX-ng golden tests must pass where applicable; README/development documentation must be updated; and the feature is committed with a concise message before moving to the next feature. Continue with the next unchecked feature after each successful commit. The source code of sox_ng is in /root/code/sox-rs/sox_ng" --stop-when "Stop only when every feature listed in DEVELOPMENT.md and doc/development/*.md is implemented, tested, documented, committed, and pushed; if a feature cannot be completed safely, stop after recording the blocker."
+gnhf --current-branch --push "Repeatedly implement Auralis features from DEVELOPMENT.md, doc/development/*.md, and doc/development/06-effects/*.md in order. In each iteration, implement exactly the next unchecked leaf feature and do not skip ahead. Add complete tests first or alongside the implementation. A feature is successful only if cargo fmt, clippy, cargo test, cargo doc tests, required SoX-ng golden tests, complex pipeline golden coverage where applicable, coverage report artifact generation where applicable, and optional/helper uv pytest checks pass. Missing sox_ng must fail release/gnhf golden checks. Keep README as a compact index/status entry and put detailed effect status in development-plan files. Continue with the next unchecked feature after each successful commit. The source code of sox_ng is in /root/code/sox-rs/sox_ng" --stop-when "Stop only when every feature listed in DEVELOPMENT.md, doc/development/*.md, and doc/development/06-effects/*.md is implemented, tested, documented, committed, and pushed; if a feature cannot be completed safely, stop after recording the blocker."
 ```
 
 For parallel work, use worktrees only when features are independent. Avoid
@@ -67,8 +80,9 @@ parallel work on the same module until the core API is stable.
 | 4.x | [`04-simd.md`](doc/development/04-simd.md) | backend dispatch, sample conversion, SIMD retrofits |
 | 5.x | [`05-pipeline-parity.md`](doc/development/05-pipeline-parity.md) | chains, effects files, input/output policies, modularization debt, layered-test debt |
 | 6.x | [`06-effect-coverage.md`](doc/development/06-effect-coverage.md) | remaining SoX-ng effect coverage |
-| 7.x | [`07-format-support.md`](doc/development/07-format-support.md) | richer WAV and additional formats |
-| 8.x | [`08-python-package.md`](doc/development/08-python-package.md) | future PyO3/maturin packaging |
+| 7.x | [`07-dsp-primitives.md`](doc/development/07-dsp-primitives.md) | reusable DSP primitive audit and extraction roadmap |
+| 8.x | [`08-format-support.md`](doc/development/08-format-support.md) | richer WAV and additional formats |
+| 9.x | [`09-python-package.md`](doc/development/09-python-package.md) | future PyO3/maturin packaging |
 
 Milestone headings group work only. A `Feature x.y.z` item is one gnhf
 iteration and one focused commit unless the plan explicitly says it is a
@@ -113,11 +127,15 @@ Required test classes depend on feature type:
 | Stateful DSP | analytical/structural tests, chunk invariance, edge-case tests, golden tests |
 | SIMD | scalar-vs-SIMD differential tests, tail-length tests, benchmarks where performance-sensitive |
 | CLI | command tests, error tests, library-equivalent behavior tests |
-| Python test harness | uv-based pytest tests |
+| Python helper/testkit tooling | uv-based smoke/helper tests, with authoritative gates named in Rust/testkit where applicable |
 
-### README L0-L7 test contract
+### L0-L7 test contract
 
-The README defines the authoritative layered test model:
+[`doc/testing.md`](doc/testing.md) is the user-facing authoritative layered
+test contract. [`03-test-infrastructure.md`](doc/development/03-test-infrastructure.md)
+is the development-plan authority for implementing and evolving that contract.
+README may summarize L0-L7, but it must not carry detailed status or override
+those files.
 
 - L0 deterministic corpus
 - L1 WAV I/O correctness
@@ -129,7 +147,10 @@ The README defines the authoritative layered test model:
 - L7 fuzzing, sanitizers, and coverage
 
 Every new feature must state which layers apply and must either implement them
-or document a narrow N/A reason. The current gaps are tracked as Feature 5.7.x.
+or document a narrow N/A reason. The current gaps are tracked in
+[`03-test-infrastructure.md`](doc/development/03-test-infrastructure.md),
+[`05-pipeline-parity.md`](doc/development/05-pipeline-parity.md), and the
+layered coverage matrix.
 
 ### No hidden behavior
 
@@ -238,7 +259,7 @@ cargo test --workspace --all-features
 cargo test --doc --workspace
 ```
 
-If Python tests exist for the current milestone:
+If Python helper tests exist for the current milestone:
 
 ```bash
 cd tools/pytest
@@ -258,7 +279,7 @@ If the feature uses SoX-ng golden tests:
 export AURALIS_SOX_NG_BIN=${AURALIS_SOX_NG_BIN:-sox_ng}
 cargo test --workspace --all-features golden
 cd tools/pytest
-uv run pytest -m golden
+uv run pytest -m golden  # optional/helper layer when Python goldens still exist
 ```
 
 A commit that cannot pass the required checks must not be accepted as a
@@ -295,8 +316,16 @@ For sample comparison, prefer decoded samples over full container bytes.
 
 ## Python and uv Policy
 
-Python is used for numerical tests, golden comparisons, corpus generation, and
-failure artifact generation. All Python work must use `uv`.
+Python is retained as an optional/helper layer for numerical experiments, golden
+comparison utilities, corpus generation, smoke checks, and failure artifact
+generation. It is not required for all feature behavior, and feature acceptance
+must not depend on duplicating every Rust behavior in pytest.
+
+Critical SoX-ng golden coverage and complex pipeline behavior should be
+implemented in Rust/testkit where feasible, especially for release and gnhf
+gates. Existing duplicate Python goldens should either migrate into Rust/testkit
+or be downgraded to smoke/helper coverage with the authoritative gate named in
+the Rust test plan. All remaining Python work must use `uv`.
 
 Expected structure:
 
@@ -336,25 +365,30 @@ Tests:
 [ ] L0 deterministic corpus case added or reused, if applicable
 [ ] L1 WAV I/O tests, if applicable
 [ ] L2 SoX-ng golden tests, if applicable
+[ ] Complex pipeline golden test added or updated, if applicable
 [ ] L3 analytical tests, if applicable
 [ ] L4 property/metamorphic tests, if applicable
 [ ] L5 chunk invariance tests, if applicable
 [ ] L6 scalar-vs-SIMD tests, or SIMD N/A reason checked
 [ ] L7 fuzz/sanitizer/coverage target added or explicitly not applicable
 [ ] Layered coverage matrix row added or updated, if behavior or test surface changes
+[ ] Coverage report artifact generated or explicitly not applicable
+[ ] Rust-first golden coverage used where feasible
 [ ] Unit tests
 [ ] Doc tests
 [ ] Integration tests
 [ ] CLI and typed API equivalence tests, if applicable
-[ ] Python uv pytest tests, if applicable
+[ ] Python uv pytest smoke/helper tests, if applicable
 
 Quality gate:
 [ ] cargo fmt --all --check
 [ ] cargo clippy --workspace --all-targets --all-features -- -D warnings
 [ ] cargo test --workspace --all-features
 [ ] cargo test --doc --workspace
-[ ] uv run pytest, if Python tests exist
-[ ] SoX-ng golden test command, if golden manifests exist
+[ ] uv run pytest, if Python helper tests exist
+[ ] SoX-ng golden test command, if golden manifests exist; missing sox_ng fails release/gnhf gates
+[ ] Complex pipeline golden command, if pipeline manifests exist
+[ ] Coverage report artifact command, if coverage is applicable
 [ ] cargo bench, if performance-sensitive
 ```
 

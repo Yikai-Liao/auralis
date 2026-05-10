@@ -1,4 +1,4 @@
-# 8.x Python and Package Milestone
+# 9.x Python and Package Milestone
 
 Do not add PyO3 bindings until effect pipeline behavior is stable.
 
