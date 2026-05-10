@@ -813,6 +813,7 @@ mod tests {
                 | EffectCommand::Riaa(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::Silence(_)
+                | EffectCommand::Sinc(_)
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Speed(_)
                 | EffectCommand::Splice(_)

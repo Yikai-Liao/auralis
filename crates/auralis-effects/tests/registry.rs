@@ -45,6 +45,7 @@ fn supported_canonical_names_resolve_to_descriptors() {
         ("riaa", EffectKind::Riaa),
         ("saturation", EffectKind::Saturation),
         ("silence", EffectKind::Silence),
+        ("sinc", EffectKind::Sinc),
         ("softvol", EffectKind::SoftVol),
         ("swap", EffectKind::Swap),
         ("treble", EffectKind::Treble),

@@ -1507,6 +1507,24 @@ Implementation notes:
 
 ### Feature 6.8.5: `sinc` low-pass and high-pass
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered `sinc [options] freq` and `sinc [options] -freq` as executable
+  SoX-ng-style high-pass and low-pass FIR filters, with canonical parsing and
+  rendering for attenuation, beta, transition bandwidth, explicit taps,
+  auto-tap rounding, and low-pass delete-at-Nyquist metadata.
+- Added a public `Sinc` processor that designs deterministic scalar
+  Kaiser-windowed low-pass coefficients, inverts them for high-pass mode, and
+  delegates length-preserving execution to the shared FIR processor.
+- Coverage includes parser/rendering tests, chain grouping and execution,
+  finite-output property coverage, chunked FIR-state equivalence, parser fuzz
+  coverage, L0-L7 matrix metadata, and explicit-tap mono/stereo SoX-ng golden
+  cases. SIMD remains N/A until a future vectorized FIR backend is planned.
+- Band-pass and band-reject frequency ranges remain rejected and scheduled for
+  Feature 6.8.6.
+
 ### Feature 6.8.6: `sinc` band-pass and band-reject
 
 ### Feature 6.8.7: `dither` TPDF and sloped TPDF

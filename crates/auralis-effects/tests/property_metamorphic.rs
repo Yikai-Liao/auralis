@@ -9,9 +9,9 @@ use auralis_effects::{
     DcShift, Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
     FlangerInterpolation, FlangerWave, Gain, HighPass, Loudness, LowPass, MCompand, Norm, Oops,
     Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, Silence, SoftVol,
-    Speed, Splice, SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble,
-    Tremolo, Trim, Upsample, Vad, Vol,
+    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, Silence, Sinc,
+    SincBand, SincOptions, SoftVol, Speed, Splice, SpliceAmount, SplicePoint, SplicePosition,
+    Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -398,6 +398,15 @@ proptest! {
             .process_buffer(&mut high_passed)
             .expect("fixture sample rate keeps frequency below Nyquist");
         prop_assert_all_finite(&high_passed)?;
+
+        let sinc_filtered = Sinc::with_options(
+            SincBand::low_pass(4_000.0, false),
+            SincOptions::with_taps(11).expect("fixture sinc taps are valid"),
+        )
+        .expect("fixture sinc design is valid")
+        .process_buffer(&source)
+        .expect("fixture sample rate keeps sinc frequency below Nyquist");
+        prop_assert_all_finite(&sinc_filtered)?;
 
         let mut deemphasized = source.clone();
         Deemph::new()

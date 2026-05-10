@@ -235,6 +235,10 @@ pub enum EffectError {
     #[error("hilbert taps must be an odd value in the SoX-ng range 3..=1073741823")]
     InvalidHilbert,
 
+    /// A sinc FIR filter command had invalid frequencies or design options.
+    #[error("sinc frequency and design options must be finite and in SoX-ng-compatible ranges")]
+    InvalidSinc,
+
     /// A silence command had invalid periods, durations, thresholds, or options.
     #[error(
         "silence periods, durations, thresholds, and -l usage must match SoX-ng-compatible ranges"

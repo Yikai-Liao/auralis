@@ -114,6 +114,8 @@ pub enum EffectKind {
     Saturation,
     /// SoX-ng-style silence trimming.
     Silence,
+    /// SoX-ng-style low-pass or high-pass windowed-sinc FIR filter.
+    Sinc,
     /// SoX-ng-style soft volume control.
     SoftVol,
     #[doc = "SoX-ng-style speed adjustment."]
@@ -581,6 +583,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Silence",
         "silence [-l] above-periods [duration threshold] [below-periods duration threshold]",
         "trim leading, trailing, or middle silence",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Sinc,
+        "sinc",
+        &[],
+        "Sinc",
+        "sinc [-a att|-b beta] [-t tbw|-n taps] [freqHP|-freqLP] [-r] [-d]",
+        "apply a low-pass or high-pass windowed-sinc FIR filter",
     ),
     EffectDescriptor::new(
         EffectKind::Vad,

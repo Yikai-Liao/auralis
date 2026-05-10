@@ -57,6 +57,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
         | EffectCommand::Silence(_)
+        | EffectCommand::Sinc(_)
         | EffectCommand::Speed(_)
         | EffectCommand::Splice(_)
         | EffectCommand::Stretch(_)
@@ -177,6 +178,11 @@ fn apply_buffer_command(
             *audio = hilbert
                 .process_buffer(audio)
                 .map_err(|source| ("taps", source))?;
+        }
+        EffectCommand::Sinc(sinc) => {
+            *audio = sinc
+                .process_buffer(audio)
+                .map_err(|source| ("frequency-range", source))?;
         }
         EffectCommand::Flanger(flanger) => {
             *audio = flanger
@@ -394,6 +400,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Swap => no_arg_end(tokens, args_start),
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Silence => silence_arg_end(tokens, args_start),
+        EffectKind::Sinc => sinc_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::Vad => vad_arg_end(tokens, args_start),
         EffectKind::AllPass
@@ -409,6 +416,22 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn sinc_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-a" | "-b" | "-t" | "-n" => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+            }
+            _ => end += 1,
+        }
+    }
+    end
 }
 
 fn vad_arg_end(tokens: &[&str], args_start: usize) -> usize {
