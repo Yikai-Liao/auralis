@@ -231,7 +231,10 @@ pub use stat::{Stat, StatReport};
 pub use stats::{Stats, StatsDisplayScale, StatsReport, StatsSummary};
 pub use stretch::{Stretch, StretchFade};
 pub use swap::Swap;
-pub use synth::{Synth, SynthChannel, SynthLength, SynthWaveform};
+pub use synth::{
+    Synth, SynthChannel, SynthCombineMode, SynthLength, SynthSweep, SynthVariableDelay,
+    SynthWaveform,
+};
 pub use tempo::{Tempo, TempoProfile};
 pub use treble::Treble;
 pub use tremolo::Tremolo;

@@ -1318,6 +1318,39 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_synth_mono_whitenoise]
+input = "effects/synth_noise_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["synth", "-n", "whitenoise"]
+sox_ng = ["synth", "-n", "whitenoise"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_synth_mono_linear_sweep]
+input = "effects/synth_sweep_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["synth", "-n", "32s", "sine", "1000:2000"]
+sox_ng = ["synth", "-n", "32s", "sine", "1000:2000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_synth_mono_mix]
+input = "effects/synth_mix_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["synth", "-n", "sine", "mix", "1000"]
+sox_ng = ["synth", "-n", "sine", "mix", "1000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_stretch_mono_lengthen]
 input = "effects/stretch_mono.wav"
 corpus_id = "l0/sine_mono_8192"

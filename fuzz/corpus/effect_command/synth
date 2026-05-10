@@ -1,1 +1,1 @@
-synth -n 16s sine 1000 square 500
+synth -n 16s sine fmod 1000:2000 whitenoise mix pinknoise brownnoise

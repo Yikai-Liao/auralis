@@ -449,7 +449,11 @@ fn synth_arg_end(tokens: &[&str], args_start: usize) -> usize {
         }
         end += 1;
         if end < tokens.len() && is_synth_combine_mode(tokens[end]) {
-            return include_unexpected_argument(tokens, end + 1);
+            let is_vdelay = tokens[end] == "vdelay";
+            end += 1;
+            if is_vdelay && end < tokens.len() && !is_command_boundary(tokens[end]) {
+                end += 1;
+            }
         }
         while end < tokens.len()
             && !is_command_boundary(tokens[end])

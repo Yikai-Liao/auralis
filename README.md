@@ -57,9 +57,9 @@ a typed deterministic report API for SoX-ng-style sample statistics.
 It supports `stats [-b bits|-x bits|-s scale] [-w window-time] [-j]` as a
 pass-through analyzer with typed deterministic overall and per-channel sample
 statistics.
-It supports `synth [-n] [length] {sine|square|sawtooth|triangle|trapezium|exp}
-[frequency]` as a deterministic create-mode tonal waveform generator over the
-decoded input shape; noise, sweeps, and input-combine modes remain deferred.
+It supports `synth [-n] [length] waveform [combine] [frequency-sweep]` as a
+deterministic SoX-ng-style waveform and noise generator over the decoded input
+shape, including sweep and input-combine modes.
 The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata,
 `gain -n` peak normalization, `gain -l` limiting, and channel-aware `gain -e`,
 `gain -B`, and `gain -b` scans: `gain -h DB` applies the fixed attenuation and
@@ -628,9 +628,10 @@ scale, window-time, and JSON report options; chain execution passes audio
 through while the typed API returns deterministic overall and per-channel
 sample statistics.
 The implemented `synth` command accepts `-n`, optional seconds or frame-count
-length, and create-mode tonal waveforms `sine`, `square`, `sawtooth`,
-`triangle`, `trapezium`, and `exp`; chain execution replaces decoded samples
-with generated output over the input shape.
+length, tonal waveforms `sine`, `square`, `sawtooth`, `triangle`, `trapezium`,
+and `exp`, noise waveforms `whitenoise`, `tpdfnoise`, `pinknoise`, and
+`brownnoise`, `:`, `+`, `/`, and `-` sweep forms, and `create`, `mix`, `amod`,
+`fmod`, and `vdelay` combine modes.
 The implemented `fir` command accepts SoX-ng-style coefficient input: no
 arguments or `-` represent standard input, one argument is a coefficient-file
 path even when it looks numeric, and two or more arguments are inline finite
@@ -1044,7 +1045,7 @@ and explicit-amount forms; `softvol` coverage includes fixed volume plus
 recovery/headroom forms; `loudness` coverage includes identity mono and
 short-filter stereo ISO 226 compensation forms; `silence` coverage includes
 mono and stereo leading-trim command forms; `vad` coverage includes mono and
-stereo no-voice trimming with advanced trigger options; `noiseprof` coverage includes mono and stereo pass-through command forms with profile output captured from stdout; `noisered` coverage includes mono and stereo generated-profile command forms with broad waveform tolerances and exact output-shape checks; `stat` and `stats` coverage includes mono and stereo pass-through command forms plus typed report assertions; `synth` coverage includes mono sine and stereo sine/square create-mode command forms; `tremolo` coverage includes default-depth mono and
+stereo no-voice trimming with advanced trigger options; `noiseprof` coverage includes mono and stereo pass-through command forms with profile output captured from stdout; `noisered` coverage includes mono and stereo generated-profile command forms with broad waveform tolerances and exact output-shape checks; `stat` and `stats` coverage includes mono and stereo pass-through command forms plus typed report assertions; `synth` coverage includes mono sine, stereo sine/square, deterministic whitenoise, linear sweep, and mix command forms; `tremolo` coverage includes default-depth mono and
 explicit-depth stereo modulation forms; `overdrive` coverage includes default
 mono and explicit-argument stereo distortion forms; `saturation` coverage
 includes default tanh mono and explicit sqrt stereo distortion forms; `repeat`
@@ -1305,8 +1306,9 @@ Examples:
 - `stats`: pass-through overall and per-channel sample statistics analysis
   with signed-bit, hexadecimal, floating scale, window-time, and JSON report
   options
-- `synth`: create-mode tonal waveform generation with optional length and
-  deterministic sine, square, sawtooth, triangle, trapezium, and exp waveforms
+- `synth`: waveform and noise generation with optional length, deterministic
+  sine, square, sawtooth, triangle, trapezium, exp, white, TPDF, pink, and brown
+  noise forms, plus sweep and input-combine modes
 - `fir`: coefficient input parsing from stdin, one coefficient-file path, or
   inline finite coefficients, with `#` comments in coefficient text
 - `firfit`: frequency/gain knot parsing from stdin, one knot-file path, or

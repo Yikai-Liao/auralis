@@ -677,7 +677,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "synth",
         &[],
         "Synth",
-        "synth [-n] [length] {sine|square|sawtooth|triangle|trapezium|exp} [frequency]",
+        "synth [-n] [length] waveform [combine] [frequency[-|+|/|:]frequency2]",
         "create deterministic tonal waveforms over decoded audio",
     ),
     EffectDescriptor::new(

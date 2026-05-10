@@ -1690,8 +1690,27 @@ Implemented in this branch.
 
 ### Feature 6.8.13: `synth` noise, sweep, and combine modes
 
-Analysis and generation effects must define deterministic output and metadata
-behavior before CLI integration.
+Status: implemented.
+
+Implementation notes:
+
+- Extended the public `Synth` model with deterministic SoX-ng-style
+  `whitenoise`, `tpdfnoise`, `pinknoise`, and `brownnoise` generation, typed
+  frequency sweeps, and `create`, `mix`, `amod`, `fmod`, and `vdelay` combine
+  modes.
+- Wired noise aliases, `:`, `+`, `/`, and `-` sweep frequency tokens, and
+  combine-mode parsing/rendering through the command parser, effect-chain
+  grouping, CLI positional-chain path, fuzz corpus, standalone golden
+  manifest, and L0-L7 coverage metadata.
+- Processing uses the repeatable SoX-ng linear-congruential PRNG seed for
+  command-style noise and preserves frame-major random draw order across
+  channels while writing Auralis' planar buffer layout.
+- Coverage includes deterministic PRNG assertions, sweep and combine parser
+  tests, `fmod` and `vdelay` processing checks, finite-output property
+  coverage, mono SoX-ng golden rows for whitenoise, linear sweep, and mix, and
+  continued stereo basic-waveform golden coverage. SIMD remains N/A because
+  synth is scalar oscillator/noise state generation rather than a
+  backend-dispatched sample transform.
 
 ## Milestone 6.9: specialized and integration effects
 

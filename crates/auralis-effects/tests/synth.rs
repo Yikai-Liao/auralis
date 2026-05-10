@@ -2,8 +2,8 @@
 
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_effects::{
-    EffectChainParseError, EffectCommand, EffectCommandParseError, EffectError, Synth,
-    SynthChannel, SynthLength, SynthWaveform, parse_effect_chain, parse_effect_command,
+    EffectCommand, EffectError, Synth, SynthChannel, SynthCombineMode, SynthLength, SynthSweep,
+    SynthVariableDelay, SynthWaveform, parse_effect_chain, parse_effect_command,
 };
 
 #[test]
@@ -27,6 +27,37 @@ fn synth_command_parses_renders_and_groups_with_next_effect() {
         ["synth", "4s", "sine", "1"]
     );
     assert_eq!(chain.commands()[1].render_tokens(), ["reverse"]);
+}
+
+#[test]
+fn synth_command_parses_noise_sweeps_and_combine_modes() {
+    assert_eq!(
+        parse_effect_command(&["synth", "noise"])
+            .unwrap()
+            .render_tokens(),
+        ["synth", "whitenoise", "440"]
+    );
+    assert_eq!(
+        parse_effect_command(&["synth", "8s", "sine", "440:880"])
+            .unwrap()
+            .render_tokens(),
+        ["synth", "8s", "sine", "440:880"]
+    );
+
+    let chain = parse_effect_chain(&[
+        "synth", "sine", "mix", "2", "synth", "sine", "vdelay", "10,2,25", "reverse",
+    ])
+    .unwrap();
+
+    assert_eq!(chain.len(), 3);
+    assert_eq!(
+        chain.commands()[0].render_tokens(),
+        ["synth", "sine", "mix", "2"]
+    );
+    assert_eq!(
+        chain.commands()[1].render_tokens(),
+        ["synth", "sine", "vdelay", "10,2,25", "440"]
+    );
 }
 
 #[test]
@@ -57,43 +88,47 @@ fn synth_can_set_output_length_and_repeat_channel_specs() {
 }
 
 #[test]
-fn synth_rejects_deferred_noise_sweep_and_combine_modes() {
-    let noise = parse_effect_chain(&["synth", "noise"]).unwrap_err();
-    assert!(matches!(
-        noise,
-        EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::UnsupportedOption {
-                effect: "synth",
-                ..
-            },
-            ..
-        }
-    ));
+fn synth_noise_sweep_and_combine_processing_is_deterministic() {
+    let audio = audio_buffer(4, 1, vec![0.25, 0.25, 0.25, 0.25]);
 
-    let sweep = parse_effect_chain(&["synth", "sine", "440:880"]).unwrap_err();
-    assert!(matches!(
-        sweep,
-        EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::InvalidNumber {
-                effect: "synth",
-                argument: "frequency",
-                ..
-            },
-            ..
-        }
-    ));
+    let noise = Synth::with_channels(
+        None,
+        [SynthChannel::new(SynthWaveform::WhiteNoise, 440.0).unwrap()],
+    )
+    .unwrap()
+    .process_buffer(&audio)
+    .unwrap();
+    assert_samples_close(
+        noise.as_planar_f32(),
+        &[0.472_135_93, 0.557_133_8, -0.360_932_47, -0.664_266_2],
+    );
 
-    let combine = parse_effect_chain(&["synth", "sine", "mix"]).unwrap_err();
-    assert!(matches!(
-        combine,
-        EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::UnsupportedOption {
-                effect: "synth",
-                option,
-            },
-            ..
-        } if option == "mix"
-    ));
+    let sweep = SynthChannel::new(SynthWaveform::Sine, 1.0)
+        .unwrap()
+        .with_sweep(SynthSweep::Linear, 2.0)
+        .unwrap()
+        .with_combine(SynthCombineMode::Fmod);
+    let swept = Synth::with_channels(Some(SynthLength::frames(FrameCount::new(4))), [sweep])
+        .unwrap()
+        .process_buffer(&audio)
+        .unwrap();
+    assert!(
+        swept
+            .as_planar_f32()
+            .iter()
+            .all(|sample| sample.is_finite())
+    );
+
+    let delay = SynthChannel::new(SynthWaveform::Sine, 1.0)
+        .unwrap()
+        .with_combine(SynthCombineMode::Vdelay(
+            SynthVariableDelay::new(250.0, 0.0, 1.0).unwrap(),
+        ));
+    let delayed = Synth::with_channels(None, [delay])
+        .unwrap()
+        .process_buffer(&audio_buffer(4, 1, vec![0.25, 0.5, 0.75, 1.0]))
+        .unwrap();
+    assert_samples_close(delayed.as_planar_f32(), &[0.0, 0.25, 0.5, 0.75]);
 }
 
 #[test]
