@@ -47,6 +47,7 @@ mod command_channels;
 mod command_contrast;
 mod command_dcshift;
 mod command_deemph;
+mod command_delay;
 mod command_equalizer;
 mod command_fade;
 mod command_filter;
@@ -71,6 +72,7 @@ mod command_vol;
 mod contrast;
 mod dcshift;
 mod deemph;
+mod delay;
 mod effects_file;
 mod equalizer;
 mod error;
@@ -114,6 +116,7 @@ pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_e
 pub use contrast::Contrast;
 pub use dcshift::DcShift;
 pub use deemph::Deemph;
+pub use delay::{Delay, DelayAmount, DelayAnchor, DelayPosition};
 pub use effects_file::{
     EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,
     parse_effects_file, parse_effects_file_str,

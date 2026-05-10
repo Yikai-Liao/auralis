@@ -54,6 +54,9 @@ pub enum EffectKind {
     /// Constant normalized full-scale offset.
     DcShift,
 
+    /// SoX-ng-style per-channel delay.
+    Delay,
+
     /// SoX-ng-style CD/DAT de-emphasis filter.
     Deemph,
 
@@ -279,6 +282,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "DcShift",
         "dcshift shift [limiter-gain]",
         "add a constant normalized full-scale offset",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Delay,
+        "delay",
+        &[],
+        "Delay",
+        "delay {position}",
+        "delay decoded channels by independent positions",
     ),
     EffectDescriptor::new(
         EffectKind::Deemph,
@@ -778,6 +789,7 @@ mod tests {
             ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
+            ("delay", EffectKind::Delay),
             ("deemph", EffectKind::Deemph),
             ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
@@ -851,18 +863,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("delay").unwrap_err();
+        let error = EffectRegistry::resolve("echo").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "delay".to_owned(),
+                name: "echo".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `delay`")
+                .contains("missing SoX-ng coverage entry for `echo`")
         );
     }
 

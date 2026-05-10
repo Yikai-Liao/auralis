@@ -5,8 +5,8 @@ use auralis_core::{
 };
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Contrast, DcShift, Deemph, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops,
-    Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation,
+    Channels, Contrast, DcShift, Deemph, Delay, Equalizer, Fade, Gain, HighPass, LowPass, Norm,
+    Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation,
     SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
@@ -389,6 +389,11 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated padding cannot overflow");
         prop_assert_all_finite(&padded)?;
+
+        let delayed = Delay::new([FrameCount::new(1)])
+            .process_buffer(&source)
+            .expect("small generated delay cannot overflow");
+        prop_assert_all_finite(&delayed)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

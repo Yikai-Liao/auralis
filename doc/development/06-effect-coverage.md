@@ -769,6 +769,25 @@ Implementation notes:
 
 ### Feature 6.5.1: `delay`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Delay` effect matching SoX-ng's per-channel `delay
+  {position}` command family. Positions can be absolute from the start,
+  relative to the previous channel position, or relative to the end of the
+  input; frame-count `s` positions and seconds-based time positions resolve
+  against the input sample rate at processing time.
+- Processing delays each configured channel independently, leaves channels
+  without an explicit position undelayed, and extends every channel to the
+  largest resolved delay with trailing silence. Latency is the per-channel
+  resolved delay, tail flush emits the buffered original channel samples plus
+  any max-delay alignment silence, and chunked streaming would be exact when a
+  future streaming API preserves per-channel delay buffers and flushes tails.
+- Coverage includes typed processor tests, command and chain integration tests,
+  L4 finite-output property coverage, parser fuzz seeds, and standalone
+  SoX-ng golden cases for mono frame delay and stereo per-channel delay.
+
 ### Feature 6.5.2: `echo`
 
 ### Feature 6.5.3: `echos`

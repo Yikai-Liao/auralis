@@ -508,6 +508,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_delay_mono_frames]
+input = "effects/delay_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["delay", "2s"]
+sox_ng = ["delay", "2s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_delay_stereo_per_channel]
+input = "effects/delay_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["delay", "2s", "1s"]
+sox_ng = ["delay", "2s", "1s"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_deemph_mono_48000]
 input = "effects/deemph_mono.wav"
 corpus_id = "l0/sine_mono_32"

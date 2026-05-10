@@ -6,29 +6,6 @@
 //! into existing typed effect processors. Unsupported SoX-ng options are
 //! reported explicitly instead of being stored as untyped strings.
 //!
-//! # Examples
-//!
-//! ```
-//! use auralis_core::{Decibels, FrameCount};
-//! use auralis_effects::{EffectCommand, Fade, Gain, parse_effect_command};
-//!
-//! let gain = parse_effect_command(&["gain", "-3"])?;
-//! assert_eq!(gain, EffectCommand::Gain(Gain::new(Decibels::new(-3.0)?)));
-//! assert_eq!(gain.render_tokens(), ["gain", "-3"]);
-//!
-//! let fade = EffectCommand::parse("fade", &["t", "10", "20"])?;
-//! assert_eq!(
-//!     fade,
-//!     EffectCommand::Fade(Fade::with_stop_position(
-//!         auralis_effects::FadeCurve::Linear,
-//!         FrameCount::new(10),
-//!         FrameCount::new(20),
-//!         FrameCount::new(10),
-//!     ))
-//! );
-//! assert_eq!(fade.render_tokens(), ["fade", "t", "10", "20", "10"]);
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
 
 use std::{
     fmt,
@@ -49,6 +26,7 @@ use crate::command_channels::{parse_channels, render_channels};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
+use crate::command_delay::{parse_delay, render_delay};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
@@ -71,7 +49,7 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    Deemph, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain,
+    Deemph, Delay, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain,
     HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Riaa, Saturation,
     SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
@@ -111,6 +89,8 @@ pub enum EffectCommand {
     DcShift(DcShift),
     /// SoX-ng-style CD/DAT de-emphasis filter.
     Deemph(Deemph),
+    /// SoX-ng-style per-channel delay.
+    Delay(Delay),
     /// SoX-ng-style peaking equalizer filter.
     Equalizer(Equalizer),
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
@@ -178,6 +158,7 @@ impl EffectCommand {
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
+            EffectKind::Delay => parse_delay(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
@@ -216,6 +197,7 @@ impl EffectCommand {
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
+            Self::Delay(_) => EffectKind::Delay,
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
@@ -260,6 +242,7 @@ impl EffectCommand {
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],
+            Self::Delay(delay) => render_delay(delay),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
@@ -383,6 +366,16 @@ pub enum EffectCommandParseError {
         /// Source parse error.
         #[source]
         source: ParseIntError,
+    },
+
+    /// A delay position could not be parsed.
+    #[error("effect `{effect}` argument `position` must be a SoX-ng position, got `{value}`")]
+    InvalidDelayPosition {
+        /// Canonical effect name.
+        effect: &'static str,
+
+        /// Original argument value.
+        value: String,
     },
 
     /// A parsed core value was rejected by its typed constructor.

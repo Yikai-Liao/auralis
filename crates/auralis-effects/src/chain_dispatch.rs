@@ -30,6 +30,13 @@ pub(crate) fn apply_command(
             *audio = converted;
             Ok(())
         }
+        EffectCommand::Delay(delay) => {
+            let delayed = delay
+                .process_buffer(audio)
+                .map_err(|source| ("position", source))?;
+            *audio = delayed;
+            Ok(())
+        }
         EffectCommand::Fade(fade) => {
             if fade.stop_position.is_some() {
                 let faded = fade
@@ -183,6 +190,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
         }
+        EffectKind::Delay => delay_arg_end(tokens, args_start),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
         EffectKind::Deemph
@@ -221,6 +229,14 @@ fn centercut_arg_end(tokens: &[&str], args_start: usize) -> usize {
 }
 
 fn trim_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+    end
+}
+
+fn delay_arg_end(tokens: &[&str], args_start: usize) -> usize {
     let mut end = args_start;
     while end < tokens.len() && !is_command_boundary(tokens[end]) {
         end += 1;

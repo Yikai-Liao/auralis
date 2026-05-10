@@ -784,6 +784,7 @@ mod tests {
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
                 | EffectCommand::Contrast(_)
+                | EffectCommand::Delay(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Oops(_)
                 | EffectCommand::Overdrive(_)

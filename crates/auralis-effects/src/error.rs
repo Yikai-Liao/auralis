@@ -35,6 +35,18 @@ pub enum EffectError {
     #[error("repeat output frame count exceeds representable audio buffer length")]
     RepeatLengthOverflow,
 
+    /// A delay position was not finite or was negative.
+    #[error("delay positions must be finite and non-negative")]
+    InvalidDelayPosition,
+
+    /// A delay command supplied more positions than the input has channels.
+    #[error("delay cannot specify more positions than the input channel count")]
+    DelayTooManyPositions,
+
+    /// A delay command would create a buffer shape that cannot be represented.
+    #[error("delay output frame count exceeds representable audio buffer length")]
+    DelayLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,
