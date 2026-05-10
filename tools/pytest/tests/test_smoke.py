@@ -18,7 +18,7 @@ from auralis_testkit.golden_report import (
     json_number,
 )
 from auralis_testkit.metrics import dc_offset, max_abs_error, peak, rms_error, snr_db
-from auralis_testkit.sox_ng import SoxNgUnavailable, run_sox_ng
+from auralis_testkit.sox_ng import SoxNgUnavailable, find_sox_ng, run_sox_ng
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -154,3 +154,13 @@ def test_sox_ng_wrapper_reports_missing_binary(
 
     with pytest.raises(SoxNgUnavailable):
         run_sox_ng(tmp_path / "in.wav", tmp_path / "out.wav", ["gain", "-3"])
+
+
+def test_sox_ng_configured_binary_must_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.setenv("AURALIS_SOX_NG_BIN", str(tmp_path / "missing-sox-ng"))
+
+    assert find_sox_ng() is None

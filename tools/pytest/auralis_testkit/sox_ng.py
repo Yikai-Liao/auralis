@@ -18,7 +18,10 @@ def find_sox_ng() -> str | None:
 
     configured = os.environ.get("AURALIS_SOX_NG_BIN")
     if configured:
-        return configured
+        has_separator = os.sep in configured or bool(os.altsep and os.altsep in configured)
+        if has_separator:
+            return configured if Path(configured).is_file() else None
+        return shutil.which(configured)
     return shutil.which("sox_ng")
 
 

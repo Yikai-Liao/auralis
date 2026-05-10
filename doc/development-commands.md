@@ -38,8 +38,9 @@ cd tools/pytest
 uv run pytest -m golden
 ```
 
-If the oracle is missing during those validation runs, treat it as a blocker,
-not a skipped success.
+The Rust `golden` test filter and pytest `-m golden` gate fail immediately when
+the oracle is missing. Set `AURALIS_REQUIRE_SOX_NG=1` to force the same Rust
+oracle check during a broader test invocation.
 
 Pipeline-sensitive milestones should grow complex pipeline golden manifests in
 Rust/testkit first. Coverage report artifacts are expected for later milestones

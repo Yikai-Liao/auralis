@@ -24,8 +24,10 @@ The current order is:
    [`doc/development/06-effects/`](doc/development/06-effects/), while README
    remains a short user-facing entry point.
 2. Strengthen the test gates before more effect implementation: missing
-   `sox_ng` must fail release/gnhf golden checks, complex pipeline goldens must
-   be covered, and coverage artifacts must be produced by the applicable gate.
+   `sox_ng` now fails explicit release/gnhf golden checks through the Rust
+   `golden` test filter and pytest `-m golden` gate; complex pipeline goldens
+   must still be covered, and coverage artifacts must still be produced by the
+   applicable gate.
 3. Continue Rust-first migration of critical SoX-ng golden and complex pipeline
    coverage. Python/pytest may remain as helper tooling, but key behavior gates
    should move into Rust/testkit where feasible.
