@@ -845,17 +845,39 @@ Implementation notes:
 - Delay and depth are configured in milliseconds and resolved against the
   input sample rate at processing time. The core rejects non-finite values,
   out-of-range gains/decay, negative timing parameters, zero resolved delay
-  lines, and modulation speeds above the sample rate.
+  lines, zero modulation speed, and modulation speeds above the sample rate.
 - Latency is the current modulated delay, and tail behavior is explicit:
   whole-buffer processing extends the output by `ceil(delay + depth)` frames.
   A future streaming API can be exact only if it preserves the per-channel
   delay line, modulation phase, and exposes a final zero-input flush.
 - Coverage includes analytical typed-processor tests and L4 finite-output
-  property coverage. The SoX-ng command parser, golden tests, interpolation
-  options, waveform selection, and multi-delay command surface remain owned by
-  Feature 6.5.5.
+  property coverage. Feature 6.5.5 later added the SoX-ng command parser,
+  golden tests, interpolation options, waveform selection, and multi-delay
+  command surface.
 
 ### Feature 6.5.5: `chorus` interpolation and multi-delay options
+
+Status: implemented.
+
+Implementation notes:
+
+- Extended the typed `Chorus` model with SoX-ng's global `-n`, `-l`, and
+  `-q` interpolation modes, sine/triangle waveform selection, per-stage wave
+  overrides, and multiple stage support while preserving the single-stage
+  constructor from Feature 6.5.4.
+- Wired `chorus [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay decay speed depth
+  [-sine|-triangle]]...]]` through the effect registry, typed command parser,
+  effect-chain execution, effects-file diagnostics, CLI positional chain path,
+  and parser fuzz corpus.
+- Processing keeps independent per-channel delay lines for each stage, sums
+  the configured stage decays, clips inside the effect, and extends output by
+  the largest SoX-ng-style drain length, including the delay-line tail, the
+  final drain frame, and the extra samples required by linear and quadratic
+  interpolation.
+- Coverage includes typed processor tests, command and chain integration
+  tests, L4 finite-output property coverage, parser fuzz seeds, layered
+  coverage metadata, and standalone SoX-ng golden cases for linear mono chorus
+  and multi-stage stereo chorus.
 
 ### Feature 6.5.6: `flanger`
 

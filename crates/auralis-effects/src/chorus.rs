@@ -9,36 +9,73 @@ const DEFAULT_DECAY: f64 = 0.5;
 const DEFAULT_SPEED_HZ: f64 = 0.25;
 const DEFAULT_DEPTH_MS: f64 = 2.0;
 
-/// One scalar sinusoidal chorus delay stage.
-///
-/// This is the core data model for the SoX-ng-style chorus family. It covers a
-/// single sine-modulated delay line; command options, interpolation modes, and
-/// multi-stage command parsing are reserved for the follow-up chorus feature.
+/// SoX-ng chorus delay-line interpolation mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChorusInterpolation {
+    /// Use the nearest integer modulated delay offset.
+    #[default]
+    None,
+    /// Linearly interpolate between adjacent delay-line samples.
+    Linear,
+    /// Use SoX-ng's quadratic interpolation across three delay-line samples.
+    Quadratic,
+}
+
+/// SoX-ng chorus modulation waveform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChorusWave {
+    /// Sine modulation.
+    #[default]
+    Sine,
+    /// Triangle modulation.
+    Triangle,
+}
+
+/// One scalar SoX-ng-style chorus delay stage.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChorusStage {
     delay_ms: f64,
     decay: f64,
     speed_hz: f64,
     depth_ms: f64,
+    wave: ChorusWave,
 }
 
 impl ChorusStage {
-    /// Creates a chorus stage from delay, decay, modulation speed, and depth.
+    /// Creates a sine-modulated chorus stage.
     ///
     /// # Errors
     ///
     /// Returns [`EffectError::InvalidChorus`] when `decay` is outside
-    /// `-1..=1`, when delay/depth/speed are negative, or when any value is
-    /// non-finite.
+    /// `-1..=1`, delay/depth are outside SoX-ng's millisecond range, speed is
+    /// outside `0..=192000`, or any value is non-finite. A zero speed is
+    /// accepted at construction but rejected at processing start to mirror
+    /// SoX-ng's runtime validation.
     pub fn new(delay_ms: f64, decay: f64, speed_hz: f64, depth_ms: f64) -> Result<Self> {
+        Self::with_wave(delay_ms, decay, speed_hz, depth_ms, ChorusWave::Sine)
+    }
+
+    /// Creates a chorus stage with an explicit modulation waveform.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidChorus`] when any numeric parameter is
+    /// outside SoX-ng's accepted range or non-finite.
+    pub fn with_wave(
+        delay_ms: f64,
+        decay: f64,
+        speed_hz: f64,
+        depth_ms: f64,
+        wave: ChorusWave,
+    ) -> Result<Self> {
         if !delay_ms.is_finite()
-            || delay_ms < 0.0
+            || !(0.0..=86_400_000.0).contains(&delay_ms)
             || !decay.is_finite()
             || !(-1.0..=1.0).contains(&decay)
             || !speed_hz.is_finite()
-            || speed_hz < 0.0
+            || !(0.0..=192_000.0).contains(&speed_hz)
             || !depth_ms.is_finite()
-            || depth_ms < 0.0
+            || !(0.0..=86_400_000.0).contains(&depth_ms)
         {
             return Err(EffectError::InvalidChorus);
         }
@@ -48,6 +85,7 @@ impl ChorusStage {
             decay,
             speed_hz,
             depth_ms,
+            wave,
         })
     }
 
@@ -59,6 +97,7 @@ impl ChorusStage {
             decay: DEFAULT_DECAY,
             speed_hz: DEFAULT_SPEED_HZ,
             depth_ms: DEFAULT_DEPTH_MS,
+            wave: ChorusWave::Sine,
         }
     }
 
@@ -74,7 +113,7 @@ impl ChorusStage {
         self.decay
     }
 
-    /// Returns the sinusoidal modulation speed in hertz.
+    /// Returns the modulation speed in hertz.
     #[must_use]
     pub const fn speed_hz(self) -> f64 {
         self.speed_hz
@@ -86,18 +125,34 @@ impl ChorusStage {
         self.depth_ms
     }
 
-    fn resolve(self, sample_rate_hz: u32) -> Result<ResolvedChorusStage> {
+    /// Returns the stage modulation waveform.
+    #[must_use]
+    pub const fn wave(self) -> ChorusWave {
+        self.wave
+    }
+
+    fn resolve(
+        self,
+        sample_rate_hz: u32,
+        interpolation: ChorusInterpolation,
+    ) -> Result<ResolvedChorusStage> {
         let sample_rate = f64::from(sample_rate_hz);
-        if self.speed_hz > sample_rate {
+        if self.speed_hz == 0.0 || self.speed_hz > sample_rate {
             return Err(EffectError::InvalidChorus);
         }
 
         let base_delay = frames_from_ms(self.delay_ms, sample_rate)?;
         let depth = frames_from_ms(self.depth_ms, sample_rate)?;
-        let max_delay = (base_delay + depth).ceil();
-        if max_delay < 1.0 {
+        let raw_delay_line_length = (base_delay + depth).ceil();
+        if raw_delay_line_length < 1.0 {
             return Err(EffectError::InvalidChorus);
         }
+        let interpolation_padding = match interpolation {
+            ChorusInterpolation::None => 0,
+            ChorusInterpolation::Linear => 1,
+            ChorusInterpolation::Quadratic => 2,
+        };
+        let delay_line_length = raw_delay_line_length + f64::from(interpolation_padding);
 
         #[allow(
             clippy::cast_possible_truncation,
@@ -107,10 +162,12 @@ impl ChorusStage {
         Ok(ResolvedChorusStage {
             base_delay,
             depth,
-            max_delay: max_delay as usize,
+            delay_line_length: delay_line_length as usize,
             decay: self.decay,
             speed_hz: self.speed_hz,
             sample_rate,
+            wave: self.wave,
+            interpolation,
         })
     }
 }
@@ -121,14 +178,12 @@ impl Default for ChorusStage {
     }
 }
 
-/// Single-stage sinusoidal chorus processor.
+/// SoX-ng-style chorus processor.
 ///
-/// `Chorus` applies a clean input gain, adds one sine-modulated delayed copy
-/// of the input scaled by the stage decay, applies a final output gain, clips
-/// to normalized full scale, and extends the output by the maximum resolved
-/// delay. The current core is scalar and whole-buffer oriented; chunked
-/// streaming would be exact only when callers preserve the per-channel delay
-/// line, modulation phase, and explicit tail flush state.
+/// `Chorus` applies a clean input gain, adds one or more modulated delayed
+/// copies of the input scaled by each stage decay, applies a final output gain,
+/// clips to normalized full scale, and extends the output by the largest
+/// resolved delay line.
 ///
 /// # Examples
 ///
@@ -145,31 +200,52 @@ impl Default for ChorusStage {
 /// );
 /// let audio = AudioBuffer::from_planar_f32(spec, FrameCount::new(2), vec![1.0, 0.0])?;
 ///
-/// let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(1.0, 0.25, 0.0, 0.0)?)?;
+/// let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(1.0, 0.25, 1.0, 0.0)?)?;
 /// let processed = chorus.process_buffer(&audio)?;
 ///
-/// assert_eq!(processed.as_planar_f32(), &[0.5, 0.25, 0.0]);
+/// assert_eq!(processed.as_planar_f32(), &[0.5, 0.25, 0.0, 0.0]);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Chorus {
     gain_in: f64,
     gain_out: f64,
-    stage: ChorusStage,
+    stages: Vec<ChorusStage>,
+    interpolation: ChorusInterpolation,
 }
 
 impl Chorus {
-    /// Creates a single-stage chorus processor.
+    /// Creates a single-stage chorus processor with no interpolation.
     ///
     /// # Errors
     ///
     /// Returns [`EffectError::InvalidChorus`] when either gain is outside
     /// `-1..=1` or non-finite.
     pub fn new(gain_in: f64, gain_out: f64, stage: ChorusStage) -> Result<Self> {
+        Self::with_options(gain_in, gain_out, [stage], ChorusInterpolation::None)
+    }
+
+    /// Creates a chorus processor with explicit interpolation and stages.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidChorus`] when either gain is outside
+    /// `-1..=1`, non-finite, or when no stages are supplied.
+    pub fn with_options<I>(
+        gain_in: f64,
+        gain_out: f64,
+        stages: I,
+        interpolation: ChorusInterpolation,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = ChorusStage>,
+    {
+        let stages = stages.into_iter().collect::<Vec<_>>();
         if !gain_in.is_finite()
             || !(-1.0..=1.0).contains(&gain_in)
             || !gain_out.is_finite()
             || !(-1.0..=1.0).contains(&gain_out)
+            || stages.is_empty()
         {
             return Err(EffectError::InvalidChorus);
         }
@@ -177,7 +253,8 @@ impl Chorus {
         Ok(Self {
             gain_in,
             gain_out,
-            stage,
+            stages,
+            interpolation,
         })
     }
 
@@ -196,35 +273,57 @@ impl Chorus {
 
     /// Returns the clean input multiplier.
     #[must_use]
-    pub const fn gain_in(self) -> f64 {
+    pub const fn gain_in(&self) -> f64 {
         self.gain_in
     }
 
     /// Returns the final output multiplier.
     #[must_use]
-    pub const fn gain_out(self) -> f64 {
+    pub const fn gain_out(&self) -> f64 {
         self.gain_out
     }
 
-    /// Returns the configured chorus stage.
+    /// Returns the first configured chorus stage.
     #[must_use]
-    pub const fn stage(self) -> ChorusStage {
-        self.stage
+    pub fn stage(&self) -> ChorusStage {
+        self.stages[0]
+    }
+
+    /// Returns all configured chorus stages.
+    #[must_use]
+    pub fn stages(&self) -> &[ChorusStage] {
+        &self.stages
+    }
+
+    /// Returns the configured interpolation mode.
+    #[must_use]
+    pub const fn interpolation(&self) -> ChorusInterpolation {
+        self.interpolation
     }
 
     /// Applies chorus and returns an output buffer extended by the delay tail.
     ///
     /// # Errors
     ///
-    /// Returns [`EffectError::InvalidChorus`] when the stage cannot be resolved
+    /// Returns [`EffectError::InvalidChorus`] when a stage cannot be resolved
     /// at the input sample rate, or [`EffectError::ChorusLengthOverflow`] when
     /// output allocation would overflow.
-    pub fn process_buffer(self, audio: &AudioBuffer) -> Result<AudioBuffer> {
-        let resolved = self.stage.resolve(audio.spec().sample_rate().as_u32())?;
+    pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
+        let resolved = self
+            .stages
+            .iter()
+            .map(|stage| stage.resolve(audio.spec().sample_rate().as_u32(), self.interpolation))
+            .collect::<Result<Vec<_>>>()?;
+        let max_delay = resolved
+            .iter()
+            .map(|stage| stage.delay_line_length)
+            .max()
+            .ok_or(EffectError::InvalidChorus)?;
         let input_frames = usize::try_from(audio.frames().as_u64())
             .map_err(|_| EffectError::ChorusLengthOverflow)?;
         let output_frames = input_frames
-            .checked_add(resolved.max_delay)
+            .checked_add(max_delay)
+            .and_then(|frames| frames.checked_add(1))
             .ok_or(EffectError::ChorusLengthOverflow)?;
         let capacity = audio
             .channels()
@@ -242,7 +341,7 @@ impl Chorus {
                 output_frames,
                 self.gain_in,
                 self.gain_out,
-                resolved,
+                &resolved,
                 &mut output,
             );
         }
@@ -261,10 +360,20 @@ impl Chorus {
 struct ResolvedChorusStage {
     base_delay: f64,
     depth: f64,
-    max_delay: usize,
+    delay_line_length: usize,
     decay: f64,
     speed_hz: f64,
     sample_rate: f64,
+    wave: ChorusWave,
+    interpolation: ChorusInterpolation,
+}
+
+struct ChorusStageState {
+    resolved: ResolvedChorusStage,
+    delay_line: Vec<f64>,
+    delay_line_index: usize,
+    wave_index: usize,
+    wave_length: usize,
 }
 
 fn process_channel(
@@ -272,61 +381,179 @@ fn process_channel(
     output_frames: usize,
     gain_in: f64,
     gain_out: f64,
-    stage: ResolvedChorusStage,
+    stages: &[ResolvedChorusStage],
     output: &mut Vec<f32>,
 ) {
-    let mut delay_line = vec![0.0_f64; stage.max_delay];
-    let mut cursor = 0_usize;
+    let mut stage_states = stages
+        .iter()
+        .copied()
+        .map(ChorusStageState::new)
+        .collect::<Vec<_>>();
 
     for frame in 0..output_frames {
         let input_sample = input.get(frame).copied().map_or(0.0, f64::from);
-        let delay = stage.delay_at_frame(frame);
-        let delayed = if delay == 0 {
-            input_sample
-        } else {
-            let delayed_index = (cursor + stage.max_delay - delay) % stage.max_delay;
-            delay_line[delayed_index]
-        };
-        delay_line[cursor] = input_sample;
-        cursor = (cursor + 1) % stage.max_delay;
+        let mut output_sample = input_sample * gain_in;
 
-        let output_sample = (input_sample * gain_in + delayed * stage.decay) * gain_out;
+        for stage in &mut stage_states {
+            output_sample += stage.process(input_sample) * stage.resolved.decay;
+        }
+
+        output_sample *= gain_out;
         output.push(f64_to_f32_clamped(output_sample));
     }
 }
 
-impl ResolvedChorusStage {
-    fn delay_at_frame(self, frame: usize) -> usize {
-        let delay = self.base_delay + self.depth * self.modulation_at_frame(frame);
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "max_delay was range-checked before allocation and is only used as an f64 clamp bound"
-        )]
-        let bounded = delay.round().clamp(0.0, self.max_delay as f64);
-
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "delay is clamped into the allocated delay-line range"
-        )]
-        {
-            bounded as usize
+impl ChorusStageState {
+    fn new(resolved: ResolvedChorusStage) -> Self {
+        let wave_length = resolved.wave_length();
+        Self {
+            resolved,
+            delay_line: vec![0.0; resolved.delay_line_length],
+            delay_line_index: 0,
+            wave_index: 0,
+            wave_length,
         }
     }
 
-    fn modulation_at_frame(self, frame: usize) -> f64 {
+    fn process(&mut self, input_sample: f64) -> f64 {
+        let offset = self
+            .resolved
+            .delay_offset(self.wave_index, self.wave_length);
+        let sample = match self.resolved.interpolation {
+            ChorusInterpolation::None => self.process_none(input_sample, offset),
+            ChorusInterpolation::Linear => self.process_linear(input_sample, offset),
+            ChorusInterpolation::Quadratic => self.process_quadratic(input_sample, offset),
+        };
+
+        self.delay_line_index = (self.delay_line_index + 1) % self.resolved.delay_line_length;
+        self.wave_index = (self.wave_index + 1) % self.wave_length;
+        sample
+    }
+
+    fn process_none(&mut self, input_sample: f64, offset: f64) -> f64 {
+        let offset = integer_wave_offset(offset);
+        let delay_index = self.delay_index(offset);
+        let sample = self.delay_line[delay_index];
+        self.delay_line[self.delay_line_index] = input_sample;
+        sample
+    }
+
+    fn process_linear(&mut self, input_sample: f64, offset: f64) -> f64 {
+        let offset_i = offset.trunc();
+        let frac = offset - offset_i;
+        let delay_index = self.delay_index(float_offset_to_usize(offset_i));
+        let delayed_0 = self.delay_line[delay_index];
+        let delayed_1 = self.delay_line
+            [(delay_index + self.resolved.delay_line_length - 1) % self.resolved.delay_line_length];
+        self.delay_line[self.delay_line_index] = input_sample;
+        delayed_0.mul_add(1.0 - frac, delayed_1 * frac)
+    }
+
+    fn process_quadratic(&mut self, input_sample: f64, offset: f64) -> f64 {
+        let offset_i = offset.trunc();
+        let frac = offset - offset_i;
+        let delay_index = self.delay_index(float_offset_to_usize(offset_i));
+        let delayed_0 = self.delay_line[delay_index];
+        let delayed_1 = self.delay_line
+            [(delay_index + self.resolved.delay_line_length - 1) % self.resolved.delay_line_length];
+        let delayed_2 = self.delay_line
+            [(delay_index + self.resolved.delay_line_length - 2) % self.resolved.delay_line_length];
+        self.delay_line[self.delay_line_index] = input_sample;
+        let adjusted_2 = delayed_2 - delayed_0;
+        let adjusted_1 = delayed_1 - delayed_0;
+        let a = adjusted_2 * 0.5 - adjusted_1;
+        let b = adjusted_1 * 2.0 - adjusted_2 * 0.5;
+        delayed_0 + (a * frac + b) * frac
+    }
+
+    fn delay_index(&self, offset: usize) -> usize {
+        (self.delay_line_index + self.resolved.delay_line_length - offset)
+            % self.resolved.delay_line_length
+    }
+}
+
+impl ResolvedChorusStage {
+    fn wave_length(self) -> usize {
+        if self.speed_hz == 0.0 {
+            return 1;
+        }
+
+        let length = self.sample_rate / self.speed_hz + 0.5;
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "speed was validated against the sample rate, so wave length is finite and nonzero"
+        )]
+        {
+            (length as usize).max(1)
+        }
+    }
+
+    fn delay_offset(self, wave_index: usize, wave_length: usize) -> f64 {
+        self.base_delay + self.depth * self.wave_value(wave_index, wave_length)
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        reason = "chorus wave-table math mirrors SoX-ng's bounded table index conversions"
+    )]
+    fn wave_value(self, wave_index: usize, wave_length: usize) -> f64 {
         if self.depth == 0.0 || self.speed_hz == 0.0 {
             return 0.0;
         }
 
+        let phase_offset = (0.75_f64).mul_add(wave_length as f64, 0.5);
         #[allow(
-            clippy::cast_precision_loss,
-            reason = "chorus modulation phase is evaluated in f64 from frame indices"
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "wave length is finite and indexes are bounded by modulo"
         )]
-        let phase = std::f64::consts::TAU * self.speed_hz * frame as f64 / self.sample_rate
-            - std::f64::consts::FRAC_PI_2;
-        0.5 + 0.5 * phase.sin()
+        let point = (wave_index + phase_offset as usize) % wave_length;
+        let value = match self.wave {
+            ChorusWave::Sine => f64::midpoint(
+                (point as f64 / wave_length as f64 * std::f64::consts::TAU).sin(),
+                1.0,
+            ),
+            ChorusWave::Triangle => triangle_wave_value(point, wave_length),
+        };
+
+        if matches!(
+            self.interpolation,
+            ChorusInterpolation::Linear | ChorusInterpolation::Quadratic
+        ) {
+            f64::from(value as f32)
+        } else {
+            value
+        }
     }
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "chorus wave-table math mirrors SoX-ng's bounded table index conversions"
+)]
+fn triangle_wave_value(point: usize, wave_length: usize) -> f64 {
+    let d = point as f64 * 2.0 / wave_length as f64;
+    match 4 * point / wave_length {
+        0 => d + 0.5,
+        1 | 2 => 1.5 - d,
+        3 => d - 1.5,
+        _ => 0.0,
+    }
+}
+
+fn integer_wave_offset(offset: f64) -> usize {
+    float_offset_to_usize(offset + 0.5)
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "chorus offsets are non-negative and bounded by the allocated delay line"
+)]
+fn float_offset_to_usize(offset: f64) -> usize {
+    offset as usize
 }
 
 #[allow(
@@ -354,7 +581,7 @@ fn f64_to_f32_clamped(sample: f64) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Chorus, ChorusStage};
+    use super::{Chorus, ChorusInterpolation, ChorusStage, ChorusWave};
     use crate::EffectError;
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
@@ -363,12 +590,12 @@ mod tests {
     #[test]
     fn depth_zero_core_behaves_like_one_parallel_delay() {
         let audio = mono_audio_buffer(1_000, &[1.0, 0.0]);
-        let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(1.0, 0.25, 0.0, 0.0).unwrap()).unwrap();
+        let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(1.0, 0.25, 1.0, 0.0).unwrap()).unwrap();
 
         let processed = chorus.process_buffer(&audio).unwrap();
 
-        assert_eq!(processed.frames(), FrameCount::new(3));
-        assert_eq!(processed.as_planar_f32(), &[0.5, 0.25, 0.0]);
+        assert_eq!(processed.frames(), FrameCount::new(4));
+        assert_eq!(processed.as_planar_f32(), &[0.5, 0.25, 0.0, 0.0]);
     }
 
     #[test]
@@ -378,7 +605,7 @@ mod tests {
 
         let processed = chorus.process_buffer(&audio).unwrap();
 
-        assert_eq!(processed.frames(), FrameCount::new(6));
+        assert_eq!(processed.frames(), FrameCount::new(7));
         assert!(
             processed
                 .as_planar_f32()
@@ -388,13 +615,58 @@ mod tests {
     }
 
     #[test]
-    fn clips_inside_effect() {
-        let audio = mono_audio_buffer(1_000, &[1.0]);
-        let chorus = Chorus::new(1.0, 1.0, ChorusStage::new(0.0, 1.0, 0.0, 1.0).unwrap()).unwrap();
+    fn multi_stage_chorus_sums_delayed_stage_outputs() {
+        let audio = mono_audio_buffer(1_000, &[1.0, 0.0]);
+        let chorus = Chorus::with_options(
+            0.5,
+            1.0,
+            [
+                ChorusStage::new(1.0, 0.25, 1.0, 0.0).unwrap(),
+                ChorusStage::new(2.0, 0.125, 1.0, 0.0).unwrap(),
+            ],
+            ChorusInterpolation::None,
+        )
+        .unwrap();
 
         let processed = chorus.process_buffer(&audio).unwrap();
 
-        assert_eq!(processed.as_planar_f32(), &[1.0, 0.0]);
+        assert_eq!(processed.frames(), FrameCount::new(5));
+        assert_eq!(processed.as_planar_f32(), &[0.5, 0.25, 0.125, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn interpolation_modes_add_sox_ng_delay_line_tail_padding() {
+        let audio = mono_audio_buffer(1_000, &[1.0]);
+        let stage = ChorusStage::new(1.0, 0.25, 1.0, 0.0).unwrap();
+
+        let linear = Chorus::with_options(0.5, 1.0, [stage], ChorusInterpolation::Linear)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+        let quadratic = Chorus::with_options(0.5, 1.0, [stage], ChorusInterpolation::Quadratic)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+
+        assert_eq!(linear.frames(), FrameCount::new(4));
+        assert_eq!(quadratic.frames(), FrameCount::new(5));
+    }
+
+    #[test]
+    fn clips_inside_effect() {
+        let audio = mono_audio_buffer(1_000, &[1.0]);
+        let chorus = Chorus::new(1.0, 1.0, ChorusStage::new(0.0, 1.0, 1.0, 1.0).unwrap()).unwrap();
+
+        let processed = chorus.process_buffer(&audio).unwrap();
+
+        assert_eq!(processed.as_planar_f32(), &[1.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn triangle_wave_stage_configuration_is_preserved() {
+        let stage = ChorusStage::with_wave(1.0, 0.25, 1.0, 2.0, ChorusWave::Triangle).unwrap();
+
+        assert_eq!(stage.wave(), ChorusWave::Triangle);
     }
 
     #[test]
@@ -411,12 +683,16 @@ mod tests {
             Chorus::new(f64::NAN, 1.0, ChorusStage::default_stage()).unwrap_err(),
             EffectError::InvalidChorus
         );
+        assert_eq!(
+            Chorus::with_options(0.5, 1.0, [], ChorusInterpolation::None).unwrap_err(),
+            EffectError::InvalidChorus
+        );
     }
 
     #[test]
     fn rejects_zero_resolved_delay_at_processing_time() {
         let audio = mono_audio_buffer(1_000, &[1.0]);
-        let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(0.0, 0.5, 0.25, 0.0).unwrap()).unwrap();
+        let chorus = Chorus::new(0.5, 1.0, ChorusStage::new(0.0, 0.5, 1.0, 0.0).unwrap()).unwrap();
 
         assert_eq!(
             chorus.process_buffer(&audio).unwrap_err(),

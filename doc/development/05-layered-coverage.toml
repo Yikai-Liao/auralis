@@ -217,6 +217,21 @@ l6 = { status = "not_applicable", reason = "Delay inserts and copies whole chann
 l7 = { status = "covered", reason = "Effect command fuzzing covers delay position parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/delay"] }
 
 [[subject]]
+id = "effect.chorus"
+kind = "effect"
+name = "chorus"
+summary = "SoX-ng-style chorus modulation with interpolation, wave, and multi-stage delay options."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo 48 kHz L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover linear-interpolated mono chorus and stereo multi-stage chorus command shapes.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover delay-tail extension, interpolation padding, triangle wave parsing, multi-stage summing, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/chorus.rs", "crates/auralis-effects/src/command_chorus.rs", "crates/auralis-effects/tests/chorus.rs"] }
+l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current public Chorus API is a whole-buffer length-changing transform; streaming chunk invariance belongs to a future streaming API that can expose delay-line state, modulation phase, and explicit tail flush.", tests = [] }
+l6 = { status = "not_applicable", reason = "Chorus is a scalar stateful delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers chorus interpolation, wave, gain, and stage parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/chorus"] }
+
+[[subject]]
 id = "effect.echo"
 kind = "effect"
 name = "echo"

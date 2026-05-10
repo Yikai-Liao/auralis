@@ -783,6 +783,7 @@ mod tests {
                 | EffectCommand::Treble(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
+                | EffectCommand::Chorus(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Delay(_)
                 | EffectCommand::Echo(_)

@@ -16,6 +16,7 @@ use crate::command_bass::{parse_bass, render_bass};
 use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
+use crate::command_chorus::{parse_chorus, render_chorus};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
@@ -43,8 +44,8 @@ use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    Deemph, Delay, Echo, Echos, EffectError, EffectKind, EffectNameError, EffectRegistry,
+    AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
+    DcShift, Deemph, Delay, Echo, Echos, EffectError, EffectKind, EffectNameError, EffectRegistry,
     Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse,
     Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
@@ -78,6 +79,8 @@ pub enum EffectCommand {
     Centercut(Centercut),
     /// SoX-ng-style explicit channel-count conversion.
     Channels(Channels),
+    /// SoX-ng-style chorus modulation.
+    Chorus(Chorus),
     /// SoX-ng-style phase contrast enhancement.
     Contrast(Contrast),
     /// Constant normalized full-scale offset.
@@ -154,6 +157,7 @@ impl EffectCommand {
             EffectKind::Biquad => parse_biquad(effect, args),
             EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
+            EffectKind::Chorus => parse_chorus(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
@@ -195,6 +199,7 @@ impl EffectCommand {
             Self::Biquad(_) => EffectKind::Biquad,
             Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
+            Self::Chorus(_) => EffectKind::Chorus,
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
@@ -242,6 +247,7 @@ impl EffectCommand {
             Self::Biquad(biquad) => render_biquad(*biquad),
             Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
+            Self::Chorus(chorus) => render_chorus(chorus),
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],

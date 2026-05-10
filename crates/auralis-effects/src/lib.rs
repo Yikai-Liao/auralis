@@ -45,6 +45,7 @@ mod command_bass;
 mod command_biquad;
 mod command_centercut;
 mod command_channels;
+mod command_chorus;
 mod command_contrast;
 mod command_dcshift;
 mod command_deemph;
@@ -117,7 +118,7 @@ pub use chain::{
     EffectChainParseError, parse_effect_chain,
 };
 pub use channels::Channels;
-pub use chorus::{Chorus, ChorusStage};
+pub use chorus::{Chorus, ChorusInterpolation, ChorusStage, ChorusWave};
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use contrast::Contrast;
 pub use dcshift::DcShift;

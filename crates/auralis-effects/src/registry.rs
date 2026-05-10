@@ -48,6 +48,9 @@ pub enum EffectKind {
     /// SoX-ng-style explicit channel-count conversion.
     Channels,
 
+    /// SoX-ng-style chorus modulation.
+    Chorus,
+
     /// SoX-ng-style phase contrast enhancement.
     Contrast,
 
@@ -272,6 +275,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Channels",
         "channels number",
         "convert decoded audio to an explicit channel count",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Chorus,
+        "chorus",
+        &[],
+        "Chorus",
+        "chorus [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay decay speed depth [-sine|-triangle]]...]]",
+        "apply one or more modulated chorus delay lines",
     ),
     EffectDescriptor::new(
         EffectKind::Contrast,
@@ -809,6 +820,7 @@ mod tests {
             ("biquad", EffectKind::Biquad),
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
+            ("chorus", EffectKind::Chorus),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
             ("delay", EffectKind::Delay),
@@ -887,18 +899,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("chorus").unwrap_err();
+        let error = EffectRegistry::resolve("flanger").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "chorus".to_owned(),
+                name: "flanger".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `chorus`")
+                .contains("missing SoX-ng coverage entry for `flanger`")
         );
     }
 

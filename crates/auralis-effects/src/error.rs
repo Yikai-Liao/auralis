@@ -69,7 +69,7 @@ pub enum EffectError {
 
     /// A chorus processor had invalid gains, delay parameters, or modulation settings.
     #[error(
-        "chorus gains and decay must be finite in -1..=1, delay/depth/speed must be finite and non-negative, and the resolved delay line must fit the output buffer"
+        "chorus gains and decay must be finite in -1..=1, delay/depth must be finite and non-negative, speed must be finite and positive, and the resolved delay line must fit the output buffer"
     )]
     InvalidChorus,
 

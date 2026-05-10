@@ -28,6 +28,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_centercut_stereo_options",
             "effect_channels_mono_to_stereo",
             "effect_channels_stereo_to_mono",
+            "effect_chorus_mono_linear",
+            "effect_chorus_stereo_multi_stage",
             "effect_contrast_mono_default",
             "effect_contrast_stereo_amount_25",
             "effect_dcshift_limiter_mono_positive",
@@ -141,6 +143,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "saturation",
         "repeat",
         "channels",
+        "chorus",
         "remix",
         "swap",
     ] {
