@@ -57,6 +57,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"vol 2 amplitude 0.05",
         b"vol -0.25 power",
         b"pad 1 2@3 4",
+        b"deemph",
         b"dcshift 0.25 : reverse\nfade l 2 3\n",
         b"'unterminated",
         br#"[id.case]

@@ -776,6 +776,7 @@ mod tests {
                 | EffectCommand::BandPass(_)
                 | EffectCommand::BandReject(_)
                 | EffectCommand::Bass(_)
+                | EffectCommand::Deemph(_)
                 | EffectCommand::Equalizer(_)
                 | EffectCommand::HighPass(_)
                 | EffectCommand::LowPass(_)

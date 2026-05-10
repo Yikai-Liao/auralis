@@ -5,9 +5,9 @@ use auralis_core::{
 };
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Contrast, DcShift, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops, Overdrive,
-    Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation, SaturationType, SoftVol,
-    Swap, Treble, Tremolo, Trim, Vol,
+    Channels, Contrast, DcShift, Deemph, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops,
+    Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation,
+    SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -311,6 +311,12 @@ proptest! {
             .process_buffer(&mut high_passed)
             .expect("fixture sample rate keeps frequency below Nyquist");
         prop_assert_all_finite(&high_passed)?;
+
+        let mut deemphasized = source.clone();
+        Deemph::new()
+            .process_buffer(&mut deemphasized)
+            .expect("fixture sample rate has a SoX-ng deemph preset");
+        prop_assert_all_finite(&deemphasized)?;
 
         let mut normalized = source.clone();
         Norm::new(Decibels::new(db).expect("generated dB is finite"))

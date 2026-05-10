@@ -48,6 +48,7 @@ use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
+use crate::command_deemph::parse_deemph;
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
@@ -69,9 +70,9 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain, HighPass,
-    LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol, Swap, Treble,
-    Tremolo, Trim, Vol,
+    Deemph, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain,
+    HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol,
+    Swap, Treble, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -107,6 +108,8 @@ pub enum EffectCommand {
     Contrast(Contrast),
     /// Constant normalized full-scale offset.
     DcShift(DcShift),
+    /// SoX-ng-style CD/DAT de-emphasis filter.
+    Deemph(Deemph),
     /// SoX-ng-style peaking equalizer filter.
     Equalizer(Equalizer),
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
@@ -171,6 +174,7 @@ impl EffectCommand {
             EffectKind::Channels => parse_channels(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
+            EffectKind::Deemph => parse_deemph(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
@@ -207,6 +211,7 @@ impl EffectCommand {
             Self::Channels(_) => EffectKind::Channels,
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
+            Self::Deemph(_) => EffectKind::Deemph,
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
@@ -249,6 +254,7 @@ impl EffectCommand {
             Self::Channels(channels) => render_channels(*channels),
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
+            Self::Deemph(_) => vec!["deemph".to_owned()],
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),

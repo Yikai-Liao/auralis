@@ -3,9 +3,9 @@
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
     Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels,
-    Contrast, DcShift, EffectCommand, Equalizer, Fade, FadeCurve, Gain, HighPass, LowPass, Oops,
-    Pad, PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim,
-    parse_effect_command,
+    Contrast, DcShift, Deemph, EffectCommand, Equalizer, Fade, FadeCurve, Gain, HighPass, LowPass,
+    Oops, Pad, PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo,
+    Trim, parse_effect_command,
 };
 
 #[test]
@@ -59,6 +59,7 @@ fn parses_supported_effect_commands_into_typed_configs() {
             &["dcshift", "0.25"][..],
             EffectCommand::DcShift(DcShift::new(0.25).unwrap()),
         ),
+        (&["deemph"][..], EffectCommand::Deemph(Deemph::new())),
         (
             &["trim", "1", "2"][..],
             EffectCommand::Trim(Trim::new(FrameCount::new(1), FrameCount::new(3)).unwrap()),

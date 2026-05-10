@@ -54,6 +54,9 @@ pub enum EffectKind {
     /// Constant normalized full-scale offset.
     DcShift,
 
+    /// SoX-ng-style CD/DAT de-emphasis filter.
+    Deemph,
+
     /// SoX-ng-style peaking equalizer filter.
     Equalizer,
 
@@ -273,6 +276,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "DcShift",
         "dcshift shift [limiter-gain]",
         "add a constant normalized full-scale offset",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Deemph,
+        "deemph",
+        &[],
+        "Deemph",
+        "deemph",
+        "apply a CD/DAT de-emphasis filter",
     ),
     EffectDescriptor::new(
         EffectKind::Equalizer,
@@ -756,6 +767,7 @@ mod tests {
             ("channels", EffectKind::Channels),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
+            ("deemph", EffectKind::Deemph),
             ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
             ("gain", EffectKind::Gain),
@@ -827,18 +839,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("deemph").unwrap_err();
+        let error = EffectRegistry::resolve("riaa").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "deemph".to_owned(),
+                name: "riaa".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `deemph`")
+                .contains("missing SoX-ng coverage entry for `riaa`")
         );
     }
 

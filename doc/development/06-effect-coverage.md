@@ -732,6 +732,22 @@ Implementation notes:
 
 ### Feature 6.4.13: `deemph`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed no-argument `Deemph` effect matching SoX-ng's fixed CD/DAT
+  de-emphasis presets: 44.1 kHz uses 5283 Hz, `0.4845s`, and -9.477 dB; 48 kHz
+  uses 5356 Hz, `0.479s`, and -9.62 dB. Other sample rates return an invalid
+  biquad design error, matching SoX-ng's accepted input-rate restriction.
+- Processing delegates to the scalar stateful high-shelf biquad primitive, with
+  independent per-channel state and exact state-preserving chunk equivalence.
+- Coverage includes coefficient and command tests, chain integration, L4
+  finite-output property coverage, L5 chunk invariance, parser fuzz seed
+  coverage, and standalone SoX-ng golden cases for mono and stereo 48 kHz L0
+  corpora. Tolerance follows the one-PCM16-LSB filter-effect policy used by the
+  surrounding biquad-backed filters.
+
 ### Feature 6.4.14: `riaa`
 
 Each filter effect requires analytical frequency-response tests, chunk

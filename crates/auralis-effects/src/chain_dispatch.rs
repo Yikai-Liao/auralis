@@ -98,6 +98,7 @@ pub(crate) fn apply_command(
         | EffectCommand::BandPass(_)
         | EffectCommand::BandReject(_)
         | EffectCommand::Bass(_)
+        | EffectCommand::Deemph(_)
         | EffectCommand::Equalizer(_)
         | EffectCommand::HighPass(_)
         | EffectCommand::LowPass(_)
@@ -115,6 +116,7 @@ fn apply_filter_command(
         EffectCommand::BandPass(band_pass) => band_pass.process_buffer(audio),
         EffectCommand::BandReject(band_reject) => band_reject.process_buffer(audio),
         EffectCommand::Bass(bass) => bass.process_buffer(audio),
+        EffectCommand::Deemph(deemph) => deemph.process_buffer(audio),
         EffectCommand::Equalizer(equalizer) => equalizer.process_buffer(audio),
         EffectCommand::HighPass(high_pass) => high_pass.process_buffer(audio),
         EffectCommand::LowPass(low_pass) => low_pass.process_buffer(audio),
@@ -181,7 +183,9 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
-        EffectKind::Oops | EffectKind::Reverse | EffectKind::Swap => no_arg_end(tokens, args_start),
+        EffectKind::Deemph | EffectKind::Oops | EffectKind::Reverse | EffectKind::Swap => {
+            no_arg_end(tokens, args_start)
+        }
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::AllPass

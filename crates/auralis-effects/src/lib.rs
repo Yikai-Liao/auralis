@@ -46,6 +46,7 @@ mod command_centercut;
 mod command_channels;
 mod command_contrast;
 mod command_dcshift;
+mod command_deemph;
 mod command_equalizer;
 mod command_fade;
 mod command_filter;
@@ -68,6 +69,7 @@ mod command_trim;
 mod command_vol;
 mod contrast;
 mod dcshift;
+mod deemph;
 mod effects_file;
 mod equalizer;
 mod error;
@@ -109,6 +111,7 @@ pub use channels::Channels;
 pub use command::{CommandResult, EffectCommand, EffectCommandParseError, parse_effect_command};
 pub use contrast::Contrast;
 pub use dcshift::DcShift;
+pub use deemph::Deemph;
 pub use effects_file::{
     EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,
     parse_effects_file, parse_effects_file_str,
