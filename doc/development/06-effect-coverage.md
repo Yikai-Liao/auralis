@@ -1465,6 +1465,27 @@ Implementation notes:
 
 ### Feature 6.8.3: `firfit`
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered `firfit [knots-file | <freq gain>]` as an executable
+  SoX-ng-style effect command with canonical rendering, effect-chain grouping,
+  CLI positional-chain support, diagnostics, and L7 fuzz seed coverage.
+- Added public `FirFit`, `FirFitKnot`, and `FirFitKnotSource` APIs for stdin,
+  file-backed, and inline frequency/gain knot sources. Knot text supports
+  whitespace-separated pairs and `#` comments; inline/file data must contain
+  finite gains and strictly increasing non-negative frequencies.
+- Chain execution supports inline and explicit knot-file sources, rejects
+  stdin at processing time, designs exact centered-impulse coefficients for
+  flat responses, and uses a deterministic scalar log-frequency interpolation
+  scaffold for non-flat fitted responses.
+- Coverage includes parser/rendering tests, file-backed chain execution,
+  flat-response identity tests, non-flat finite-output coverage, mono/stereo
+  SoX-ng flat-response golden rows, and a layered coverage matrix row. SIMD
+  remains N/A because this feature designs scalar FIR coefficients and then
+  runs the scalar reference FIR processor.
+
 ### Feature 6.8.4: `hilbert`
 
 ### Feature 6.8.5: `sinc` low-pass and high-pass

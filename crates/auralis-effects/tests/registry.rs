@@ -24,6 +24,7 @@ fn supported_canonical_names_resolve_to_descriptors() {
         ("equalizer", EffectKind::Equalizer),
         ("fade", EffectKind::Fade),
         ("fir", EffectKind::Fir),
+        ("firfit", EffectKind::FirFit),
         ("flanger", EffectKind::Flanger),
         ("gain", EffectKind::Gain),
         ("highpass", EffectKind::HighPass),

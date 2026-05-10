@@ -66,6 +66,8 @@ pub enum EffectKind {
     Fade,
     /// SoX-ng-style finite impulse response filter.
     Fir,
+    /// SoX-ng-style FIR response-fitting filter.
+    FirFit,
     /// SoX-ng-style swept-delay flanger.
     Flanger,
     /// Constant gain in decibels.
@@ -409,6 +411,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Fir",
         "fir [coefs-file | coef <coef>]",
         "apply a finite impulse response filter from coefficients",
+    ),
+    EffectDescriptor::new(
+        EffectKind::FirFit,
+        "firfit",
+        &[],
+        "FirFit",
+        "firfit [knots-file | <freq gain>]",
+        "fit a scalar finite impulse response filter from frequency/gain knots",
     ),
     EffectDescriptor::new(
         EffectKind::Flanger,

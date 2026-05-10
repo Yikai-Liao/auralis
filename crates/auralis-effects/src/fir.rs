@@ -279,6 +279,7 @@ pub struct FirState {
     coefficients: FirCoefficients,
     history: VecDeque<f32>,
     samples_seen: usize,
+    samples_emitted: usize,
     shift: usize,
 }
 
@@ -291,6 +292,7 @@ impl FirState {
             coefficients,
             history: VecDeque::new(),
             samples_seen: 0,
+            samples_emitted: 0,
             shift,
         }
     }
@@ -307,6 +309,7 @@ impl FirState {
             self.push_sample(*sample);
             if self.samples_seen > self.shift {
                 output.push(self.current_output_sample());
+                self.samples_emitted += 1;
             }
         }
     }
@@ -320,9 +323,13 @@ impl FirState {
             return;
         }
 
+        let target_samples = self.samples_seen;
         for _ in 0..self.shift {
             self.push_sample(0.0);
-            output.push(self.current_output_sample());
+            if self.samples_seen > self.shift && self.samples_emitted < target_samples {
+                output.push(self.current_output_sample());
+                self.samples_emitted += 1;
+            }
         }
     }
 

@@ -221,6 +221,12 @@ pub enum EffectError {
     #[error("fir coefficients must be finite numbers and coefficient file paths must be non-empty")]
     InvalidFirCoefficients,
 
+    /// A FIR response-fitting source had invalid knot data or path metadata.
+    #[error(
+        "firfit knots must be finite frequency/gain pairs with strictly increasing non-negative frequencies"
+    )]
+    InvalidFirFit,
+
     /// A FIR command would create a buffer shape that cannot be represented.
     #[error("fir output frame count exceeds representable audio buffer length")]
     FirLengthOverflow,

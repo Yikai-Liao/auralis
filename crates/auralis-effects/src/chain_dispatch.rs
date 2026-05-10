@@ -40,6 +40,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
         | EffectCommand::Fir(_)
+        | EffectCommand::FirFit(_)
         | EffectCommand::Flanger(_)
         | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
@@ -165,6 +166,11 @@ fn apply_buffer_command(
             *audio = fir
                 .process_buffer(audio)
                 .map_err(|source| ("coefficients", source))?;
+        }
+        EffectCommand::FirFit(firfit) => {
+            *audio = firfit
+                .process_buffer(audio)
+                .map_err(|source| ("knots", source))?;
         }
         EffectCommand::Flanger(flanger) => {
             *audio = flanger
@@ -347,6 +353,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Fir => fir_arg_end(tokens, args_start),
+        EffectKind::FirFit => firfit_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Pitch => pitch_arg_end(tokens, args_start),
@@ -692,6 +699,10 @@ fn fir_arg_end(tokens: &[&str], args_start: usize) -> usize {
         end += 1;
     }
     end
+}
+
+fn firfit_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    fir_arg_end(tokens, args_start)
 }
 
 fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {

@@ -796,6 +796,7 @@ mod tests {
                 | EffectCommand::Echo(_)
                 | EffectCommand::Echos(_)
                 | EffectCommand::Fir(_)
+                | EffectCommand::FirFit(_)
                 | EffectCommand::Flanger(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Oops(_)

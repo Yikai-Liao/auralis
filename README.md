@@ -32,9 +32,9 @@ reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
-`Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Fir`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
+`Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Fir`, `FirFit`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, fir, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
+fade, fir, firfit, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/firfit/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -605,6 +605,12 @@ path even when it looks numeric, and two or more arguments are inline finite
 coefficients. Chain execution supports inline coefficients and explicit
 coefficient files, treats empty coefficient lists as a null effect, and applies
 the scalar SoX-ng-aligned FIR impulse response.
+The implemented `firfit` command accepts no arguments or `-` for stdin, one
+knot-file path, or inline `<freq gain>` pairs with strictly increasing
+non-negative frequencies and dB gains. Chain execution supports inline and
+file-backed knots, emits exact centered-impulse FIR coefficients for flat
+responses, and uses a deterministic scalar log-frequency interpolation
+scaffold for non-flat response fitting.
 The implemented `tremolo` command accepts a required speed in hertz and an
 optional depth percentage, defaulting to SoX-ng's `40`.
 The implemented `overdrive` command accepts optional `gain` and `color`
@@ -1251,6 +1257,8 @@ Examples:
   SoX-ng-style profile text with configurable amount
 - `fir`: coefficient input parsing from stdin, one coefficient-file path, or
   inline finite coefficients, with `#` comments in coefficient text
+- `firfit`: frequency/gain knot parsing from stdin, one knot-file path, or
+  inline pairs, with scalar FIR coefficient design for fitted responses
 - `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `overdrive`: SoX-ng's cubic soft-clipping drive with `color / 200` bias and
   a stateful high-pass output blend
