@@ -6,7 +6,7 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadState,
     BiquadWidth, Contrast, DcShift, Deemph, EffectChain, EffectCommand, Equalizer, Fade, Gain,
-    HighPass, LowPass, Saturation, SaturationType, Treble, Tremolo, Vol,
+    HighPass, LowPass, Riaa, Saturation, SaturationType, Treble, Tremolo, Vol,
 };
 use auralis_testkit::chunk_invariance::{ChunkSchedule, l5_chunk_schedules, process_chunks_mut};
 
@@ -340,6 +340,24 @@ fn deemph_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
 }
 
 #[test]
+fn riaa_matches_whole_buffer_for_l5_chunk_matrix_when_state_is_preserved() {
+    let riaa = Riaa::new();
+    let source = stereo_source(1_105);
+    let schedules = l5_chunk_schedules(frames_len(&source));
+
+    for schedule in &schedules {
+        let mut whole = source.clone();
+        let mut chunked = source.clone();
+
+        riaa.process_buffer(&mut whole)
+            .expect("fixture sample rate has a SoX-ng RIAA preset");
+        process_riaa_by_channel_chunks(&mut chunked, riaa, schedule);
+
+        assert_same_audio(&chunked, &whole, schedule);
+    }
+}
+
+#[test]
 fn fade_matches_whole_buffer_for_l5_chunk_matrix() {
     let fade = Fade::new(FrameCount::new(257), FrameCount::new(383));
     let source = stereo_source(1_105);
@@ -414,6 +432,9 @@ fn process_streaming_safe_chain_by_chunks(
             }
             EffectCommand::Deemph(deemph) => {
                 process_deemph_by_channel_chunks(audio, *deemph, schedule);
+            }
+            EffectCommand::Riaa(riaa) => {
+                process_riaa_by_channel_chunks(audio, *riaa, schedule);
             }
             EffectCommand::Treble(treble) => {
                 process_treble_by_channel_chunks(audio, *treble, schedule);
@@ -544,6 +565,13 @@ fn process_deemph_by_channel_chunks(
     let coefficients = deemph
         .coefficients(audio.spec().sample_rate())
         .expect("fixture sample rate has a SoX-ng deemph preset");
+    process_biquad_by_channel_chunks(audio, coefficients, schedule);
+}
+
+fn process_riaa_by_channel_chunks(audio: &mut AudioBuffer, riaa: Riaa, schedule: &ChunkSchedule) {
+    let coefficients = riaa
+        .coefficients(audio.spec().sample_rate())
+        .expect("fixture sample rate has a SoX-ng RIAA preset");
     process_biquad_by_channel_chunks(audio, coefficients, schedule);
 }
 

@@ -530,6 +530,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_riaa_mono_48000]
+input = "effects/riaa_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["riaa"]
+sox_ng = ["riaa"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_riaa_stereo_48000]
+input = "effects/riaa_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["riaa"]
+sox_ng = ["riaa"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_trim_mono_middle]
 input = "effects/trim_mono.wav"
 corpus_id = "l0/odd_length_mono_17"

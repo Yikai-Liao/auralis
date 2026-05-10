@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nriaa").unwrap_err();
+        let error = parse_effects_file_str("gain -3\ndelay").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `riaa` failed to parse: known SoX-ng effect `riaa` is not implemented by Auralis; missing SoX-ng coverage entry for `riaa`"
+            "effects file line 2, column 1: command `delay` failed to parse: known SoX-ng effect `delay` is not implemented by Auralis; missing SoX-ng coverage entry for `delay`"
         );
     }
 

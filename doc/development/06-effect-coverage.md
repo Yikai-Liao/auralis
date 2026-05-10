@@ -750,8 +750,20 @@ Implementation notes:
 
 ### Feature 6.4.14: `riaa`
 
-Each filter effect requires analytical frequency-response tests, chunk
-invariance, golden tests, and explicit tolerance rationale.
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed no-argument `Riaa` effect matching SoX-ng's fixed RIAA playback
+  equalization roots for 44.1 kHz, 48 kHz, 88.2 kHz, 96 kHz, and 192 kHz, with
+  the same 1 kHz response normalization and unsupported-rate rejection.
+- Processing delegates to the scalar stateful biquad primitive, with
+  independent per-channel state and exact state-preserving chunk equivalence.
+- Coverage includes coefficient and command tests, chain integration, L4
+  finite-output property coverage, L5 chunk invariance, parser fuzz seed
+  coverage, and standalone SoX-ng golden cases for mono and stereo 48 kHz L0
+  corpora. Tolerance follows the one-PCM16-LSB filter-effect policy used by the
+  surrounding biquad-backed filters.
 
 ## Milestone 6.5: delay, echo, and modulation effects
 

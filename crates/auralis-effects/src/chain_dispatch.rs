@@ -102,6 +102,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Equalizer(_)
         | EffectCommand::HighPass(_)
         | EffectCommand::LowPass(_)
+        | EffectCommand::Riaa(_)
         | EffectCommand::Treble(_) => unreachable!("filter commands returned early"),
     }
 }
@@ -120,6 +121,7 @@ fn apply_filter_command(
         EffectCommand::Equalizer(equalizer) => equalizer.process_buffer(audio),
         EffectCommand::HighPass(high_pass) => high_pass.process_buffer(audio),
         EffectCommand::LowPass(low_pass) => low_pass.process_buffer(audio),
+        EffectCommand::Riaa(riaa) => riaa.process_buffer(audio),
         EffectCommand::Treble(treble) => treble.process_buffer(audio),
         _ => return Ok(false),
     }
@@ -183,9 +185,11 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         }
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
-        EffectKind::Deemph | EffectKind::Oops | EffectKind::Reverse | EffectKind::Swap => {
-            no_arg_end(tokens, args_start)
-        }
+        EffectKind::Deemph
+        | EffectKind::Oops
+        | EffectKind::Reverse
+        | EffectKind::Riaa
+        | EffectKind::Swap => no_arg_end(tokens, args_start),
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::AllPass

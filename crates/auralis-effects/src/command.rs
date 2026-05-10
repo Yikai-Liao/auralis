@@ -61,6 +61,7 @@ use crate::command_pad::{parse_pad, render_pad};
 use crate::command_remix::{parse_remix, render_remix};
 use crate::command_repeat::{parse_repeat, render_repeat};
 use crate::command_reverse::parse_reverse;
+use crate::command_riaa::parse_riaa;
 use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_swap::parse_swap;
@@ -71,8 +72,8 @@ use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
     Deemph, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade, Gain,
-    HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Saturation, SoftVol,
-    Swap, Treble, Tremolo, Trim, Vol,
+    HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Riaa, Saturation,
+    SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -134,6 +135,8 @@ pub enum EffectCommand {
     Remix(Remix),
     /// Frame-order reversal within each channel.
     Reverse(Reverse),
+    /// SoX-ng-style RIAA vinyl playback equalization filter.
+    Riaa(Riaa),
     /// SoX-ng-style saturation distortion.
     Saturation(Saturation),
     /// SoX-ng-style soft volume control.
@@ -187,6 +190,7 @@ impl EffectCommand {
             EffectKind::Repeat => parse_repeat(effect, args),
             EffectKind::Remix => parse_remix(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
+            EffectKind::Riaa => parse_riaa(effect, args),
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
@@ -224,6 +228,7 @@ impl EffectCommand {
             Self::Repeat(_) => EffectKind::Repeat,
             Self::Remix(_) => EffectKind::Remix,
             Self::Reverse(_) => EffectKind::Reverse,
+            Self::Riaa(_) => EffectKind::Riaa,
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Swap(_) => EffectKind::Swap,
@@ -267,6 +272,7 @@ impl EffectCommand {
             Self::Repeat(repeat) => render_repeat(*repeat),
             Self::Remix(remix) => render_remix(remix),
             Self::Reverse(_) => vec!["reverse".to_owned()],
+            Self::Riaa(_) => vec!["riaa".to_owned()],
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Swap(_) => vec!["swap".to_owned()],

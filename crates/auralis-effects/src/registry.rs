@@ -93,6 +93,9 @@ pub enum EffectKind {
     /// Frame-order reversal within each channel.
     Reverse,
 
+    /// SoX-ng-style RIAA vinyl playback equalization filter.
+    Riaa,
+
     /// SoX-ng-style saturation distortion.
     Saturation,
 
@@ -380,6 +383,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Reverse",
         "reverse",
         "reverse frame order within each channel",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Riaa,
+        "riaa",
+        &[],
+        "Riaa",
+        "riaa",
+        "apply RIAA vinyl playback equalization",
     ),
     EffectDescriptor::new(
         EffectKind::Saturation,
@@ -779,6 +790,7 @@ mod tests {
             ("repeat", EffectKind::Repeat),
             ("remix", EffectKind::Remix),
             ("reverse", EffectKind::Reverse),
+            ("riaa", EffectKind::Riaa),
             ("saturation", EffectKind::Saturation),
             ("softvol", EffectKind::SoftVol),
             ("swap", EffectKind::Swap),
@@ -827,30 +839,30 @@ mod tests {
             error,
             EffectNameError::UnknownEffect {
                 name: "gian".to_owned(),
-                suggestions: vec!["gain"],
+                suggestions: vec!["gain", "riaa"],
             }
         );
-        assert_eq!(error.suggestions(), &["gain"]);
+        assert_eq!(error.suggestions(), &["gain", "riaa"]);
         assert_eq!(
             error.to_string(),
-            "unknown effect `gian`; did you mean `gain`?"
+            "unknown effect `gian`; did you mean one of `gain`, `riaa`?"
         );
     }
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("riaa").unwrap_err();
+        let error = EffectRegistry::resolve("delay").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "riaa".to_owned(),
+                name: "delay".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `riaa`")
+                .contains("missing SoX-ng coverage entry for `delay`")
         );
     }
 

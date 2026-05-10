@@ -791,6 +791,7 @@ mod tests {
                 | EffectCommand::Repeat(_)
                 | EffectCommand::Remix(_)
                 | EffectCommand::Reverse(_)
+                | EffectCommand::Riaa(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Swap(_)

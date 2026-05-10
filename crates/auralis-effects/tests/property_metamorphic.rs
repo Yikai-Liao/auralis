@@ -6,7 +6,7 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Contrast, DcShift, Deemph, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops,
-    Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Saturation,
+    Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation,
     SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
@@ -317,6 +317,12 @@ proptest! {
             .process_buffer(&mut deemphasized)
             .expect("fixture sample rate has a SoX-ng deemph preset");
         prop_assert_all_finite(&deemphasized)?;
+
+        let mut riaa_equalized = source.clone();
+        Riaa::new()
+            .process_buffer(&mut riaa_equalized)
+            .expect("fixture sample rate has a SoX-ng RIAA preset");
+        prop_assert_all_finite(&riaa_equalized)?;
 
         let mut normalized = source.clone();
         Norm::new(Decibels::new(db).expect("generated dB is finite"))
