@@ -107,6 +107,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_trim_mono_multiple_ranges",
             "effect_trim_stereo_absolute_resume",
             "effect_trim_stereo_middle",
+            "effect_upsample_mono_default",
+            "effect_upsample_stereo_factor_3",
             "effect_vol_limiter_mono_plus_2",
             "effect_vol_mono_half_amplitude",
             "effect_vol_stereo_minus_6_db",
@@ -134,6 +136,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "dcshift",
         "delay",
         "downsample",
+        "upsample",
         "echo",
         "echos",
         "deemph",
@@ -212,10 +215,10 @@ fn effects_golden_manifest_keeps_automatic_rate_and_channels_absent() {
             None,
             "{id} should not request output channel conversion"
         );
-        if id.starts_with("effect_downsample_") {
+        if id.starts_with("effect_downsample_") || id.starts_with("effect_upsample_") {
             assert!(
                 case.output_sample_rate().is_some(),
-                "{id} should request the downsampled output rate explicitly"
+                "{id} should request the effect output rate explicitly"
             );
         } else {
             assert_eq!(

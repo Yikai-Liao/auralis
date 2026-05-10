@@ -115,6 +115,14 @@ pub enum EffectError {
     #[error("downsample output sample rate must be at least 1 Hz")]
     DownsampleRateTooLow,
 
+    /// An upsample factor was outside SoX-ng's supported range.
+    #[error("upsample factor must be in the SoX-ng range 1..=256")]
+    InvalidUpsampleFactor,
+
+    /// An upsample command would produce an unrepresentable sample rate.
+    #[error("upsample output sample rate exceeds representable rate")]
+    UpsampleRateOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

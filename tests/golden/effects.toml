@@ -554,6 +554,30 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_upsample_mono_default]
+input = "effects/upsample_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+output_sample_rate = 96000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["upsample"]
+sox_ng = ["upsample"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_upsample_stereo_factor_3]
+input = "effects/upsample_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+output_sample_rate = 144000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["upsample", "3"]
+sox_ng = ["upsample", "3"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_chorus_mono_linear]
 input = "effects/chorus_mono.wav"
 corpus_id = "l0/sine_mono_32"

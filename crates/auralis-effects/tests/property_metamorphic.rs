@@ -9,7 +9,7 @@ use auralis_effects::{
     Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
     LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix,
     RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
-    SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    SoftVol, Swap, Treble, Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -181,6 +181,14 @@ proptest! {
         prop_assert_sample_bits_eq(downsampled.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(downsampled.frames(), source.frames());
         prop_assert_eq!(downsampled.channels(), source.channels());
+
+        let upsampled = Upsample::new(1)
+            .expect("factor one is valid")
+            .process_buffer(&source)
+            .expect("factor one upsample cannot fail");
+        prop_assert_sample_bits_eq(upsampled.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(upsampled.frames(), source.frames());
+        prop_assert_eq!(upsampled.channels(), source.channels());
 
         let channel_converted = Channels::new(source.channels())
             .process_buffer(&source)
@@ -410,6 +418,12 @@ proptest! {
             .process_buffer(&source)
             .expect("fixture sample rate can be halved");
         prop_assert_all_finite(&downsampled)?;
+
+        let upsampled = Upsample::new(2)
+            .expect("factor two is valid")
+            .process_buffer(&source)
+            .expect("fixture sample rate can be doubled");
+        prop_assert_all_finite(&upsampled)?;
 
         let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
             .expect("echo fixture is valid")

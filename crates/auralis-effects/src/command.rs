@@ -46,13 +46,14 @@ use crate::command_swap::parse_swap;
 use crate::command_treble::{parse_treble, render_treble};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
 use crate::command_trim::{parse_trim, render_trim};
+use crate::command_upsample::{parse_upsample, render_upsample};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
     Phaser, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim,
-    Vol,
+    Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -140,6 +141,8 @@ pub enum EffectCommand {
     Tremolo(Tremolo),
     /// End-exclusive frame range selection.
     Trim(Trim),
+    /// SoX-ng-style zero-stuffing upsample.
+    Upsample(Upsample),
     /// SoX-ng-style volume scaling with optional limiter gain.
     Vol(Vol),
 }
@@ -196,6 +199,7 @@ impl EffectCommand {
             EffectKind::Treble => parse_treble(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
             EffectKind::Trim => parse_trim(effect, args),
+            EffectKind::Upsample => parse_upsample(effect, args),
             EffectKind::Vol => parse_vol(effect, args),
         }
     }
@@ -242,6 +246,7 @@ impl EffectCommand {
             Self::Treble(_) => EffectKind::Treble,
             Self::Tremolo(_) => EffectKind::Tremolo,
             Self::Trim(_) => EffectKind::Trim,
+            Self::Upsample(_) => EffectKind::Upsample,
             Self::Vol(_) => EffectKind::Vol,
         }
     }
@@ -294,6 +299,7 @@ impl EffectCommand {
             Self::Treble(treble) => render_treble(*treble),
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),
             Self::Trim(trim) => render_trim(trim),
+            Self::Upsample(upsample) => render_upsample(*upsample),
             Self::Vol(vol) => render_vol(*vol),
         }
     }

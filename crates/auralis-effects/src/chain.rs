@@ -804,7 +804,8 @@ mod tests {
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Swap(_)
                 | EffectCommand::Tremolo(_)
-                | EffectCommand::Trim(_) => {
+                | EffectCommand::Trim(_)
+                | EffectCommand::Upsample(_) => {
                     panic!("test helper only supports streaming-safe commands")
                 }
             }

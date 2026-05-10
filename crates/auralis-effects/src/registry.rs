@@ -138,6 +138,9 @@ pub enum EffectKind {
     /// End-exclusive frame range selection.
     Trim,
 
+    /// SoX-ng-style zero-stuffing upsample.
+    Upsample,
+
     /// SoX-ng-style volume scaling.
     Vol,
 }
@@ -527,6 +530,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Trim",
         "trim start [length]",
         "keep an end-exclusive frame or seconds range",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Upsample,
+        "upsample",
+        &[],
+        "Upsample",
+        "upsample [factor]",
+        "insert zero-valued frames by a fixed integer factor",
     ),
     EffectDescriptor::new(
         EffectKind::Vol,
@@ -945,18 +956,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("upsample").unwrap_err();
+        let error = EffectRegistry::resolve("speed").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "upsample".to_owned(),
+                name: "speed".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `upsample`")
+                .contains("missing SoX-ng coverage entry for `speed`")
         );
     }
 

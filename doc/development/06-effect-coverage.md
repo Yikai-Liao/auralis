@@ -968,6 +968,25 @@ Implementation notes:
 
 ### Feature 6.6.2: `upsample`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Upsample` effect with SoX-ng's optional integer factor,
+  default factor `2`, and supported range `1..=256`.
+- Wired `upsample [factor]` through the effect registry, typed command parser,
+  effect-chain execution, effects-file diagnostics, CLI positional chain path,
+  and parser fuzz corpus.
+- Processing is simple zero stuffing: preserve each input frame, insert
+  `factor - 1` zero frames after it, preserve channel count, update sample-rate
+  metadata to `input_rate * factor`, and perform no reconstruction filtering.
+- Coverage includes unit/integration tests, L4 finite-output and factor-one
+  identity properties, parser fuzz, layered coverage metadata, and standalone
+  SoX-ng golden cases for default mono and explicit-factor stereo commands.
+- The current API is whole-buffer. It has no delay tail or flush phase, and
+  chunk-exact streaming would require exposing the SoX-ng-style insertion phase
+  across chunk boundaries.
+
 ### Feature 6.6.3: `speed`
 
 ### Feature 6.6.4: `rate` specification and scaffolding

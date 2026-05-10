@@ -45,7 +45,8 @@ pub(crate) fn apply_command(
         | EffectCommand::Reverb(_)
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
-        | EffectCommand::Trim(_) => unreachable!("buffer commands returned early"),
+        | EffectCommand::Trim(_)
+        | EffectCommand::Upsample(_) => unreachable!("buffer commands returned early"),
         EffectCommand::Biquad(_)
         | EffectCommand::Contrast(_)
         | EffectCommand::DcShift(_)
@@ -159,6 +160,11 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("frame-range", source))?;
         }
+        EffectCommand::Upsample(upsample) => {
+            *audio = upsample
+                .process_buffer(audio)
+                .map_err(|source| ("factor", source))?;
+        }
         _ => return Ok(false),
     }
 
@@ -232,16 +238,18 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
     match kind {
         EffectKind::Biquad => optional_arg_end(tokens, args_start, 6),
         EffectKind::Centercut => centercut_arg_end(tokens, args_start),
-        EffectKind::Channels => optional_arg_end(tokens, args_start, 1),
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Reverb => reverb_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Contrast | EffectKind::Downsample | EffectKind::Norm | EffectKind::Repeat => {
-            optional_arg_end(tokens, args_start, 1)
-        }
+        EffectKind::Contrast
+        | EffectKind::Channels
+        | EffectKind::Downsample
+        | EffectKind::Norm
+        | EffectKind::Repeat
+        | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
         }
