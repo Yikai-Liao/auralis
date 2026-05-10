@@ -75,6 +75,9 @@ pub enum EffectKind {
     /// SoX-ng-style fade-in and optional positional fade-out envelope.
     Fade,
 
+    /// SoX-ng-style swept-delay flanger.
+    Flanger,
+
     /// Constant gain in decibels.
     Gain,
 
@@ -347,6 +350,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Fade",
         "fade [type] fade-in-length [stop-position [fade-out-length]]",
         "apply a typed SoX-ng fade-in and fade-out envelope",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Flanger,
+        "flanger",
+        &[],
+        "Flanger",
+        "flanger [-n|-l|-q] [-s|-t] [delay [depth [regen [width [speed [shape [phase [interp]]]]]]]]",
+        "apply a swept-delay flanger with feedback",
     ),
     EffectDescriptor::new(
         EffectKind::Gain,
@@ -829,6 +840,7 @@ mod tests {
             ("deemph", EffectKind::Deemph),
             ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
+            ("flanger", EffectKind::Flanger),
             ("gain", EffectKind::Gain),
             ("highpass", EffectKind::HighPass),
             ("lowpass", EffectKind::LowPass),
@@ -899,18 +911,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("flanger").unwrap_err();
+        let error = EffectRegistry::resolve("phaser").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "flanger".to_owned(),
+                name: "phaser".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `flanger`")
+                .contains("missing SoX-ng coverage entry for `phaser`")
         );
     }
 

@@ -6,9 +6,9 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos,
-    EchosTap, Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix,
-    RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap,
-    Treble, Tremolo, Trim, Vol,
+    EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass,
+    Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa,
+    Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -418,6 +418,21 @@ proptest! {
         .process_buffer(&source)
         .expect("small generated chorus cannot overflow");
         prop_assert_all_finite(&chorused)?;
+
+        let flanged = Flanger::new(
+            0.0,
+            0.0,
+            0.0,
+            100.0,
+            1.0,
+            FlangerWave::Sine,
+            0.0,
+            FlangerInterpolation::Linear,
+        )
+        .expect("flanger fixture is valid")
+        .process_buffer(&source)
+        .expect("small generated flanger cannot overflow");
+        prop_assert_all_finite(&flanged)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

@@ -881,6 +881,26 @@ Implementation notes:
 
 ### Feature 6.5.6: `flanger`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Flanger` effect with SoX-ng's delay, depth, regeneration,
+  width, speed, wave, phase, and interpolation parameters. Defaults match
+  SoX-ng: 0 ms base delay, 2 ms depth, 0% regeneration, 71% width, 0.5 Hz
+  speed, sine wave, 25% channel phase shift, and linear interpolation.
+- Wired `flanger [-n|-l|-q] [-s|-t] [delay [depth [regen [width [speed
+  [shape [phase [interp]]]]]]]]` through the effect registry, typed command
+  parser, effect-chain execution, effects-file diagnostics, CLI positional
+  chain path, and parser fuzz corpus.
+- Processing uses independent per-channel delay lines, delayed-signal feedback,
+  SoX-ng-style dry/wet mix balancing, full-scale clipping, and preserves input
+  length. It intentionally does not emit a delayed tail; users who want the
+  final feedback/delay residue should pad before applying `flanger`.
+- Coverage includes analytical/unit, integration, L4 finite-output property,
+  parser fuzz, layered coverage metadata, and standalone SoX-ng golden cases
+  for linear mono and triangle/no-interpolation stereo flanger commands.
+
 ### Feature 6.5.7: `phaser`
 
 ### Feature 6.5.8: `reverb`

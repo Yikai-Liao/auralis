@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nflanger").unwrap_err();
+        let error = parse_effects_file_str("gain -3\nphaser").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `flanger` failed to parse: known SoX-ng effect `flanger` is not implemented by Auralis; missing SoX-ng coverage entry for `flanger`"
+            "effects file line 2, column 1: command `phaser` failed to parse: known SoX-ng effect `phaser` is not implemented by Auralis; missing SoX-ng coverage entry for `phaser`"
         );
     }
 

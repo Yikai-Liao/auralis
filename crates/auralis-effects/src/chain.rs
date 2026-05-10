@@ -788,6 +788,7 @@ mod tests {
                 | EffectCommand::Delay(_)
                 | EffectCommand::Echo(_)
                 | EffectCommand::Echos(_)
+                | EffectCommand::Flanger(_)
                 | EffectCommand::Norm(_)
                 | EffectCommand::Oops(_)
                 | EffectCommand::Overdrive(_)

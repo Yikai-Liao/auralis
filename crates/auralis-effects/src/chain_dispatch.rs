@@ -36,6 +36,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Echo(_)
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
+        | EffectCommand::Flanger(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
@@ -106,6 +107,11 @@ fn apply_buffer_command(
             } else {
                 fade.process_buffer_with_backend(audio, requested_backend);
             }
+        }
+        EffectCommand::Flanger(flanger) => {
+            *audio = flanger
+                .process_buffer(audio)
+                .map_err(|source| ("flanger", source))?;
         }
         EffectCommand::Norm(norm) => norm
             .process_buffer_with_backend(audio, requested_backend)
@@ -211,6 +217,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Channels => optional_arg_end(tokens, args_start, 1),
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
+        EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {
             optional_arg_end(tokens, args_start, 1)
@@ -287,6 +294,10 @@ fn chorus_arg_end(tokens: &[&str], args_start: usize) -> usize {
         end += 1;
     }
     end
+}
+
+fn flanger_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    chorus_arg_end(tokens, args_start)
 }
 
 fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {

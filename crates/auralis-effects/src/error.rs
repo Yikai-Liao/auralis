@@ -77,6 +77,16 @@ pub enum EffectError {
     #[error("chorus output frame count exceeds representable audio buffer length")]
     ChorusLengthOverflow,
 
+    /// A flanger processor had invalid gains, delay parameters, or modulation settings.
+    #[error(
+        "flanger delay/depth must be finite in 0..=1000 ms, regen in -100..=100, width non-negative, speed finite and positive, phase in 0..=100, and the resolved delay line must fit the output buffer"
+    )]
+    InvalidFlanger,
+
+    /// A flanger processor would create a delay-line shape that cannot be represented.
+    #[error("flanger delay line exceeds representable audio buffer length")]
+    FlangerLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

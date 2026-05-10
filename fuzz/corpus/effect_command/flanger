@@ -1,0 +1,1 @@
+flanger -q -t 1 2 25 100 1 sine 50 none

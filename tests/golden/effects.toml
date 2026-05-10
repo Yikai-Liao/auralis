@@ -991,3 +991,25 @@ sox_ng = ["fade", "t", "0", "24s", "6s"]
 max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
+
+[id.effect_flanger_mono_linear]
+input = "effects/flanger_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["flanger", "-l", "0", "0", "0", "100", "1", "sine", "0"]
+sox_ng = ["flanger", "-l", "0", "0", "0", "100", "1", "sine", "0"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_flanger_stereo_triangle]
+input = "effects/flanger_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["flanger", "-n", "-t", "0", "0", "0", "100", "1", "triangle", "50", "none"]
+sox_ng = ["flanger", "-n", "-t", "0", "0", "0", "100", "1", "triangle", "50", "none"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0

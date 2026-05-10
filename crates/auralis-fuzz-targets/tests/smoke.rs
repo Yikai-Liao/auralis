@@ -42,6 +42,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"treble -6 3000 0.5s",
         b"delay 2s 1s",
         b"chorus -l -t 0.5 1 1 0.25 1 0 -sine",
+        b"flanger -q -t 1 2 25 100 1 sine 50 none",
         b"echo 0.5 1 1 0.5",
         b"echos 0.5 1 1 0.5",
         b"highpass -1 500",
