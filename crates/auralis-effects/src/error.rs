@@ -221,6 +221,12 @@ pub enum EffectError {
     #[error("stat scale and analyzed samples must be finite, and scale must be nonzero")]
     InvalidStat,
 
+    /// A stats analyzer had invalid options or sample data.
+    #[error(
+        "stats bits/window/scale options must be in SoX-ng ranges and analyzed samples must be finite"
+    )]
+    InvalidStats,
+
     /// A loudness command had invalid gain, reference level, or filter length.
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,

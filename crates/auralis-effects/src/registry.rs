@@ -126,6 +126,8 @@ pub enum EffectKind {
     Splice,
     #[doc = "SoX-ng-style sample statistics analyzer."]
     Stat,
+    #[doc = "SoX-ng-style per-channel sample statistics analyzer."]
+    Stats,
     #[doc = "SoX-ng-style basic time stretcher."]
     Stretch,
     #[doc = "SoX-ng-style adjacent channel-pair swapping."]
@@ -643,6 +645,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Stat",
         "stat [-s scale] [-rms] [-v] [-j]",
         "collect SoX-ng-style sample statistics while passing audio through",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Stats,
+        "stats",
+        &[],
+        "Stats",
+        "stats [-b bits|-x bits|-s scale] [-w window-time] [-j]",
+        "collect SoX-ng-style per-channel statistics while passing audio through",
     ),
     EffectDescriptor::new(
         EffectKind::Stretch,

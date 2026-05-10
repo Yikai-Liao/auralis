@@ -49,6 +49,7 @@ fn supported_canonical_names_resolve_to_descriptors() {
         ("sinc", EffectKind::Sinc),
         ("softvol", EffectKind::SoftVol),
         ("stat", EffectKind::Stat),
+        ("stats", EffectKind::Stats),
         ("swap", EffectKind::Swap),
         ("treble", EffectKind::Treble),
         ("tremolo", EffectKind::Tremolo),

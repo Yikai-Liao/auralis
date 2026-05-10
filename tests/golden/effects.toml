@@ -1274,6 +1274,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_stats_mono_pass_through]
+input = "effects/stats_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["stats"]
+sox_ng = ["stats"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_stats_stereo_pass_through]
+input = "effects/stats_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["stats", "-x", "16", "-w", "0.1", "-j"]
+sox_ng = ["stats", "-x", "16", "-w", "0.1", "-j"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_stretch_mono_lengthen]
 input = "effects/stretch_mono.wav"
 corpus_id = "l0/sine_mono_8192"

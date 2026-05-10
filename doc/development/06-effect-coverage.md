@@ -1648,6 +1648,26 @@ Implementation notes:
 
 ### Feature 6.8.11: `stats`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Stats` analyzer and `StatsReport` artifact model for
+  SoX-ng-style overall and per-channel sample statistics over decoded audio.
+- Registered `stats [-b bits|-x bits|-s scale] [-w window-time] [-j]` across
+  command parsing, rendering, registry resolution, effect-chain grouping and
+  dispatch, CLI positional-chain execution, L7 fuzz seed coverage, standalone
+  pass-through SoX-ng golden rows, and the L0-L7 coverage matrix.
+- Chain execution passes audio through unchanged. The typed report API exposes
+  deterministic text and JSON renderers with DC offset, min/max levels,
+  peak/RMS dB levels, moving RMS peak/trough, crest/flat factors, peak counts,
+  bit-depth estimates, sample count, length, and window metadata.
+- Coverage includes parser/rendering tests, chain pass-through execution,
+  overall/per-channel statistics, report rendering, invalid option-range
+  rejection, non-finite sample rejection, mono/stereo standalone goldens, and a
+  fuzz corpus seed. Chunk-exact streaming accumulation and output-artifact
+  capture remain future API work because the current analyzer is whole-buffer.
+
 ### Feature 6.8.12: `synth` basic waveforms
 
 ### Feature 6.8.13: `synth` noise, sweep, and combine modes

@@ -51,6 +51,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"bend -f 40 -o 8 0s,100,+200s",
         b"splice -t 48s,4s,0s",
         b"stat -s 2 -rms -j",
+        b"stats -x 16 -w 0.1 -j",
         b"rate 44.1k",
         b"rate -q 24k",
         b"rate -Q 1 48000",
