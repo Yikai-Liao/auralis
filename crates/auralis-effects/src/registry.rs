@@ -70,6 +70,8 @@ pub enum EffectKind {
     Gain,
     /// SoX-ng-style high-pass filter family.
     HighPass,
+    /// SoX-ng-style ISO 226 loudness compensation.
+    Loudness,
     /// SoX-ng-style low-pass filter family.
     LowPass,
     /// SoX-ng-style multiband dynamic-range compander.
@@ -397,6 +399,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "HighPass",
         "highpass [-1|-2] frequency [width]",
         "apply a high-pass filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Loudness,
+        "loudness",
+        &[],
+        "Loudness",
+        "loudness [gain [reference [n]]]",
+        "apply ISO 226 equal-loudness compensation",
     ),
     EffectDescriptor::new(
         EffectKind::LowPass,
@@ -866,6 +876,7 @@ mod tests {
             ("flanger", EffectKind::Flanger),
             ("gain", EffectKind::Gain),
             ("highpass", EffectKind::HighPass),
+            ("loudness", EffectKind::Loudness),
             ("lowpass", EffectKind::LowPass),
             ("mcompand", EffectKind::MCompand),
             ("norm", EffectKind::Norm),
@@ -933,18 +944,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("loudness").unwrap_err();
+        let error = EffectRegistry::resolve("silence").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "loudness".to_owned(),
+                name: "silence".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `loudness`")
+                .contains("missing SoX-ng coverage entry for `silence`")
         );
     }
 

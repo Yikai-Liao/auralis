@@ -222,6 +222,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_loudness_mono_identity]
+input = "effects/loudness_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["loudness", "0"]
+sox_ng = ["loudness", "0"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_loudness_stereo_short_filter]
+input = "effects/loudness_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["loudness", "-6", "65", "127"]
+sox_ng = ["loudness", "-6", "65", "127"]
+max_abs = 0.01
+rms = 0.005
+snr_db = 35.0
+
 [id.effect_biquad_mono_one_pole]
 input = "effects/biquad_mono.wav"
 corpus_id = "l0/impulse_mono_16"

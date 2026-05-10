@@ -780,6 +780,7 @@ mod tests {
                 | EffectCommand::Deemph(_)
                 | EffectCommand::Equalizer(_)
                 | EffectCommand::HighPass(_)
+                | EffectCommand::Loudness(_)
                 | EffectCommand::LowPass(_)
                 | EffectCommand::MCompand(_)
                 | EffectCommand::Treble(_)

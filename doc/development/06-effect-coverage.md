@@ -1293,6 +1293,25 @@ Implementation notes:
 
 ### Feature 6.7.4: `loudness`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added public `Loudness` support for SoX-ng's `loudness [gain [reference
+  [n]]]` command shape, including default `-10 dB` gain, `65 dB` reference,
+  and `1023` half-length settings plus SoX-ng's documented ranges.
+- Processing builds a deterministic scalar centered FIR filter from the ISO
+  226 table, natural cubic interpolation, inverse FFT response generation, and
+  Kaiser windowing. A zero gain is treated as an identity command.
+- Wired `loudness` through the effect registry, typed command parser/renderer,
+  effect-chain dispatch, CLI positional-chain path, parser fuzz corpus, L0-L7
+  coverage metadata, and standalone SoX-ng golden manifest.
+- Coverage includes parser/rendering tests, command and chain integration
+  tests, identity behavior, finite-output property coverage, invalid range
+  checks, and mono/stereo standalone golden cases. SIMD is documented as N/A
+  because the current implementation is a generated FIR convolution rather
+  than a backend-dispatched per-sample kernel.
+
 ### Feature 6.7.5: `silence`
 
 ### Feature 6.7.6: `vad` core

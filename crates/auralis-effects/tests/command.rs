@@ -3,9 +3,9 @@
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
     Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels,
-    Contrast, DcShift, Deemph, EffectCommand, Equalizer, Fade, FadeCurve, Gain, HighPass, LowPass,
-    Oops, Pad, PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo,
-    Trim, parse_effect_command,
+    Contrast, DcShift, Deemph, EffectCommand, Equalizer, Fade, FadeCurve, Gain, HighPass, Loudness,
+    LowPass, Oops, Pad, PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble,
+    Tremolo, Trim, parse_effect_command,
 };
 
 #[test]
@@ -111,6 +111,14 @@ fn parses_supported_effect_commands_into_typed_configs() {
         assert_eq!(parse_effect_command(tokens).unwrap(), command);
         assert_eq!(parse_effect_command(tokens).unwrap().kind(), command.kind());
     }
+}
+
+#[test]
+fn parses_loudness_command_into_typed_config() {
+    assert_eq!(
+        parse_effect_command(&["loudness", "-6", "70", "127"]).unwrap(),
+        EffectCommand::Loudness(Loudness::new(-6.0, 70.0, 127).unwrap())
+    );
 }
 
 #[test]

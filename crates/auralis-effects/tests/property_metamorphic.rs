@@ -7,9 +7,9 @@ use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, BendPosition, BendSegment, Biquad,
     BiquadCoefficients, BiquadWidth, Centercut, Channels, Chorus, ChorusStage, Compand, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
-    FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass, MCompand, Norm, Oops, Overdrive,
-    Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec, RemixSource,
-    Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice,
+    FlangerInterpolation, FlangerWave, Gain, HighPass, Loudness, LowPass, MCompand, Norm, Oops,
+    Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec,
+    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice,
     SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
     Upsample, Vol,
 };
@@ -123,6 +123,15 @@ proptest! {
         SoftVol::default().process_buffer(&mut soft_volume_scaled);
         prop_assert_sample_bits_eq(
             soft_volume_scaled.as_planar_f32(),
+            source.as_planar_f32(),
+        )?;
+
+        let mut loudness_identity = source.clone();
+        Loudness::identity()
+            .process_buffer(&mut loudness_identity)
+            .expect("identity loudness is valid for generated audio");
+        prop_assert_sample_bits_eq(
+            loudness_identity.as_planar_f32(),
             source.as_planar_f32(),
         )?;
 
@@ -429,6 +438,13 @@ proptest! {
             .expect("generated softvol settings are valid")
             .process_buffer(&mut soft_volume_scaled);
         prop_assert_all_finite(&soft_volume_scaled)?;
+
+        let mut loudness_equalized = source.clone();
+        Loudness::new(-6.0, 65.0, 127)
+            .expect("fixture loudness settings are valid")
+            .process_buffer(&mut loudness_equalized)
+            .expect("fixture sample rate can generate a loudness FIR");
+        prop_assert_all_finite(&loudness_equalized)?;
 
         let mut tremolo_modulated = source.clone();
         Tremolo::new(5.0, 75.0)

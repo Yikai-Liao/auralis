@@ -40,6 +40,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
         | EffectCommand::Flanger(_)
+        | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
@@ -119,6 +120,11 @@ fn apply_buffer_command(
             processor
                 .process_buffer(audio)
                 .map_err(|source| ("mcompand", source))?;
+        }
+        EffectCommand::Loudness(loudness) => {
+            loudness
+                .process_buffer(audio)
+                .map_err(|source| ("loudness", source))?;
         }
         EffectCommand::Delay(delay) => {
             *audio = delay
@@ -352,6 +358,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Bass
         | EffectKind::Equalizer
         | EffectKind::HighPass
+        | EffectKind::Loudness
         | EffectKind::LowPass
         | EffectKind::Treble
         | EffectKind::SoftVol
