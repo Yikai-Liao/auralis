@@ -63,11 +63,11 @@ impl BandReject {
     /// frequency is at or above Nyquist or width conversion produces an invalid
     /// coefficient set.
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
-        BiquadCoefficients::rbj_band_reject(
+        Ok(BiquadCoefficients::rbj_band_reject(
             f64::from(sample_rate.as_u32()),
             self.frequency_hz,
             self.width,
-        )
+        )?)
     }
 
     /// Applies the band-reject filter independently to every channel.

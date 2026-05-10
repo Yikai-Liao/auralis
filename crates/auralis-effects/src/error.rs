@@ -3,6 +3,15 @@ use thiserror::Error;
 /// Crate-local result type using [`EffectError`].
 pub type Result<T> = std::result::Result<T, EffectError>;
 
+impl From<auralis_dsp::BiquadError> for EffectError {
+    fn from(error: auralis_dsp::BiquadError) -> Self {
+        match error {
+            auralis_dsp::BiquadError::InvalidCoefficients => Self::InvalidBiquadCoefficients,
+            _ => Self::InvalidBiquadDesign,
+        }
+    }
+}
+
 /// Errors produced by typed effect processors.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

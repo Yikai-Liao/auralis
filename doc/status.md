@@ -188,12 +188,12 @@ writer, format validation, sample-conversion glue, and focused integration
 tests in separate ownership modules. The remaining oversized CLI and testkit
 files have been split, and `python3 tools/check_rust_source_lines.py` enforces
 the no-thousand-line Rust source policy locally.
-The 7.x DSP primitive audit in `doc/development/07-dsp-primitives.md` now
-records shared-kernel ownership across biquad, FIR, modulation, delay-line,
-time-scale, spectral, dither, resampling, mixing, and analyzer primitives. The
-next extraction target is the direct-form biquad runtime and normalized
-coefficient type, moved into `auralis-dsp` while preserving `auralis-effects`
-re-exports.
+The 7.x DSP primitive audit in `doc/development/07-dsp-primitives.md` records
+shared-kernel ownership across biquad, FIR, modulation, delay-line, time-scale,
+spectral, dither, resampling, mixing, and analyzer primitives. The first
+extraction moved the direct-form biquad runtime, normalized coefficient type,
+and generic RBJ helper ownership into `auralis-dsp` while preserving
+`auralis-effects` re-exports and command parsing.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

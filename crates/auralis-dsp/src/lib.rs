@@ -25,6 +25,12 @@ use auralis_simd::{
     fade_f32_in_place_with_backend, gain_f32_in_place_with_backend, select_backend,
 };
 
+mod biquad;
+mod biquad_design;
+
+pub use biquad::{Biquad, BiquadCoefficients, BiquadError, BiquadResult, BiquadState};
+pub use biquad_design::BiquadWidth;
+
 /// Applies constant gain to each sample in place.
 ///
 /// `db` is measured in decibels, where `0 dB` is identity and the linear

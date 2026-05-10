@@ -95,9 +95,11 @@ impl HighPass {
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
         let sample_rate_hz = f64::from(sample_rate.as_u32());
         match self.mode {
-            HighPassMode::RbjTwoPole { width } => {
-                BiquadCoefficients::rbj_high_pass(sample_rate_hz, self.frequency_hz, width)
-            }
+            HighPassMode::RbjTwoPole { width } => Ok(BiquadCoefficients::rbj_high_pass(
+                sample_rate_hz,
+                self.frequency_hz,
+                width,
+            )?),
             HighPassMode::OnePole => self.one_pole_coefficients(sample_rate_hz),
         }
     }

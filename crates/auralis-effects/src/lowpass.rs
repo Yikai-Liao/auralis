@@ -95,9 +95,11 @@ impl LowPass {
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
         let sample_rate_hz = f64::from(sample_rate.as_u32());
         match self.mode {
-            LowPassMode::RbjTwoPole { width } => {
-                BiquadCoefficients::rbj_low_pass(sample_rate_hz, self.frequency_hz, width)
-            }
+            LowPassMode::RbjTwoPole { width } => Ok(BiquadCoefficients::rbj_low_pass(
+                sample_rate_hz,
+                self.frequency_hz,
+                width,
+            )?),
             LowPassMode::OnePole => self.one_pole_coefficients(sample_rate_hz),
         }
     }

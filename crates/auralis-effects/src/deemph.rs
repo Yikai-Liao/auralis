@@ -75,12 +75,12 @@ impl Deemph {
             _ => return Err(EffectError::InvalidBiquadDesign),
         };
 
-        BiquadCoefficients::rbj_high_shelf(
+        Ok(BiquadCoefficients::rbj_high_shelf(
             f64::from(sample_rate.as_u32()),
             frequency_hz,
             width,
             gain_db,
-        )
+        )?)
     }
 
     /// Applies the de-emphasis filter independently to every channel.

@@ -67,12 +67,12 @@ impl Equalizer {
     /// frequency is at or above Nyquist or width conversion produces an invalid
     /// coefficient set.
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
-        BiquadCoefficients::rbj_peaking_eq(
+        Ok(BiquadCoefficients::rbj_peaking_eq(
             f64::from(sample_rate.as_u32()),
             self.frequency_hz,
             self.width,
             self.gain_db,
-        )
+        )?)
     }
 
     /// Applies the peaking equalizer independently to every channel.

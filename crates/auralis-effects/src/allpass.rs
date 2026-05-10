@@ -90,9 +90,11 @@ impl AllPass {
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
         let sample_rate_hz = f64::from(sample_rate.as_u32());
         match self.mode {
-            AllPassMode::RbjTwoPole { width } => {
-                BiquadCoefficients::rbj_all_pass(sample_rate_hz, self.frequency_hz, width)
-            }
+            AllPassMode::RbjTwoPole { width } => Ok(BiquadCoefficients::rbj_all_pass(
+                sample_rate_hz,
+                self.frequency_hz,
+                width,
+            )?),
             AllPassMode::OnePole => self.one_pole_coefficients(sample_rate_hz),
             AllPassMode::TwoPole => self.two_pole_coefficients(sample_rate_hz),
         }
@@ -145,21 +147,21 @@ impl AllPass {
     fn one_pole_coefficients(self, sample_rate_hz: f64) -> Result<BiquadCoefficients> {
         let w0 = checked_w0(sample_rate_hz, self.frequency_hz)?;
         let pole = (-w0).exp();
-        BiquadCoefficients::normalized(pole, -1.0, 0.0, -pole, 0.0)
+        Ok(BiquadCoefficients::normalized(pole, -1.0, 0.0, -pole, 0.0)?)
     }
 
     fn two_pole_coefficients(self, sample_rate_hz: f64) -> Result<BiquadCoefficients> {
         let w0 = checked_w0(sample_rate_hz, self.frequency_hz)?;
         let sin_w0 = w0.sin();
         let cos_w0 = w0.cos();
-        BiquadCoefficients::from_raw(
+        Ok(BiquadCoefficients::from_raw(
             1.0 - sin_w0,
             -2.0 * cos_w0,
             1.0 + sin_w0,
             1.0 + sin_w0,
             -2.0 * cos_w0,
             1.0 - sin_w0,
-        )
+        )?)
     }
 }
 

@@ -94,12 +94,12 @@ impl Treble {
     /// Returns [`EffectError::InvalidBiquadDesign`] when this configuration is
     /// invalid for the sample rate, such as a frequency at or above Nyquist.
     pub fn coefficients(self, sample_rate: auralis_core::SampleRate) -> Result<BiquadCoefficients> {
-        BiquadCoefficients::rbj_high_shelf(
+        Ok(BiquadCoefficients::rbj_high_shelf(
             f64::from(sample_rate.as_u32()),
             self.frequency_hz,
             self.width,
             self.gain_db,
-        )
+        )?)
     }
 
     /// Applies the treble tone control independently to every channel.

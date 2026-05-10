@@ -20,7 +20,7 @@ pub(super) fn parse_biquad(effect: &'static str, args: &[&str]) -> CommandResult
         .map_err(|source| EffectCommandParseError::InvalidEffectConfig {
             effect,
             argument: "coefficients",
-            source,
+            source: source.into(),
         })
 }
 

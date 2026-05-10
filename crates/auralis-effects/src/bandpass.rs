@@ -86,16 +86,16 @@ impl BandPass {
     pub fn coefficients(self, sample_rate: SampleRate) -> Result<BiquadCoefficients> {
         let sample_rate_hz = f64::from(sample_rate.as_u32());
         match self.mode {
-            BandPassMode::ConstantPeak => BiquadCoefficients::rbj_band_pass_constant_peak(
+            BandPassMode::ConstantPeak => Ok(BiquadCoefficients::rbj_band_pass_constant_peak(
                 sample_rate_hz,
                 self.frequency_hz,
                 self.width,
-            ),
-            BandPassMode::ConstantSkirt => BiquadCoefficients::rbj_band_pass_constant_skirt(
+            )?),
+            BandPassMode::ConstantSkirt => Ok(BiquadCoefficients::rbj_band_pass_constant_skirt(
                 sample_rate_hz,
                 self.frequency_hz,
                 self.width,
-            ),
+            )?),
         }
     }
 
