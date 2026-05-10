@@ -267,6 +267,37 @@ fn run_boundary_control_returns_clear_error() {
 }
 
 #[test]
+fn run_blocked_dolbyb_effect_returns_actionable_error() {
+    let input = temp_path("auralis-cli-run-dolbyb-blocked-input", "wav");
+    let output = temp_path("auralis-cli-run-dolbyb-blocked-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 1, 2]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "dolbyb",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("known SoX-ng effect `dolbyb` is blocked"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("use `sox_ng ... dolbyb ...`"), "{stderr}");
+    assert!(
+        stderr.contains("compatible pure-Rust/public-domain spec"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn run_missing_effects_file_returns_clear_error() {
     let input = temp_path("auralis-cli-run-missing-effects-file-input", "wav");
     let effects_file = temp_path("auralis-cli-run-missing-effects-file", "effects");

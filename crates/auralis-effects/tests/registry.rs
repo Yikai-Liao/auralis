@@ -113,6 +113,23 @@ fn empty_names_are_rejected_without_suggestions() {
 }
 
 #[test]
+fn blocked_known_effects_return_actionable_diagnostics() {
+    let error = EffectRegistry::resolve("dolbyb").unwrap_err();
+
+    assert_eq!(
+        error,
+        EffectNameError::UnsupportedSoxNgEffect {
+            name: "dolbyb".to_owned(),
+        }
+    );
+    assert!(error.suggestions().is_empty());
+    assert_eq!(
+        error.to_string(),
+        "known SoX-ng effect `dolbyb` is blocked in Auralis: SoX-ng uses GPLv2 libdolbyb C code while Auralis is MIT and pure Rust; use `sox_ng ... dolbyb ...` for Dolby B processing or provide a compatible pure-Rust/public-domain spec"
+    );
+}
+
+#[test]
 fn implemented_sox_ng_names_are_supported_effect_descriptors() {
     for descriptor in SUPPORTED_EFFECTS {
         assert!(EffectRegistry::is_known_sox_ng_effect(

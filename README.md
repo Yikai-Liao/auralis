@@ -581,7 +581,11 @@ upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
 `trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `loudness`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `synth`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `noiseprof`, `noisered`, `stat`, `stats`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `reverse`, `fade`, `silence`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `eq`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
-coverage return a stable missing-coverage diagnostic. Tokenized commands such
+coverage return a stable missing-coverage diagnostic. `dolbyb` is a stable
+blocked exception rather than ordinary missing coverage: SoX-ng's available
+path depends on GPLv2 `libdolbyb` C code, while Auralis is MIT and pure Rust, so
+the CLI points users to `sox_ng ... dolbyb ...` or a compatible
+pure-Rust/public-domain spec. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
 "24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
 accepts the frame-count subset implemented by Auralis and supports SoX-ng fade

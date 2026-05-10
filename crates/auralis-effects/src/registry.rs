@@ -837,10 +837,18 @@ impl fmt::Display for EffectNameError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyName => formatter.write_str("effect name cannot be empty"),
-            Self::UnsupportedSoxNgEffect { name } => write!(
-                formatter,
-                "known SoX-ng effect `{name}` is not implemented by Auralis; missing SoX-ng coverage entry for `{name}`"
-            ),
+            Self::UnsupportedSoxNgEffect { name } => {
+                if let Some(diagnostic) =
+                    crate::registry_known::blocked_sox_ng_effect_diagnostic(name)
+                {
+                    write!(formatter, "known SoX-ng effect `{name}` is {diagnostic}")
+                } else {
+                    write!(
+                        formatter,
+                        "known SoX-ng effect `{name}` is not implemented by Auralis; missing SoX-ng coverage entry for `{name}`"
+                    )
+                }
+            }
             Self::UnknownEffect { name, suggestions } if suggestions.is_empty() => {
                 write!(formatter, "unknown effect `{name}`")
             }

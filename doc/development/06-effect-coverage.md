@@ -1719,9 +1719,26 @@ Implementation notes:
 Record whether a safe, testable implementation path exists. If blocked, the CLI
 diagnostic must be stable and actionable.
 
+Status: blocked.
+
+The current SoX-ng-compatible implementation path is not safe for Auralis:
+SoX-ng wires `dolbyb` through `libdolbyb`, whose C library README states that
+the C version is GPLv2, while Auralis is MIT-licensed and the current codec/effect
+policy excludes native wrapper dependencies. Auralis also does not vendor or
+track a compatible pure-Rust/public-domain Dolby B circuit specification that
+could be implemented independently without deriving from the GPLv2 C source.
+
+The `dolbyb` command therefore remains out of the implemented registry. Parser
+and CLI diagnostics are intentionally stable and actionable: users should run
+`sox_ng ... dolbyb ...` for Dolby B processing, or provide a compatible
+pure-Rust/public-domain specification before this effect can be reconsidered.
+Feature 6.9.2 must stay blocked until that condition changes.
+
 ### Feature 6.9.2: `dolbyb` implementation
 
 Implement only if Feature 6.9.1 records a safe implementation path.
+
+Status: blocked by Feature 6.9.1.
 
 ### Feature 6.9.3: `dop`
 
