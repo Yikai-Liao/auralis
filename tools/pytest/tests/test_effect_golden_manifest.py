@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from auralis_testkit.corpus import pcm16_corpus_fixture
+from auralis_testkit.corpus import corpus_case, pcm16_corpus_fixture
 from auralis_testkit.golden_report import (
     build_golden_failure_report,
     comparison_metadata,
@@ -44,6 +44,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
     tmp_path: Path,
 ) -> None:
     input_path = _write_fixture(case["corpus_id"], tmp_path / case["input"])
+    effect_tokens = _resolve_effect_tokens(case, tmp_path)
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     sox_output = tmp_path / f"{case_id}.sox.wav"
     output_sample_rate = case.get("output_sample_rate")
@@ -59,7 +60,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
         str(input_path),
         str(auralis_output),
         *(["--rate", str(output_sample_rate)] if output_sample_rate is not None else []),
-        *case["auralis"],
+        *effect_tokens["auralis"],
     ]
     auralis_result = subprocess.run(
         auralis_command,
@@ -73,7 +74,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
         sox_result = run_sox_ng(
             input_path,
             sox_output,
-            case["sox_ng"],
+            effect_tokens["sox_ng"],
             output_sample_rate=output_sample_rate,
         )
     except SoxNgUnavailable as error:
@@ -119,6 +120,36 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
 def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return pcm16_corpus_fixture(path, corpus_id)
+
+
+def _resolve_effect_tokens(case: dict[str, Any], tmp_path: Path) -> dict[str, list[str]]:
+    profile_placeholders = {
+        token
+        for command in (case["auralis"], case["sox_ng"])
+        for token in command
+        if token == "{zero_noise_profile}"
+    }
+    replacements: dict[str, str] = {}
+    if profile_placeholders:
+        channels = _corpus_channels(case["corpus_id"])
+        profile_path = tmp_path / "zero_noise_profile.prof"
+        _write_zero_noise_profile(profile_path, channels)
+        replacements["{zero_noise_profile}"] = str(profile_path)
+
+    return {
+        name: [replacements.get(token, token) for token in case[name]]
+        for name in ("auralis", "sox_ng")
+    }
+
+
+def _write_zero_noise_profile(path: Path, channels: int) -> None:
+    bins = ", ".join(["0.000000"] * 1025)
+    text = "".join(f"Channel {channel}: {bins}\n" for channel in range(channels))
+    path.write_text(text, encoding="utf-8")
+
+
+def _corpus_channels(corpus_id: str) -> int:
+    return corpus_case(corpus_id).channels
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:

@@ -43,6 +43,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
         | EffectCommand::NoiseProf(_)
+        | EffectCommand::NoiseRed(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
@@ -125,6 +126,11 @@ fn apply_buffer_command(
                 .map_err(|source| ("mcompand", source))?;
         }
         EffectCommand::NoiseProf(noiseprof) => noiseprof.process_buffer(audio),
+        EffectCommand::NoiseRed(noisered) => {
+            *audio = noisered
+                .process_buffer(audio)
+                .map_err(|source| ("noisered", source))?;
+        }
         EffectCommand::Loudness(loudness) => {
             loudness
                 .process_buffer(audio)
@@ -347,6 +353,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Repeat
         | EffectKind::Speed
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
+        EffectKind::NoiseRed => optional_arg_end(tokens, args_start, 2),
         EffectKind::Splice => splice_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Compand | EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),

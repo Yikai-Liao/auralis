@@ -81,6 +81,62 @@ pub struct NoiseProfile {
 }
 
 impl NoiseProfile {
+    /// Creates a profile from channel-major log-power bins.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidNoiseProfile`] when any channel does not
+    /// contain exactly [`NOISE_PROFILE_FREQ_COUNT`] finite bins.
+    pub fn new(channels: Vec<Vec<f64>>) -> Result<Self> {
+        if !channels.is_empty()
+            && channels.iter().all(|bins| {
+                bins.len() == NOISE_PROFILE_FREQ_COUNT && bins.iter().all(|v| v.is_finite())
+            })
+        {
+            Ok(Self { channels })
+        } else {
+            Err(EffectError::InvalidNoiseProfile)
+        }
+    }
+
+    /// Parses SoX-ng `noiseprof` text in `Channel N: ...` format.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidNoiseProfile`] when the text is malformed,
+    /// channel indexes are not contiguous from zero, or a row does not contain
+    /// exactly [`NOISE_PROFILE_FREQ_COUNT`] finite bins.
+    pub fn parse_text(text: &str) -> Result<Self> {
+        let mut channels = Vec::new();
+        for (expected_channel, line) in text
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .enumerate()
+        {
+            let Some((prefix, bins)) = line.split_once(':') else {
+                return Err(EffectError::InvalidNoiseProfile);
+            };
+            let Some(channel) = prefix.trim().strip_prefix("Channel ") else {
+                return Err(EffectError::InvalidNoiseProfile);
+            };
+            if channel.parse::<usize>().ok() != Some(expected_channel) {
+                return Err(EffectError::InvalidNoiseProfile);
+            }
+            let parsed = bins
+                .split(',')
+                .map(str::trim)
+                .map(|value| {
+                    value
+                        .parse::<f64>()
+                        .map_err(|_| EffectError::InvalidNoiseProfile)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            channels.push(parsed);
+        }
+
+        Self::new(channels)
+    }
+
     /// Collects a noise profile for every channel in `audio`.
     ///
     /// # Errors

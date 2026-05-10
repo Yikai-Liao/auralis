@@ -784,6 +784,7 @@ mod tests {
                 | EffectCommand::LowPass(_)
                 | EffectCommand::MCompand(_)
                 | EffectCommand::NoiseProf(_)
+                | EffectCommand::NoiseRed(_)
                 | EffectCommand::Treble(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)

@@ -562,6 +562,21 @@ l6 = { status = "not_applicable", reason = "NoiseProf uses a scalar FFT/statisti
 l7 = { status = "covered", reason = "Effect command fuzzing covers noiseprof optional profile path parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/noiseprof"] }
 
 [[subject]]
+id = "effect.noisered"
+kind = "effect"
+name = "noisered"
+summary = "SoX-ng-style spectral noise reduction from a noise profile."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases use deterministic mono and stereo long-window corpus IDs with generated zero noise profiles.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; profile file loading is command metadata rather than WAV container behavior.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono and stereo command execution, profile loading, amount parsing, and SoX-ng half-window output length behavior.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover profile text parsing, command parsing/rendering, chain grouping, invalid amount rejection, zero-profile silence output, and window output length.", tests = ["crates/auralis-effects/src/noisered.rs", "crates/auralis-effects/src/command_noisered.rs", "crates/auralis-effects/tests/noisered.rs"] }
+l4 = { status = "not_applicable", reason = "The current noisered implementation is a whole-buffer spectral gate with profile-file state; property coverage needs a future generated-profile strategy.", tests = [] }
+l5 = { status = "not_applicable", reason = "Noisered uses overlapping FFT windows and profile state; chunk-exact streaming belongs to a future API that exposes reducer state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Noisered uses scalar FFT-domain processing with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers noisered profile path and amount parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/noisered"] }
+
+[[subject]]
 id = "effect.contrast"
 kind = "effect"
 name = "contrast"

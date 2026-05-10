@@ -78,6 +78,8 @@ pub enum EffectKind {
     MCompand,
     /// SoX-ng-style noise profile analyzer.
     NoiseProf,
+    /// SoX-ng-style spectral noise reducer.
+    NoiseRed,
     /// Whole-buffer peak normalization.
     Norm,
     /// SoX-ng-style out-of-phase stereo extraction.
@@ -317,6 +319,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "NoiseProf",
         "noiseprof [profile-file(-)]",
         "collect a SoX-ng-style spectral noise profile while passing audio through",
+    ),
+    EffectDescriptor::new(
+        EffectKind::NoiseRed,
+        "noisered",
+        &[],
+        "NoiseRed",
+        "noisered [profile-file(-) [amount(0.5)]]",
+        "apply spectral noise reduction from a noise profile",
     ),
     EffectDescriptor::new(
         EffectKind::Contrast,
@@ -639,13 +649,10 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "apply volume scaling with optional limiter gain",
     ),
 ];
-
 pub use crate::registry_known::KNOWN_SOX_NG_EFFECTS;
-
 /// Registry namespace for effect name resolution.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EffectRegistry;
-
 impl EffectRegistry {
     /// Creates a registry value.
     ///
@@ -655,19 +662,16 @@ impl EffectRegistry {
     pub const fn new() -> Self {
         Self
     }
-
     /// Returns descriptors for all implemented effects.
     #[must_use]
     pub const fn supported_effects() -> &'static [EffectDescriptor] {
         SUPPORTED_EFFECTS
     }
-
     /// Returns the SoX-ng effect surface tracked by Auralis.
     #[must_use]
     pub const fn known_sox_ng_effects() -> &'static [&'static str] {
         KNOWN_SOX_NG_EFFECTS
     }
-
     /// Resolves a name or alias to an implemented typed effect descriptor.
     ///
     /// # Errors
@@ -685,7 +689,6 @@ impl EffectRegistry {
         if let Some(descriptor) = descriptor_for_name(name) {
             return Ok(descriptor);
         }
-
         if Self::is_known_sox_ng_effect(name) {
             return Err(EffectNameError::UnsupportedSoxNgEffect {
                 name: name.to_owned(),

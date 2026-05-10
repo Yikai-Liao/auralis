@@ -1396,8 +1396,24 @@ Scope:
 
 ### Feature 6.7.9: `noisered`
 
-Dynamics and noise effects require deterministic state handling and careful
-golden tolerances.
+Status: implemented.
+
+Scope:
+
+- Adds a public `NoiseRed` processor that consumes the `NoiseProfile` text
+  shape from Feature 6.7.8 or loads a command-style profile path at processing
+  time.
+- Supports `noisered [profile-file(-) [amount(0.5)]]` command
+  parsing/rendering, registry resolution, effects-file and positional-chain
+  grouping, chain execution, and `0..=1` amount validation.
+- Implements deterministic scalar FFT-domain noise gating with 2048-frame
+  windows, 50% overlap, smoothing, and SoX-ng's half-window output latency
+  shape. SIMD remains N/A because the processor is an FFT/stateful spectral
+  reducer rather than a backend-dispatched sample transform.
+- Coverage includes profile text parsing, parser/rendering tests, chain
+  grouping, typed zero-profile processing, mono/stereo SoX-ng command-shape
+  golden rows with generated zero profiles, L7 fuzz seed coverage, and a
+  layered coverage matrix row.
 
 ## Milestone 6.8: FIR, analysis, generation, and dither effects
 

@@ -80,6 +80,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_mcompand_stereo_single_band",
             "effect_noiseprof_mono_pass_through",
             "effect_noiseprof_stereo_pass_through",
+            "effect_noisered_mono_zero_profile",
+            "effect_noisered_stereo_zero_profile",
             "effect_norm_mono_minus_3",
             "effect_norm_stereo_default",
             "effect_oops_stereo",
@@ -207,6 +209,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "compand",
         "mcompand",
         "noiseprof",
+        "noisered",
         "remix",
         "swap",
     ] {
