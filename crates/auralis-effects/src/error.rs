@@ -97,6 +97,16 @@ pub enum EffectError {
     #[error("phaser delay line exceeds representable audio buffer length")]
     PhaserLengthOverflow,
 
+    /// A reverb processor had invalid command parameters.
+    #[error(
+        "reverb percent parameters must be finite in 0..=100, pre-delay in 0..=500 ms, and wet gain in -10..=10 dB"
+    )]
+    InvalidReverb,
+
+    /// A reverb processor would create a delay or output shape that cannot be represented.
+    #[error("reverb delay or output shape exceeds representable audio buffer length")]
+    ReverbLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

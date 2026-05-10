@@ -41,6 +41,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
         | EffectCommand::Phaser(_)
+        | EffectCommand::Reverb(_)
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
         | EffectCommand::Trim(_) => unreachable!("buffer commands returned early"),
@@ -118,6 +119,11 @@ fn apply_buffer_command(
             *audio = phaser
                 .process_buffer(audio)
                 .map_err(|source| ("phaser", source))?;
+        }
+        EffectCommand::Reverb(reverb) => {
+            *audio = reverb
+                .process_buffer(audio)
+                .map_err(|source| ("reverb", source))?;
         }
         EffectCommand::Norm(norm) => norm
             .process_buffer_with_backend(audio, requested_backend)
@@ -225,6 +231,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
+        EffectKind::Reverb => reverb_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {
             optional_arg_end(tokens, args_start, 1)
@@ -309,6 +316,15 @@ fn flanger_arg_end(tokens: &[&str], args_start: usize) -> usize {
 
 fn phaser_arg_end(tokens: &[&str], args_start: usize) -> usize {
     chorus_arg_end(tokens, args_start)
+}
+
+fn reverb_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    if matches!(tokens.get(end).copied(), Some("-w" | "--wet-only")) {
+        end += 1;
+    }
+
+    optional_arg_end(tokens, end, 6)
 }
 
 fn gain_arg_end(tokens: &[&str], args_start: usize) -> usize {

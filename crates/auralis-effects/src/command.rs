@@ -36,6 +36,7 @@ use crate::command_pad::{parse_pad, render_pad};
 use crate::command_phaser::{parse_phaser, render_phaser};
 use crate::command_remix::{parse_remix, render_remix};
 use crate::command_repeat::{parse_repeat, render_repeat};
+use crate::command_reverb::{parse_reverb, render_reverb};
 use crate::command_reverse::parse_reverse;
 use crate::command_riaa::parse_riaa;
 use crate::command_saturation::{parse_saturation, render_saturation};
@@ -49,7 +50,7 @@ use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Echo, Echos, EffectError, EffectKind, EffectNameError, EffectRegistry,
     Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Phaser, Remix,
-    Repeat, Reverse, Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -113,6 +114,8 @@ pub enum EffectCommand {
     Pad(Pad),
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser(Phaser),
+    /// SoX-ng-style stereo reverberation.
+    Reverb(Reverb),
     /// SoX-ng-style finite output repetition.
     Repeat(Repeat),
     /// SoX-ng-style basic channel routing.
@@ -177,6 +180,7 @@ impl EffectCommand {
             EffectKind::Overdrive => parse_overdrive(effect, args),
             EffectKind::Pad => parse_pad(effect, args),
             EffectKind::Phaser => parse_phaser(effect, args),
+            EffectKind::Reverb => parse_reverb(effect, args),
             EffectKind::Repeat => parse_repeat(effect, args),
             EffectKind::Remix => parse_remix(effect, args),
             EffectKind::Reverse => parse_reverse(effect, args),
@@ -221,6 +225,7 @@ impl EffectCommand {
             Self::Overdrive(_) => EffectKind::Overdrive,
             Self::Pad(_) => EffectKind::Pad,
             Self::Phaser(_) => EffectKind::Phaser,
+            Self::Reverb(_) => EffectKind::Reverb,
             Self::Repeat(_) => EffectKind::Repeat,
             Self::Remix(_) => EffectKind::Remix,
             Self::Reverse(_) => EffectKind::Reverse,
@@ -271,6 +276,7 @@ impl EffectCommand {
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),
             Self::Pad(pad) => render_pad(pad),
             Self::Phaser(phaser) => render_phaser(*phaser),
+            Self::Reverb(reverb) => render_reverb(*reverb),
             Self::Repeat(repeat) => render_repeat(*repeat),
             Self::Remix(remix) => render_remix(remix),
             Self::Reverse(_) => vec!["reverse".to_owned()],

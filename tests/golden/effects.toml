@@ -1035,3 +1035,25 @@ sox_ng = ["phaser", "-t", "0.8", "0.74", "1", "0.24", "2"]
 max_abs = 0.000031
 rms = 0.000031
 snr_db = 85.0
+
+[id.effect_reverb_mono_wet_only]
+input = "effects/reverb_mono.wav"
+corpus_id = "l0/sine_mono_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["reverb", "-w", "60", "40", "80", "100", "0", "0"]
+sox_ng = ["reverb", "-w", "60", "40", "80", "100", "0", "0"]
+max_abs = 0.000061
+rms = 0.000061
+snr_db = 80.0
+
+[id.effect_reverb_stereo_default]
+input = "effects/reverb_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["reverb", "50", "50", "100", "100", "0", "0"]
+sox_ng = ["reverb", "50", "50", "100", "100", "0", "0"]
+max_abs = 0.000061
+rms = 0.000061
+snr_db = 80.0

@@ -923,6 +923,24 @@ Implementation notes:
 
 ### Feature 6.5.8: `reverb`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Reverb` effect with SoX-ng's `-w` wet-only mode and
+  reverberance, HF damping, room scale, stereo depth, pre-delay, and wet-gain
+  parameters.
+- Wired `reverb [-w] [reverberance [HF-damping [room-scale [stereo-depth
+  [pre-delay [wet-gain]]]]]]` through the effect registry, typed command
+  parser, effect-chain execution, effects-file diagnostics, CLI positional
+  chain path, and parser fuzz corpus.
+- Processing uses SoX-ng's Freeverb-derived comb/all-pass delay network,
+  preserves input length, keeps the command-line output channel shape stable,
+  and does not drain the delayed wet tail after the input ends.
+- Coverage includes unit/integration tests, L4 finite-output coverage, parser
+  fuzz, layered coverage metadata, and standalone SoX-ng golden cases for
+  mono wet-only and stereo dry-plus-wet reverb commands.
+
 These effects are stateful. Each feature must document latency, tail behavior,
 flush behavior, and whether chunked output is exact or tolerance-based.
 

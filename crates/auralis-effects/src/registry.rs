@@ -102,6 +102,9 @@ pub enum EffectKind {
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser,
 
+    /// SoX-ng-style stereo reverberation.
+    Reverb,
+
     /// SoX-ng-style finite output repetition.
     Repeat,
 
@@ -433,6 +436,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Repeat",
         "repeat [count]",
         "append finite copies of the input audio",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Reverb,
+        "reverb",
+        &[],
+        "Reverb",
+        "reverb [-w] [reverberance [HF-damping [room-scale [stereo-depth [pre-delay [wet-gain]]]]]]",
+        "apply stereo reverberation with optional wet-only output",
     ),
     EffectDescriptor::new(
         EffectKind::Remix,
@@ -859,6 +870,7 @@ mod tests {
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
             ("repeat", EffectKind::Repeat),
+            ("reverb", EffectKind::Reverb),
             ("remix", EffectKind::Remix),
             ("reverse", EffectKind::Reverse),
             ("riaa", EffectKind::Riaa),
@@ -922,18 +934,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("reverb").unwrap_err();
+        let error = EffectRegistry::resolve("downsample").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "reverb".to_owned(),
+                name: "downsample".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `reverb`")
+                .contains("missing SoX-ng coverage entry for `downsample`")
         );
     }
 

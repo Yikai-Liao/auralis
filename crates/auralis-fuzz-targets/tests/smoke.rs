@@ -44,6 +44,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"chorus -l -t 0.5 1 1 0.25 1 0 -sine",
         b"flanger -q -t 1 2 25 100 1 sine 50 none",
         b"phaser -q -t 0.8 0.74 3 0.4 0.5 -s",
+        b"reverb -w 75 25 50 0 10 -3",
         b"echo 0.5 1 1 0.5",
         b"echos 0.5 1 1 0.5",
         b"highpass -1 500",

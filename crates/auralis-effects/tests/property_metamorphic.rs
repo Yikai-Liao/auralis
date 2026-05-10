@@ -8,8 +8,8 @@ use auralis_effects::{
     Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos,
     EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass,
     Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo,
-    Trim, Vol,
+    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap, Treble,
+    Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -448,6 +448,12 @@ proptest! {
         .process_buffer(&source)
         .expect("small generated phaser cannot overflow");
         prop_assert_all_finite(&phased)?;
+
+        let reverbed = Reverb::new(false, 50.0, 50.0, 100.0, 0.0, 0.0, 0.0)
+            .expect("reverb fixture is valid")
+            .process_buffer(&source)
+            .expect("small generated reverb cannot overflow");
+        prop_assert_all_finite(&reverbed)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

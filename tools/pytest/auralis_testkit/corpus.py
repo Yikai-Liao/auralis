@@ -16,6 +16,7 @@ CORPUS_IDS = (
     "l0/impulse_mono_16",
     "l0/step_mono_16",
     "l0/sine_mono_32",
+    "l0/sine_mono_8192",
     "l0/sweep_mono_64",
     "l0/noise_mono_32_seed_1",
     "l0/full_scale_mono_8",
@@ -69,6 +70,7 @@ def corpus_case(corpus_id: str) -> CorpusCase:
         "l0/impulse_mono_16": _impulse_mono_16,
         "l0/step_mono_16": _step_mono_16,
         "l0/sine_mono_32": lambda: _mono(_sine(32, 1_000.0, 0.5, 0.0)),
+        "l0/sine_mono_8192": lambda: _mono(_sine(8192, 750.0, 0.5, 0.0)),
         "l0/sweep_mono_64": lambda: _mono(_sweep(64, 200.0, 4_000.0, 0.45)),
         "l0/noise_mono_32_seed_1": lambda: _mono(_seeded_noise(32, 1, 0.5)),
         "l0/full_scale_mono_8": lambda: _mono(
