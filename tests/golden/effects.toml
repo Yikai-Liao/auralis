@@ -1416,6 +1416,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_fir_mono_inline]
+input = "effects/fir_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["fir", "0.25", "0.5", "0.25"]
+sox_ng = ["fir", "0.25", "0.5", "0.25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_fir_stereo_inline]
+input = "effects/fir_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["fir", "0.5", "0.25"]
+sox_ng = ["fir", "0.5", "0.25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_flanger_mono_linear]
 input = "effects/flanger_mono.wav"
 corpus_id = "l0/sine_mono_32"

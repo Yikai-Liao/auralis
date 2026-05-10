@@ -39,6 +39,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Echo(_)
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
+        | EffectCommand::Fir(_)
         | EffectCommand::Flanger(_)
         | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
@@ -159,6 +160,11 @@ fn apply_buffer_command(
             } else {
                 fade.process_buffer_with_backend(audio, requested_backend);
             }
+        }
+        EffectCommand::Fir(fir) => {
+            *audio = fir
+                .process_buffer(audio)
+                .map_err(|source| ("coefficients", source))?;
         }
         EffectCommand::Flanger(flanger) => {
             *audio = flanger
@@ -340,6 +346,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Centercut => centercut_arg_end(tokens, args_start),
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
+        EffectKind::Fir => fir_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Pitch => pitch_arg_end(tokens, args_start),
@@ -677,6 +684,14 @@ fn fade_arg_end(tokens: &[&str], args_start: usize) -> usize {
     }
 
     include_unexpected_argument(tokens, end)
+}
+
+fn fir_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+    end
 }
 
 fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {

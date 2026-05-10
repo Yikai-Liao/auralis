@@ -1,3 +1,7 @@
+use std::{collections::VecDeque, fs, path::Path};
+
+use auralis_core::{AudioBuffer, FrameCount};
+
 use crate::{EffectError, Result};
 
 /// A validated list of SoX-ng-style FIR coefficients.
@@ -107,11 +111,13 @@ pub enum FirCoefficientSource {
     Inline(FirCoefficients),
 }
 
-/// Parsed SoX-ng-style FIR coefficient input.
+/// Parsed SoX-ng-style FIR effect.
 ///
-/// This type intentionally models only coefficient acquisition for Feature
-/// 6.8.1. It is not registered as an executable effect command until the
-/// streaming FIR processor is implemented.
+/// `fir [coefs-file | coef <coef>]` loads a validated coefficient list and
+/// applies a deterministic scalar finite impulse response filter. Like
+/// SoX-ng's DFT FIR effect, output length matches input length and the impulse
+/// response is aligned by dropping `(coefficient_count - 1) / 2` leading
+/// convolution samples.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fir {
     source: FirCoefficientSource,
@@ -203,6 +209,153 @@ impl Fir {
             }
         }
     }
+
+    /// Applies the resolved FIR coefficients to a decoded audio buffer.
+    ///
+    /// Empty coefficient lists are null effects and return the input audio
+    /// unchanged. Library chain execution cannot read command-style stdin, so
+    /// `FirCoefficientSource::Stdin` returns
+    /// [`EffectError::InvalidFirCoefficients`]; CLI and library callers should
+    /// pass inline coefficients or an explicit coefficient file path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidFirCoefficients`] when command-style
+    /// coefficient loading fails, or [`EffectError::FirLengthOverflow`] when
+    /// the output shape cannot be represented.
+    pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
+        let coefficients = self.resolved_coefficients()?;
+        if coefficients.is_empty() {
+            return Ok(audio.clone());
+        }
+
+        let frames =
+            usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+        let mut planar = Vec::with_capacity(audio.as_planar_f32().len());
+
+        for channel_index in 0..audio.channels().as_usize() {
+            let channel = audio
+                .channel(channel_index)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            let mut state = FirState::new(coefficients.clone());
+            let mut filtered = Vec::with_capacity(frames);
+            state.process_mono_samples(channel, &mut filtered);
+            state.finish(&mut filtered);
+            if filtered.len() != frames {
+                return Err(EffectError::FirLengthOverflow);
+            }
+            planar.extend(filtered);
+        }
+
+        AudioBuffer::from_planar_f32(
+            audio.spec(),
+            FrameCount::new(audio.frames().as_u64()),
+            planar,
+        )
+        .map_err(|_| EffectError::FirLengthOverflow)
+    }
+
+    fn resolved_coefficients(&self) -> Result<FirCoefficients> {
+        match &self.source {
+            FirCoefficientSource::Inline(coefficients) => Ok(coefficients.clone()),
+            FirCoefficientSource::File(path) => {
+                let text = fs::read_to_string(Path::new(path))
+                    .map_err(|_| EffectError::InvalidFirCoefficients)?;
+                FirCoefficients::parse_text(&text)
+            }
+            FirCoefficientSource::Stdin => Err(EffectError::InvalidFirCoefficients),
+        }
+    }
+}
+
+/// Stateful scalar FIR processor for one mono sample stream.
+///
+/// The state emits samples with SoX-ng-compatible alignment. For coefficient
+/// lists longer than two taps, this means output for the newest input sample is
+/// delayed until enough look-ahead is available; callers must invoke
+/// [`Self::finish`] once at end-of-stream to flush the final aligned samples.
+#[derive(Debug, Clone)]
+pub struct FirState {
+    coefficients: FirCoefficients,
+    history: VecDeque<f32>,
+    samples_seen: usize,
+    shift: usize,
+}
+
+impl FirState {
+    /// Creates zero-initialized FIR state for one mono stream.
+    #[must_use]
+    pub fn new(coefficients: FirCoefficients) -> Self {
+        let shift = coefficients.len().saturating_sub(1) / 2;
+        Self {
+            coefficients,
+            history: VecDeque::new(),
+            samples_seen: 0,
+            shift,
+        }
+    }
+
+    /// Processes one chunk of mono samples, appending available output samples.
+    pub fn process_mono_samples(&mut self, input: &[f32], output: &mut Vec<f32>) {
+        if self.coefficients.is_empty() {
+            output.extend_from_slice(input);
+            self.samples_seen += input.len();
+            return;
+        }
+
+        for sample in input {
+            self.push_sample(*sample);
+            if self.samples_seen > self.shift {
+                output.push(self.current_output_sample());
+            }
+        }
+    }
+
+    /// Flushes delayed end-of-stream samples by appending the remaining output.
+    ///
+    /// This method consumes the state so a stream cannot accidentally be
+    /// flushed twice.
+    pub fn finish(mut self, output: &mut Vec<f32>) {
+        if self.coefficients.is_empty() {
+            return;
+        }
+
+        for _ in 0..self.shift {
+            self.push_sample(0.0);
+            output.push(self.current_output_sample());
+        }
+    }
+
+    fn push_sample(&mut self, sample: f32) {
+        self.history.push_back(sample);
+        if self.history.len() > self.coefficients.len() {
+            self.history.pop_front();
+        }
+        self.samples_seen += 1;
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Auralis stores decoded samples as f32 after deterministic f64 FIR accumulation"
+    )]
+    fn current_output_sample(&self) -> f32 {
+        let newest_index = self.samples_seen - 1;
+        let oldest_index = self.samples_seen - self.history.len();
+        let mut value = 0.0;
+        for (coefficient_index, coefficient) in
+            self.coefficients.as_slice().iter().copied().enumerate()
+        {
+            if newest_index >= coefficient_index {
+                let input_index = newest_index - coefficient_index;
+                if input_index >= oldest_index {
+                    let history_index = input_index - oldest_index;
+                    value += f64::from(self.history[history_index]) * coefficient;
+                }
+            }
+        }
+
+        value as f32
+    }
 }
 
 fn push_token(values: &mut Vec<f64>, token: &mut String) -> Result<()> {
@@ -228,7 +381,7 @@ fn render_f64(value: f64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Fir, FirCoefficientSource, FirCoefficients};
+    use super::{Fir, FirCoefficientSource, FirCoefficients, FirState};
     use crate::EffectError;
 
     #[test]
@@ -291,5 +444,89 @@ mod tests {
             Fir::parse_sox_args(&["coeffs.txt", "extra"]).unwrap_err(),
             EffectError::InvalidFirCoefficients
         );
+    }
+
+    #[test]
+    fn empty_coefficients_are_a_null_effect() {
+        let fir = Fir::from_coefficients(FirCoefficients::new([]).unwrap());
+        let audio = mono_audio_buffer(vec![0.0, 0.25, -0.5]);
+
+        let filtered = fir.process_buffer(&audio).unwrap();
+
+        assert_eq!(filtered, audio);
+    }
+
+    #[test]
+    fn filters_mono_samples_with_sox_aligned_impulse_response() {
+        let fir = Fir::from_coefficients(FirCoefficients::new([1.0, 2.0, 3.0]).unwrap());
+        let audio = mono_audio_buffer(vec![1.0, 0.0, 0.0, 0.0]);
+
+        let filtered = fir.process_buffer(&audio).unwrap();
+
+        assert_eq!(filtered.as_planar_f32(), &[2.0, 3.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn filters_each_channel_independently() {
+        let fir = Fir::from_coefficients(FirCoefficients::new([0.5, 0.25]).unwrap());
+        let audio = stereo_audio_buffer(vec![1.0, 0.0, 0.0, 0.0, -1.0, 0.0]);
+
+        let filtered = fir.process_buffer(&audio).unwrap();
+
+        assert_eq!(
+            filtered.as_planar_f32(),
+            &[0.5, 0.25, 0.0, 0.0, -0.5, -0.25]
+        );
+    }
+
+    #[test]
+    fn command_style_stdin_is_rejected_at_processing_time() {
+        let audio = mono_audio_buffer(vec![0.0]);
+
+        assert_eq!(
+            Fir::stdin().process_buffer(&audio).unwrap_err(),
+            EffectError::InvalidFirCoefficients
+        );
+    }
+
+    #[test]
+    fn state_preserves_alignment_across_chunks() {
+        let coefficients = FirCoefficients::new([0.25, 0.5, 0.25]).unwrap();
+        let fir = Fir::from_coefficients(coefficients.clone());
+        let audio = mono_audio_buffer(vec![0.0, 1.0, 0.5, -0.5, 0.0]);
+        let whole = fir.process_buffer(&audio).unwrap();
+        let mut state = FirState::new(coefficients);
+        let mut chunked = Vec::new();
+
+        state.process_mono_samples(&audio.as_planar_f32()[..2], &mut chunked);
+        state.process_mono_samples(&audio.as_planar_f32()[2..3], &mut chunked);
+        state.process_mono_samples(&audio.as_planar_f32()[3..], &mut chunked);
+        state.finish(&mut chunked);
+
+        assert_eq!(whole.as_planar_f32(), chunked.as_slice());
+    }
+
+    fn mono_audio_buffer(samples: Vec<f32>) -> auralis_core::AudioBuffer {
+        audio_buffer(samples, 1)
+    }
+
+    fn stereo_audio_buffer(samples: Vec<f32>) -> auralis_core::AudioBuffer {
+        audio_buffer(samples, 2)
+    }
+
+    fn audio_buffer(samples: Vec<f32>, channels: u16) -> auralis_core::AudioBuffer {
+        let spec = auralis_core::AudioSpec::new(
+            auralis_core::SampleRate::new(48_000).unwrap(),
+            auralis_core::ChannelCount::new(channels).unwrap(),
+            auralis_core::SampleFormat::Float32,
+        );
+        auralis_core::AudioBuffer::from_planar_f32(
+            spec,
+            auralis_core::FrameCount::new(
+                u64::try_from(samples.len() / usize::from(channels)).unwrap(),
+            ),
+            samples,
+        )
+        .unwrap()
     }
 }

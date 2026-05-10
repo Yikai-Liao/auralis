@@ -59,6 +59,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"chorus -l -t 0.5 1 1 0.25 1 0 -sine",
         b"compand 0.3,1 6:-70,-60,-20,-20,0,0 -3 -90 0.01",
         b"mcompand '0,0 -60,-60,0,0' 1k '0.01,0.1 -70,-60,0,-3'",
+        b"fir 0.5 0.25",
         b"noiseprof profile.prof",
         b"noisered profile.prof 0.25",
         b"silence -l 1 1s 0% -1 2s -40d",

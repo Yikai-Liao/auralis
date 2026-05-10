@@ -1441,6 +1441,28 @@ Implementation notes:
 
 ### Feature 6.8.2: `fir` streaming processor
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered `fir [coefs-file | coef <coef>]` as an executable
+  SoX-ng-style effect command with canonical rendering, effect-chain grouping,
+  file-backed coefficient loading, CLI positional-chain support, diagnostics,
+  fuzz seed coverage, and L0-L7 matrix metadata.
+- Added deterministic scalar FIR processing over decoded planar `AudioBuffer`
+  samples. Empty coefficient lists are null effects, inline coefficients and
+  explicit coefficient files execute in library/CLI chains, and command-style
+  stdin is rejected at processing time because library chain execution cannot
+  safely read interactive stdin.
+- The processor preserves input frame count and follows SoX-ng FIR alignment by
+  dropping `(coefficient_count - 1) / 2` leading convolution samples before
+  returning the length-preserving output.
+- Coverage includes unit and integration tests for command parsing, chain
+  grouping, inline and file-backed execution, per-channel filtering, null
+  coefficients, chunked-state equivalence, mono/stereo standalone SoX-ng
+  golden rows, and L7 command fuzz seeds. SIMD remains N/A for this scalar
+  reference feature until a vectorized convolution backend is planned.
+
 ### Feature 6.8.3: `firfit`
 
 ### Feature 6.8.4: `hilbert`

@@ -637,6 +637,21 @@ l6 = { status = "covered", reason = "Forced scalar and requested SIMD paths are 
 l7 = { status = "covered", reason = "Effect command fuzzing covers fade argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/fade_curves"] }
 
 [[subject]]
+id = "effect.fir"
+kind = "effect"
+name = "fir"
+summary = "SoX-ng-style finite impulse response filter from inline or file coefficients."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover inline fir coefficient commands.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests cover coefficient text parsing, stdin/file/inline command shapes, null empty coefficients, per-channel FIR convolution, SoX-ng impulse alignment, and file-backed chain execution.", tests = ["crates/auralis-effects/src/fir.rs", "crates/auralis-effects/tests/fir.rs"] }
+l4 = { status = "covered", reason = "Integration coverage checks finite deterministic output for bounded FIR coefficient and sample fixtures.", tests = ["crates/auralis-effects/tests/fir.rs"] }
+l5 = { status = "covered", reason = "Chunked-state convolution coverage checks whole-buffer FIR output against chunked processing of the same coefficient state.", tests = ["crates/auralis-effects/tests/fir.rs"] }
+l6 = { status = "not_applicable", reason = "Feature 6.8.2 implements the scalar reference FIR path; SIMD remains N/A until a future vectorized convolution backend is planned.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers fir argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/fir"] }
+
+[[subject]]
 id = "effect.gain"
 kind = "effect"
 name = "gain"

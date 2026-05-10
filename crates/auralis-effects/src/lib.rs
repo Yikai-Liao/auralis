@@ -59,6 +59,7 @@ mod command_echos;
 mod command_equalizer;
 mod command_fade;
 mod command_filter;
+mod command_fir;
 mod command_flanger;
 mod command_gain;
 mod command_highpass;
@@ -176,7 +177,7 @@ pub use effects_file::{
 pub use equalizer::Equalizer;
 pub use error::{EffectError, Result};
 pub use fade::{Fade, FadeCurve};
-pub use fir::{Fir, FirCoefficientSource, FirCoefficients};
+pub use fir::{Fir, FirCoefficientSource, FirCoefficients, FirState};
 pub use flanger::{Flanger, FlangerInterpolation, FlangerWave};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};
 pub use highpass::{HighPass, HighPassMode};

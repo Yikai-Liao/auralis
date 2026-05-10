@@ -28,6 +28,7 @@ use crate::command_echo::{parse_echo, render_echo};
 use crate::command_echos::{parse_echos, render_echos};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
+use crate::command_fir::{parse_fir, render_fir};
 use crate::command_flanger::{parse_flanger, render_flanger};
 use crate::command_gain::{parse_gain, render_gain};
 use crate::command_highpass::{parse_highpass, render_highpass};
@@ -65,10 +66,10 @@ use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Compand,
     Contrast, DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind,
-    EffectNameError, EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, Loudness, LowPass,
-    MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive, Pad, Phaser, Pitch, Rate, Remix, Repeat,
-    Reverb, Reverse, Riaa, Saturation, Silence, SoftVol, Speed, Splice, Stretch, Swap, Tempo,
-    Treble, Tremolo, Trim, Upsample, Vad, Vol,
+    EffectNameError, EffectRegistry, Equalizer, Fade, Fir, Flanger, Gain, HighPass, Loudness,
+    LowPass, MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive, Pad, Phaser, Pitch, Rate, Remix,
+    Repeat, Reverb, Reverse, Riaa, Saturation, Silence, SoftVol, Speed, Splice, Stretch, Swap,
+    Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -120,6 +121,8 @@ pub enum EffectCommand {
     Equalizer(Equalizer),
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
     Fade(Fade),
+    /// SoX-ng-style finite impulse response filter.
+    Fir(Fir),
     /// SoX-ng-style swept-delay flanger.
     Flanger(Flanger),
     /// Constant gain in decibels.
@@ -224,6 +227,7 @@ impl EffectCommand {
             EffectKind::Echos => parse_echos(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
+            EffectKind::Fir => parse_fir(effect, args),
             EffectKind::Flanger => parse_flanger(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
             EffectKind::HighPass => parse_highpass(effect, args),
@@ -285,6 +289,7 @@ impl EffectCommand {
             Self::Echos(_) => EffectKind::Echos,
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
+            Self::Fir(_) => EffectKind::Fir,
             Self::Flanger(_) => EffectKind::Flanger,
             Self::Gain(_) => EffectKind::Gain,
             Self::HighPass(_) => EffectKind::HighPass,
@@ -352,6 +357,7 @@ impl EffectCommand {
             Self::Echos(echos) => render_echos(echos),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
+            Self::Fir(fir) => render_fir(fir),
             Self::Flanger(flanger) => render_flanger(*flanger),
             Self::Gain(gain) => render_gain(*gain),
             Self::HighPass(high_pass) => render_highpass(*high_pass),
