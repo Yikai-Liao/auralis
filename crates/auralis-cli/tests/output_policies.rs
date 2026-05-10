@@ -228,3 +228,89 @@ fn run_no_auto_rate_requires_output_rate() {
         "{stderr}"
     );
 }
+
+#[test]
+fn run_dither_is_explicit_and_repeatable() {
+    let input = temp_path("auralis-cli-run-dither-input", "wav");
+    let plain_output = temp_path("auralis-cli-run-dither-plain-output", "wav");
+    let first_output = temp_path("auralis-cli-run-dither-first-output", "wav");
+    let second_output = temp_path("auralis-cli-run-dither-second-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -1000, 2000, -2000, 3000, -3000]);
+
+    let plain = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            plain_output.to_str().unwrap(),
+            "--gain-db",
+            "-0.1",
+        ])
+        .output()
+        .unwrap();
+    let first = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            first_output.to_str().unwrap(),
+            "--gain-db",
+            "-0.1",
+            "--dither",
+            "--dither-seed",
+            "0",
+        ])
+        .output()
+        .unwrap();
+    let second = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            second_output.to_str().unwrap(),
+            "--gain-db",
+            "-0.1",
+            "--dither",
+            "--dither-seed",
+            "0",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(plain.status.success(), "stderr: {}", stderr(&plain));
+    assert!(first.status.success(), "stderr: {}", stderr(&first));
+    assert!(second.status.success(), "stderr: {}", stderr(&second));
+    assert_eq!(
+        read_pcm16_wav(&first_output),
+        read_pcm16_wav(&second_output)
+    );
+    assert_ne!(read_pcm16_wav(&plain_output), read_pcm16_wav(&first_output));
+    fs::remove_file(plain_output).unwrap();
+    fs::remove_file(first_output).unwrap();
+    fs::remove_file(second_output).unwrap();
+}
+
+#[test]
+fn run_dither_seed_requires_dither() {
+    let input = temp_path("auralis-cli-run-dither-seed-missing-input", "wav");
+    let output = temp_path("auralis-cli-run-dither-seed-missing-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "run",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--dither-seed",
+            "0",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --dither-seed requires --dither"),
+        "{stderr}"
+    );
+}

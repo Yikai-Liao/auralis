@@ -7,8 +7,9 @@ use std::fs;
 
 use auralis::{
     AudioFile, BackendKind, ChannelConversionError, ChannelConversionPolicy, Error,
-    OutputLevelError, SampleRateConversionError, SampleRateConversionPolicy,
-    convert_audio_channels, convert_audio_channels_with_backend, convert_audio_sample_rate,
+    OutputDitherConfig, OutputDitherError, OutputDitherPolicy, OutputLevelError,
+    SampleRateConversionError, SampleRateConversionPolicy, convert_audio_channels,
+    convert_audio_channels_with_backend, convert_audio_sample_rate, dither_audio_for_pcm16,
     guard_audio_level, guard_audio_level_with_backend, normalize_audio_level,
     normalize_audio_level_with_backend,
 };
@@ -171,6 +172,35 @@ fn normalize_audio_level_preserves_silence() {
 }
 
 #[test]
+fn dither_audio_for_pcm16_is_explicit_and_deterministic() {
+    let source = audio_buffer(vec![0.1, -0.1, 0.0, 0.25]);
+    let config = OutputDitherConfig::new().with_seed(0);
+
+    let first = dither_audio_for_pcm16(&source, config).unwrap();
+    let second = dither_audio_for_pcm16(&source, config).unwrap();
+
+    assert_sample_bits_eq(first.as_planar_f32(), second.as_planar_f32());
+    assert_ne!(first.as_planar_f32(), source.as_planar_f32());
+}
+
+#[test]
+fn dither_audio_for_pcm16_rejects_non_finite_samples_before_dither() {
+    let error = dither_audio_for_pcm16(
+        &audio_buffer(vec![0.0, f32::INFINITY]),
+        OutputDitherConfig::new(),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        OutputDitherError::NonFiniteSample {
+            channel_index: 0,
+            frame_index: 1,
+        }
+    );
+}
+
+#[test]
 fn output_level_policy_rejects_non_finite_samples_before_encoding() {
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.25, f32::NAN]))
         .into_pipeline()
@@ -261,6 +291,24 @@ fn pipeline_write_wav_applies_explicit_output_normalization_policy() {
 }
 
 #[test]
+fn pipeline_write_wav_applies_explicit_output_dither_policy_after_level_policy() {
+    let output = temp_path("auralis-output-dither-policy", "wav");
+    let source = audio_buffer(vec![0.1, -0.1, 0.0]);
+    let config = OutputDitherConfig::new().with_seed(0);
+    let expected = dither_audio_for_pcm16(&source, config).unwrap();
+
+    AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .with_output_dither_policy(OutputDitherPolicy::automatic_with_config(config))
+        .write_wav(&output)
+        .unwrap();
+
+    let decoded = auralis_wav::decode_pcm16_path(&output).unwrap();
+    assert_samples_close(decoded.as_planar_f32(), expected.as_planar_f32());
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
 fn pipeline_into_audio_buffer_does_not_apply_output_level_policy() {
     let actual = AudioFile::from_audio_buffer(audio_buffer(vec![0.25, -0.5]))
         .into_pipeline()
@@ -269,6 +317,17 @@ fn pipeline_into_audio_buffer_does_not_apply_output_level_policy() {
         .unwrap();
 
     assert_samples_close(actual.as_planar_f32(), &[0.25, -0.5]);
+}
+
+#[test]
+fn pipeline_into_audio_buffer_does_not_apply_output_dither_policy() {
+    let actual = AudioFile::from_audio_buffer(audio_buffer(vec![0.1, -0.1]))
+        .into_pipeline()
+        .with_output_dither()
+        .into_audio_buffer()
+        .unwrap();
+
+    assert_samples_close(actual.as_planar_f32(), &[0.1, -0.1]);
 }
 
 #[test]

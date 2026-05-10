@@ -1115,3 +1115,18 @@ l4 = { status = "not_applicable", reason = "Guard and norm are explicit output p
 l5 = { status = "not_applicable", reason = "The current policies are applied at output materialization rather than as streaming processors.", tests = [] }
 l6 = { status = "not_applicable", reason = "The implemented output-level policies have no SIMD kernels.", tests = [] }
 l7 = { status = "covered", reason = "Golden-manifest fuzzing covers output-level metadata fields and validation.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "pipeline.auto_dither"
+kind = "pipeline"
+name = "automatic-output-dither"
+summary = "Explicit output dither policy used to mirror SoX-ng automatic dither insertion."
+[subject.layers]
+l0 = { status = "covered", reason = "Auto-dither golden cases use a deterministic corpus ID with non-integer post-effect PCM16 samples.", tests = ["tests/golden/auto_dither.toml", "crates/auralis-testkit/tests/golden_auto_dither.rs"] }
+l1 = { status = "not_applicable", reason = "The policy changes decoded samples before PCM16 writing; WAV container parsing is covered separately.", tests = [] }
+l2 = { status = "covered", reason = "Auto-dither manifests record when SoX-ng auto-inserts dither and compare decoded samples.", tests = ["tests/golden/auto_dither.toml", "tools/pytest/tests/test_auto_dither_golden_manifest.py", "crates/auralis-testkit/tests/golden_auto_dither.rs"] }
+l3 = { status = "covered", reason = "Library and CLI tests cover explicit policy defaults, deterministic seed behavior, diagnostics, and write-boundary behavior.", tests = ["crates/auralis/tests/output_policies.rs", "crates/auralis-cli/tests/output_policies.rs"] }
+l4 = { status = "not_applicable", reason = "Automatic dither policy is an explicit pipeline policy, not a standalone effect property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current policy is applied at output materialization rather than as a streaming processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "The implemented output dither policy uses the deterministic scalar dither primitive.", tests = [] }
+l7 = { status = "covered", reason = "Golden-manifest fuzzing covers the auto-dither metadata field through the shared parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }

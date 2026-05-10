@@ -1,5 +1,6 @@
 use crate::{
-    ChannelConversionError, InputCombineError, OutputLevelError, SampleRateConversionError,
+    ChannelConversionError, InputCombineError, OutputDitherError, OutputLevelError,
+    SampleRateConversionError,
 };
 use thiserror::Error;
 
@@ -39,6 +40,10 @@ pub enum Error {
     #[error(transparent)]
     OutputLevel(#[from] OutputLevelError),
 
+    /// Output dither insertion failed before encoding.
+    #[error(transparent)]
+    OutputDither(#[from] OutputDitherError),
+
     /// A seconds-based trim range could not be represented as frames.
     #[error("trim seconds range cannot be represented as frame positions")]
     InvalidTrimSecondsRange,
@@ -55,6 +60,7 @@ impl PartialEq for Error {
             (Self::ChannelConversion(left), Self::ChannelConversion(right)) => left == right,
             (Self::SampleRateConversion(left), Self::SampleRateConversion(right)) => left == right,
             (Self::OutputLevel(left), Self::OutputLevel(right)) => left == right,
+            (Self::OutputDither(left), Self::OutputDither(right)) => left == right,
             (Self::InvalidTrimSecondsRange, Self::InvalidTrimSecondsRange) => true,
             _ => false,
         }

@@ -304,5 +304,9 @@ fn effects_golden_manifest_keeps_automatic_rate_and_channels_absent() {
             !case.sox_ng_auto_rate_inserted(),
             "{id} should record SoX-ng rate auto-conversion as absent"
         );
+        assert!(
+            !case.sox_ng_auto_dither_inserted(),
+            "{id} should record SoX-ng automatic dither as absent"
+        );
     }
 }

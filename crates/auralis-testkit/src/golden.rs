@@ -1,12 +1,7 @@
 //! Golden-test manifest parsing and deterministic command rendering.
 //!
-//! Golden manifests are small TOML documents that describe one or more
-//! reference comparisons. Each case lives under the `id` table; the table key is
-//! the stable case identifier used in test reports and failure artifacts.
-//! Command vectors are rendered separately from command-line displays: vectors
-//! remain suitable for `std::process::Command`, while display helpers apply
-//! deterministic quoting and escaping for human-readable failure reports.
-//!
+//! Golden manifests are small TOML documents keyed by stable case identifiers.
+//! Command vectors stay shell-free; display helpers add deterministic quoting.
 
 use std::{
     collections::BTreeMap,
@@ -23,9 +18,6 @@ use crate::corpus::is_known_corpus_id;
 pub type Result<T> = std::result::Result<T, GoldenManifestError>;
 
 /// A parsed golden-test manifest.
-///
-/// Cases are stored in a [`BTreeMap`] so iteration and report rendering are
-/// deterministic across platforms and TOML parser internals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoldenManifest {
     cases: BTreeMap<String, GoldenCase>,
@@ -37,10 +29,9 @@ impl GoldenManifest {
     /// The accepted format contains one or more `[id.<case>]` tables. Each case
     /// table must define `input`, `auralis`, `sox_ng`, `max_abs`, `rms`, and
     /// `snr_db`. Cases may also define `output_channels`,
-    /// `output_sample_rate`, `sox_ng_auto_rate = true`, and
-    /// `sox_ng_auto_channels = true` to record SoX-ng output-channel options
-    /// and output-rate options that auto-insert its `channels` and `rate`
-    /// effects.
+    /// `output_sample_rate`, `sox_ng_auto_rate = true`,
+    /// `sox_ng_auto_channels = true`, and `sox_ng_auto_dither = true` to
+    /// record SoX-ng automatic output-boundary effects.
     ///
     /// # Errors
     ///
@@ -97,6 +88,7 @@ pub struct GoldenCase {
     output_sample_rate: Option<u32>,
     sox_ng_auto_channels: bool,
     sox_ng_auto_rate: bool,
+    sox_ng_auto_dither: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     tolerance: GoldenTolerance,
@@ -180,6 +172,12 @@ impl GoldenCase {
     #[must_use]
     pub const fn sox_ng_auto_rate_inserted(&self) -> bool {
         self.sox_ng_auto_rate
+    }
+
+    /// Returns whether the SoX-ng command relies on auto-inserted `dither`.
+    #[must_use]
+    pub const fn sox_ng_auto_dither_inserted(&self) -> bool {
+        self.sox_ng_auto_dither
     }
 
     /// Returns the Auralis argument fragment recorded by the manifest.
@@ -307,11 +305,6 @@ impl GoldenCase {
     }
 
     /// Renders a deterministic SoX-ng command vector.
-    ///
-    /// The `-R` flag is always included to match Auralis' repeatable
-    /// golden-test policy. The `-D` flag is included except for explicit
-    /// `dither` effect cases, which must exercise SoX-ng's dither invocation
-    /// directly.
     #[must_use]
     pub fn render_sox_ng_command(
         &self,
@@ -325,8 +318,7 @@ impl GoldenCase {
     /// Renders a deterministic SoX-ng command vector for one or more inputs.
     ///
     /// Multi-input cases include `--combine <METHOD>` before the input paths.
-    /// Cases that omit `combine` default to `concatenate`. The `-R` flag is
-    /// always included; `-D` is omitted for explicit `dither` effect cases.
+    /// `-D` is omitted for explicit or auto-dither cases.
     #[must_use]
     pub fn render_sox_ng_command_with_inputs<I, P>(
         &self,
@@ -343,7 +335,7 @@ impl GoldenCase {
             .map(|path| path_to_command_arg(path.as_ref()))
             .collect::<Vec<_>>();
         let mut command = vec![executable.as_ref().to_owned(), "-R".to_owned()];
-        if !self.is_explicit_dither_case() {
+        if !self.uses_sox_ng_dither() {
             command.push("-D".to_owned());
         }
         if input_paths.len() > 1 {
@@ -364,8 +356,8 @@ impl GoldenCase {
         command
     }
 
-    fn is_explicit_dither_case(&self) -> bool {
-        self.sox_ng.first().is_some_and(|effect| effect == "dither")
+    fn uses_sox_ng_dither(&self) -> bool {
+        self.sox_ng_auto_dither || self.sox_ng.first().is_some_and(|effect| effect == "dither")
     }
 
     /// Renders a deterministic display form of the SoX-ng command.
@@ -428,6 +420,7 @@ impl GoldenCase {
             output_sample_rate: raw.output_sample_rate,
             sox_ng_auto_channels: raw.sox_ng_auto_channels,
             sox_ng_auto_rate: raw.sox_ng_auto_rate,
+            sox_ng_auto_dither: raw.sox_ng_auto_dither,
             auralis: raw.auralis,
             sox_ng: raw.sox_ng,
             tolerance: GoldenTolerance {
@@ -820,6 +813,8 @@ struct RawGoldenCase {
     sox_ng_auto_channels: bool,
     #[serde(default)]
     sox_ng_auto_rate: bool,
+    #[serde(default)]
+    sox_ng_auto_dither: bool,
     auralis: Vec<String>,
     sox_ng: Vec<String>,
     max_abs: f64,

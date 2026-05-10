@@ -25,6 +25,7 @@
 mod audio_file;
 mod channel_policy;
 mod combine;
+mod dither_policy;
 mod errors;
 mod level_policy;
 mod pipeline;
@@ -51,6 +52,10 @@ pub use combine::{
     mix_audio_buffers, mix_audio_buffers_with_backend, mix_power_audio_buffers,
     mix_power_audio_buffers_with_backend, multiply_audio_buffers,
     multiply_audio_buffers_with_backend, sequence_audio_buffers,
+};
+pub use dither_policy::{
+    OutputDitherConfig, OutputDitherError, OutputDitherMode, OutputDitherPolicy,
+    dither_audio_for_pcm16,
 };
 pub use errors::Error;
 pub use level_policy::{

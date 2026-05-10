@@ -1574,7 +1574,23 @@ Acceptance tests:
 
 Moved here from the old Feature 5.5.4.
 
-Implement only after Feature 6.8.7 exists.
+Status: implemented.
+
+Implemented explicit output-boundary dither insertion now that Feature 6.8.7
+provides deterministic dither primitives.
+
+Implementation notes:
+
+- Added `OutputDitherPolicy`, `OutputDitherConfig`, and
+  `Pipeline::with_output_dither_policy` / `Pipeline::with_output_dither` so
+  library callers opt in explicitly instead of receiving hidden dither noise.
+- Output dither runs after output sample-rate conversion, channel conversion,
+  guard, and normalization, and before PCM16 encoding.
+- The high-level library and CLI default to disabled dither. The CLI exposes
+  opt-in deterministic TPDF dither as `--dither`; `--dither-seed` selects a
+  repeatable seed and is rejected unless `--dither` is present.
+- Golden coverage records `sox_ng_auto_dither = true` and runs SoX-ng without
+  `-D` for the automatic-dither reference case.
 
 Acceptance tests:
 

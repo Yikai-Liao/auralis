@@ -3,11 +3,13 @@ use std::path::Path;
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 
 use crate::channel_policy::apply_channel_conversion_policy_with_backend;
+use crate::dither_policy::apply_output_dither_policy;
 use crate::level_policy::apply_output_level_policy_with_backend;
 use crate::rate_policy::apply_sample_rate_conversion_policy;
 use crate::{
     AudioBuffer, BackendKind, ChannelConversionPolicy, ChannelCount, Decibels, EffectChain, Error,
-    FrameCount, OutputLevelPolicy, Result, SampleRate, SampleRateConversionPolicy, TimeSeconds,
+    FrameCount, OutputDitherConfig, OutputDitherPolicy, OutputLevelPolicy, Result, SampleRate,
+    SampleRateConversionPolicy, TimeSeconds,
 };
 
 /// Chainable in-memory audio processing pipeline.
@@ -24,6 +26,7 @@ pub struct Pipeline {
     sample_rate_conversion_policy: SampleRateConversionPolicy,
     channel_conversion_policy: ChannelConversionPolicy,
     output_level_policy: OutputLevelPolicy,
+    output_dither_policy: OutputDitherPolicy,
 }
 
 impl Pipeline {
@@ -49,6 +52,7 @@ impl Pipeline {
             sample_rate_conversion_policy: SampleRateConversionPolicy::Preserve,
             channel_conversion_policy: ChannelConversionPolicy::Preserve,
             output_level_policy: OutputLevelPolicy::Preserve,
+            output_dither_policy: OutputDitherPolicy::Disabled,
         }
     }
 
@@ -147,6 +151,30 @@ impl Pipeline {
     #[must_use]
     pub const fn with_output_normalization(mut self, target: Decibels) -> Self {
         self.output_level_policy = OutputLevelPolicy::Normalize(target);
+        self
+    }
+
+    /// Sets the explicit output dither policy for later writes.
+    ///
+    /// The default policy is [`OutputDitherPolicy::Disabled`], which means
+    /// `write_wav` performs PCM16 quantization without added dither. Use
+    /// [`OutputDitherPolicy::Automatic`] to apply deterministic TPDF dither
+    /// after output rate, channel, and level policies and before PCM16
+    /// encoding.
+    #[must_use]
+    pub const fn with_output_dither_policy(mut self, policy: OutputDitherPolicy) -> Self {
+        self.output_dither_policy = policy;
+        self
+    }
+
+    /// Requests deterministic TPDF dither before PCM16 writing.
+    ///
+    /// This is a convenience wrapper around
+    /// [`Self::with_output_dither_policy`] using
+    /// [`OutputDitherPolicy::Automatic`].
+    #[must_use]
+    pub const fn with_output_dither(mut self) -> Self {
+        self.output_dither_policy = OutputDitherPolicy::Automatic(OutputDitherConfig::new());
         self
     }
 
@@ -373,6 +401,7 @@ impl Pipeline {
             self.output_level_policy,
             self.requested_backend,
         )?;
+        let audio = apply_output_dither_policy(audio, self.output_dither_policy)?;
         auralis_wav::encode_pcm16_path_with_backend(path, &audio, self.requested_backend)?;
 
         Ok(())

@@ -69,6 +69,14 @@ enum Command {
         #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
         norm: Option<f64>,
 
+        /// Apply deterministic TPDF dither before PCM16 encoding.
+        #[arg(long)]
+        dither: bool,
+
+        /// Deterministic seed used when --dither is enabled.
+        #[arg(long, value_name = "SEED")]
+        dither_seed: Option<u32>,
+
         /// Constant gain to apply, in decibels.
         #[arg(long, value_name = "DB", allow_hyphen_values = true)]
         gain_db: Option<f64>,
@@ -148,6 +156,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             no_auto_rate,
             guard,
             norm,
+            dither,
+            dither_seed,
             gain_db,
             dc_shift,
             trim_start_frame,
@@ -172,6 +182,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 no_auto_rate,
                 guard: OutputGuard::from(guard),
                 norm,
+                dither: OutputDither::from(dither),
+                dither_seed,
                 gain_db,
                 dc_shift,
                 trim_start_frame,
@@ -219,12 +231,14 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     let channel_conversion_policy = options.channel_conversion_policy()?;
     let sample_rate_conversion_policy = options.sample_rate_conversion_policy()?;
     let output_level_policy = options.output_level_policy()?;
+    let output_dither_policy = options.output_dither_policy()?;
     let effect_chain = options.effect_chain()?;
     let pipeline = open_pipeline(input, options)?
         .with_backend(backend)
         .with_sample_rate_conversion_policy(sample_rate_conversion_policy)
         .with_channel_conversion_policy(channel_conversion_policy)
-        .with_output_level_policy(output_level_policy);
+        .with_output_level_policy(output_level_policy)
+        .with_output_dither_policy(output_dither_policy);
 
     if let Some(effect_chain) = effect_chain {
         pipeline
@@ -283,6 +297,8 @@ struct RunOptions {
     no_auto_rate: bool,
     guard: OutputGuard,
     norm: Option<f64>,
+    dither: OutputDither,
+    dither_seed: Option<u32>,
     gain_db: Option<f64>,
     dc_shift: Option<f32>,
     trim_start_frame: Option<u64>,
@@ -378,6 +394,19 @@ impl RunOptions {
                 .map_err(auralis::Error::from)
                 .map_err(CliError::from),
             (OutputGuard::Enabled, Some(_)) => Err(CliError::MixedGuardAndNorm),
+        }
+    }
+
+    fn output_dither_policy(&self) -> Result<auralis::OutputDitherPolicy, CliError> {
+        match (self.dither, self.dither_seed) {
+            (OutputDither::Disabled, None) => Ok(auralis::OutputDitherPolicy::disabled()),
+            (OutputDither::Enabled, seed) => {
+                let config = seed
+                    .map(|seed| auralis::OutputDitherConfig::new().with_seed(seed))
+                    .unwrap_or_default();
+                Ok(auralis::OutputDitherPolicy::automatic_with_config(config))
+            }
+            (OutputDither::Disabled, Some(_)) => Err(CliError::DitherSeedWithoutDither),
         }
     }
 
@@ -477,6 +506,18 @@ impl From<bool> for OutputGuard {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum OutputDither {
+    Disabled,
+    Enabled,
+}
+
+impl From<bool> for OutputDither {
+    fn from(value: bool) -> Self {
+        if value { Self::Enabled } else { Self::Disabled }
+    }
+}
+
 fn ensure_wav_extension(path: &Path, role: PathRole) -> Result<(), CliError> {
     if path.extension().and_then(OsStr::to_str) == Some("wav") {
         Ok(())
@@ -539,6 +580,7 @@ enum CliError {
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
     MixedGuardAndNorm,
+    DitherSeedWithoutDither,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
     UnsupportedFormat { path: PathBuf, role: PathRole },
@@ -591,6 +633,7 @@ impl std::fmt::Display for CliError {
             Self::MixedGuardAndNorm => {
                 formatter.write_str("--guard cannot be combined with --norm")
             }
+            Self::DitherSeedWithoutDither => formatter.write_str("--dither-seed requires --dither"),
             Self::NoAutoChannelsWithoutOutputChannels => {
                 formatter.write_str("--no-auto-channels requires --channels")
             }

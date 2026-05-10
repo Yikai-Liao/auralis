@@ -1,0 +1,12 @@
+# Automatic output dither golden cases. `sox_ng_auto_dither` records that
+# SoX-ng runs without `-D` and auto-inserts output dither before PCM16 writing.
+
+[id.auto_dither_gain_to_pcm16]
+input = "auto/dither_headroom.wav"
+corpus_id = "auto/level_headroom"
+sox_ng_auto_dither = true
+auralis = ["--dither", "--gain-db", "-0.1"]
+sox_ng = ["gain", "-0.1"]
+max_abs = 0.0001
+rms = 0.00001
+snr_db = 80.0

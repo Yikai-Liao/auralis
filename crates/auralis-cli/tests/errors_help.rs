@@ -173,6 +173,12 @@ fn run_help_documents_gain_and_trim_units() {
         stdout.contains("Normalize final output to a peak level"),
         "{stdout}"
     );
+    assert!(stdout.contains("--dither"), "{stdout}");
+    assert!(
+        stdout.contains("Apply deterministic TPDF dither before PCM16 encoding"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--dither-seed <SEED>"), "{stdout}");
     assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");
     assert!(
         stdout.contains("Constant normalized DC offset to add"),

@@ -931,9 +931,18 @@ final buffer only when its absolute peak exceeds full scale. They can use
 `OutputLevelPolicy::Normalize(Decibels)` to scale non-silent output to a target
 peak before writing. The CLI exposes these policies as `--guard` and
 `--norm[=DB]`; `--norm` defaults to 0 dBFS, and `--guard` cannot be combined
-with `--norm`. Automatic dither insertion has been deferred to the
-post-explicit-`dither` effect plan in DEVELOPMENT, so current Auralis output
-never adds hidden dither noise.
+with `--norm`.
+
+Output dither insertion follows the same explicit output-boundary model. The
+high-level library defaults to `OutputDitherPolicy::Disabled`, so current copy
+and test paths never get hidden noise. Callers can use
+`Pipeline::with_output_dither` or
+`Pipeline::with_output_dither_policy(OutputDitherPolicy::Automatic(_))` to apply
+deterministic TPDF dither after rate, channel, guard, and norm policies and
+before PCM16 encoding. The CLI exposes this as `--dither`; `--dither-seed`
+selects a repeatable PRNG seed and is rejected unless `--dither` is present.
+SoX-ng comparison manifests use `sox_ng_auto_dither = true` when their reference
+command intentionally runs without `-D` and lets SoX-ng auto-insert dither.
 
 Selected crates:
 
@@ -1039,7 +1048,9 @@ SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
 records output-rate policy coverage where SoX-ng auto-inserts `rate`
 conversion. `tests/golden/auto_level.toml` records output-level guard and
 normalization coverage for representative clipping and peak-normalization
-cases. The Python golden runners
+cases. `tests/golden/auto_dither.toml` records explicit Auralis output dither
+against SoX-ng automatic dither insertion with repeatable `-R` randomness. The
+Python golden runners
 resolve each manifest `corpus_id` or `corpus_ids`, generate deterministic PCM16
 fixtures, execute both command lines, compare decoded sample metadata plus
 max-abs/RMS/SNR/peak metrics, and write a JSON failure report when output drifts
