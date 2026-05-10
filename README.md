@@ -32,9 +32,9 @@ reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
-`Compand`, `MCompand`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
+`Compand`, `MCompand`, `NoiseProf`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
+fade, noiseprof, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/noiseprof/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -47,6 +47,8 @@ model, optional post gain, initial volume, and length-preserving look-ahead
 delay. It also supports `mcompand` quoted band groups with ascending crossover
 frequencies; nonzero mcompand band delays are rejected because SoX-ng's own
 mcompand flow path treats them as unsupported at runtime.
+It also supports `noiseprof [profile-file(-)]` as a pass-through analyzer with
+typed profile generation and SoX-ng-style channel-major profile text rendering.
 The chain path supports SoX-ng-style `gain -h` and `gain -r` headroom metadata,
 `gain -n` peak normalization, `gain -l` limiting, and channel-aware `gain -e`,
 `gain -B`, and `gain -b` scans: `gain -h DB` applies the fixed attenuation and
@@ -541,16 +543,17 @@ Contains typed effect processors built from DSP primitives:
 - `Swap`
 - `Compand`
 - `MCompand`
+- `NoiseProf`
 - `Silence`
 - `Vad`
 
 Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
 The crate root is a small facade; effect-local behavior lives in focused
-`gain`, `channels`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
+`gain`, `channels`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `noiseprof`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
 The crate also owns the static effect registry and typed command parser used by
 upcoming chain parsing. Implemented SoX-ng names such as `gain`, `dcshift`,
-`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `loudness`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `reverse`, `fade`, `silence`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
+`trim`, `pad`, `repeat`, `remix`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `loudness`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `noiseprof`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `reverse`, `fade`, `silence`, `vol`, `channels`, `norm`, `contrast`, `softvol`, `tremolo`, `overdrive`, and `saturation` resolve to typed descriptors; aliases such
 as `dc-shift`, `eq`, `gain-db`, `volume`, `soft-volume`, and `normalize` resolve to their canonical names; unknown names
 receive deterministic suggestions; and known SoX-ng effects without Auralis
 coverage return a stable missing-coverage diagnostic. Tokenized commands such
@@ -585,6 +588,10 @@ for restart-based middle-silence removal.
 The implemented `vad` command accepts SoX-ng's advanced timing, noise,
 measurement, filter/lifter, trigger, search, gap, and pre-trigger options and
 maps them onto Auralis' deterministic whole-buffer leading-trim detector.
+The implemented `noiseprof` command accepts an optional profile output path
+and exposes deterministic 2048-point FFT log-power profile generation for
+later `noisered` use; chain execution preserves SoX-ng's audio pass-through
+behavior.
 The implemented `tremolo` command accepts a required speed in hertz and an
 optional depth percentage, defaulting to SoX-ng's `40`.
 The implemented `overdrive` command accepts optional `gain` and `color`
@@ -964,7 +971,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `splice`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `splice`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `noiseprof`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -977,7 +984,7 @@ and explicit-amount forms; `softvol` coverage includes fixed volume plus
 recovery/headroom forms; `loudness` coverage includes identity mono and
 short-filter stereo ISO 226 compensation forms; `silence` coverage includes
 mono and stereo leading-trim command forms; `vad` coverage includes mono and
-stereo no-voice trimming with advanced trigger options; `tremolo` coverage includes default-depth mono and
+stereo no-voice trimming with advanced trigger options; `noiseprof` coverage includes mono and stereo pass-through command forms with profile output captured from stdout; `tremolo` coverage includes default-depth mono and
 explicit-depth stereo modulation forms; `overdrive` coverage includes default
 mono and explicit-argument stereo distortion forms; `saturation` coverage
 includes default tanh mono and explicit sqrt stereo distortion forms; `repeat`
@@ -1225,6 +1232,8 @@ Examples:
   and decay, optional post gain, initial volume, and look-ahead delay
 - `mcompand`: multiband companding with quoted compand band groups, ascending
   crossovers, and scalar Linkwitz-Riley-style band splitting
+- `noiseprof`: pass-through 2048-point FFT log-power profile collection with
+  SoX-ng-style text rendering for each channel
 - `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `overdrive`: SoX-ng's cubic soft-clipping drive with `color / 200` bias and
   a stateful high-pass output blend

@@ -1376,6 +1376,24 @@ Implementation notes:
 
 ### Feature 6.7.8: `noiseprof`
 
+Status: implemented.
+
+Scope:
+
+- Adds a public `NoiseProf` analyzer and `NoiseProfile` artifact model for
+  SoX-ng-style 2048-point FFT noise profile collection.
+- Supports `noiseprof [profile-file(-)]` command parsing/rendering, registry
+  resolution, effects-file and positional-chain grouping, and chain execution
+  as an audio pass-through command.
+- Renders channel-major profile text using SoX-ng's `Channel N: ...` format so
+  Feature 6.7.9 can consume the same stable profile shape for `noisered`.
+- Coverage includes parser/rendering tests, chain pass-through execution,
+  deterministic silence and stereo profile tests, mono/stereo SoX-ng
+  pass-through golden rows, L7 fuzz seed coverage, and a layered coverage
+  matrix row. SIMD remains N/A because the implemented analyzer is a
+  whole-window FFT/statistics pass rather than a backend-dispatched sample
+  transform.
+
 ### Feature 6.7.9: `noisered`
 
 Dynamics and noise effects require deterministic state handling and careful

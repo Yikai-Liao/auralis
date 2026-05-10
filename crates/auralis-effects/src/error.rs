@@ -201,6 +201,10 @@ pub enum EffectError {
     )]
     InvalidMCompand,
 
+    /// A noise profile command had invalid profile output metadata.
+    #[error("noiseprof profile output path and collected channel profile must be valid")]
+    InvalidNoiseProfile,
+
     /// A loudness command had invalid gain, reference level, or filter length.
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,

@@ -34,6 +34,7 @@ use crate::command_highpass::{parse_highpass, render_highpass};
 use crate::command_loudness::{parse_loudness, render_loudness};
 use crate::command_lowpass::{parse_lowpass, render_lowpass};
 use crate::command_mcompand::{parse_mcompand, render_mcompand};
+use crate::command_noiseprof::{parse_noiseprof, render_noiseprof};
 use crate::command_norm::{parse_norm, render_norm};
 use crate::command_oops::parse_oops;
 use crate::command_overdrive::{parse_overdrive, render_overdrive};
@@ -64,9 +65,9 @@ use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Compand,
     Contrast, DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind,
     EffectNameError, EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, Loudness, LowPass,
-    MCompand, Norm, Oops, Overdrive, Pad, Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse,
-    Riaa, Saturation, Silence, SoftVol, Speed, Splice, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
-    Upsample, Vad, Vol,
+    MCompand, NoiseProf, Norm, Oops, Overdrive, Pad, Phaser, Pitch, Rate, Remix, Repeat, Reverb,
+    Reverse, Riaa, Saturation, Silence, SoftVol, Speed, Splice, Stretch, Swap, Tempo, Treble,
+    Tremolo, Trim, Upsample, Vad, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -130,6 +131,8 @@ pub enum EffectCommand {
     LowPass(LowPass),
     /// SoX-ng-style multiband dynamic-range compander.
     MCompand(MCompand),
+    /// SoX-ng-style noise profile analyzer.
+    NoiseProf(NoiseProf),
     /// SoX-ng-style whole-buffer peak normalization.
     Norm(Norm),
     /// SoX-ng-style out-of-phase stereo extraction.
@@ -224,6 +227,7 @@ impl EffectCommand {
             EffectKind::Loudness => parse_loudness(effect, args),
             EffectKind::LowPass => parse_lowpass(effect, args),
             EffectKind::MCompand => parse_mcompand(effect, args),
+            EffectKind::NoiseProf => parse_noiseprof(effect, args),
             EffectKind::Norm => parse_norm(effect, args),
             EffectKind::Oops => parse_oops(effect, args),
             EffectKind::Overdrive => parse_overdrive(effect, args),
@@ -283,6 +287,7 @@ impl EffectCommand {
             Self::Loudness(_) => EffectKind::Loudness,
             Self::LowPass(_) => EffectKind::LowPass,
             Self::MCompand(_) => EffectKind::MCompand,
+            Self::NoiseProf(_) => EffectKind::NoiseProf,
             Self::Norm(_) => EffectKind::Norm,
             Self::Oops(_) => EffectKind::Oops,
             Self::Overdrive(_) => EffectKind::Overdrive,
@@ -348,6 +353,7 @@ impl EffectCommand {
             Self::Loudness(loudness) => render_loudness(*loudness),
             Self::LowPass(low_pass) => render_lowpass(*low_pass),
             Self::MCompand(mcompand) => render_mcompand(mcompand),
+            Self::NoiseProf(noiseprof) => render_noiseprof(noiseprof),
             Self::Norm(norm) => render_norm(*norm),
             Self::Oops(_) => vec!["oops".to_owned()],
             Self::Overdrive(overdrive) => render_overdrive(*overdrive),

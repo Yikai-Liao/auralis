@@ -547,6 +547,21 @@ l6 = { status = "not_applicable", reason = "VAD is a structural detector and tri
 l7 = { status = "covered", reason = "Effect command fuzzing covers VAD option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/vad"] }
 
 [[subject]]
+id = "effect.noiseprof"
+kind = "effect"
+name = "noiseprof"
+summary = "SoX-ng-style pass-through spectral noise profile collection."
+[subject.layers]
+l0 = { status = "covered", reason = "Deterministic silence and stereo fixture tests cover zero-profile and channel-major rendering behavior.", tests = ["crates/auralis-effects/src/noiseprof.rs", "crates/auralis-effects/tests/noiseprof.rs"] }
+l1 = { status = "not_applicable", reason = "The typed analyzer operates on decoded AudioBuffer samples; profile file writing belongs to a CLI/artifact layer, not WAV I/O.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono and stereo pass-through audio behavior while capturing profile artifacts from stdout.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover command parsing, command rendering, optional profile path metadata, no-op chain execution, silence profile bins, and profile text rendering.", tests = ["crates/auralis-effects/src/noiseprof.rs", "crates/auralis-effects/src/command_noiseprof.rs", "crates/auralis-effects/tests/noiseprof.rs"] }
+l4 = { status = "not_applicable", reason = "noiseprof collects analysis statistics and does not transform samples; property coverage for no-op chain execution is covered by exact integration assertions.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current NoiseProf API is a whole-buffer analyzer; chunk-exact streaming belongs to a future API that exposes accumulated window state.", tests = [] }
+l6 = { status = "not_applicable", reason = "NoiseProf uses a scalar FFT/statistics analyzer with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers noiseprof optional profile path parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/noiseprof"] }
+
+[[subject]]
 id = "effect.contrast"
 kind = "effect"
 name = "contrast"

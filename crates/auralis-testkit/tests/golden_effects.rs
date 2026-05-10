@@ -78,6 +78,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_lowpass_stereo_one_pole",
             "effect_mcompand_mono_single_band",
             "effect_mcompand_stereo_single_band",
+            "effect_noiseprof_mono_pass_through",
+            "effect_noiseprof_stereo_pass_through",
             "effect_norm_mono_minus_3",
             "effect_norm_stereo_default",
             "effect_oops_stereo",
@@ -204,6 +206,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "chorus",
         "compand",
         "mcompand",
+        "noiseprof",
         "remix",
         "swap",
     ] {

@@ -354,6 +354,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 85.0
 
+[id.effect_noiseprof_mono_pass_through]
+input = "effects/noiseprof_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["noiseprof", "-"]
+sox_ng = ["noiseprof", "-"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_noiseprof_stereo_pass_through]
+input = "effects/noiseprof_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["noiseprof", "-"]
+sox_ng = ["noiseprof", "-"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_contrast_mono_default]
 input = "effects/contrast_mono.wav"
 corpus_id = "l0/step_mono_16"

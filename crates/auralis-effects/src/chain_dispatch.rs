@@ -42,6 +42,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Flanger(_)
         | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
+        | EffectCommand::NoiseProf(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
@@ -123,6 +124,7 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("mcompand", source))?;
         }
+        EffectCommand::NoiseProf(noiseprof) => noiseprof.process_buffer(audio),
         EffectCommand::Loudness(loudness) => {
             loudness
                 .process_buffer(audio)
@@ -340,6 +342,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Contrast
         | EffectKind::Channels
         | EffectKind::Downsample
+        | EffectKind::NoiseProf
         | EffectKind::Norm
         | EffectKind::Repeat
         | EffectKind::Speed

@@ -76,6 +76,8 @@ pub enum EffectKind {
     LowPass,
     /// SoX-ng-style multiband dynamic-range compander.
     MCompand,
+    /// SoX-ng-style noise profile analyzer.
+    NoiseProf,
     /// Whole-buffer peak normalization.
     Norm,
     /// SoX-ng-style out-of-phase stereo extraction.
@@ -307,6 +309,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "MCompand",
         "mcompand quoted_compand_args {crossover_frequency quoted_compand_args}",
         "apply dynamic-range companding independently across crossover bands",
+    ),
+    EffectDescriptor::new(
+        EffectKind::NoiseProf,
+        "noiseprof",
+        &[],
+        "NoiseProf",
+        "noiseprof [profile-file(-)]",
+        "collect a SoX-ng-style spectral noise profile while passing audio through",
     ),
     EffectDescriptor::new(
         EffectKind::Contrast,
@@ -899,6 +909,7 @@ mod tests {
             ("loudness", EffectKind::Loudness),
             ("lowpass", EffectKind::LowPass),
             ("mcompand", EffectKind::MCompand),
+            ("noiseprof", EffectKind::NoiseProf),
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
