@@ -28,6 +28,16 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.chain_boundary_mix_gain_noop]
+inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
+corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]
+combine = "mix"
+auralis = ["gain", "-3", ":", "gain", "0", ":", "dcshift", "0"]
+sox_ng = ["gain", "-3", ":", "gain", "0", ":", "dcshift", "0"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.chain_multi_input_mix_gain_reverse]
 inputs = ["combine/stereo_front.wav", "combine/stereo_tail.wav"]
 corpus_ids = ["combine/stereo_front", "combine/stereo_tail"]

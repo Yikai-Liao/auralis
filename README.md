@@ -21,9 +21,9 @@ Auralis is pre-alpha. The repository already contains:
 - `auralis run` with positional SoX-ng-style effect chains, effects files,
   input combiners, output channel/rate/level/dither policies, and many typed
   effects;
-- a deterministic Rust testkit, SoX-ng golden manifests, L0-L7 layered coverage
-  metadata, fuzz/parser seeds, and optional Python helpers for cross-tool
-  golden execution and reporting.
+- a deterministic Rust testkit, SoX-ng golden manifests with complex
+  chain/boundary cases, L0-L7 layered coverage metadata, fuzz/parser seeds,
+  and optional Python helpers for cross-tool golden execution and reporting.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

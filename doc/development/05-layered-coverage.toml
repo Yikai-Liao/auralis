@@ -1019,7 +1019,7 @@ summary = "Explicit ':' chain boundary preservation and unsupported newfile/rest
 [subject.layers]
 l0 = { status = "covered", reason = "Boundary tests reuse deterministic chain fixtures and corpus-backed chain manifests.", tests = ["crates/auralis-cli/tests/chains_effects_file.rs", "tests/golden/chains.toml"] }
 l1 = { status = "not_applicable", reason = "Boundary tokens affect command segmentation, not WAV container behavior.", tests = [] }
-l2 = { status = "covered", reason = "Golden manifest rendering tests preserve ':' tokens deterministically for Auralis and SoX-ng command displays.", tests = ["crates/auralis-testkit/tests/golden_chains.rs"] }
+l2 = { status = "covered", reason = "Golden chain manifests preserve ':' tokens deterministically and compare a boundary-stress mix case against SoX-ng through positional and effects-file paths.", tests = ["tests/golden/chains.toml", "tools/pytest/tests/test_chain_golden_manifest.py", "crates/auralis-testkit/tests/golden_chains.rs"] }
 l3 = { status = "covered", reason = "Unit and CLI tests cover boundary preservation, current no-op execution, empty segments, and unsupported controls.", tests = ["crates/auralis-effects/src/chain.rs", "crates/auralis-effects/src/effects_file.rs", "crates/auralis-cli/tests/chains_effects_file.rs"] }
 l4 = { status = "not_applicable", reason = "Boundary preservation is command syntax behavior, not a mathematical DSP property.", tests = [] }
 l5 = { status = "not_applicable", reason = "Chunking applies to the effects inside segments; current boundary semantics are preserved metadata.", tests = [] }
