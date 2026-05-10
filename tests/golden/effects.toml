@@ -288,6 +288,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_compand_mono_transfer]
+input = "effects/compand_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["compand", "0,0", "-60,-60,0,-6"]
+sox_ng = ["compand", "0,0", "-60,-60,0,-6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_compand_stereo_delay]
+input = "effects/compand_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["compand", "0.01,0.05", "3:-70,-70,-20,-20,0,-3", "0", "-20", "0.000125"]
+sox_ng = ["compand", "0.01,0.05", "3:-70,-70,-20,-20,0,-3", "0", "-20", "0.000125"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
 [id.effect_contrast_mono_default]
 input = "effects/contrast_mono.wav"
 corpus_id = "l0/step_mono_16"

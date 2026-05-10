@@ -1,8 +1,10 @@
+use auralis_core::AudioBuffer;
+
 use crate::{EffectError, Result};
 
 const MIN_EFFECTIVE_SOFT_KNEE_DB: f64 = 0.01;
 const DB_TO_NATURAL_LOG: f64 = std::f64::consts::LN_10 / 20.0;
-const SOX_SAMPLE_MIN_DB: f64 = -186.638_597_306_397_2;
+pub(crate) const SOX_SAMPLE_MIN_DB: f64 = -186.638_597_306_397_2;
 
 /// Attack and decay times for one SoX-ng `compand` channel group.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -179,7 +181,46 @@ impl CompandTransfer {
     }
 }
 
-/// Parsed SoX-ng `compand` configuration without sample processing.
+/// SoX-ng-style dynamic-range compander.
+///
+/// `Compand` tracks an envelope follower per channel, or one shared follower
+/// for all channels when the command supplied only one attack/decay pair. The
+/// current envelope is evaluated through the configured dB transfer function
+/// and multiplied into either the current sample or a delayed look-ahead sample.
+/// Processing is length-preserving: delay changes which source sample receives
+/// the current gain, then drains the buffered input without extending duration.
+///
+/// # Errors
+///
+/// [`Self::process_buffer`] returns [`EffectError::InvalidCompand`] when the
+/// command supplied multiple attack/decay pairs that do not match the input
+/// channel count, or when delay resolution cannot be represented.
+///
+/// # Examples
+///
+/// ```
+/// use auralis_core::{
+///     AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
+/// };
+/// use auralis_effects::Compand;
+///
+/// let spec = AudioSpec::new(
+///     SampleRate::new(48_000)?,
+///     ChannelCount::new(1)?,
+///     SampleFormat::Float32,
+/// );
+/// let mut audio = AudioBuffer::from_planar_f32(
+///     spec,
+///     FrameCount::new(2),
+///     vec![0.25, -0.25],
+/// )?;
+/// let compand = Compand::parse_sox_args(&["0,0", "-60,-60,0,0"])?;
+///
+/// compand.process_buffer(&mut audio)?;
+///
+/// assert_eq!(audio.as_planar_f32(), &[0.25, -0.25]);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compand {
     attack_decay: Vec<CompandAttackDecay>,
@@ -276,6 +317,242 @@ impl Compand {
     pub const fn transfer(&self) -> &CompandTransfer {
         &self.transfer
     }
+
+    /// Applies the compander to an audio buffer in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidCompand`] when the configured
+    /// attack/decay pair count is neither one nor the input channel count, or
+    /// when delay resolution cannot fit the current platform.
+    pub fn process_buffer(&self, audio: &mut AudioBuffer) -> Result<()> {
+        let channels = audio.channels().as_usize();
+        if self.attack_decay.len() != 1 && self.attack_decay.len() != channels {
+            return Err(EffectError::InvalidCompand);
+        }
+
+        let frames =
+            usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidCompand)?;
+        let delay_samples = self.delay_samples(audio)?;
+        let coefficients = self.attack_decay_coefficients(audio.spec().sample_rate().as_u32());
+        let initial_volume = db_to_linear(self.initial_volume_db);
+        let mut state = CompandState::new(
+            self.attack_decay.len(),
+            coefficients,
+            initial_volume,
+            delay_samples,
+        );
+        let output = process_planar(audio.as_planar_f32(), frames, channels, self, &mut state);
+
+        *audio = AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), output)?;
+        Ok(())
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "the comparison only rejects values outside the representable delay range"
+    )]
+    fn delay_samples(&self, audio: &AudioBuffer) -> Result<usize> {
+        let sample_count = self.delay_seconds
+            * f64::from(audio.spec().sample_rate().as_u32())
+            * f64::from(audio.channels().as_u16());
+        if !sample_count.is_finite() || sample_count > usize::MAX as f64 {
+            return Err(EffectError::InvalidCompand);
+        }
+
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "delay_seconds was validated finite and non-negative"
+        )]
+        Ok(sample_count as usize)
+    }
+
+    fn attack_decay_coefficients(&self, sample_rate_hz: u32) -> Vec<CompandEnvelopeCoefficients> {
+        self.attack_decay
+            .iter()
+            .copied()
+            .map(|pair| CompandEnvelopeCoefficients {
+                attack: envelope_coefficient(pair.attack_seconds, sample_rate_hz),
+                decay: envelope_coefficient(pair.decay_seconds, sample_rate_hz),
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct CompandState {
+    volumes: Vec<f64>,
+    coefficients: Vec<CompandEnvelopeCoefficients>,
+    delay_buffer: Vec<f32>,
+    delay_index: usize,
+    delay_count: usize,
+    delay_was_full: bool,
+}
+
+impl CompandState {
+    fn new(
+        channel_groups: usize,
+        coefficients: Vec<CompandEnvelopeCoefficients>,
+        initial_volume: f64,
+        delay_samples: usize,
+    ) -> Self {
+        Self {
+            volumes: vec![initial_volume; channel_groups],
+            coefficients,
+            delay_buffer: vec![0.0; delay_samples],
+            delay_index: 0,
+            delay_count: 0,
+            delay_was_full: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct CompandEnvelopeCoefficients {
+    attack: f64,
+    decay: f64,
+}
+
+fn process_planar(
+    input: &[f32],
+    frames: usize,
+    channels: usize,
+    compand: &Compand,
+    state: &mut CompandState,
+) -> Vec<f32> {
+    let mut output_interleaved = Vec::with_capacity(input.len());
+
+    for frame in 0..frames {
+        update_frame_volumes(input, frame, frames, channels, state);
+        for channel in 0..channels {
+            let source = input[channel * frames + frame];
+            process_interleaved_sample(source, channel, compand, state, &mut output_interleaved);
+        }
+    }
+
+    drain_delay(compand, state, &mut output_interleaved);
+    interleaved_to_planar(&output_interleaved, frames, channels)
+}
+
+fn update_frame_volumes(
+    input: &[f32],
+    frame: usize,
+    frames: usize,
+    channels: usize,
+    state: &mut CompandState,
+) {
+    if state.volumes.len() == 1 && channels > 1 {
+        let level = (0..channels)
+            .map(|channel| f64::from(input[channel * frames + frame]).abs())
+            .fold(0.0_f64, f64::max);
+        update_volume(state, 0, level);
+        return;
+    }
+
+    for channel in 0..channels {
+        let level = f64::from(input[channel * frames + frame]).abs();
+        update_volume(state, channel, level);
+    }
+}
+
+fn update_volume(state: &mut CompandState, channel_group: usize, level: f64) {
+    let volume = &mut state.volumes[channel_group];
+    let coefficient = state.coefficients[channel_group];
+    let delta = level - *volume;
+    let smoothing = if delta > 0.0 {
+        coefficient.attack
+    } else {
+        coefficient.decay
+    };
+    *volume += delta * smoothing;
+}
+
+fn process_interleaved_sample(
+    source: f32,
+    channel: usize,
+    compand: &Compand,
+    state: &mut CompandState,
+    output: &mut Vec<f32>,
+) {
+    let channel_group = if state.volumes.len() > 1 { channel } else { 0 };
+    let gain = compand
+        .transfer
+        .linear_gain_for_level(state.volumes[channel_group]);
+    if state.delay_buffer.is_empty() {
+        output.push(apply_compand_gain(source, gain));
+        return;
+    }
+
+    if state.delay_count >= state.delay_buffer.len() {
+        state.delay_was_full = true;
+        output.push(apply_compand_gain(
+            state.delay_buffer[state.delay_index],
+            gain,
+        ));
+    } else {
+        state.delay_count += 1;
+    }
+    state.delay_buffer[state.delay_index] = source;
+    state.delay_index = (state.delay_index + 1) % state.delay_buffer.len();
+}
+
+fn drain_delay(compand: &Compand, state: &mut CompandState, output: &mut Vec<f32>) {
+    if state.delay_buffer.is_empty() {
+        return;
+    }
+    if !state.delay_was_full {
+        state.delay_index = 0;
+    }
+    state.delay_was_full = true;
+
+    while state.delay_count > 0 {
+        let channel_group = if state.volumes.len() > 1 {
+            output.len() % state.volumes.len()
+        } else {
+            0
+        };
+        let gain = compand
+            .transfer
+            .linear_gain_for_level(state.volumes[channel_group]);
+        output.push(apply_compand_gain(
+            state.delay_buffer[state.delay_index],
+            gain,
+        ));
+        state.delay_index = (state.delay_index + 1) % state.delay_buffer.len();
+        state.delay_count -= 1;
+    }
+}
+
+fn apply_compand_gain(sample: f32, gain: f64) -> f32 {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Auralis' effect buffer format is f32 and output is clipped to normalized full scale"
+    )]
+    let output = (f64::from(sample) * gain).clamp(-1.0, 1.0) as f32;
+    output
+}
+
+fn interleaved_to_planar(input: &[f32], frames: usize, channels: usize) -> Vec<f32> {
+    let mut output = vec![0.0; input.len()];
+    for frame in 0..frames {
+        for channel in 0..channels {
+            output[channel * frames + frame] = input[frame * channels + channel];
+        }
+    }
+    output
+}
+
+fn envelope_coefficient(seconds: f64, sample_rate_hz: u32) -> f64 {
+    if seconds > 1.0 / f64::from(sample_rate_hz) {
+        1.0 - (-1.0 / (f64::from(sample_rate_hz) * seconds)).exp()
+    } else {
+        1.0
+    }
+}
+
+fn db_to_linear(db: f64) -> f64 {
+    10.0_f64.powf(db / 20.0)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

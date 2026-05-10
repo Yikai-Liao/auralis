@@ -785,6 +785,7 @@ mod tests {
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
                 | EffectCommand::Chorus(_)
+                | EffectCommand::Compand(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Delay(_)
                 | EffectCommand::Downsample(_)

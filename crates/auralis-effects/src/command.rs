@@ -18,6 +18,7 @@ use crate::command_biquad::{parse_biquad, render_biquad};
 use crate::command_centercut::{parse_centercut, render_centercut};
 use crate::command_channels::{parse_channels, render_channels};
 use crate::command_chorus::{parse_chorus, render_chorus};
+use crate::command_compand::{parse_compand, render_compand};
 use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
@@ -56,11 +57,11 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_upsample::{parse_upsample, render_upsample};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
-    AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Contrast,
-    DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
-    EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
-    Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Splice,
-    Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
+    AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Compand,
+    Contrast, DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind,
+    EffectNameError, EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops,
+    Overdrive, Pad, Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol,
+    Speed, Splice, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -92,6 +93,8 @@ pub enum EffectCommand {
     Channels(Channels),
     /// SoX-ng-style chorus modulation.
     Chorus(Chorus),
+    /// SoX-ng-style dynamic-range compander.
+    Compand(Compand),
     /// SoX-ng-style phase contrast enhancement.
     Contrast(Contrast),
     /// Constant normalized full-scale offset.
@@ -192,6 +195,7 @@ impl EffectCommand {
             EffectKind::Centercut => parse_centercut(effect, args),
             EffectKind::Channels => parse_channels(effect, args),
             EffectKind::Chorus => parse_chorus(effect, args),
+            EffectKind::Compand => parse_compand(effect, args),
             EffectKind::Contrast => parse_contrast(effect, args),
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
@@ -246,6 +250,7 @@ impl EffectCommand {
             Self::Centercut(_) => EffectKind::Centercut,
             Self::Channels(_) => EffectKind::Channels,
             Self::Chorus(_) => EffectKind::Chorus,
+            Self::Compand(_) => EffectKind::Compand,
             Self::Contrast(_) => EffectKind::Contrast,
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
@@ -306,6 +311,7 @@ impl EffectCommand {
             Self::Centercut(centercut) => render_centercut(*centercut),
             Self::Channels(channels) => render_channels(*channels),
             Self::Chorus(chorus) => render_chorus(chorus),
+            Self::Compand(compand) => render_compand(compand),
             Self::Contrast(contrast) => render_contrast(*contrast),
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],

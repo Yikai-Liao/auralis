@@ -48,6 +48,7 @@ mod command_biquad;
 mod command_centercut;
 mod command_channels;
 mod command_chorus;
+mod command_compand;
 mod command_contrast;
 mod command_dcshift;
 mod command_deemph;

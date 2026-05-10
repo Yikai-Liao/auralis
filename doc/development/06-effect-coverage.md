@@ -1242,6 +1242,28 @@ Implementation notes:
 
 ### Feature 6.7.2: `compand` processor
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered executable `compand` support for the SoX-ng command shape
+  `attack,decay{,attack,decay} [soft-knee-dB:]in-dB1[,out-dB1]{,in-dB2,out-dB2}
+  [gain [initial-volume-dB [delay]]]`, reusing the typed parser and transfer
+  model from Feature 6.7.1.
+- Processing follows SoX-ng's envelope follower: one attack/decay pair creates
+  a shared frame-peak envelope for multichannel input, while multiple pairs
+  must match the input channel count and track channels independently.
+- Optional delay is implemented as length-preserving look-ahead, where the
+  current envelope gain is applied to delayed samples and the buffered samples
+  are drained without extending total frame count.
+- Wired `compand` through the effect registry, typed command renderer,
+  effect-chain dispatch, CLI positional-chain path, parser fuzz corpus, L0-L7
+  coverage metadata, and standalone SoX-ng golden manifest.
+- Coverage includes parser/rendering tests, chain integration tests,
+  shared-envelope stereo behavior, delay behavior, invalid channel-group
+  rejection, finite-output property coverage, and mono/stereo standalone
+  golden cases.
+
 ### Feature 6.7.3: `mcompand`
 
 ### Feature 6.7.4: `loudness`

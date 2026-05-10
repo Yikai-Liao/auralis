@@ -33,6 +33,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Bend(_)
         | EffectCommand::Channels(_)
         | EffectCommand::Chorus(_)
+        | EffectCommand::Compand(_)
         | EffectCommand::Delay(_)
         | EffectCommand::Downsample(_)
         | EffectCommand::Echo(_)
@@ -107,6 +108,11 @@ fn apply_buffer_command(
             *audio = chorus
                 .process_buffer(audio)
                 .map_err(|source| ("stage", source))?;
+        }
+        EffectCommand::Compand(processor) => {
+            processor
+                .process_buffer(audio)
+                .map_err(|source| ("compand", source))?;
         }
         EffectCommand::Delay(delay) => {
             *audio = delay
@@ -316,7 +322,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
         EffectKind::Splice => splice_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
-        EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
+        EffectKind::Compand | EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::Rate => rate_arg_end(tokens, args_start),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)

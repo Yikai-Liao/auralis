@@ -44,6 +44,8 @@ pub enum EffectKind {
     Channels,
     /// SoX-ng-style chorus modulation.
     Chorus,
+    /// SoX-ng-style dynamic-range compander.
+    Compand,
     /// SoX-ng-style phase contrast enhancement.
     Contrast,
     /// Constant normalized full-scale offset.
@@ -281,6 +283,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Chorus",
         "chorus [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay decay speed depth [-sine|-triangle]]...]]",
         "apply one or more modulated chorus delay lines",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Compand,
+        "compand",
+        &[],
+        "Compand",
+        "compand attack,decay{,attack,decay} [soft-knee-dB:]in-dB1[,out-dB1]{,in-dB2,out-dB2} [gain [initial-volume-dB [delay]]]",
+        "apply dynamic-range companding with optional look-ahead delay",
     ),
     EffectDescriptor::new(
         EffectKind::Contrast,
@@ -834,6 +844,7 @@ mod tests {
             ("centercut", EffectKind::Centercut),
             ("channels", EffectKind::Channels),
             ("chorus", EffectKind::Chorus),
+            ("compand", EffectKind::Compand),
             ("contrast", EffectKind::Contrast),
             ("dcshift", EffectKind::DcShift),
             ("delay", EffectKind::Delay),
@@ -911,18 +922,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("compand").unwrap_err();
+        let error = EffectRegistry::resolve("mcompand").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "compand".to_owned(),
+                name: "mcompand".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `compand`")
+                .contains("missing SoX-ng coverage entry for `mcompand`")
         );
     }
 
