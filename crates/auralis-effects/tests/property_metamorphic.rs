@@ -7,10 +7,11 @@ use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, BendPosition, BendSegment, Biquad,
     BiquadCoefficients, BiquadWidth, Centercut, Channels, Chorus, ChorusStage, Compand, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
-    FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Phaser,
-    PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec, RemixSource, Repeat,
-    Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice, SpliceAmount,
-    SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
+    FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass, MCompand, Norm, Oops, Overdrive,
+    Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec, RemixSource,
+    Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice,
+    SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
+    Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -415,6 +416,13 @@ proptest! {
             .process_buffer(&mut companded)
             .expect("generated channel counts use a shared compand envelope");
         prop_assert_all_finite(&companded)?;
+
+        let mut multiband_companded = source.clone();
+        MCompand::parse_sox_args(&["0.01,0.1 -60,-60,0,-6"])
+            .expect("fixture mcompand command is valid")
+            .process_buffer(&mut multiband_companded)
+            .expect("single-band mcompand reuses shared compand envelope");
+        prop_assert_all_finite(&multiband_companded)?;
 
         let mut soft_volume_scaled = source.clone();
         SoftVol::new(2.0, 1.0, 0.1)

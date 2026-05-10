@@ -195,6 +195,12 @@ pub enum EffectError {
     )]
     InvalidCompand,
 
+    /// An mcompand command had invalid bands, crossover frequencies, or unsupported delays.
+    #[error(
+        "mcompand bands must use valid compand settings, ascending positive crossover frequencies, and zero delay"
+    )]
+    InvalidMCompand,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

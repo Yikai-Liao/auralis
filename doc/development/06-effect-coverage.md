@@ -1266,6 +1266,31 @@ Implementation notes:
 
 ### Feature 6.7.3: `mcompand`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added public `MCompand` and `MCompandBand` APIs for SoX-ng's
+  `mcompand quoted_compand_args {crossover_frequency quoted_compand_args}`
+  command shape, reusing the `Compand` transfer and envelope model for each
+  band.
+- Processing splits decoded input with scalar Linkwitz-Riley-style crossover
+  pairs, applies each band compander independently, sums bands back to the
+  original channel/frame shape, and clips the summed output to normalized full
+  scale.
+- Crossover frequencies must be positive and strictly ascending, with `k`/`K`
+  kilohertz shorthand supported by the command parser.
+- Nonzero per-band compander delays are rejected because SoX-ng parses them but
+  its current `mcompand` flow path fails at runtime when delay buffering is
+  active.
+- Wired `mcompand` through the effect registry, typed command parser,
+  effect-chain dispatch, CLI positional-chain path, parser fuzz corpus,
+  L0-L7 coverage metadata, and standalone single-band SoX-ng golden manifest.
+- Coverage includes parser/rendering tests, chain integration tests,
+  single-band equivalence with `compand`, multiband finite-output coverage,
+  invalid shape/order/delay checks, property finite-output coverage, and
+  mono/stereo standalone goldens for the SoX-ng-compatible single-band path.
+
 ### Feature 6.7.4: `loudness`
 
 ### Feature 6.7.5: `silence`

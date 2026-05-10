@@ -310,6 +310,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 85.0
 
+[id.effect_mcompand_mono_single_band]
+input = "effects/mcompand_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["mcompand", "0,0 -60,-60,0,-6"]
+sox_ng = ["mcompand", "0,0 -60,-60,0,-6"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_mcompand_stereo_single_band]
+input = "effects/mcompand_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["mcompand", "0.01,0.05 -70,-70,0,-3"]
+sox_ng = ["mcompand", "0.01,0.05 -70,-70,0,-3"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 85.0
+
 [id.effect_contrast_mono_default]
 input = "effects/contrast_mono.wav"
 corpus_id = "l0/step_mono_16"

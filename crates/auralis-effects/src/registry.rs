@@ -72,6 +72,8 @@ pub enum EffectKind {
     HighPass,
     /// SoX-ng-style low-pass filter family.
     LowPass,
+    /// SoX-ng-style multiband dynamic-range compander.
+    MCompand,
     /// Whole-buffer peak normalization.
     Norm,
     /// SoX-ng-style out-of-phase stereo extraction.
@@ -291,6 +293,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Compand",
         "compand attack,decay{,attack,decay} [soft-knee-dB:]in-dB1[,out-dB1]{,in-dB2,out-dB2} [gain [initial-volume-dB [delay]]]",
         "apply dynamic-range companding with optional look-ahead delay",
+    ),
+    EffectDescriptor::new(
+        EffectKind::MCompand,
+        "mcompand",
+        &[],
+        "MCompand",
+        "mcompand quoted_compand_args {crossover_frequency quoted_compand_args}",
+        "apply dynamic-range companding independently across crossover bands",
     ),
     EffectDescriptor::new(
         EffectKind::Contrast,
@@ -857,6 +867,7 @@ mod tests {
             ("gain", EffectKind::Gain),
             ("highpass", EffectKind::HighPass),
             ("lowpass", EffectKind::LowPass),
+            ("mcompand", EffectKind::MCompand),
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
@@ -922,18 +933,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("mcompand").unwrap_err();
+        let error = EffectRegistry::resolve("loudness").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "mcompand".to_owned(),
+                name: "loudness".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `mcompand`")
+                .contains("missing SoX-ng coverage entry for `loudness`")
         );
     }
 

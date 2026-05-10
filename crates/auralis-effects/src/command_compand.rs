@@ -25,11 +25,13 @@ pub(super) fn parse_compand(effect: &'static str, args: &[&str]) -> CommandResul
 }
 
 pub(super) fn render_compand(compand: &Compand) -> Vec<String> {
-    let mut tokens = vec![
-        "compand".to_owned(),
-        render_attack_decay(compand),
-        render_transfer(compand),
-    ];
+    let mut tokens = vec!["compand".to_owned()];
+    tokens.extend(render_compand_args(compand));
+    tokens
+}
+
+pub(super) fn render_compand_args(compand: &Compand) -> Vec<String> {
+    let mut tokens = vec![render_attack_decay(compand), render_transfer(compand)];
 
     if compand.gain_db != 0.0 || compand.initial_volume_db != 0.0 || compand.delay_seconds != 0.0 {
         tokens.push(render_f64(compand.gain_db));
@@ -42,6 +44,10 @@ pub(super) fn render_compand(compand: &Compand) -> Vec<String> {
     }
 
     tokens
+}
+
+pub(super) fn render_frequency_hz(frequency_hz: f64) -> String {
+    render_f64(frequency_hz)
 }
 
 fn render_attack_decay(compand: &Compand) -> String {

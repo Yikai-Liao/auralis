@@ -40,6 +40,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
         | EffectCommand::Flanger(_)
+        | EffectCommand::MCompand(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
@@ -113,6 +114,11 @@ fn apply_buffer_command(
             processor
                 .process_buffer(audio)
                 .map_err(|source| ("compand", source))?;
+        }
+        EffectCommand::MCompand(processor) => {
+            processor
+                .process_buffer(audio)
+                .map_err(|source| ("mcompand", source))?;
         }
         EffectCommand::Delay(delay) => {
             *audio = delay
@@ -323,6 +329,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Splice => splice_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Compand | EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
+        EffectKind::MCompand => mcompand_arg_end(tokens, args_start),
         EffectKind::Rate => rate_arg_end(tokens, args_start),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
@@ -350,6 +357,15 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn mcompand_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    end
 }
 
 fn tempo_arg_end(tokens: &[&str], args_start: usize) -> usize {

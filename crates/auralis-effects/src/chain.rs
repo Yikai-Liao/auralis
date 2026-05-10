@@ -781,6 +781,7 @@ mod tests {
                 | EffectCommand::Equalizer(_)
                 | EffectCommand::HighPass(_)
                 | EffectCommand::LowPass(_)
+                | EffectCommand::MCompand(_)
                 | EffectCommand::Treble(_)
                 | EffectCommand::Centercut(_)
                 | EffectCommand::Channels(_)
