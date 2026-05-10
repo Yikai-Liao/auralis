@@ -75,7 +75,7 @@ pub(super) fn parse_dither(effect: &'static str, args: &[&str]) -> CommandResult
 pub(super) fn render_dither(dither: Dither) -> Vec<String> {
     let mut tokens = vec!["dither".to_owned()];
     match dither.noise_shape() {
-        Some(DitherNoiseShape::Shibata) => tokens.push("-s".to_owned()),
+        Some(_) => tokens.push("-s".to_owned()),
         None if dither.mode() == DitherMode::SlopedTpdf => tokens.push("-S".to_owned()),
         None => {}
     }

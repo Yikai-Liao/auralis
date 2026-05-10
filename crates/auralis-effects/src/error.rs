@@ -18,6 +18,12 @@ impl From<auralis_dsp::FirError> for EffectError {
     }
 }
 
+impl From<auralis_dsp::DitherError> for EffectError {
+    fn from(_: auralis_dsp::DitherError) -> Self {
+        Self::InvalidDither
+    }
+}
+
 /// Errors produced by typed effect processors.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

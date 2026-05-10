@@ -27,10 +27,15 @@ use auralis_simd::{
 
 mod biquad;
 mod biquad_design;
+mod dither;
 mod fir;
 
 pub use biquad::{Biquad, BiquadCoefficients, BiquadError, BiquadResult, BiquadState};
 pub use biquad_design::BiquadWidth;
+pub use dither::{
+    DEFAULT_DITHER_SEED, Dither, DitherError, DitherMode, DitherNoiseShape, DitherResult,
+    DitherState,
+};
 pub use fir::{FirCoefficients, FirError, FirResult, FirState};
 
 /// Applies constant gain to each sample in place.

@@ -37,11 +37,10 @@ The current order is:
    only after the above planning and test-gate corrections are in place.
 5. Continue
    [`7.x reusable DSP primitive extraction`](doc/development/07-dsp-primitives.md)
-   after the completed biquad and FIR numeric primitive extractions. Feature
-   7.4 selected deterministic dither/noise as the next reusable primitive
-   family; the next 7.x leaf should move only that reusable state and
-   quantization kernel into `auralis-dsp`, preserving `auralis-effects` command
-   parsing and public compatibility wrappers.
+   after the completed biquad, FIR, and deterministic dither/noise primitive
+   extractions. Feature 7.5 moved only reusable dither state and quantization
+   into `auralis-dsp`, preserving `auralis-effects` command parsing and public
+   compatibility wrappers.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.

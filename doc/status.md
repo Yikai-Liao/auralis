@@ -193,11 +193,10 @@ shared-kernel ownership across biquad, FIR, modulation, delay-line, time-scale,
 spectral, dither, resampling, mixing, and analyzer primitives. The first
 extractions moved the direct-form biquad runtime, normalized coefficient type,
 generic RBJ helper ownership, reusable FIR coefficient validation, and centered
-FIR state into `auralis-dsp` while preserving `auralis-effects` command parsing
-and public compatibility wrappers. The next selected extraction target is the
-deterministic dither/noise state and quantization primitive, with command
-parsing and public compatibility remaining at the effect/output-policy
-boundaries.
+FIR state, and deterministic dither/noise state plus quantization helpers into
+`auralis-dsp` while preserving `auralis-effects` command parsing and public
+compatibility wrappers. Dither SIMD remains intentionally not applicable
+because the PRNG and noise-shaping state order is semantically observable.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
