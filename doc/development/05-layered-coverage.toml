@@ -247,6 +247,21 @@ l6 = { status = "not_applicable", reason = "Upsample copies frames and inserts z
 l7 = { status = "covered", reason = "Effect command fuzzing covers upsample factor parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/upsample"] }
 
 [[subject]]
+id = "effect.speed"
+kind = "effect"
+name = "speed"
+summary = "SoX-ng-style speed adjustment that changes pitch and tempo together through sample-rate metadata."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo 48 kHz L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono speed-up and stereo slow-down ratios with explicit output sample rates.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover ratio parsing, cents conversion, canonical rendering, chain execution, sample-rate metadata changes, factor-one identity, invalid factors, and output-rate range errors.", tests = ["crates/auralis-effects/src/speed.rs", "crates/auralis-effects/src/command_speed.rs", "crates/auralis-effects/tests/speed.rs"] }
+l4 = { status = "covered", reason = "Property tests include factor-one identity and finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "Speed is metadata-only for decoded samples in the current whole-buffer API; chunk-exact streaming belongs to a future API that exposes sample-rate state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Speed preserves decoded samples and only changes sample-rate metadata, so there is no SIMD sample kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers speed ratio and cents parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/speed"] }
+
+[[subject]]
 id = "effect.chorus"
 kind = "effect"
 name = "chorus"

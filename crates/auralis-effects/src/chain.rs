@@ -802,6 +802,7 @@ mod tests {
                 | EffectCommand::Riaa(_)
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)
+                | EffectCommand::Speed(_)
                 | EffectCommand::Swap(_)
                 | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_)

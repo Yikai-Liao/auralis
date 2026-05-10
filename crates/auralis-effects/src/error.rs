@@ -123,6 +123,14 @@ pub enum EffectError {
     #[error("upsample output sample rate exceeds representable rate")]
     UpsampleRateOverflow,
 
+    /// A speed factor was not finite or not positive.
+    #[error("speed factor must be finite and greater than zero")]
+    InvalidSpeedFactor,
+
+    /// A speed command would produce an unrepresentable sample rate.
+    #[error("speed output sample rate must round into the representable positive rate range")]
+    SpeedRateOutOfRange,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

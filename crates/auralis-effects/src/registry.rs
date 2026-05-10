@@ -26,121 +26,84 @@ const MAX_SUGGESTIONS: usize = 3;
 pub enum EffectKind {
     /// SoX-ng-style all-pass filter family.
     AllPass,
-
     /// SoX-ng-style resonator band-pass filter.
     Band,
-
     /// SoX-ng-style RBJ band-pass filter.
     BandPass,
-
     /// SoX-ng-style RBJ band-reject filter.
     BandReject,
-
     /// SoX-ng-style bass tone control.
     Bass,
-
     /// SoX-ng-style direct coefficient biquad IIR filter.
     Biquad,
-
     /// SoX-ng-style center-cut stereo separation.
     Centercut,
-
     /// SoX-ng-style explicit channel-count conversion.
     Channels,
-
     /// SoX-ng-style chorus modulation.
     Chorus,
-
     /// SoX-ng-style phase contrast enhancement.
     Contrast,
-
     /// Constant normalized full-scale offset.
     DcShift,
-
     /// SoX-ng-style per-channel delay.
     Delay,
-
     /// SoX-ng-style decimating downsample.
     Downsample,
-
     /// SoX-ng-style parallel echo delay line.
     Echo,
-
     /// SoX-ng-style cascaded echo delay line.
     Echos,
-
     /// SoX-ng-style CD/DAT de-emphasis filter.
     Deemph,
-
     /// SoX-ng-style peaking equalizer filter.
     Equalizer,
-
     /// SoX-ng-style fade-in and optional positional fade-out envelope.
     Fade,
-
     /// SoX-ng-style swept-delay flanger.
     Flanger,
-
     /// Constant gain in decibels.
     Gain,
-
     /// SoX-ng-style high-pass filter family.
     HighPass,
-
     /// SoX-ng-style low-pass filter family.
     LowPass,
-
     /// Whole-buffer peak normalization.
     Norm,
-
     /// SoX-ng-style out-of-phase stereo extraction.
     Oops,
-
     /// SoX-ng-style overdrive distortion.
     Overdrive,
-
     /// Zero padding before and after the input.
     Pad,
-
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser,
-
     /// SoX-ng-style stereo reverberation.
     Reverb,
-
     /// SoX-ng-style finite output repetition.
     Repeat,
-
     /// SoX-ng-style basic channel routing.
     Remix,
-
     /// Frame-order reversal within each channel.
     Reverse,
-
     /// SoX-ng-style RIAA vinyl playback equalization filter.
     Riaa,
-
     /// SoX-ng-style saturation distortion.
     Saturation,
-
     /// SoX-ng-style soft volume control.
     SoftVol,
-
+    /// SoX-ng-style speed adjustment.
+    Speed,
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap,
-
     /// SoX-ng-style treble tone control.
     Treble,
-
     /// SoX-ng-style sinusoidal tremolo modulation.
     Tremolo,
-
     /// End-exclusive frame range selection.
     Trim,
-
     /// SoX-ng-style zero-stuffing upsample.
     Upsample,
-
     /// SoX-ng-style volume scaling.
     Vol,
 }
@@ -498,6 +461,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "SoftVol",
         "softvol [volume [double-time [headroom]]]",
         "apply soft volume scaling that avoids clipping",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Speed,
+        "speed",
+        &[],
+        "Speed",
+        "speed factor[c]",
+        "change pitch and tempo together by adjusting sample-rate metadata",
     ),
     EffectDescriptor::new(
         EffectKind::Swap,
@@ -956,18 +927,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("speed").unwrap_err();
+        let error = EffectRegistry::resolve("stretch").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "speed".to_owned(),
+                name: "stretch".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `speed`")
+                .contains("missing SoX-ng coverage entry for `stretch`")
         );
     }
 

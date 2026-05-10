@@ -4,11 +4,11 @@ use auralis_effects::parse_effect_command;
 
 #[test]
 fn unsupported_and_unknown_effect_names_use_registry_diagnostics() {
-    let unsupported = parse_effect_command(&["speed"]).unwrap_err();
+    let unsupported = parse_effect_command(&["stretch"]).unwrap_err();
     assert!(
         unsupported
             .to_string()
-            .contains("known SoX-ng effect `speed`")
+            .contains("known SoX-ng effect `stretch`")
     );
 
     let unknown = parse_effect_command(&["gian"]).unwrap_err();

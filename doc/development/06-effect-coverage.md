@@ -989,6 +989,28 @@ Implementation notes:
 
 ### Feature 6.6.3: `speed`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Speed` effect with SoX-ng's required `factor[c]` argument:
+  positive ratio values are accepted directly, while a trailing `c` converts
+  cents through `2^(cents / 1200)`.
+- Wired `speed factor[c]` through the effect registry, typed command parser,
+  effect-chain execution, effects-file diagnostics, CLI positional chain path,
+  and parser fuzz corpus.
+- Processing preserves decoded samples, frame count, channel count, and sample
+  format while updating sample-rate metadata to
+  `round(input_rate * factor)`. It performs no interpolation or anti-alias
+  filtering; later `rate` features own resampling quality.
+- Coverage includes unit/integration tests, L4 factor-one identity and
+  finite-output coverage, parser fuzz, layered coverage metadata, and
+  standalone SoX-ng golden cases for mono speed-up and stereo slow-down
+  commands with explicit output sample rates.
+- The current API is whole-buffer. It has no delay tail or flush phase, and
+  chunk-exact streaming is metadata-only once callers expose chunk-level
+  sample-rate state.
+
 ### Feature 6.6.4: `rate` specification and scaffolding
 
 ### Feature 6.6.5: `rate` quick and low-quality modes

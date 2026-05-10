@@ -97,6 +97,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_saturation_stereo_sqrt",
             "effect_softvol_mono_gain_1_5",
             "effect_softvol_stereo_recovery_headroom",
+            "effect_speed_mono_ratio_1_5",
+            "effect_speed_stereo_ratio_0_5",
             "effect_swap_mono_identity",
             "effect_swap_stereo",
             "effect_treble_mono_default",
@@ -158,6 +160,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "saturation",
         "repeat",
         "reverb",
+        "speed",
         "channels",
         "chorus",
         "remix",
@@ -215,7 +218,10 @@ fn effects_golden_manifest_keeps_automatic_rate_and_channels_absent() {
             None,
             "{id} should not request output channel conversion"
         );
-        if id.starts_with("effect_downsample_") || id.starts_with("effect_upsample_") {
+        if id.starts_with("effect_downsample_")
+            || id.starts_with("effect_speed_")
+            || id.starts_with("effect_upsample_")
+        {
             assert!(
                 case.output_sample_rate().is_some(),
                 "{id} should request the effect output rate explicitly"
