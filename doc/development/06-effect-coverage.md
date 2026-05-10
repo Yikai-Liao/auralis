@@ -1336,6 +1336,24 @@ Implementation notes:
 
 ### Feature 6.7.6: `vad` core
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public typed `Vad` core that performs deterministic whole-buffer
+  leading non-voice trimming. The core detects voice with a normalized
+  full-scale frame threshold, requires a configurable number of voice frames,
+  can retain a fixed pre-trigger span, and can tolerate short quiet gaps while
+  searching for the trigger.
+- The implementation is deliberately not registered as an executable
+  `EffectCommand` yet. Feature 6.7.7 owns SoX-ng command parsing, advanced VAD
+  option mapping, L2 golden rows, fuzz seeds, and the L0-L7 matrix row.
+- Coverage includes typed integration tests for leading trim, empty no-voice
+  output, pre-trigger retention, quiet-gap tolerance, multichannel detection,
+  invalid threshold rejection, and L4 finite-output property coverage. SIMD is
+  documented as N/A for this structural detector because it is a whole-buffer
+  search rather than a data-parallel sample transform.
+
 ### Feature 6.7.7: `vad` advanced options
 
 ### Feature 6.7.8: `noiseprof`

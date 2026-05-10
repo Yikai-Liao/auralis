@@ -11,7 +11,7 @@ use auralis_effects::{
     Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec,
     RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, Silence, SoftVol,
     Speed, Splice, SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble,
-    Tremolo, Trim, Upsample, Vol,
+    Tremolo, Trim, Upsample, Vad, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -632,6 +632,11 @@ proptest! {
             .process_buffer(&source)
             .expect("copy-through silence cannot fail");
         prop_assert_all_finite(&silence_copied)?;
+
+        let voice_detected = Vad::default()
+            .process_buffer(&source)
+            .expect("default VAD cannot overflow generated buffers");
+        prop_assert_all_finite(&voice_detected)?;
 
         let converted = Channels::new(ChannelCount::new(2).expect("fixture channel count is valid"))
             .process_buffer(&source)

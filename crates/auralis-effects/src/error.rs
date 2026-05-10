@@ -215,6 +215,14 @@ pub enum EffectError {
     #[error("silence output frame count exceeds representable audio buffer length")]
     SilenceLengthOverflow,
 
+    /// A VAD processor had invalid threshold or timing settings.
+    #[error("vad threshold must be finite in 0..=1 and timing settings must be representable")]
+    InvalidVad,
+
+    /// A VAD command would create a buffer shape that cannot be represented.
+    #[error("vad output frame count exceeds representable audio buffer length")]
+    VadLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

@@ -136,6 +136,7 @@ mod treble;
 mod tremolo;
 mod trim;
 mod upsample;
+mod vad;
 mod vol;
 
 pub use allpass::{AllPass, AllPassMode};
@@ -205,4 +206,5 @@ pub use treble::Treble;
 pub use tremolo::Tremolo;
 pub use trim::{Trim, TrimPosition};
 pub use upsample::Upsample;
+pub use vad::Vad;
 pub use vol::{Vol, VolGainType};
