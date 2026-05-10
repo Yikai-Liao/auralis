@@ -413,8 +413,8 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "rate",
         &[],
         "Rate",
-        "rate [-q|-l|-m|-g|-h|-e|-v|-u] frequency",
-        "convert decoded audio to an explicit sample rate",
+        "rate [quality/options] frequency",
+        "convert decoded audio to an explicit sample rate with SoX-ng-style quality metadata",
     ),
     EffectDescriptor::new(
         EffectKind::Repeat,

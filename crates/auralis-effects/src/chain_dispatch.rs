@@ -310,17 +310,27 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
 fn rate_arg_end(tokens: &[&str], args_start: usize) -> usize {
     let mut end = args_start;
 
-    match tokens.get(end).copied() {
-        Some("-q" | "-l" | "-m" | "-g" | "-h" | "-e" | "-v" | "-u") => {
-            end += 1;
-        }
-        Some("-Q") => {
-            end += 1;
-            if end < tokens.len() && !is_command_boundary(tokens[end]) {
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-q" | "-l" | "-m" | "-g" | "-h" | "-e" | "-v" | "-u" | "-f" | "-n" | "-t" | "-M"
+            | "-I" | "-L" | "-s" | "-a" => {
                 end += 1;
             }
+            "-Q" | "-i" | "-c" | "-p" | "-b" | "-B" | "-A" | "-d" | "-R" => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+            }
+            token if is_option_like(token) => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+                return include_unexpected_argument(tokens, end);
+            }
+            _ => break,
         }
-        _ => {}
     }
 
     if end < tokens.len() && !is_command_boundary(tokens[end]) {

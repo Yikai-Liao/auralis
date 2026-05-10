@@ -2,7 +2,8 @@
 
 use auralis_core::{AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_effects::{
-    EffectChainParseError, EffectCommand, EffectCommandParseError, Rate, Reverse,
+    EffectChainParseError, EffectCommand, EffectCommandParseError, Rate, RateBandwidth,
+    RateOptionFlags, RateOptions, RatePhase, RatePrecision, RateQuality, Reverse,
     parse_effect_chain,
 };
 
@@ -74,6 +75,42 @@ fn rate_chain_parses_high_quality_modes() {
 }
 
 #[test]
+fn rate_chain_parses_override_options_before_target_frequency() {
+    let chain = parse_effect_chain(&[
+        "rate", "-h", "-M", "-s", "-A", "95", "-a", "-R", "120", "24k", "reverse",
+    ])
+    .unwrap();
+
+    assert_eq!(
+        chain.commands(),
+        &[
+            EffectCommand::Rate(
+                Rate::with_options(
+                    SampleRate::new(24_000).unwrap(),
+                    RateQuality::High,
+                    RateOptions {
+                        phase: Some(RatePhase::Minimum),
+                        bandwidth: RateBandwidth::Steep,
+                        anti_aliasing_percent: Some(95.0),
+                        flags: RateOptionFlags::DEFAULT.with_allow_aliasing(),
+                        precision: RatePrecision::RejectionDb(120.0),
+                        ..RateOptions::DEFAULT
+                    },
+                )
+                .unwrap()
+            ),
+            EffectCommand::Reverse(Reverse::new())
+        ]
+    );
+    assert_eq!(
+        chain.render_tokens(),
+        [
+            "rate", "-h", "-M", "-s", "-A", "95", "-a", "-R", "120", "24000", "reverse"
+        ]
+    );
+}
+
+#[test]
 fn rate_changes_sample_rate_and_resamples_decoded_audio() {
     let mut audio = stereo_audio(vec![0.0, 1.0, 0.0], vec![1.0, 0.0, -1.0]);
 
@@ -142,11 +179,15 @@ fn rate_rejects_missing_invalid_options() {
         }
     ));
 
-    let override_option = parse_effect_chain(&["rate", "-M", "24000"]).unwrap_err();
+    let low_quality_override = parse_effect_chain(&["rate", "-l", "-M", "24000"]).unwrap_err();
     assert!(matches!(
-        override_option,
+        low_quality_override,
         EffectChainParseError::CommandParseFailed {
-            source: EffectCommandParseError::UnsupportedOption { effect: "rate", .. },
+            source: EffectCommandParseError::InvalidEffectConfig {
+                effect: "rate",
+                argument: "options",
+                source: auralis_effects::EffectError::InvalidRateOptions,
+            },
             ..
         }
     ));

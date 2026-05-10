@@ -1070,6 +1070,26 @@ Implementation notes:
 
 ### Feature 6.6.7: `rate` override options
 
+Status: implemented.
+
+Implementation notes:
+
+- `Rate` now records a `RateOptions` struct covering SoX-ng control flags
+  `-i`, `-c`, `-f`, `-n`, and `-t`, plus high-quality override flags for
+  phase, bandwidth, aliasing, and precision.
+- The command parser accepts phase options `-M`, `-I`, `-L`, and `-p`,
+  bandwidth options `-s`, `-b`, and `-B`, aliasing controls `-A` and `-a`,
+  and precision controls `-d` and `-R`, while preserving SoX-ng's rule that
+  high-quality overrides require medium quality or higher when an explicit
+  quality selector is present.
+- Override options currently feed the existing deterministic scalar linear
+  resampling scaffold as typed metadata. Full polyphase/FIR quality behavior
+  remains future implementation work behind the same public model.
+- Coverage includes typed validation, parser/rendering, chain-boundary tests,
+  fuzz seed coverage, and narrow standalone SoX-ng golden cases for high
+  quality override parsing on mono silence and generic custom override parsing
+  on stereo identity-rate input.
+
 ### Feature 6.6.8: `stretch`
 
 ### Feature 6.6.9: `tempo` core

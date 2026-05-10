@@ -135,6 +135,12 @@ pub enum EffectError {
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,
 
+    /// A rate command combined incompatible SoX-ng quality and override options.
+    #[error(
+        "rate override options require medium or higher quality and must satisfy SoX-ng bandwidth constraints"
+    )]
+    InvalidRateOptions,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

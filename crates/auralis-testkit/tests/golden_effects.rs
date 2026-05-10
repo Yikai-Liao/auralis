@@ -81,6 +81,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_pad_stereo_positioned",
             "effect_phaser_mono_linear",
             "effect_phaser_stereo_triangle",
+            "effect_rate_generic_custom_overrides_stereo_identity",
+            "effect_rate_high_overrides_mono_to_24000",
             "effect_rate_low_stereo_identity",
             "effect_rate_medium_mono_to_24000",
             "effect_rate_mono_to_24000",
