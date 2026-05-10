@@ -9,8 +9,8 @@ use auralis_effects::{
     Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
     FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Phaser,
     PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec, RemixSource, Repeat,
-    Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Stretch, Swap, Tempo,
-    Treble, Tremolo, Trim, Upsample, Vol,
+    Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice, SpliceAmount,
+    SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -500,6 +500,19 @@ proptest! {
             .process_buffer(&source)
             .expect("fixture pitch state is representable");
         prop_assert_all_finite(&pitch_shifted)?;
+
+        let splice_position = FrameCount::new(32);
+        if source.frames().as_u64() >= 48 {
+            let spliced = Splice::new([SplicePoint::new(
+                SplicePosition::frames(splice_position),
+                Some(SpliceAmount::Frames(FrameCount::new(4))),
+                Some(SpliceAmount::Frames(FrameCount::new(0))),
+            )])
+            .expect("fixture splice is valid")
+            .process_buffer(&source)
+            .expect("fixture splice state is representable");
+            prop_assert_all_finite(&spliced)?;
+        }
 
         let bend_end = FrameCount::new(source.frames().as_u64().min(32));
         let bent = Bend::new([BendSegment::new(

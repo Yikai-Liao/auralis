@@ -179,6 +179,16 @@ pub enum EffectError {
     #[error("bend STFT state or resolved position exceeds representable audio buffer length")]
     BendLengthOverflow,
 
+    /// A splice command had invalid positions, excess, or leeway.
+    #[error(
+        "splice requires at least one point, finite non-negative positions, strictly increasing starts, and excess no longer than the splice position"
+    )]
+    InvalidSplice,
+
+    /// A splice command would create a buffer shape that cannot be represented.
+    #[error("splice state or output frame count exceeds representable audio buffer length")]
+    SpliceLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

@@ -100,6 +100,8 @@ pub enum EffectKind {
     SoftVol,
     #[doc = "SoX-ng-style speed adjustment."]
     Speed,
+    #[doc = "SoX-ng-style cross-faded audio splice."]
+    Splice,
     #[doc = "SoX-ng-style basic time stretcher."]
     Stretch,
     #[doc = "SoX-ng-style adjacent channel-pair swapping."]
@@ -503,6 +505,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Speed",
         "speed factor[c]",
         "change pitch and tempo together by adjusting sample-rate metadata",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Splice,
+        "splice",
+        &[],
+        "Splice",
+        "splice [-h|-t|-q] {position[,excess[,leeway]]}",
+        "remove excess audio around splice points and cross-fade the joins",
     ),
     EffectDescriptor::new(
         EffectKind::Stretch,

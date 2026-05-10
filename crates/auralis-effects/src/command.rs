@@ -46,6 +46,7 @@ use crate::command_riaa::parse_riaa;
 use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_speed::{parse_speed, render_speed};
+use crate::command_splice::{parse_splice, render_splice};
 use crate::command_stretch::{parse_stretch, render_stretch};
 use crate::command_swap::parse_swap;
 use crate::command_tempo::{parse_tempo, render_tempo};
@@ -58,8 +59,8 @@ use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
-    Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch,
-    Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
+    Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Splice,
+    Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -147,6 +148,8 @@ pub enum EffectCommand {
     SoftVol(SoftVol),
     /// SoX-ng-style speed adjustment.
     Speed(Speed),
+    /// SoX-ng-style cross-faded audio splice.
+    Splice(Splice),
     /// SoX-ng-style basic time stretcher.
     Stretch(Stretch),
     /// SoX-ng-style adjacent channel-pair swapping.
@@ -217,6 +220,7 @@ impl EffectCommand {
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Speed => parse_speed(effect, args),
+            EffectKind::Splice => parse_splice(effect, args),
             EffectKind::Stretch => parse_stretch(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
             EffectKind::Tempo => parse_tempo(effect, args),
@@ -270,6 +274,7 @@ impl EffectCommand {
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Speed(_) => EffectKind::Speed,
+            Self::Splice(_) => EffectKind::Splice,
             Self::Stretch(_) => EffectKind::Stretch,
             Self::Swap(_) => EffectKind::Swap,
             Self::Tempo(_) => EffectKind::Tempo,
@@ -329,6 +334,7 @@ impl EffectCommand {
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Speed(speed) => render_speed(*speed),
+            Self::Splice(splice) => render_splice(splice),
             Self::Stretch(stretch) => render_stretch(*stretch),
             Self::Swap(_) => vec!["swap".to_owned()],
             Self::Tempo(tempo) => render_tempo(*tempo),

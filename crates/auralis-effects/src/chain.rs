@@ -806,6 +806,7 @@ mod tests {
                 | EffectCommand::Saturation(_)
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Speed(_)
+                | EffectCommand::Splice(_)
                 | EffectCommand::Stretch(_)
                 | EffectCommand::Swap(_)
                 | EffectCommand::Tempo(_)

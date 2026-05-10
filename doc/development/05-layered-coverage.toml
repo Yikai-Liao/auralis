@@ -277,6 +277,21 @@ l6 = { status = "not_applicable", reason = "The Feature 6.6.4 scaffold uses a sc
 l7 = { status = "covered", reason = "Effect command fuzzing covers rate target frequency, quality option parsing, and override option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/rate", "fuzz/corpus/effect_command/rate_quick", "fuzz/corpus/effect_command/rate_low_q", "fuzz/corpus/effect_command/rate_medium", "fuzz/corpus/effect_command/rate_ultra_q", "fuzz/corpus/effect_command/rate_overrides"] }
 
 [[subject]]
+id = "effect.splice"
+kind = "effect"
+name = "splice"
+summary = "SoX-ng-style audio splicing through cross-faded joins with optional overlap search."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic long mono and stereo 48 kHz L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover quarter-sine mono splicing and half-sine stereo splicing with explicit excess and zero leeway.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover fade option parsing, splice point parsing, canonical rendering, chain execution, output-length changes, stereo shape preservation, invalid options, and invalid point geometry.", tests = ["crates/auralis-effects/src/splice.rs", "crates/auralis-effects/src/command_splice.rs", "crates/auralis-effects/tests/splice.rs"] }
+l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input where the splice geometry is valid.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current public Splice API is a whole-buffer stateful transform; chunk-exact streaming belongs to a future API that exposes overlap-search state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Splice is a scalar overlap-search and cross-fade transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers splice fade option and point parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/splice"] }
+
+[[subject]]
 id = "effect.stretch"
 kind = "effect"
 name = "stretch"

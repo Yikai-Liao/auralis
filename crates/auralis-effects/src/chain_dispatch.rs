@@ -49,6 +49,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
         | EffectCommand::Speed(_)
+        | EffectCommand::Splice(_)
         | EffectCommand::Stretch(_)
         | EffectCommand::Tempo(_)
         | EffectCommand::Trim(_)
@@ -173,6 +174,11 @@ fn apply_buffer_command(
             *audio = remix
                 .process_buffer(audio)
                 .map_err(|source| ("out-spec", source))?;
+        }
+        EffectCommand::Splice(splice) => {
+            *audio = splice
+                .process_buffer(audio)
+                .map_err(|source| ("splice", source))?;
         }
         EffectCommand::Stretch(stretch) => {
             *audio = stretch
@@ -308,6 +314,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Repeat
         | EffectKind::Speed
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Splice => splice_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::Rate => rate_arg_end(tokens, args_start),
@@ -377,6 +384,23 @@ fn pitch_arg_end(tokens: &[&str], args_start: usize) -> usize {
     }
 
     optional_arg_end(tokens, end, 4)
+}
+
+fn splice_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    if end < tokens.len() && matches!(tokens[end], "-h" | "-t" | "-q") {
+        end += 1;
+    } else if end < tokens.len() && is_option_like(tokens[end]) {
+        end += 1;
+        return include_unexpected_argument(tokens, end);
+    }
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    end
 }
 
 fn bend_arg_end(tokens: &[&str], args_start: usize) -> usize {

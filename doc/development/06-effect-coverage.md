@@ -1194,9 +1194,26 @@ Implementation notes:
 
 ### Feature 6.6.13: `splice`
 
-Resampling and time-domain features require output-length tests, spectral tests
-where applicable, SoX-ng golden comparisons, and explicit aliasing/tolerance
-documentation.
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Splice` effect with `SpliceFade`, `SplicePoint`,
+  `SplicePosition`, and `SpliceAmount` typed APIs. The command surface supports
+  SoX-ng `splice [-h|-t|-q] {position[,excess[,leeway]]}` forms, including
+  frame-count `s` suffixes, seconds, colon time parsing, and canonical
+  rendering.
+- Processing applies whole-buffer scalar cross-faded joins with SoX-ng-style
+  excess/leeway resolution: explicit excess and leeway are doubled, the default
+  excess/leeway are 5 ms per side, overlap has a 16-frame floor and 8-frame
+  alignment, and `-q` uses zero default search.
+- Wired `splice` through the effect registry, typed command parser, effect-chain
+  dispatch, CLI positional-chain path, parser fuzz corpus, L0-L7 coverage
+  metadata, and standalone SoX-ng golden manifest.
+- Coverage includes parser/rendering tests, chain integration tests, typed
+  validation tests, output-length and finite-sample assertions, property
+  finite-output coverage, invalid point checks, and mono/stereo standalone
+  golden cases.
 
 ## Milestone 6.7: dynamics, silence, and noise effects
 
