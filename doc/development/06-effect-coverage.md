@@ -1560,8 +1560,9 @@ before any automatic insertion policy.
   coverage, mono/stereo standalone SoX-ng golden cases, and L0-L7 layered
   coverage metadata.
 - SoX-ng golden dither cases run with `-R` and an explicit `dither` command
-  rather than relying on automatic `-D` behavior. Noise shaping (`-s`/`-f`) and
-  automatic on/off detection (`-a`) remain scheduled for later dither features.
+  rather than relying on automatic `-D` behavior. Noise shaping is covered by
+  Feature 6.8.9, while automatic on/off detection (`-a`) remains scheduled for
+  a later dither feature.
 
 Acceptance tests:
 
@@ -1605,8 +1606,22 @@ Acceptance tests:
 
 ### Feature 6.8.9: `dither` noise shaping
 
-Add noise-shaping modes after the base dither behavior and automatic insertion
-policy are stable.
+Status: implemented.
+
+Implementation notes:
+
+- Extended the public `Dither` model with `DitherNoiseShape::Shibata`,
+  including the SoX-ng `dither -s` shorthand and `dither -f shibata` command
+  forms.
+- Noise-shaped processing uses deterministic TPDF input plus stateful
+  error-feedback shaping before the same target-precision quantization used by
+  the base dither path. The typed seed policy is preserved, and chunked
+  `DitherState` processing remains deterministic for shaped dither.
+- Coverage includes parser/rendering tests, command and chain integration,
+  finite/quantized output checks, chunk-state equivalence, parser fuzz corpus,
+  L0-L7 matrix updates, and a standalone SoX-ng golden case for explicit
+  `dither -s -p 8`. Additional named SoX-ng shaping filters and automatic
+  on/off detection remain unimplemented.
 
 ### Feature 6.8.10: `stat`
 

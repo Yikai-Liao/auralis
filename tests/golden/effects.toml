@@ -729,6 +729,17 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_dither_mono_shibata_p8]
+input = "effects/dither_shibata_mono.wav"
+corpus_id = "l0/near_zero_mono_8"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["dither", "-s", "-p", "8"]
+sox_ng = ["dither", "-s", "-p", "8"]
+max_abs = 0.03125
+rms = 0.02
+snr_db = 0.0
+
 [id.effect_dither_mono_tpdf_p8]
 input = "effects/dither_mono.wav"
 corpus_id = "l0/near_zero_mono_8"

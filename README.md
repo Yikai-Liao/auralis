@@ -108,10 +108,11 @@ The implemented `sinc` command covers SoX-ng-style low-pass, high-pass,
 band-pass, and band-reject Kaiser-windowed FIR filters with attenuation, beta,
 transition-bandwidth, explicit-tap, auto-tap rounding, and low-pass
 delete-at-Nyquist options.
-The implemented `dither` command covers deterministic plain TPDF and `-S`
-sloped TPDF, with `-p bits` target precision and explicit typed seed
-configuration. Noise shaping (`-s`/`-f`) and automatic on/off detection (`-a`)
-remain later roadmap items.
+The implemented `dither` command covers deterministic plain TPDF, `-S` sloped
+TPDF, and Shibata noise shaping through `-s` or `-f shibata`, with `-p bits`
+target precision and explicit typed seed configuration. Automatic on/off
+detection (`-a`) and additional named shaping filters remain later roadmap
+items.
 The implemented `loudness` command covers SoX-ng's ISO 226 equal-loudness
 FIR compensation with gain, reference-level, and half-length arguments.
 The implemented `riaa` command covers SoX-ng's no-argument RIAA playback
@@ -1048,7 +1049,9 @@ SoX-ng auto-inserts `channels` conversion, and `tests/golden/auto_rate.toml`
 records output-rate policy coverage where SoX-ng auto-inserts `rate`
 conversion. `tests/golden/auto_level.toml` records output-level guard and
 normalization coverage for representative clipping and peak-normalization
-cases. `tests/golden/auto_dither.toml` records explicit Auralis output dither
+cases. Dither coverage includes plain TPDF, sloped TPDF, and Shibata-shaped
+explicit dither with dither-specific stochastic comparison thresholds.
+`tests/golden/auto_dither.toml` records explicit Auralis output dither
 against SoX-ng automatic dither insertion with repeatable `-R` randomness. The
 Python golden runners
 resolve each manifest `corpus_id` or `corpus_ids`, generate deterministic PCM16

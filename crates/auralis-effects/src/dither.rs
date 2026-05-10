@@ -1,4 +1,4 @@
-//! Deterministic TPDF dither primitives.
+//! Deterministic dither and noise-shaping primitives.
 
 use auralis_core::AudioBuffer;
 
@@ -26,10 +26,19 @@ pub enum DitherMode {
     SlopedTpdf,
 }
 
+/// Noise-shaping filter family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DitherNoiseShape {
+    /// SoX-ng's default `dither -s` Shibata-style error-feedback curve.
+    Shibata,
+}
+
 /// SoX-ng-style deterministic dither configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Dither {
     mode: DitherMode,
+    noise_shape: Option<DitherNoiseShape>,
     precision_bits: u8,
     seed: u32,
 }
@@ -40,6 +49,7 @@ impl Dither {
     pub const fn new() -> Self {
         Self {
             mode: DitherMode::Tpdf,
+            noise_shape: None,
             precision_bits: DEFAULT_PRECISION_BITS,
             seed: DEFAULT_DITHER_SEED,
         }
@@ -50,6 +60,18 @@ impl Dither {
     pub const fn sloped_tpdf() -> Self {
         Self {
             mode: DitherMode::SlopedTpdf,
+            noise_shape: None,
+            precision_bits: DEFAULT_PRECISION_BITS,
+            seed: DEFAULT_DITHER_SEED,
+        }
+    }
+
+    /// Creates default Shibata noise-shaped TPDF dither for 16-bit output.
+    #[must_use]
+    pub const fn shibata() -> Self {
+        Self {
+            mode: DitherMode::Tpdf,
+            noise_shape: Some(DitherNoiseShape::Shibata),
             precision_bits: DEFAULT_PRECISION_BITS,
             seed: DEFAULT_DITHER_SEED,
         }
@@ -76,10 +98,24 @@ impl Dither {
         self
     }
 
+    /// Returns this dither configuration with explicit noise shaping.
+    #[must_use]
+    pub const fn with_noise_shape(mut self, noise_shape: DitherNoiseShape) -> Self {
+        self.noise_shape = Some(noise_shape);
+        self.mode = DitherMode::Tpdf;
+        self
+    }
+
     /// Returns the configured dither mode.
     #[must_use]
     pub const fn mode(self) -> DitherMode {
         self.mode
+    }
+
+    /// Returns the configured noise-shaping filter, if any.
+    #[must_use]
+    pub const fn noise_shape(self) -> Option<DitherNoiseShape> {
+        self.noise_shape
     }
 
     /// Returns the target precision in bits.
@@ -118,6 +154,8 @@ pub struct DitherState {
     dither: Dither,
     random: u32,
     previous_random: i32,
+    previous_errors: [f64; SHIBATA_48KHZ.len()],
+    shape_position: usize,
 }
 
 impl DitherState {
@@ -128,6 +166,8 @@ impl DitherState {
             random: dither.seed,
             dither,
             previous_random: 0,
+            previous_errors: [0.0; SHIBATA_48KHZ.len()],
+            shape_position: 0,
         }
     }
 
@@ -144,6 +184,10 @@ impl DitherState {
         reason = "SoX-ng-compatible quantization maps between integer sample units and normalized f32"
     )]
     fn process_sample(&mut self, sample: f32) -> f32 {
+        if self.dither.noise_shape.is_some() {
+            return self.process_noise_shaped_sample(sample);
+        }
+
         let precision = self.dither.precision_bits;
         let random = self.next_random() >> u32::from(precision);
         let second = match self.dither.mode {
@@ -164,6 +208,46 @@ impl DitherState {
         (output as f64 / SOX_SAMPLE_SCALE) as f32
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        reason = "SoX-ng-compatible noise-shaped quantization maps between integer sample units and normalized f32"
+    )]
+    fn process_noise_shaped_sample(&mut self, sample: f32) -> f32 {
+        let precision = self.dither.precision_bits;
+        let random = f64::from(self.next_random() >> u32::from(precision))
+            + f64::from(self.next_random() >> u32::from(precision));
+        let denominator = f64::from(1_u32 << u32::from(32 - precision));
+        let shaped = self.shaped_internal_sample(sample);
+        let scaled = (shaped + random) / denominator;
+        let quantized = round_half_away_from_zero(scaled);
+        let minimum = -(1_i64 << u32::from(precision - 1));
+        let maximum = (1_i64 << u32::from(precision - 1)) - 1;
+        let clamped = quantized.clamp(minimum, maximum);
+
+        self.shape_position = self
+            .shape_position
+            .checked_sub(1)
+            .unwrap_or(SHIBATA_48KHZ.len() - 1);
+        self.previous_errors[self.shape_position] = (clamped as f64 * denominator) - shaped;
+
+        let output = clamped << u32::from(32 - precision);
+        (output as f64 / SOX_SAMPLE_SCALE) as f32
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "noise-shaping feedback works in SoX integer sample units before f64 coefficient convolution"
+    )]
+    fn shaped_internal_sample(&self, sample: f32) -> f64 {
+        let mut shaped = normalized_to_sox_sample(sample) as f64;
+        for (offset, coefficient) in SHIBATA_48KHZ.iter().enumerate() {
+            let index = (self.shape_position + offset) % SHIBATA_48KHZ.len();
+            shaped -= coefficient * self.previous_errors[index];
+        }
+        shaped
+    }
+
     fn next_random(&mut self) -> i32 {
         self.random = self
             .random
@@ -172,6 +256,25 @@ impl DitherState {
         i32::from_ne_bytes(self.random.to_ne_bytes())
     }
 }
+
+const SHIBATA_48KHZ: [f64; 16] = [
+    2.872_072_935_104_37,
+    -5.041_323_184_967_041,
+    6.244_299_411_773_682,
+    -5.848_398_685_455_322,
+    3.706_754_207_611_084,
+    -1.049_511_909_484_863,
+    -1.183_023_691_177_368,
+    2.112_679_243_087_769,
+    -1.909_453_153_610_229,
+    0.999_130_845_069_885,
+    -0.170_908_063_650_131,
+    -0.326_156_020_164_49,
+    0.391_276_448_965_073,
+    -0.268_764_615_058_899,
+    0.097_676_105_797_29,
+    -0.023_473_845_794_797,
+];
 
 #[allow(
     clippy::cast_possible_truncation,
@@ -200,7 +303,7 @@ fn round_half_away_from_zero(value: f64) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Dither, DitherMode, DitherState};
+    use super::{Dither, DitherMode, DitherNoiseShape, DitherState};
 
     #[test]
     fn rejects_invalid_precision() {
@@ -253,10 +356,7 @@ mod tests {
 
     #[test]
     fn chunked_processing_matches_whole_slice_processing() {
-        let dither = Dither::sloped_tpdf()
-            .with_precision(8)
-            .unwrap()
-            .with_seed(123);
+        let dither = Dither::shibata().with_precision(8).unwrap().with_seed(123);
         let mut whole = [0.0, 0.001, -0.001, 0.25, -0.25, 0.0];
         let mut chunked = whole;
         let mut state = DitherState::new(dither);
@@ -271,10 +371,33 @@ mod tests {
 
     #[test]
     fn exposes_mode_and_seed_policy() {
-        let dither = Dither::sloped_tpdf().with_seed(42);
+        let dither = Dither::sloped_tpdf()
+            .with_noise_shape(DitherNoiseShape::Shibata)
+            .with_seed(42);
 
-        assert_eq!(dither.mode(), DitherMode::SlopedTpdf);
+        assert_eq!(dither.mode(), DitherMode::Tpdf);
+        assert_eq!(dither.noise_shape(), Some(DitherNoiseShape::Shibata));
         assert_eq!(dither.seed(), 42);
+    }
+
+    #[test]
+    fn shibata_noise_shaping_feeds_back_quantization_error() {
+        let mut plain = [0.0; 8];
+        let mut shaped = plain;
+
+        Dither::new()
+            .with_precision(8)
+            .unwrap()
+            .with_seed(0)
+            .process_samples(&mut plain);
+        Dither::shibata()
+            .with_precision(8)
+            .unwrap()
+            .with_seed(0)
+            .process_samples(&mut shaped);
+
+        assert_ne!(plain.map(f32::to_bits), shaped.map(f32::to_bits));
+        assert!(shaped.iter().all(|sample| is_quantized_to_8_bits(*sample)));
     }
 
     fn is_quantized_to_8_bits(sample: f32) -> bool {

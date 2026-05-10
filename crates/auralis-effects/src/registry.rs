@@ -367,8 +367,8 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "dither",
         &[],
         "Dither",
-        "dither [-S] [-p precision]",
-        "apply deterministic TPDF or sloped TPDF dither",
+        "dither [-S|-s|-f shibata] [-p precision]",
+        "apply deterministic TPDF, sloped TPDF, or Shibata-shaped dither",
     ),
     EffectDescriptor::new(
         EffectKind::Downsample,

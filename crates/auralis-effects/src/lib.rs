@@ -175,7 +175,7 @@ pub use contrast::Contrast;
 pub use dcshift::DcShift;
 pub use deemph::Deemph;
 pub use delay::{Delay, DelayAmount, DelayAnchor, DelayPosition};
-pub use dither::{DEFAULT_DITHER_SEED, Dither, DitherMode, DitherState};
+pub use dither::{DEFAULT_DITHER_SEED, Dither, DitherMode, DitherNoiseShape, DitherState};
 pub use downsample::Downsample;
 pub use echo::{Echo, EchoTap};
 pub use echos::{Echos, EchosTap};

@@ -44,6 +44,7 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_deemph_stereo_48000",
             "effect_delay_mono_frames",
             "effect_delay_stereo_per_channel",
+            "effect_dither_mono_shibata_p8",
             "effect_dither_mono_tpdf_p8",
             "effect_dither_stereo_sloped_p8",
             "effect_downsample_mono_default",
