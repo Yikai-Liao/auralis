@@ -6,12 +6,12 @@ use auralis_core::{
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, BendPosition, BendSegment, Biquad,
     BiquadCoefficients, BiquadWidth, Centercut, Channels, Chorus, ChorusStage, Compand, Contrast,
-    DcShift, Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
-    FlangerInterpolation, FlangerWave, Gain, HighPass, Loudness, LowPass, MCompand, Norm, Oops,
-    Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, Silence, Sinc,
-    SincBand, SincOptions, SoftVol, Speed, Splice, SpliceAmount, SplicePoint, SplicePosition,
-    Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
+    DcShift, Deemph, Delay, Dither, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade,
+    Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass, Loudness, LowPass, MCompand, Norm,
+    Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix,
+    RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
+    Silence, Sinc, SincBand, SincOptions, SoftVol, Speed, Splice, SpliceAmount, SplicePoint,
+    SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -429,6 +429,13 @@ proptest! {
         let mut shifted = source.clone();
         DcShift::new(shift).expect("generated shift is valid").process_buffer(&mut shifted);
         prop_assert_all_finite(&shifted)?;
+
+        let mut dithered = source.clone();
+        Dither::new()
+            .with_precision(8)
+            .expect("fixture dither precision is valid")
+            .process_buffer(&mut dithered);
+        prop_assert_all_finite(&dithered)?;
 
         let mut contrasted = source.clone();
         Contrast::new(75.0).expect("default contrast amount is valid")

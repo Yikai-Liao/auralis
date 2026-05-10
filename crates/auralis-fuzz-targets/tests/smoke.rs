@@ -63,6 +63,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"firfit 20 0 10k -3",
         b"hilbert -n 5",
         b"sinc -n 11 1000-4000",
+        b"dither -S -p 8",
         b"noiseprof profile.prof",
         b"noisered profile.prof 0.25",
         b"silence -l 1 1s 0% -1 2s -40d",

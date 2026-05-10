@@ -68,6 +68,7 @@ pub(crate) fn apply_command(
         EffectCommand::Biquad(_)
         | EffectCommand::Contrast(_)
         | EffectCommand::DcShift(_)
+        | EffectCommand::Dither(_)
         | EffectCommand::Overdrive(_)
         | EffectCommand::Reverse(_)
         | EffectCommand::Saturation(_)
@@ -328,6 +329,7 @@ fn apply_in_place_command(
         EffectCommand::DcShift(dc_shift) => {
             dc_shift.process_buffer_with_backend(audio, requested_backend);
         }
+        EffectCommand::Dither(dither) => dither.process_buffer(audio),
         EffectCommand::Overdrive(overdrive) => overdrive.process_buffer(audio),
         EffectCommand::Reverse(reverse) => reverse.process_buffer(audio),
         EffectCommand::Saturation(saturation) => saturation.process_buffer(audio),
@@ -389,6 +391,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
         }
+        EffectKind::Dither => dither_arg_end(tokens, args_start),
         EffectKind::Delay => delay_arg_end(tokens, args_start),
         EffectKind::Echo | EffectKind::Echos => echo_arg_end(tokens, args_start),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
@@ -416,6 +419,22 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn dither_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-p" | "-f" => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+            }
+            _ => end += 1,
+        }
+    }
+    end
 }
 
 fn sinc_arg_end(tokens: &[&str], args_start: usize) -> usize {

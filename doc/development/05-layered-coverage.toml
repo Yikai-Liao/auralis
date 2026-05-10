@@ -697,6 +697,21 @@ l6 = { status = "not_applicable", reason = "Feature 6.8.6 implements the scalar 
 l7 = { status = "covered", reason = "Effect command fuzzing covers sinc range argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/sinc"] }
 
 [[subject]]
+id = "effect.dither"
+kind = "effect"
+name = "dither"
+summary = "SoX-ng-style deterministic TPDF and sloped TPDF dither."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic near-zero mono and silence stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; output-boundary automatic dither policy is a later feature.", tests = [] }
+l2 = { status = "covered", reason = "Standalone mono and stereo SoX-ng golden cases cover explicit dither -p 8 and dither -S -p 8 invocation rules.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical tests cover parser rendering, unsupported shaping/auto-detect options, deterministic seed configuration, quantization, silence, and near-zero behavior.", tests = ["crates/auralis-effects/src/dither.rs", "crates/auralis-effects/src/command_dither.rs", "crates/auralis-effects/tests/dither.rs"] }
+l4 = { status = "covered", reason = "Property coverage checks finite deterministic output for bounded sample fixtures.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "covered", reason = "Stateful DitherState coverage checks whole-slice output against chunked processing with the same seed and sloped history.", tests = ["crates/auralis-effects/tests/dither.rs"] }
+l6 = { status = "not_applicable", reason = "Feature 6.8.7 implements deterministic scalar PRNG state; SIMD is N/A because sample order and seed history are semantically observable.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers dither option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/dither"] }
+
+[[subject]]
 id = "effect.gain"
 kind = "effect"
 name = "gain"

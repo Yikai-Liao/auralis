@@ -52,6 +52,8 @@ pub enum EffectKind {
     DcShift,
     /// SoX-ng-style per-channel delay.
     Delay,
+    /// SoX-ng-style deterministic TPDF dither.
+    Dither,
     /// SoX-ng-style decimating downsample.
     Downsample,
     /// SoX-ng-style parallel echo delay line.
@@ -359,6 +361,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Delay",
         "delay {position}",
         "delay decoded channels by independent positions",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Dither,
+        "dither",
+        &[],
+        "Dither",
+        "dither [-S] [-p precision]",
+        "apply deterministic TPDF or sloped TPDF dither",
     ),
     EffectDescriptor::new(
         EffectKind::Downsample,

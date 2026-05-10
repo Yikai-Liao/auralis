@@ -308,9 +308,10 @@ impl GoldenCase {
 
     /// Renders a deterministic SoX-ng command vector.
     ///
-    /// The `-R` and `-D` flags are always included to match Auralis' repeatable
-    /// golden-test policy: repeatable random state and disabled automatic
-    /// dithering.
+    /// The `-R` flag is always included to match Auralis' repeatable
+    /// golden-test policy. The `-D` flag is included except for explicit
+    /// `dither` effect cases, which must exercise SoX-ng's dither invocation
+    /// directly.
     #[must_use]
     pub fn render_sox_ng_command(
         &self,
@@ -324,9 +325,8 @@ impl GoldenCase {
     /// Renders a deterministic SoX-ng command vector for one or more inputs.
     ///
     /// Multi-input cases include `--combine <METHOD>` before the input paths.
-    /// Cases that omit `combine` default to `concatenate`. The `-R` and `-D`
-    /// flags are always included to match Auralis' repeatable golden-test
-    /// policy.
+    /// Cases that omit `combine` default to `concatenate`. The `-R` flag is
+    /// always included; `-D` is omitted for explicit `dither` effect cases.
     #[must_use]
     pub fn render_sox_ng_command_with_inputs<I, P>(
         &self,
@@ -342,11 +342,10 @@ impl GoldenCase {
             .into_iter()
             .map(|path| path_to_command_arg(path.as_ref()))
             .collect::<Vec<_>>();
-        let mut command = vec![
-            executable.as_ref().to_owned(),
-            "-R".to_owned(),
-            "-D".to_owned(),
-        ];
+        let mut command = vec![executable.as_ref().to_owned(), "-R".to_owned()];
+        if !self.is_explicit_dither_case() {
+            command.push("-D".to_owned());
+        }
         if input_paths.len() > 1 {
             command.push("--combine".to_owned());
             command.push(self.rendered_combine_method().to_owned());
@@ -363,6 +362,10 @@ impl GoldenCase {
         command.push(path_to_command_arg(output_path.as_ref()));
         command.extend(self.sox_ng.iter().cloned());
         command
+    }
+
+    fn is_explicit_dither_case(&self) -> bool {
+        self.sox_ng.first().is_some_and(|effect| effect == "dither")
     }
 
     /// Renders a deterministic display form of the SoX-ng command.

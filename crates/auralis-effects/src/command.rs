@@ -23,6 +23,7 @@ use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
 use crate::command_delay::{parse_delay, render_delay};
+use crate::command_dither::{parse_dither, render_dither};
 use crate::command_downsample::{parse_downsample, render_downsample};
 use crate::command_echo::{parse_echo, render_echo};
 use crate::command_echos::{parse_echos, render_echos};
@@ -68,7 +69,7 @@ use crate::command_vad::{parse_vad, render_vad};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Bend, Biquad, Centercut, Channels, Chorus, Compand,
-    Contrast, DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind,
+    Contrast, DcShift, Deemph, Delay, Dither, Downsample, Echo, Echos, EffectError, EffectKind,
     EffectNameError, EffectRegistry, Equalizer, Fade, Fir, FirFit, Flanger, Gain, HighPass,
     Hilbert, Loudness, LowPass, MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive, Pad, Phaser,
     Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, Silence, Sinc, SoftVol, Speed,
@@ -114,6 +115,8 @@ pub enum EffectCommand {
     Deemph(Deemph),
     /// SoX-ng-style per-channel delay.
     Delay(Delay),
+    /// SoX-ng-style deterministic TPDF dither.
+    Dither(Dither),
     /// SoX-ng-style decimating downsample.
     Downsample(Downsample),
     /// SoX-ng-style parallel echo delay line.
@@ -231,6 +234,7 @@ impl EffectCommand {
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
             EffectKind::Delay => parse_delay(effect, args),
+            EffectKind::Dither => parse_dither(effect, args),
             EffectKind::Downsample => parse_downsample(effect, args),
             EffectKind::Echo => parse_echo(effect, args),
             EffectKind::Echos => parse_echos(effect, args),
@@ -296,6 +300,7 @@ impl EffectCommand {
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
             Self::Delay(_) => EffectKind::Delay,
+            Self::Dither(_) => EffectKind::Dither,
             Self::Downsample(_) => EffectKind::Downsample,
             Self::Echo(_) => EffectKind::Echo,
             Self::Echos(_) => EffectKind::Echos,
@@ -367,6 +372,7 @@ impl EffectCommand {
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],
             Self::Delay(delay) => render_delay(delay),
+            Self::Dither(dither) => render_dither(*dither),
             Self::Downsample(downsample) => render_downsample(*downsample),
             Self::Echo(echo) => render_echo(echo),
             Self::Echos(echos) => render_echos(echos),

@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
-`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `Hilbert`, `Sinc`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `Hilbert`, `Sinc`, `Dither`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 `Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Fir`, `FirFit`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
-gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, hilbert, sinc, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, fir, firfit, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/hilbert/sinc/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/firfit/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
+gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, hilbert, sinc, dither, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
+fade, fir, firfit, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/hilbert/sinc/dither/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/firfit/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -108,6 +108,10 @@ The implemented `sinc` command covers SoX-ng-style low-pass, high-pass,
 band-pass, and band-reject Kaiser-windowed FIR filters with attenuation, beta,
 transition-bandwidth, explicit-tap, auto-tap rounding, and low-pass
 delete-at-Nyquist options.
+The implemented `dither` command covers deterministic plain TPDF and `-S`
+sloped TPDF, with `-p bits` target precision and explicit typed seed
+configuration. Noise shaping (`-s`/`-f`) and automatic on/off detection (`-a`)
+remain later roadmap items.
 The implemented `loudness` command covers SoX-ng's ISO 226 equal-loudness
 FIR compensation with gain, reference-level, and half-length arguments.
 The implemented `riaa` command covers SoX-ng's no-argument RIAA playback
@@ -927,9 +931,9 @@ final buffer only when its absolute peak exceeds full scale. They can use
 `OutputLevelPolicy::Normalize(Decibels)` to scale non-silent output to a target
 peak before writing. The CLI exposes these policies as `--guard` and
 `--norm[=DB]`; `--norm` defaults to 0 dBFS, and `--guard` cannot be combined
-with `--norm`. Automatic dither insertion has been deferred to the post-`dither`
-effect plan in DEVELOPMENT, so current Auralis output never adds hidden dither
-noise.
+with `--norm`. Automatic dither insertion has been deferred to the
+post-explicit-`dither` effect plan in DEVELOPMENT, so current Auralis output
+never adds hidden dither noise.
 
 Selected crates:
 

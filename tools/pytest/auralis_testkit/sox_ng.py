@@ -30,6 +30,7 @@ def run_sox_ng(
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
     output_channels: int | None = None,
     output_sample_rate: int | None = None,
+    disable_auto_dither: bool = True,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with deterministic flags and return the completed process."""
 
@@ -40,7 +41,7 @@ def run_sox_ng(
     command = [
         executable,
         "-R",
-        "-D",
+        *(["-D"] if disable_auto_dither else []),
         str(input_path),
         *output_encoding,
         *output_channel_args(output_channels),
@@ -60,6 +61,7 @@ def run_sox_ng_with_inputs(
     output_encoding: Sequence[str] = ("-b", "16", "-e", "signed-integer"),
     output_channels: int | None = None,
     output_sample_rate: int | None = None,
+    disable_auto_dither: bool = True,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run SoX-ng with multiple inputs and deterministic combine settings."""
 
@@ -72,7 +74,7 @@ def run_sox_ng_with_inputs(
     command = [
         executable,
         "-R",
-        "-D",
+        *(["-D"] if disable_auto_dither else []),
         "--combine",
         combine,
         *(str(path) for path in input_paths),

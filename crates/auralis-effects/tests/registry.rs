@@ -18,6 +18,7 @@ fn supported_canonical_names_resolve_to_descriptors() {
         ("contrast", EffectKind::Contrast),
         ("dcshift", EffectKind::DcShift),
         ("delay", EffectKind::Delay),
+        ("dither", EffectKind::Dither),
         ("echo", EffectKind::Echo),
         ("echos", EffectKind::Echos),
         ("deemph", EffectKind::Deemph),

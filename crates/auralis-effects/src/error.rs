@@ -47,6 +47,10 @@ pub enum EffectError {
     #[error("delay output frame count exceeds representable audio buffer length")]
     DelayLengthOverflow,
 
+    /// A dither command had invalid target precision.
+    #[error("dither precision must be in the implemented SoX-ng range 2..=24 bits")]
+    InvalidDither,
+
     /// An echo command had invalid gains, delay taps, or no delay taps.
     #[error(
         "echo gains and decays must be finite, delays must be finite and non-negative, and at least one delay-decay pair is required"

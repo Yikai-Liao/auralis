@@ -402,7 +402,8 @@ mod tests {
         parse_effect_chain,
     };
     use crate::{
-        BiquadState, DcShift, EffectCommand, EffectError, Fade, Gain, Pad, Reverse, SoftVol, Trim,
+        BiquadState, DcShift, DitherState, EffectCommand, EffectError, Fade, Gain, Pad, Reverse,
+        SoftVol, Trim,
     };
     use auralis_core::{
         AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,
@@ -757,6 +758,12 @@ mod tests {
                 EffectCommand::DcShift(dc_shift) => {
                     for chunk in chunks_mut(samples, chunk_sizes) {
                         dc_shift.process_samples(chunk);
+                    }
+                }
+                EffectCommand::Dither(dither) => {
+                    let mut state = DitherState::new(*dither);
+                    for chunk in chunks_mut(samples, chunk_sizes) {
+                        state.process_samples(chunk);
                     }
                 }
                 EffectCommand::Fade(fade) => {

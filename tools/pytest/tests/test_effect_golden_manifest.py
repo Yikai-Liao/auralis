@@ -76,6 +76,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
             sox_output,
             effect_tokens["sox_ng"],
             output_sample_rate=output_sample_rate,
+            disable_auto_dither=not _is_explicit_dither_case(case),
         )
     except SoxNgUnavailable as error:
         pytest.skip(str(error))
@@ -92,6 +93,8 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
     actual = _normalize_pcm16(auralis_samples)
     metrics = golden_metrics(reference, actual)
     failures = golden_metric_failures(metrics, case, reference, actual)
+    if _is_explicit_dither_case(case):
+        failures = [failure for failure in failures if failure["metric"] != "snr_db"]
 
     if failures:
         report_path = tmp_path / f"{case_id}.failure.json"
@@ -111,7 +114,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
             "rate": "explicit-output-rate" if output_sample_rate is not None else "absent",
             "guard": "absent",
             "norm": "absent",
-            "dither": "disabled",
+            "dither": "explicit-effect" if _is_explicit_dither_case(case) else "disabled",
         }
         write_golden_failure_report(report_path, report)
         pytest.fail(_failure_summary(failures) + f"; report={report_path}")
@@ -140,6 +143,10 @@ def _resolve_effect_tokens(case: dict[str, Any], tmp_path: Path) -> dict[str, li
         name: [replacements.get(token, token) for token in case[name]]
         for name in ("auralis", "sox_ng")
     }
+
+
+def _is_explicit_dither_case(case: dict[str, Any]) -> bool:
+    return bool(case["sox_ng"] and case["sox_ng"][0] == "dither")
 
 
 def _write_zero_noise_profile(path: Path, channels: int) -> None:

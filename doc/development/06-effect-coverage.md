@@ -1545,8 +1545,23 @@ Implementation notes:
 
 ### Feature 6.8.7: `dither` TPDF and sloped TPDF
 
-Implement deterministic dither primitives and an explicit `dither` effect before
-any automatic insertion policy.
+Status: implemented.
+
+Implemented deterministic dither primitives and an explicit `dither` effect
+before any automatic insertion policy.
+
+- Added public `Dither`, `DitherMode`, and `DitherState` APIs covering plain
+  TPDF, `-S` sloped TPDF, `-p bits` target precision, and explicit deterministic
+  seed configuration.
+- Registered `dither [-S] [-p precision]` through the effect registry, command
+  parser/renderer, effect-chain dispatch, CLI positional chain path, and parser
+  fuzz corpus.
+- Added Rust parser/processor/chunk-state tests, finite-output property
+  coverage, mono/stereo standalone SoX-ng golden cases, and L0-L7 layered
+  coverage metadata.
+- SoX-ng golden dither cases run with `-R` and an explicit `dither` command
+  rather than relying on automatic `-D` behavior. Noise shaping (`-s`/`-f`) and
+  automatic on/off detection (`-a`) remain scheduled for later dither features.
 
 Acceptance tests:
 
