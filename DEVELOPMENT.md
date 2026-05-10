@@ -14,8 +14,8 @@ The core rule:
 
 The current development queue has completed the specialized-effect
 classification pass for `dolbyb`, `dop`, `earwax`, `ladspa`, and `sdm`.
-Implementation planning should now move through the 7.x reusable DSP primitive
-audit before adding more effect families.
+The 7.x reusable DSP primitive audit has recorded the extraction order before
+more effect families add duplicate effect-local kernels.
 
 The current order is:
 
@@ -35,10 +35,11 @@ The current order is:
 4. Resume
    [`6.9 specialized and integration effects`](doc/development/06-effects/06-9-specialized-and-integration-effects.md)
    only after the above planning and test-gate corrections are in place.
-5. After the 6.9 specialized-effect classification pass, run the
-   [`7.x reusable DSP primitives roadmap`](doc/development/07-dsp-primitives.md)
-   before adding more effect families, so shared algorithms are audited before
-   they continue accumulating in effect-local modules.
+5. Begin the first
+   [`7.x reusable DSP primitive extraction`](doc/development/07-dsp-primitives.md):
+   move the already-tested biquad runtime and normalized coefficient type into
+   `auralis-dsp`, preserving `auralis-effects` re-exports and keeping
+   SoX-ng-specific command parsing in the effect crate.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.
