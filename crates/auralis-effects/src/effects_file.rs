@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nechos").unwrap_err();
+        let error = parse_effects_file_str("gain -3\nchorus").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `echos` failed to parse: known SoX-ng effect `echos` is not implemented by Auralis; missing SoX-ng coverage entry for `echos`"
+            "effects file line 2, column 1: command `chorus` failed to parse: known SoX-ng effect `chorus` is not implemented by Auralis; missing SoX-ng coverage entry for `chorus`"
         );
     }
 

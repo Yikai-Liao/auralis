@@ -811,6 +811,27 @@ Implementation notes:
 
 ### Feature 6.5.3: `echos`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a typed `Echos` effect matching SoX-ng's cascaded `echos gain-in
+  gain-out <delay decay>` command family. Delay values are milliseconds,
+  resolve against the input sample rate by truncating to a frame count, and
+  each delay line feeds the next delay line plus the current input, so later
+  taps include echoes of earlier echoes.
+- Processing applies clean input gain, sums cascaded delayed tap decays,
+  applies final output gain, clips inside the effect, and extends output by
+  the sum of all resolved tap delays. Each delay must resolve to at least one
+  frame, and decay is restricted to SoX-ng's `0..=1` range.
+- Latency is governed by the cascaded delay sequence; tail flush emits the
+  remaining cascaded delay-line contents with zero input. Chunked streaming
+  would be exact when a future streaming API preserves all per-channel delay
+  buffers and exposes explicit tail flush.
+- Coverage includes typed processor tests, command and chain integration
+  tests, L4 finite-output property coverage, parser fuzz seeds, and standalone
+  SoX-ng golden cases for mono cascaded echos and stereo single-tap echos.
+
 ### Feature 6.5.4: `chorus` core
 
 ### Feature 6.5.5: `chorus` interpolation and multi-delay options

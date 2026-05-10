@@ -60,6 +60,9 @@ pub enum EffectKind {
     /// SoX-ng-style parallel echo delay line.
     Echo,
 
+    /// SoX-ng-style cascaded echo delay line.
+    Echos,
+
     /// SoX-ng-style CD/DAT de-emphasis filter.
     Deemph,
 
@@ -301,6 +304,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Echo",
         "echo gain-in gain-out <delay decay>",
         "add one or more parallel delayed echoes",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Echos,
+        "echos",
+        &[],
+        "Echos",
+        "echos gain-in gain-out <delay decay>",
+        "add one or more cascaded delayed echoes",
     ),
     EffectDescriptor::new(
         EffectKind::Deemph,
@@ -802,6 +813,7 @@ mod tests {
             ("dcshift", EffectKind::DcShift),
             ("delay", EffectKind::Delay),
             ("echo", EffectKind::Echo),
+            ("echos", EffectKind::Echos),
             ("deemph", EffectKind::Deemph),
             ("equalizer", EffectKind::Equalizer),
             ("fade", EffectKind::Fade),
@@ -875,18 +887,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("echos").unwrap_err();
+        let error = EffectRegistry::resolve("chorus").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "echos".to_owned(),
+                name: "chorus".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `echos`")
+                .contains("missing SoX-ng coverage entry for `chorus`")
         );
     }
 

@@ -49,6 +49,7 @@ mod command_dcshift;
 mod command_deemph;
 mod command_delay;
 mod command_echo;
+mod command_echos;
 mod command_equalizer;
 mod command_fade;
 mod command_filter;
@@ -75,6 +76,7 @@ mod dcshift;
 mod deemph;
 mod delay;
 mod echo;
+mod echos;
 mod effects_file;
 mod equalizer;
 mod error;
@@ -120,6 +122,7 @@ pub use dcshift::DcShift;
 pub use deemph::Deemph;
 pub use delay::{Delay, DelayAmount, DelayAnchor, DelayPosition};
 pub use echo::{Echo, EchoTap};
+pub use echos::{Echos, EchosTap};
 pub use effects_file::{
     EffectsFileParseError, EffectsFileParseResult, EffectsFileReadError, EffectsFileReadResult,
     parse_effects_file, parse_effects_file_str,

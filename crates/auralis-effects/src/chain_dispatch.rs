@@ -33,6 +33,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Channels(_)
         | EffectCommand::Delay(_)
         | EffectCommand::Echo(_)
+        | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
@@ -83,6 +84,11 @@ fn apply_buffer_command(
         }
         EffectCommand::Echo(echo) => {
             *audio = echo
+                .process_buffer(audio)
+                .map_err(|source| ("delay-decay-pair", source))?;
+        }
+        EffectCommand::Echos(echos) => {
+            *audio = echos
                 .process_buffer(audio)
                 .map_err(|source| ("delay-decay-pair", source))?;
         }
@@ -206,7 +212,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
             optional_arg_end(tokens, args_start, 2)
         }
         EffectKind::Delay => delay_arg_end(tokens, args_start),
-        EffectKind::Echo => echo_arg_end(tokens, args_start),
+        EffectKind::Echo | EffectKind::Echos => echo_arg_end(tokens, args_start),
         EffectKind::Pad => pad_arg_end(tokens, args_start),
         EffectKind::Remix => remix_arg_end(tokens, args_start),
         EffectKind::Deemph

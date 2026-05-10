@@ -1,11 +1,4 @@
 //! Typed parser for currently implemented effect commands.
-//!
-//! The parser accepts a small SoX-ng-style token shape, where the first token
-//! is an effect name and the remaining tokens are positional effect arguments.
-//! It resolves names through [`crate::EffectRegistry`] and converts arguments
-//! into existing typed effect processors. Unsupported SoX-ng options are
-//! reported explicitly instead of being stored as untyped strings.
-//!
 
 use std::{
     fmt,
@@ -28,6 +21,7 @@ use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
 use crate::command_delay::{parse_delay, render_delay};
 use crate::command_echo::{parse_echo, render_echo};
+use crate::command_echos::{parse_echos, render_echos};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
 use crate::command_fade::{parse_fade, render_fade};
 use crate::command_gain::{parse_gain, render_gain};
@@ -50,9 +44,9 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Contrast, DcShift,
-    Deemph, Delay, Echo, EffectError, EffectKind, EffectNameError, EffectRegistry, Equalizer, Fade,
-    Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse, Riaa, Saturation,
-    SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    Deemph, Delay, Echo, Echos, EffectError, EffectKind, EffectNameError, EffectRegistry,
+    Equalizer, Fade, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Remix, Repeat, Reverse,
+    Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -94,6 +88,8 @@ pub enum EffectCommand {
     Delay(Delay),
     /// SoX-ng-style parallel echo delay line.
     Echo(Echo),
+    /// SoX-ng-style cascaded echo delay line.
+    Echos(Echos),
     /// SoX-ng-style peaking equalizer filter.
     Equalizer(Equalizer),
     /// SoX-ng-style fade curve, fade-in, and optional positional fade-out.
@@ -163,6 +159,7 @@ impl EffectCommand {
             EffectKind::Deemph => parse_deemph(effect, args),
             EffectKind::Delay => parse_delay(effect, args),
             EffectKind::Echo => parse_echo(effect, args),
+            EffectKind::Echos => parse_echos(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
             EffectKind::Fade => parse_fade(effect, args),
             EffectKind::Gain => parse_gain(effect, args),
@@ -203,6 +200,7 @@ impl EffectCommand {
             Self::Deemph(_) => EffectKind::Deemph,
             Self::Delay(_) => EffectKind::Delay,
             Self::Echo(_) => EffectKind::Echo,
+            Self::Echos(_) => EffectKind::Echos,
             Self::Equalizer(_) => EffectKind::Equalizer,
             Self::Fade(_) => EffectKind::Fade,
             Self::Gain(_) => EffectKind::Gain,
@@ -249,6 +247,7 @@ impl EffectCommand {
             Self::Deemph(_) => vec!["deemph".to_owned()],
             Self::Delay(delay) => render_delay(delay),
             Self::Echo(echo) => render_echo(echo),
+            Self::Echos(echos) => render_echos(echos),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),
             Self::Fade(fade) => render_fade(*fade),
             Self::Gain(gain) => render_gain(*gain),
