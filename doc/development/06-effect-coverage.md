@@ -1013,6 +1013,25 @@ Implementation notes:
 
 ### Feature 6.6.4: `rate` specification and scaffolding
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Rate` effect scaffold and `rate frequency` command parser.
+  The target frequency accepts integer hertz and `k`/`K` kilohertz shorthand,
+  then renders as canonical integer hertz.
+- Processing uses deterministic scalar linear resampling, preserves channel
+  count and sample format, updates sample-rate metadata to the explicit target,
+  and rounds output frames as `round(input_frames * target / source)`.
+- SoX-ng quality flags and override options are deliberately rejected for now;
+  Feature 6.6.5 owns quick/low-quality mode behavior, Feature 6.6.6 owns
+  high-quality modes, and Feature 6.6.7 owns override options.
+- Coverage includes analytical and integration tests for parsing, rendering,
+  chain execution, identity-rate behavior, output length overflow, L4
+  matching-rate identity, parser fuzz seed coverage, and narrow standalone
+  SoX-ng goldens for mono silence conversion and stereo identity-rate command
+  behavior.
+
 ### Feature 6.6.5: `rate` quick and low-quality modes
 
 ### Feature 6.6.6: `rate` high-quality modes

@@ -262,6 +262,21 @@ l6 = { status = "not_applicable", reason = "Speed preserves decoded samples and 
 l7 = { status = "covered", reason = "Effect command fuzzing covers speed ratio and cents parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/speed"] }
 
 [[subject]]
+id = "effect.rate"
+kind = "effect"
+name = "rate"
+summary = "SoX-ng-style sample-rate conversion scaffold with deterministic scalar linear resampling."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono silence and short stereo L0 corpus IDs.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover a mono target-rate conversion on silence and a stereo identity-rate command while later features add quality-mode drift cases.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover target-rate parsing, kilohertz shorthand, canonical rendering, chain execution, frame-count rounding, linear interpolation, matching-rate identity, unsupported quality options, and output length overflow.", tests = ["crates/auralis-effects/src/rate.rs", "crates/auralis-effects/src/command_rate.rs", "crates/auralis-effects/tests/rate.rs"] }
+l4 = { status = "covered", reason = "Property tests include matching-rate identity coverage for generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current Rate API is a whole-buffer resampler; chunk-exact streaming requires exposing resampler phase and filter state in a future API.", tests = [] }
+l6 = { status = "not_applicable", reason = "The Feature 6.6.4 scaffold uses a scalar linear resampler and documents SIMD as N/A until the concrete quality-mode implementation chooses vectorizable kernels.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers rate target frequency parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/rate"] }
+
+[[subject]]
 id = "effect.chorus"
 kind = "effect"
 name = "chorus"

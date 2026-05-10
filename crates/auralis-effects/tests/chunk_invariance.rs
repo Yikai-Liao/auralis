@@ -492,6 +492,7 @@ fn process_streaming_safe_chain_by_chunks(
             | EffectCommand::Norm(_)
             | EffectCommand::Oops(_)
             | EffectCommand::Pad(_)
+            | EffectCommand::Rate(_)
             | EffectCommand::Repeat(_)
             | EffectCommand::Remix(_)
             | EffectCommand::Reverse(_)

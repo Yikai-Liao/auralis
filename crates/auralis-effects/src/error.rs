@@ -131,6 +131,10 @@ pub enum EffectError {
     #[error("speed output sample rate must round into the representable positive rate range")]
     SpeedRateOutOfRange,
 
+    /// A rate command would create a buffer shape that cannot be represented.
+    #[error("rate output frame count exceeds representable audio buffer length")]
+    RateLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

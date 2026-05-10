@@ -954,6 +954,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_rate_mono_to_24000]
+input = "effects/rate_mono.wav"
+corpus_id = "l0/silence_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["rate", "24000"]
+sox_ng = ["rate", "24000"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_rate_stereo_identity]
+input = "effects/rate_stereo.wav"
+corpus_id = "l0/short_stereo_2"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["rate", "48000"]
+sox_ng = ["rate", "48000"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_tremolo_mono_default_depth]
 input = "effects/tremolo_mono.wav"
 corpus_id = "l0/sine_mono_32"

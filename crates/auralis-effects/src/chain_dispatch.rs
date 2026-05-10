@@ -42,6 +42,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
         | EffectCommand::Phaser(_)
+        | EffectCommand::Rate(_)
         | EffectCommand::Reverb(_)
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
@@ -77,6 +78,10 @@ fn apply_buffer_command(
     audio: &mut AudioBuffer,
     requested_backend: BackendKind,
 ) -> std::result::Result<bool, (&'static str, EffectError)> {
+    if apply_sample_rate_command(command, audio)? {
+        return Ok(true);
+    }
+
     match command {
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio)?,
         EffectCommand::Channels(channels) => {
@@ -93,11 +98,6 @@ fn apply_buffer_command(
             *audio = delay
                 .process_buffer(audio)
                 .map_err(|source| ("position", source))?;
-        }
-        EffectCommand::Downsample(downsample) => {
-            *audio = downsample
-                .process_buffer(audio)
-                .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Echo(echo) => {
             *audio = echo
@@ -156,15 +156,36 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("out-spec", source))?;
         }
-        EffectCommand::Speed(speed) => {
-            *audio = speed
-                .process_buffer(audio)
-                .map_err(|source| ("factor", source))?;
-        }
         EffectCommand::Trim(trim) => {
             *audio = trim
                 .process_buffer(audio)
                 .map_err(|source| ("frame-range", source))?;
+        }
+        _ => return Ok(false),
+    }
+
+    Ok(true)
+}
+
+fn apply_sample_rate_command(
+    command: &EffectCommand,
+    audio: &mut AudioBuffer,
+) -> std::result::Result<bool, (&'static str, EffectError)> {
+    match command {
+        EffectCommand::Downsample(downsample) => {
+            *audio = downsample
+                .process_buffer(audio)
+                .map_err(|source| ("factor", source))?;
+        }
+        EffectCommand::Rate(rate) => {
+            *audio = rate
+                .process_buffer(audio)
+                .map_err(|source| ("frequency", source))?;
+        }
+        EffectCommand::Speed(speed) => {
+            *audio = speed
+                .process_buffer(audio)
+                .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Upsample(upsample) => {
             *audio = upsample
@@ -254,6 +275,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Channels
         | EffectKind::Downsample
         | EffectKind::Norm
+        | EffectKind::Rate
         | EffectKind::Repeat
         | EffectKind::Speed
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),

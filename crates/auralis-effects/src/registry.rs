@@ -78,6 +78,8 @@ pub enum EffectKind {
     Pad,
     /// SoX-ng-style phaser swept delay with feedback.
     Phaser,
+    /// SoX-ng-style sample-rate conversion scaffold.
+    Rate,
     /// SoX-ng-style stereo reverberation.
     Reverb,
     /// SoX-ng-style finite output repetition.
@@ -405,6 +407,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Phaser",
         "phaser [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay [regen [speed [-s|-t]]]]]]",
         "apply a swept-delay phaser with feedback",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Rate,
+        "rate",
+        &[],
+        "Rate",
+        "rate frequency",
+        "convert decoded audio to an explicit sample rate",
     ),
     EffectDescriptor::new(
         EffectKind::Repeat,
@@ -862,6 +872,7 @@ mod tests {
             ("norm", EffectKind::Norm),
             ("overdrive", EffectKind::Overdrive),
             ("pad", EffectKind::Pad),
+            ("rate", EffectKind::Rate),
             ("repeat", EffectKind::Repeat),
             ("reverb", EffectKind::Reverb),
             ("remix", EffectKind::Remix),

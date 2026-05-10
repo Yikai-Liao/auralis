@@ -795,6 +795,7 @@ mod tests {
                 | EffectCommand::Overdrive(_)
                 | EffectCommand::Pad(_)
                 | EffectCommand::Phaser(_)
+                | EffectCommand::Rate(_)
                 | EffectCommand::Reverb(_)
                 | EffectCommand::Repeat(_)
                 | EffectCommand::Remix(_)

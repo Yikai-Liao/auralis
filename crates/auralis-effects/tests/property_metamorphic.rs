@@ -7,7 +7,7 @@ use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Downsample, Echo, EchoTap,
     Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
-    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix,
+    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Rate, Remix,
     RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
     SoftVol, Speed, Swap, Treble, Tremolo, Trim, Upsample, Vol,
 };
@@ -197,6 +197,13 @@ proptest! {
         prop_assert_sample_bits_eq(same_speed.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(same_speed.frames(), source.frames());
         prop_assert_eq!(same_speed.channels(), source.channels());
+
+        let same_rate = Rate::new(source.spec().sample_rate())
+            .process_buffer(&source)
+            .expect("matching rate cannot fail");
+        prop_assert_sample_bits_eq(same_rate.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(same_rate.frames(), source.frames());
+        prop_assert_eq!(same_rate.channels(), source.channels());
 
         let channel_converted = Channels::new(source.channels())
             .process_buffer(&source)
