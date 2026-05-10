@@ -807,6 +807,7 @@ mod tests {
                 | EffectCommand::Reverse(_)
                 | EffectCommand::Riaa(_)
                 | EffectCommand::Saturation(_)
+                | EffectCommand::Silence(_)
                 | EffectCommand::SoftVol(_)
                 | EffectCommand::Speed(_)
                 | EffectCommand::Splice(_)

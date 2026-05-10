@@ -47,6 +47,7 @@ use crate::command_reverb::{parse_reverb, render_reverb};
 use crate::command_reverse::parse_reverse;
 use crate::command_riaa::parse_riaa;
 use crate::command_saturation::{parse_saturation, render_saturation};
+use crate::command_silence::{parse_silence, render_silence};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_speed::{parse_speed, render_speed};
 use crate::command_splice::{parse_splice, render_splice};
@@ -63,7 +64,7 @@ use crate::{
     Contrast, DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind,
     EffectNameError, EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, Loudness, LowPass,
     MCompand, Norm, Oops, Overdrive, Pad, Phaser, Pitch, Rate, Remix, Repeat, Reverb, Reverse,
-    Riaa, Saturation, SoftVol, Speed, Splice, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
+    Riaa, Saturation, Silence, SoftVol, Speed, Splice, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
     Upsample, Vol,
 };
 
@@ -154,6 +155,8 @@ pub enum EffectCommand {
     Riaa(Riaa),
     /// SoX-ng-style saturation distortion.
     Saturation(Saturation),
+    /// SoX-ng-style silence trimming.
+    Silence(Silence),
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
     /// SoX-ng-style speed adjustment.
@@ -231,6 +234,7 @@ impl EffectCommand {
             EffectKind::Reverse => parse_reverse(effect, args),
             EffectKind::Riaa => parse_riaa(effect, args),
             EffectKind::Saturation => parse_saturation(effect, args),
+            EffectKind::Silence => parse_silence(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Speed => parse_speed(effect, args),
             EffectKind::Splice => parse_splice(effect, args),
@@ -288,6 +292,7 @@ impl EffectCommand {
             Self::Reverse(_) => EffectKind::Reverse,
             Self::Riaa(_) => EffectKind::Riaa,
             Self::Saturation(_) => EffectKind::Saturation,
+            Self::Silence(_) => EffectKind::Silence,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Speed(_) => EffectKind::Speed,
             Self::Splice(_) => EffectKind::Splice,
@@ -351,6 +356,7 @@ impl EffectCommand {
             Self::Reverse(_) => vec!["reverse".to_owned()],
             Self::Riaa(_) => vec!["riaa".to_owned()],
             Self::Saturation(saturation) => render_saturation(*saturation),
+            Self::Silence(silence) => render_silence(silence),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Speed(speed) => render_speed(*speed),
             Self::Splice(splice) => render_splice(splice),

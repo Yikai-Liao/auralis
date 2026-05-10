@@ -51,6 +51,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Reverb(_)
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
+        | EffectCommand::Silence(_)
         | EffectCommand::Speed(_)
         | EffectCommand::Splice(_)
         | EffectCommand::Stretch(_)
@@ -192,6 +193,11 @@ fn apply_buffer_command(
             *audio = remix
                 .process_buffer(audio)
                 .map_err(|source| ("out-spec", source))?;
+        }
+        EffectCommand::Silence(silence) => {
+            *audio = silence
+                .process_buffer(audio)
+                .map_err(|source| ("silence", source))?;
         }
         EffectCommand::Splice(splice) => {
             *audio = splice
@@ -350,6 +356,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Riaa
         | EffectKind::Swap => no_arg_end(tokens, args_start),
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
+        EffectKind::Silence => silence_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
         EffectKind::AllPass
         | EffectKind::Band
@@ -592,6 +599,28 @@ fn pad_arg_end(tokens: &[&str], args_start: usize) -> usize {
 
 fn remix_arg_end(tokens: &[&str], args_start: usize) -> usize {
     pad_arg_end(tokens, args_start)
+}
+
+fn silence_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    if matches!(tokens.get(end).copied(), Some("-l")) {
+        end += 1;
+    } else if tokens.get(end).is_some_and(|token| is_option_like(token)) {
+        end += 1;
+        return include_unexpected_argument(tokens, end);
+    }
+    if end >= tokens.len() || is_command_boundary(tokens[end]) {
+        return end;
+    }
+    let above_periods = tokens[end].parse::<u32>().ok();
+    end += 1;
+    if above_periods.is_some_and(|periods| periods > 0) {
+        end = end.saturating_add(2).min(tokens.len());
+    }
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end = end.saturating_add(3).min(tokens.len());
+    }
+    include_unexpected_argument(tokens, end)
 }
 
 fn no_arg_end(tokens: &[&str], args_start: usize) -> usize {

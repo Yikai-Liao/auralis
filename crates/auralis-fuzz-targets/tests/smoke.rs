@@ -59,6 +59,7 @@ fn seeds() -> Vec<&'static [u8]> {
         b"chorus -l -t 0.5 1 1 0.25 1 0 -sine",
         b"compand 0.3,1 6:-70,-60,-20,-20,0,0 -3 -90 0.01",
         b"mcompand '0,0 -60,-60,0,0' 1k '0.01,0.1 -70,-60,0,-3'",
+        b"silence -l 1 1s 0% -1 2s -40d",
         b"flanger -q -t 1 2 25 100 1 sine 50 none",
         b"phaser -q -t 0.8 0.74 3 0.4 0.5 -s",
         b"reverb -w 75 25 50 0 10 -3",

@@ -517,6 +517,21 @@ l6 = { status = "not_applicable", reason = "Loudness currently uses scalar gener
 l7 = { status = "covered", reason = "Effect command fuzzing covers loudness argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/loudness"] }
 
 [[subject]]
+id = "effect.silence"
+kind = "effect"
+name = "silence"
+summary = "SoX-ng-style leading, trailing, and middle silence trimming."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs with leading zero frames.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer samples; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono and stereo leading-trim command behavior.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover parser syntax, command rendering, leading trim, trailing trim, restart middle-silence removal, retained silence, multichannel below-period detection, and invalid configs.", tests = ["crates/auralis-effects/src/silence.rs", "crates/auralis-effects/src/command_silence.rs", "crates/auralis-effects/tests/silence.rs"] }
+l4 = { status = "covered", reason = "Property tests include copy-through identity and finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "The current Silence API is a whole-buffer length-changing transform; chunk-exact streaming belongs to a future API that exposes detector and holdoff state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Silence is a structural trimming effect with no data-parallel SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers silence option, duration, threshold, and restart parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/silence"] }
+
+[[subject]]
 id = "effect.contrast"
 kind = "effect"
 name = "contrast"

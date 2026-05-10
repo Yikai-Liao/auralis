@@ -9,9 +9,9 @@ use auralis_effects::{
     DcShift, Deemph, Delay, Downsample, Echo, EchoTap, Echos, EchosTap, Equalizer, Fade, Flanger,
     FlangerInterpolation, FlangerWave, Gain, HighPass, Loudness, LowPass, MCompand, Norm, Oops,
     Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Speed, Splice,
-    SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim,
-    Upsample, Vol,
+    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, Silence, SoftVol,
+    Speed, Splice, SpliceAmount, SplicePoint, SplicePosition, Stretch, Swap, Tempo, Treble,
+    Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -265,6 +265,13 @@ proptest! {
         prop_assert_sample_bits_eq(remixed.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(remixed.frames(), source.frames());
         prop_assert_eq!(remixed.channels(), source.channels());
+
+        let silence_copy = Silence::copy_through()
+            .process_buffer(&source)
+            .expect("copy-through silence cannot fail");
+        prop_assert_sample_bits_eq(silence_copy.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(silence_copy.frames(), source.frames());
+        prop_assert_eq!(silence_copy.channels(), source.channels());
     }
 
     #[test]
@@ -620,6 +627,11 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated repeat cannot overflow");
         prop_assert_all_finite(&repeated)?;
+
+        let silence_copied = Silence::copy_through()
+            .process_buffer(&source)
+            .expect("copy-through silence cannot fail");
+        prop_assert_all_finite(&silence_copied)?;
 
         let converted = Channels::new(ChannelCount::new(2).expect("fixture channel count is valid"))
             .process_buffer(&source)

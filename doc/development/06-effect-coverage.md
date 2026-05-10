@@ -1314,6 +1314,26 @@ Implementation notes:
 
 ### Feature 6.7.5: `silence`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added public `Silence`, `SilenceDuration`, `SilenceThreshold`, and
+  `SilencePeriod` support for SoX-ng's `silence [-l] above-periods [duration
+  threshold] [below-periods duration threshold]` command family.
+- Durations support SoX-ng's silence-specific parsing rule where bare numbers
+  and `s` suffixes are sample/frame counts, while decimal, colon, and `t`
+  forms are seconds resolved using the input sample rate.
+- Whole-buffer processing supports leading trim, trailing trim, `-l` retained
+  silence, and negative `below-periods` restart behavior for middle-silence
+  removal. The current threshold detector is deterministic over decoded `f32`
+  samples and keeps the command/API boundary ready for a later streaming state
+  implementation.
+- Coverage includes parser/rendering tests, command and chain integration
+  tests, leading/trailing/middle trim behavior, invalid option/threshold
+  checks, property identity/finite-output coverage, fuzz seed coverage, and
+  standalone mono/stereo SoX-ng golden cases for leading-trim command behavior.
+
 ### Feature 6.7.6: `vad` core
 
 ### Feature 6.7.7: `vad` advanced options

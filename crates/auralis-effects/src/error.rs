@@ -205,6 +205,16 @@ pub enum EffectError {
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,
 
+    /// A silence command had invalid periods, durations, thresholds, or options.
+    #[error(
+        "silence periods, durations, thresholds, and -l usage must match SoX-ng-compatible ranges"
+    )]
+    InvalidSilence,
+
+    /// A silence command would create a buffer shape that cannot be represented.
+    #[error("silence output frame count exceeds representable audio buffer length")]
+    SilenceLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

@@ -996,6 +996,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 85.0
 
+[id.effect_silence_mono_leading_trim]
+input = "effects/silence_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["silence", "1", "1s", "0%"]
+sox_ng = ["silence", "1", "1s", "0%"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_silence_stereo_leading_trim]
+input = "effects/silence_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["silence", "1", "1s", "0%"]
+sox_ng = ["silence", "1", "1s", "0%"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_softvol_mono_gain_1_5]
 input = "effects/softvol_mono.wav"
 corpus_id = "l0/step_mono_16"

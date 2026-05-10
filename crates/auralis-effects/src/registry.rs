@@ -102,6 +102,8 @@ pub enum EffectKind {
     Riaa,
     /// SoX-ng-style saturation distortion.
     Saturation,
+    /// SoX-ng-style silence trimming.
+    Silence,
     /// SoX-ng-style soft volume control.
     SoftVol,
     #[doc = "SoX-ng-style speed adjustment."]
@@ -521,6 +523,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "apply nonlinear saturation distortion",
     ),
     EffectDescriptor::new(
+        EffectKind::Silence,
+        "silence",
+        &[],
+        "Silence",
+        "silence [-l] above-periods [duration threshold] [below-periods duration threshold]",
+        "trim leading, trailing, or middle silence",
+    ),
+    EffectDescriptor::new(
         EffectKind::SoftVol,
         "softvol",
         &["soft-volume", "soft_volume"],
@@ -890,6 +900,7 @@ mod tests {
             ("reverse", EffectKind::Reverse),
             ("riaa", EffectKind::Riaa),
             ("saturation", EffectKind::Saturation),
+            ("silence", EffectKind::Silence),
             ("softvol", EffectKind::SoftVol),
             ("swap", EffectKind::Swap),
             ("treble", EffectKind::Treble),
@@ -944,18 +955,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("silence").unwrap_err();
+        let error = EffectRegistry::resolve("vad").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "silence".to_owned(),
+                name: "vad".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `silence`")
+                .contains("missing SoX-ng coverage entry for `vad`")
         );
     }
 
