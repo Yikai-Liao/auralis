@@ -96,6 +96,8 @@ pub enum EffectKind {
     SoftVol,
     /// SoX-ng-style speed adjustment.
     Speed,
+    /// SoX-ng-style basic time stretcher.
+    Stretch,
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap,
     /// SoX-ng-style treble tone control.
@@ -479,6 +481,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Speed",
         "speed factor[c]",
         "change pitch and tempo together by adjusting sample-rate metadata",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Stretch,
+        "stretch",
+        &[],
+        "Stretch",
+        "stretch [factor [window [fade [shift [fading]]]]]",
+        "change duration with SoX-ng's basic windowed cross-fade stretcher",
     ),
     EffectDescriptor::new(
         EffectKind::Swap,
@@ -938,18 +948,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("stretch").unwrap_err();
+        let error = EffectRegistry::resolve("compand").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "stretch".to_owned(),
+                name: "compand".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `stretch`")
+                .contains("missing SoX-ng coverage entry for `compand`")
         );
     }
 

@@ -131,6 +131,16 @@ pub enum EffectError {
     #[error("speed output sample rate must round into the representable positive rate range")]
     SpeedRateOutOfRange,
 
+    /// A stretch command had invalid window, factor, shift, or fading settings.
+    #[error(
+        "stretch factor/window/shift/fading must be finite, factor must be non-negative, window at least 1 ms, shift in (0, 1], and fading in 0..=0.5"
+    )]
+    InvalidStretch,
+
+    /// A stretch command would create an unrepresentable state or output shape.
+    #[error("stretch state or output frame count exceeds representable audio buffer length")]
+    StretchLengthOverflow,
+
     /// A rate command would create a buffer shape that cannot be represented.
     #[error("rate output frame count exceeds representable audio buffer length")]
     RateLengthOverflow,

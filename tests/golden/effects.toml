@@ -954,6 +954,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_stretch_mono_lengthen]
+input = "effects/stretch_mono.wav"
+corpus_id = "l0/sine_mono_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["stretch", "1.25", "20", "l", "0.8", "0.2"]
+sox_ng = ["stretch", "1.25", "20", "l", "0.8", "0.2"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_stretch_stereo_shorten]
+input = "effects/stretch_stereo.wav"
+corpus_id = "l0/opposite_phase_stereo_8192"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["stretch", "0.75", "20", "q", "1", "0.25"]
+sox_ng = ["stretch", "0.75", "20", "q", "1", "0.25"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_rate_mono_to_24000]
 input = "effects/rate_mono.wav"
 corpus_id = "l0/silence_mono_16"

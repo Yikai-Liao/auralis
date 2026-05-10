@@ -47,6 +47,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
         | EffectCommand::Speed(_)
+        | EffectCommand::Stretch(_)
         | EffectCommand::Trim(_)
         | EffectCommand::Upsample(_) => unreachable!("buffer commands returned early"),
         EffectCommand::Biquad(_)
@@ -155,6 +156,11 @@ fn apply_buffer_command(
             *audio = remix
                 .process_buffer(audio)
                 .map_err(|source| ("out-spec", source))?;
+        }
+        EffectCommand::Stretch(stretch) => {
+            *audio = stretch
+                .process_buffer(audio)
+                .map_err(|source| ("stretch", source))?;
         }
         EffectCommand::Trim(trim) => {
             *audio = trim
@@ -278,6 +284,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Repeat
         | EffectKind::Speed
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::Rate => rate_arg_end(tokens, args_start),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)

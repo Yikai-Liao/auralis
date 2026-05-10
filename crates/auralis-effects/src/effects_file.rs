@@ -665,11 +665,11 @@ mod tests {
 
     #[test]
     fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nstretch").unwrap_err();
+        let error = parse_effects_file_str("gain -3\ncompand").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `stretch` failed to parse: known SoX-ng effect `stretch` is not implemented by Auralis; missing SoX-ng coverage entry for `stretch`"
+            "effects file line 2, column 1: command `compand` failed to parse: known SoX-ng effect `compand` is not implemented by Auralis; missing SoX-ng coverage entry for `compand`"
         );
     }
 

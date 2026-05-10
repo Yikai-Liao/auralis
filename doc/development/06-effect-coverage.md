@@ -1092,6 +1092,23 @@ Implementation notes:
 
 ### Feature 6.6.8: `stretch`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Stretch` processor with SoX-ng's `factor`, `window`, `fade`,
+  `shift`, and `fading` options, including linear, sqrt, half-cosine, and
+  quarter-cosine cross-fade families.
+- Processing mirrors SoX-ng's channel-local window/shift state machine,
+  preserves sample-rate metadata, clips the mixed output to full scale, and
+  treats factor `1` as a null effect.
+- Wired `stretch` through the effect registry, typed command parser/rendering,
+  effect-chain execution, effects-file diagnostics, CLI positional chain path,
+  and fuzz smoke corpus.
+- Coverage includes unit/integration/property tests, standalone mono/stereo
+  SoX-ng golden cases, and an L0-L7 layered coverage matrix entry. SIMD is
+  documented as N/A for this scalar stateful window-overlap implementation.
+
 ### Feature 6.6.9: `tempo` core
 
 ### Feature 6.6.10: `tempo` tuning options

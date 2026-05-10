@@ -44,6 +44,7 @@ use crate::command_riaa::parse_riaa;
 use crate::command_saturation::{parse_saturation, render_saturation};
 use crate::command_softvol::{parse_softvol, render_softvol};
 use crate::command_speed::{parse_speed, render_speed};
+use crate::command_stretch::{parse_stretch, render_stretch};
 use crate::command_swap::parse_swap;
 use crate::command_treble::{parse_treble, render_treble};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
@@ -54,8 +55,8 @@ use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
     DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
     EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
-    Phaser, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Swap, Treble,
-    Tremolo, Trim, Upsample, Vol,
+    Phaser, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Speed, Stretch, Swap,
+    Treble, Tremolo, Trim, Upsample, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -139,6 +140,8 @@ pub enum EffectCommand {
     SoftVol(SoftVol),
     /// SoX-ng-style speed adjustment.
     Speed(Speed),
+    /// SoX-ng-style basic time stretcher.
+    Stretch(Stretch),
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap(Swap),
     /// SoX-ng-style treble tone control.
@@ -203,6 +206,7 @@ impl EffectCommand {
             EffectKind::Saturation => parse_saturation(effect, args),
             EffectKind::SoftVol => parse_softvol(effect, args),
             EffectKind::Speed => parse_speed(effect, args),
+            EffectKind::Stretch => parse_stretch(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
             EffectKind::Treble => parse_treble(effect, args),
             EffectKind::Tremolo => parse_tremolo(effect, args),
@@ -252,6 +256,7 @@ impl EffectCommand {
             Self::Saturation(_) => EffectKind::Saturation,
             Self::SoftVol(_) => EffectKind::SoftVol,
             Self::Speed(_) => EffectKind::Speed,
+            Self::Stretch(_) => EffectKind::Stretch,
             Self::Swap(_) => EffectKind::Swap,
             Self::Treble(_) => EffectKind::Treble,
             Self::Tremolo(_) => EffectKind::Tremolo,
@@ -307,6 +312,7 @@ impl EffectCommand {
             Self::Saturation(saturation) => render_saturation(*saturation),
             Self::SoftVol(softvol) => render_softvol(*softvol),
             Self::Speed(speed) => render_speed(*speed),
+            Self::Stretch(stretch) => render_stretch(*stretch),
             Self::Swap(_) => vec!["swap".to_owned()],
             Self::Treble(treble) => render_treble(*treble),
             Self::Tremolo(tremolo) => render_tremolo(*tremolo),

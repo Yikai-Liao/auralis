@@ -9,7 +9,7 @@ use auralis_effects::{
     Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
     LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Rate, Remix,
     RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
-    SoftVol, Speed, Swap, Treble, Tremolo, Trim, Upsample, Vol,
+    SoftVol, Speed, Stretch, Swap, Treble, Tremolo, Trim, Upsample, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -197,6 +197,13 @@ proptest! {
         prop_assert_sample_bits_eq(same_speed.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(same_speed.frames(), source.frames());
         prop_assert_eq!(same_speed.channels(), source.channels());
+
+        let same_stretch = Stretch::default()
+            .process_buffer(&source)
+            .expect("factor one stretch cannot fail");
+        prop_assert_sample_bits_eq(same_stretch.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(same_stretch.frames(), source.frames());
+        prop_assert_eq!(same_stretch.channels(), source.channels());
 
         let same_rate = Rate::new(source.spec().sample_rate())
             .process_buffer(&source)
@@ -445,6 +452,12 @@ proptest! {
             .process_buffer(&source)
             .expect("fixture sample rate can be multiplied");
         prop_assert_all_finite(&sped_up)?;
+
+        let stretched = Stretch::new(1.5, 1.0)
+            .expect("fixture stretch settings are valid")
+            .process_buffer(&source)
+            .expect("fixture stretch state is representable");
+        prop_assert_all_finite(&stretched)?;
 
         let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
             .expect("echo fixture is valid")
