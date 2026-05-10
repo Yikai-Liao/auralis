@@ -1419,6 +1419,26 @@ Scope:
 
 ### Feature 6.8.1: `fir` coefficient input
 
+Status: implemented.
+
+Implementation notes:
+
+- Added public `Fir`, `FirCoefficientSource`, and `FirCoefficients` types for
+  SoX-ng-style coefficient acquisition without registering `fir` as an
+  executable effect yet.
+- `Fir::parse_sox_args` mirrors SoX-ng's command split: no arguments read
+  coefficients from standard input, one argument is a coefficient-file path
+  even when it looks numeric, and two or more arguments are parsed as inline
+  finite coefficients.
+- `FirCoefficients::parse_text` parses coefficient-file text with
+  whitespace-separated finite numbers and `#` comments, preserving empty
+  coefficient files as empty lists because SoX-ng treats them as a null effect.
+- Coverage includes unit and doc tests for command-shape parsing, canonical
+  rendering, coefficient text comments, empty files, malformed inline input,
+  and non-finite coefficient rejection. This feature intentionally does not add
+  registry, chain execution, fuzz seeds, or SoX-ng golden rows; Feature 6.8.2
+  owns the streaming FIR processor and executable command surface.
+
 ### Feature 6.8.2: `fir` streaming processor
 
 ### Feature 6.8.3: `firfit`

@@ -105,6 +105,7 @@ mod effects_file;
 mod equalizer;
 mod error;
 mod fade;
+mod fir;
 mod flanger;
 mod gain;
 mod highpass;
@@ -175,6 +176,7 @@ pub use effects_file::{
 pub use equalizer::Equalizer;
 pub use error::{EffectError, Result};
 pub use fade::{Fade, FadeCurve};
+pub use fir::{Fir, FirCoefficientSource, FirCoefficients};
 pub use flanger::{Flanger, FlangerInterpolation, FlangerWave};
 pub use gain::{Gain, GainChannelMode, GainHeadroom};
 pub use highpass::{HighPass, HighPassMode};

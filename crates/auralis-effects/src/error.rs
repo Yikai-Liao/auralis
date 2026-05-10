@@ -217,6 +217,10 @@ pub enum EffectError {
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,
 
+    /// A FIR coefficient source had invalid numeric coefficients or path metadata.
+    #[error("fir coefficients must be finite numbers and coefficient file paths must be non-empty")]
+    InvalidFirCoefficients,
+
     /// A silence command had invalid periods, durations, thresholds, or options.
     #[error(
         "silence periods, durations, thresholds, and -l usage must match SoX-ng-compatible ranges"

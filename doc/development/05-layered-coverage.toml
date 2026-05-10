@@ -22,6 +22,21 @@ l6 = { status = "not_applicable", reason = "The initial primitive is scalar-only
 l7 = { status = "not_applicable", reason = "No parser or serialized command surface exists for the primitive in Feature 6.4.1.", tests = [] }
 
 [[subject]]
+id = "primitive.fir_coefficients"
+kind = "primitive"
+name = "fir-coefficients"
+summary = "SoX-ng-style FIR coefficient source and coefficient-file parser for the future fir processor."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "The coefficient input model parses scalar coefficients and does not consume deterministic audio corpus IDs directly.", tests = [] }
+l1 = { status = "not_applicable", reason = "The model does not read or write WAV containers; WAV behavior remains covered by WAV I/O features.", tests = [] }
+l2 = { status = "not_applicable", reason = "Feature 6.8.1 intentionally does not register an executable fir command; SoX-ng golden coverage belongs to the streaming processor feature.", tests = [] }
+l3 = { status = "covered", reason = "Unit and doc tests cover coefficient text comments, empty coefficient files, SoX-ng argument-shape parsing, canonical rendering, malformed inline input, and non-finite rejection.", tests = ["crates/auralis-effects/src/fir.rs"] }
+l4 = { status = "not_applicable", reason = "Coefficient input parsing is deterministic structured input handling rather than sample processing with metamorphic audio behavior.", tests = [] }
+l5 = { status = "not_applicable", reason = "No chunked audio processing exists until Feature 6.8.2 adds the FIR processor.", tests = [] }
+l6 = { status = "not_applicable", reason = "The coefficient input model has no backend-dispatched sample kernel.", tests = [] }
+l7 = { status = "not_applicable", reason = "Feature 6.8.1 intentionally does not expose fir through the shared effect command parser or fuzz target.", tests = [] }
+
+[[subject]]
 id = "primitive.rbj_biquad_coefficients"
 kind = "primitive"
 name = "rbj-biquad-coefficients"

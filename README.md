@@ -32,7 +32,7 @@ reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
-`Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
+`Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Silence`, `Vad`, and `Vol` effect processors, the typed `Fir` coefficient-input model, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
 fade, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
@@ -599,6 +599,11 @@ behavior.
 The implemented `noisered` command accepts a profile path and optional
 `0..=1` amount, loads SoX-ng-style `Channel N: ...` profile text, and applies
 deterministic scalar overlap-window spectral reduction.
+The typed `Fir` model parses SoX-ng-style coefficient input for the future
+`fir` processor: no arguments or `-` represent standard input, one argument is
+a coefficient-file path even when it looks numeric, and two or more arguments
+are inline finite coefficients. Coefficient text accepts whitespace-separated
+numbers and `#` comments.
 The implemented `tremolo` command accepts a required speed in hertz and an
 optional depth percentage, defaulting to SoX-ng's `40`.
 The implemented `overdrive` command accepts optional `gain` and `color`
@@ -1243,6 +1248,8 @@ Examples:
   SoX-ng-style text rendering for each channel
 - `noisered`: scalar overlap-window spectral noise reduction from
   SoX-ng-style profile text with configurable amount
+- `fir`: coefficient input parsing from stdin, one coefficient-file path, or
+  inline finite coefficients, with `#` comments in coefficient text
 - `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `overdrive`: SoX-ng's cubic soft-clipping drive with `color / 200` bias and
   a stateful high-pass output blend
