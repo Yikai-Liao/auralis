@@ -104,9 +104,10 @@ high-pass filter with optional width units and the single-pole `-1` form.
 The implemented `hilbert` command covers SoX-ng's Blackman-windowed Hilbert
 transform FIR filter with default sample-rate-derived taps and explicit
 odd tap-count overrides.
-The implemented `sinc` command covers SoX-ng-style low-pass and high-pass
-Kaiser-windowed FIR filters with attenuation, beta, transition-bandwidth,
-explicit-tap, auto-tap rounding, and low-pass delete-at-Nyquist options.
+The implemented `sinc` command covers SoX-ng-style low-pass, high-pass,
+band-pass, and band-reject Kaiser-windowed FIR filters with attenuation, beta,
+transition-bandwidth, explicit-tap, auto-tap rounding, and low-pass
+delete-at-Nyquist options.
 The implemented `loudness` command covers SoX-ng's ISO 226 equal-loudness
 FIR compensation with gain, reference-level, and half-length arguments.
 The implemented `riaa` command covers SoX-ng's no-argument RIAA playback
@@ -1265,8 +1266,8 @@ Examples:
   inline finite coefficients, with `#` comments in coefficient text
 - `firfit`: frequency/gain knot parsing from stdin, one knot-file path, or
   inline pairs, with scalar FIR coefficient design for fitted responses
-- `sinc`: low-pass and high-pass Kaiser-windowed FIR filtering with
-  deterministic scalar coefficient design
+- `sinc`: low-pass, high-pass, band-pass, and band-reject Kaiser-windowed FIR
+  filtering with deterministic scalar coefficient design
 - `tremolo`: sinusoidal amplitude modulation from `1 - depth / 100` to `1`
 - `overdrive`: SoX-ng's cubic soft-clipping drive with `color / 200` bias and
   a stateful high-pass output blend

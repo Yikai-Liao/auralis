@@ -114,7 +114,7 @@ pub enum EffectKind {
     Saturation,
     /// SoX-ng-style silence trimming.
     Silence,
-    /// SoX-ng-style low-pass or high-pass windowed-sinc FIR filter.
+    /// SoX-ng-style windowed-sinc FIR filter.
     Sinc,
     /// SoX-ng-style soft volume control.
     SoftVol,
@@ -589,8 +589,8 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "sinc",
         &[],
         "Sinc",
-        "sinc [-a att|-b beta] [-t tbw|-n taps] [freqHP|-freqLP] [-r] [-d]",
-        "apply a low-pass or high-pass windowed-sinc FIR filter",
+        "sinc [-a att|-b beta] [-t tbw|-n taps] [freqHP|-freqLP|freq-low-freq-high] [-r] [-d]",
+        "apply a low-pass, high-pass, band-pass, or band-reject windowed-sinc FIR filter",
     ),
     EffectDescriptor::new(
         EffectKind::Vad,

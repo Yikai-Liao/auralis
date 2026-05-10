@@ -1527,6 +1527,22 @@ Implementation notes:
 
 ### Feature 6.8.6: `sinc` band-pass and band-reject
 
+Status: implemented.
+
+Implementation notes:
+
+- Extended the public `SincBand` model with SoX-ng-style `low-high`
+  band-pass and reversed `high-low` band-reject ranges.
+- Band filters reuse the deterministic scalar Kaiser low-pass designer,
+  centered coefficient composition, and length-preserving FIR executor from
+  Feature 6.8.5.
+- Wired band range parsing, canonical rendering, effect-chain grouping, parser
+  fuzz coverage, L0-L7 coverage metadata, and standalone SoX-ng golden cases.
+- Coverage includes parser/rendering tests, invalid equal-edge rejection,
+  typed/chain processor equivalence, finite-output coverage, centered
+  band-pass/band-reject complement checks, and mono/stereo explicit-tap
+  goldens. SIMD remains N/A until a future vectorized FIR backend exists.
+
 ### Feature 6.8.7: `dither` TPDF and sloped TPDF
 
 Implement deterministic dither primitives and an explicit `dither` effect before

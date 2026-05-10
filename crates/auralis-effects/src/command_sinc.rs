@@ -112,10 +112,12 @@ fn apply_delete_option(
     }
     match band {
         SincBand::LowPass { frequency_hz, .. } => Ok(SincBand::low_pass(frequency_hz, true)),
-        SincBand::HighPass { .. } => Err(EffectCommandParseError::UnsupportedOption {
-            effect,
-            option: "-d".to_owned(),
-        }),
+        SincBand::HighPass { .. } | SincBand::BandPass { .. } | SincBand::BandReject { .. } => {
+            Err(EffectCommandParseError::UnsupportedOption {
+                effect,
+                option: "-d".to_owned(),
+            })
+        }
     }
 }
 
@@ -174,6 +176,12 @@ pub(super) fn render_sinc(sinc: Sinc) -> Vec<String> {
             }
         }
         SincBand::HighPass { frequency_hz } => tokens.push(render_f64(frequency_hz)),
+        SincBand::BandPass { lower_hz, upper_hz } => {
+            tokens.push(format!("{}-{}", render_f64(lower_hz), render_f64(upper_hz)));
+        }
+        SincBand::BandReject { lower_hz, upper_hz } => {
+            tokens.push(format!("{}-{}", render_f64(upper_hz), render_f64(lower_hz)));
+        }
     }
     tokens
 }
@@ -192,12 +200,33 @@ fn parse_sinc_band(effect: &'static str, arg: &str) -> CommandResult<SincBand> {
         ));
     }
 
-    if arg.contains('-') {
-        return Err(EffectCommandParseError::InvalidEffectConfig {
-            effect,
-            argument: "frequency-range",
-            source: EffectError::InvalidSinc,
-        });
+    if let Some((left, right)) = arg.split_once('-') {
+        if left.is_empty() || right.is_empty() {
+            return Err(EffectCommandParseError::InvalidEffectConfig {
+                effect,
+                argument: "frequency-range",
+                source: EffectError::InvalidSinc,
+            });
+        }
+        let left_hz = parse_frequency_hz(effect, left)?;
+        let right_hz = parse_frequency_hz(effect, right)?;
+        return if left_hz < right_hz {
+            Ok(SincBand::BandPass {
+                lower_hz: left_hz,
+                upper_hz: right_hz,
+            })
+        } else if right_hz < left_hz {
+            Ok(SincBand::BandReject {
+                lower_hz: right_hz,
+                upper_hz: left_hz,
+            })
+        } else {
+            Err(EffectCommandParseError::InvalidEffectConfig {
+                effect,
+                argument: "frequency-range",
+                source: EffectError::InvalidSinc,
+            })
+        };
     }
 
     Ok(SincBand::HighPass {
@@ -336,12 +365,31 @@ mod tests {
                 .unwrap()
             )
         );
+        assert_eq!(
+            parse_sinc("sinc", &["-n", "11", "1000-4000"])
+                .unwrap()
+                .render_tokens(),
+            ["sinc", "-n", "11", "1000-4000"]
+        );
+        assert_eq!(
+            parse_sinc("sinc", &["-n", "11", "4000-1000"]).unwrap(),
+            EffectCommand::Sinc(
+                Sinc::with_options(
+                    SincBand::BandReject {
+                        lower_hz: 1000.0,
+                        upper_hz: 4000.0,
+                    },
+                    SincOptions::with_taps(11).unwrap()
+                )
+                .unwrap()
+            )
+        );
     }
 
     #[test]
-    fn rejects_band_ranges_and_unsupported_phase_options() {
+    fn rejects_invalid_ranges_and_unsupported_phase_options() {
         assert_eq!(
-            parse_sinc("sinc", &["1000-4000"]).unwrap_err(),
+            parse_sinc("sinc", &["1000-1000"]).unwrap_err(),
             EffectCommandParseError::InvalidEffectConfig {
                 effect: "sinc",
                 argument: "frequency-range",

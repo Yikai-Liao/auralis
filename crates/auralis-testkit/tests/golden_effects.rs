@@ -125,6 +125,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_saturation_stereo_sqrt",
             "effect_silence_mono_leading_trim",
             "effect_silence_stereo_leading_trim",
+            "effect_sinc_bandpass_mono_11_taps",
+            "effect_sinc_bandreject_stereo_11_taps",
             "effect_sinc_highpass_stereo_11_taps",
             "effect_sinc_lowpass_mono_11_taps",
             "effect_softvol_mono_gain_1_5",

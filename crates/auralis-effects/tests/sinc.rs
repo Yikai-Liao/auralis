@@ -1,4 +1,4 @@
-//! Integration coverage for SoX-ng-style sinc low-pass and high-pass filtering.
+//! Integration coverage for SoX-ng-style sinc filtering.
 
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_effects::{
@@ -26,13 +26,32 @@ fn sinc_command_parses_renders_and_groups_with_next_effect() {
             .unwrap()
         )
     );
+    assert_eq!(
+        parse_effect_command(&["sinc", "-n", "11", "1000-4000"])
+            .unwrap()
+            .render_tokens(),
+        ["sinc", "-n", "11", "1000-4000"]
+    );
+    assert_eq!(
+        parse_effect_command(&["sinc", "-n", "11", "4000-1000"]).unwrap(),
+        EffectCommand::Sinc(
+            Sinc::with_options(
+                SincBand::BandReject {
+                    lower_hz: 1_000.0,
+                    upper_hz: 4_000.0
+                },
+                SincOptions::with_taps(11).unwrap(),
+            )
+            .unwrap()
+        )
+    );
 
-    let chain = parse_effect_chain(&["sinc", "-n", "11", "-4000", "reverse"]).unwrap();
+    let chain = parse_effect_chain(&["sinc", "-n", "11", "1000-4000", "reverse"]).unwrap();
 
     assert_eq!(chain.len(), 2);
     assert_eq!(
         chain.commands()[0].render_tokens(),
-        ["sinc", "-n", "11", "-4000"]
+        ["sinc", "-n", "11", "1000-4000"]
     );
     assert_eq!(chain.commands()[1].render_tokens(), ["reverse"]);
 }
@@ -58,8 +77,8 @@ fn sinc_chain_execution_matches_typed_processor() {
 }
 
 #[test]
-fn sinc_rejects_band_ranges_until_band_feature() {
-    let band = parse_effect_chain(&["sinc", "1000-4000"]).unwrap_err();
+fn sinc_rejects_invalid_ranges_and_unsupported_phase_options() {
+    let band = parse_effect_chain(&["sinc", "1000-1000"]).unwrap_err();
     assert!(matches!(
         band,
         auralis_effects::EffectChainParseError::CommandParseFailed {
@@ -86,8 +105,9 @@ fn sinc_rejects_band_ranges_until_band_feature() {
 fn sinc_output_is_finite_and_length_preserving() {
     let source = mono_audio_buffer(vec![0.25, -0.5, 0.75, -0.25, 0.0, 0.5]);
     let filtered = Sinc::with_options(
-        SincBand::HighPass {
-            frequency_hz: 1_000.0,
+        SincBand::BandReject {
+            lower_hz: 1_000.0,
+            upper_hz: 4_000.0,
         },
         SincOptions::with_taps(11).unwrap(),
     )

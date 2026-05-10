@@ -266,6 +266,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_sinc_bandpass_mono_11_taps]
+input = "effects/sinc_bandpass_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["sinc", "-n", "11", "1000-4000"]
+sox_ng = ["sinc", "-n", "11", "1000-4000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_sinc_bandreject_stereo_11_taps]
+input = "effects/sinc_bandreject_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["sinc", "-n", "11", "4000-1000"]
+sox_ng = ["sinc", "-n", "11", "4000-1000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_loudness_mono_identity]
 input = "effects/loudness_mono.wav"
 corpus_id = "l0/sine_mono_32"

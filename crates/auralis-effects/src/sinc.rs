@@ -14,11 +14,11 @@ const MAX_TAPS: u32 = 1_073_741_823;
 
 /// SoX-ng-style windowed-sinc FIR filter.
 ///
-/// Feature 6.8.5 covers the low-pass and high-pass forms:
-/// `sinc [options] -freq` and `sinc [options] freq`. The filter is designed as
-/// a deterministic scalar Kaiser-windowed FIR and executed through the shared
-/// length-preserving FIR processor. Band-pass and band-reject ranges are owned
-/// by Feature 6.8.6.
+/// Feature 6.8.6 covers the low-pass, high-pass, band-pass, and band-reject
+/// forms: `sinc [options] -freq`, `sinc [options] freq`,
+/// `sinc [options] freq-low-freq-high`, and the reversed band-reject range.
+/// The filter is designed as a deterministic scalar Kaiser-windowed FIR and
+/// executed through the shared length-preserving FIR processor.
 ///
 /// # Examples
 ///
@@ -39,7 +39,7 @@ const MAX_TAPS: u32 = 1_073_741_823;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Sinc {
-    /// Frequency range covered by this Feature 6.8.5 sinc filter.
+    /// Frequency range covered by this sinc filter.
     pub band: SincBand,
 
     /// FIR design options.
@@ -73,6 +73,32 @@ impl Sinc {
         Self::with_options(SincBand::HighPass { frequency_hz }, SincOptions::default())
     }
 
+    /// Creates a band-pass sinc filter with default SoX-ng options.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidSinc`] when either edge is not finite and
+    /// positive, or when `lower_hz >= upper_hz`.
+    pub fn band_pass(lower_hz: f64, upper_hz: f64) -> Result<Self> {
+        Self::with_options(
+            SincBand::BandPass { lower_hz, upper_hz },
+            SincOptions::default(),
+        )
+    }
+
+    /// Creates a band-reject sinc filter with default SoX-ng options.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidSinc`] when either edge is not finite and
+    /// positive, or when `lower_hz >= upper_hz`.
+    pub fn band_reject(lower_hz: f64, upper_hz: f64) -> Result<Self> {
+        Self::with_options(
+            SincBand::BandReject { lower_hz, upper_hz },
+            SincOptions::default(),
+        )
+    }
+
     /// Creates a sinc filter with explicit design options.
     ///
     /// # Errors
@@ -94,25 +120,46 @@ impl Sinc {
     pub fn coefficients_for_sample_rate(self, sample_rate: SampleRate) -> Result<FirCoefficients> {
         let sample_rate_hz = f64::from(sample_rate.as_u32());
         let nyquist_hz = sample_rate_hz * 0.5;
-        let frequency_hz = self.band.frequency_hz();
-
-        if frequency_hz >= nyquist_hz {
-            if matches!(
-                self.band,
-                SincBand::LowPass {
-                    delete_at_nyquist: true,
-                    ..
+        let coefficients = match self.band {
+            SincBand::LowPass {
+                frequency_hz,
+                delete_at_nyquist,
+            } => {
+                if frequency_hz >= nyquist_hz {
+                    if delete_at_nyquist {
+                        return FirCoefficients::new(Vec::new());
+                    }
+                    return Err(EffectError::InvalidSinc);
                 }
-            ) {
-                return FirCoefficients::new(Vec::new());
+                self.design_low_pass(sample_rate_hz, frequency_hz)?
             }
-            return Err(EffectError::InvalidSinc);
-        }
-
-        let mut coefficients = self.design_low_pass(sample_rate_hz, frequency_hz)?;
-        if matches!(self.band, SincBand::HighPass { .. }) {
-            invert_filter(&mut coefficients);
-        }
+            SincBand::HighPass { frequency_hz } => {
+                ensure_below_nyquist(frequency_hz, nyquist_hz)?;
+                let mut coefficients = self.design_low_pass(sample_rate_hz, frequency_hz)?;
+                invert_filter(&mut coefficients);
+                coefficients
+            }
+            SincBand::BandPass { lower_hz, upper_hz } => {
+                ensure_below_nyquist(lower_hz, nyquist_hz)?;
+                ensure_below_nyquist(upper_hz, nyquist_hz)?;
+                let mut beta = self.initial_beta();
+                let mut coefficients = combine_high_low_pass(
+                    self.design_low_pass_with_beta(sample_rate_hz, lower_hz, &mut beta)?,
+                    self.design_low_pass_with_beta(sample_rate_hz, upper_hz, &mut beta)?,
+                )?;
+                invert_filter(&mut coefficients);
+                coefficients
+            }
+            SincBand::BandReject { lower_hz, upper_hz } => {
+                ensure_below_nyquist(lower_hz, nyquist_hz)?;
+                ensure_below_nyquist(upper_hz, nyquist_hz)?;
+                let mut beta = self.initial_beta();
+                combine_high_low_pass(
+                    self.design_low_pass_with_beta(sample_rate_hz, upper_hz, &mut beta)?,
+                    self.design_low_pass_with_beta(sample_rate_hz, lower_hz, &mut beta)?,
+                )?
+            }
+        };
 
         FirCoefficients::new(coefficients).map_err(|_| EffectError::InvalidSinc)
     }
@@ -130,6 +177,20 @@ impl Sinc {
     }
 
     fn design_low_pass(self, sample_rate_hz: f64, frequency_hz: f64) -> Result<Vec<f64>> {
+        let mut beta = self.initial_beta();
+        self.design_low_pass_with_beta(sample_rate_hz, frequency_hz, &mut beta)
+    }
+
+    fn initial_beta(self) -> f64 {
+        self.options.beta.unwrap_or(-1.0)
+    }
+
+    fn design_low_pass_with_beta(
+        self,
+        sample_rate_hz: f64,
+        frequency_hz: f64,
+        beta: &mut f64,
+    ) -> Result<Vec<f64>> {
         let nyquist_hz = sample_rate_hz * 0.5;
         let cutoff = frequency_hz / nyquist_hz;
         if cutoff <= 0.0 || cutoff >= 1.0 {
@@ -137,7 +198,6 @@ impl Sinc {
         }
 
         let mut taps = self.options.taps.unwrap_or(0);
-        let mut beta = self.options.beta.unwrap_or(-1.0);
         let transition = self
             .options
             .transition_width_hz
@@ -147,7 +207,7 @@ impl Sinc {
             self.options.attenuation_db,
             cutoff,
             transition,
-            &mut beta,
+            beta,
             &mut taps,
         )?;
         if self.options.taps.is_none() {
@@ -161,12 +221,12 @@ impl Sinc {
         make_low_pass(
             usize::try_from(taps).map_err(|_| EffectError::InvalidSinc)?,
             cutoff,
-            beta,
+            *beta,
         )
     }
 }
 
-/// Frequency range selected by a Feature 6.8.5 sinc filter.
+/// Frequency range selected by a sinc filter.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SincBand {
     /// `sinc -freq`, low-pass filtering up to `frequency_hz`.
@@ -182,6 +242,22 @@ pub enum SincBand {
         /// High-pass cutoff frequency in hertz.
         frequency_hz: f64,
     },
+
+    /// `sinc low-high`, band-pass filtering between two frequencies.
+    BandPass {
+        /// Lower band edge in hertz.
+        lower_hz: f64,
+        /// Upper band edge in hertz.
+        upper_hz: f64,
+    },
+
+    /// `sinc high-low`, band-reject filtering outside two frequencies.
+    BandReject {
+        /// Lower rejected band edge in hertz.
+        lower_hz: f64,
+        /// Upper rejected band edge in hertz.
+        upper_hz: f64,
+    },
 }
 
 impl SincBand {
@@ -195,21 +271,46 @@ impl SincBand {
         }
     }
 
-    /// Returns the cutoff frequency in hertz.
+    /// Returns the primary cutoff frequency in hertz.
     #[must_use]
     pub const fn frequency_hz(self) -> f64 {
         match self {
             Self::LowPass { frequency_hz, .. } | Self::HighPass { frequency_hz } => frequency_hz,
+            Self::BandPass { lower_hz, .. } | Self::BandReject { lower_hz, .. } => lower_hz,
         }
     }
 
     pub(crate) fn validate(self) -> Result<()> {
-        let frequency_hz = self.frequency_hz();
-        if frequency_hz.is_finite() && frequency_hz > 0.0 {
-            Ok(())
-        } else {
-            Err(EffectError::InvalidSinc)
+        match self {
+            Self::LowPass { frequency_hz, .. } | Self::HighPass { frequency_hz } => {
+                validate_frequency(frequency_hz)
+            }
+            Self::BandPass { lower_hz, upper_hz } | Self::BandReject { lower_hz, upper_hz } => {
+                validate_frequency(lower_hz)?;
+                validate_frequency(upper_hz)?;
+                if lower_hz < upper_hz {
+                    Ok(())
+                } else {
+                    Err(EffectError::InvalidSinc)
+                }
+            }
         }
+    }
+}
+
+fn validate_frequency(frequency_hz: f64) -> Result<()> {
+    if frequency_hz.is_finite() && frequency_hz > 0.0 {
+        Ok(())
+    } else {
+        Err(EffectError::InvalidSinc)
+    }
+}
+
+fn ensure_below_nyquist(frequency_hz: f64, nyquist_hz: f64) -> Result<()> {
+    if frequency_hz < nyquist_hz {
+        Ok(())
+    } else {
+        Err(EffectError::InvalidSinc)
     }
 }
 
@@ -376,6 +477,29 @@ fn invert_filter(coefficients: &mut [f64]) {
     coefficients[center] += 1.0;
 }
 
+fn combine_high_low_pass(mut high_pass_source: Vec<f64>, low_pass: Vec<f64>) -> Result<Vec<f64>> {
+    invert_filter(&mut high_pass_source);
+    add_centered(high_pass_source, low_pass)
+}
+
+fn add_centered(first: Vec<f64>, second: Vec<f64>) -> Result<Vec<f64>> {
+    let (mut longer, shorter) = if first.len() >= second.len() {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    let offset = longer
+        .len()
+        .checked_sub(shorter.len())
+        .ok_or(EffectError::InvalidSinc)?
+        / 2;
+
+    for (index, coefficient) in shorter.into_iter().enumerate() {
+        longer[index + offset] += coefficient;
+    }
+    Ok(longer)
+}
+
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -493,8 +617,42 @@ mod tests {
     }
 
     #[test]
+    fn band_pass_and_reject_ranges_produce_finite_odd_coefficients() {
+        let options = SincOptions::with_taps(11).unwrap();
+        let band_pass = Sinc::with_options(
+            SincBand::BandPass {
+                lower_hz: 1_000.0,
+                upper_hz: 4_000.0,
+            },
+            options,
+        )
+        .unwrap()
+        .coefficients_for_sample_rate(SampleRate::new(48_000).unwrap())
+        .unwrap();
+        let band_reject = Sinc::with_options(
+            SincBand::BandReject {
+                lower_hz: 1_000.0,
+                upper_hz: 4_000.0,
+            },
+            options,
+        )
+        .unwrap()
+        .coefficients_for_sample_rate(SampleRate::new(48_000).unwrap())
+        .unwrap();
+
+        assert_eq!(band_pass.len(), 11);
+        assert_eq!(band_reject.len(), 11);
+        assert!(band_pass.as_slice().iter().all(|value| value.is_finite()));
+        assert!(band_reject.as_slice().iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
     fn rejects_invalid_frequency_and_options() {
         assert_eq!(Sinc::low_pass(0.0).unwrap_err(), EffectError::InvalidSinc);
+        assert_eq!(
+            Sinc::band_pass(4_000.0, 1_000.0).unwrap_err(),
+            EffectError::InvalidSinc
+        );
         assert_eq!(
             SincOptions::with_taps(10).unwrap_err(),
             EffectError::InvalidSinc

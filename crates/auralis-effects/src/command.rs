@@ -174,7 +174,7 @@ pub enum EffectCommand {
     Saturation(Saturation),
     /// SoX-ng-style silence trimming.
     Silence(Silence),
-    /// SoX-ng-style low-pass or high-pass windowed-sinc FIR filter.
+    /// SoX-ng-style windowed-sinc FIR filter.
     Sinc(Sinc),
     /// SoX-ng-style soft volume control.
     SoftVol(SoftVol),
