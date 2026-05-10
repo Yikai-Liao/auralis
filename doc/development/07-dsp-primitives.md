@@ -54,12 +54,12 @@ diagnostics, registry entries, and compatibility quirks remain in
 | RBJ width units and cookbook coefficient helpers | `crates/auralis-dsp/src/biquad_design.rs`, re-exported by `auralis-effects` | Current users: tone/filter effects listed above. Likely users: future EQ/filter families. | Moved with the biquad coefficient type in Feature 7.2 because inherent RBJ helper methods must live in the crate that owns `BiquadCoefficients`. Width parsing remains in command modules. | Scalar coefficient math only. SIMD not applicable. | Keep closed-form coefficient tests and invalid-design coverage; verify concrete effect command rendering and SoX-ng golden behavior do not change. |
 | FIR coefficient storage, centered convolution state, and tail flush | `crates/auralis-dsp/src/fir.rs`, wrapped by `auralis-effects` command/source handling | Current users: `fir`, `sinc`, `hilbert`, `loudness`, `earwax` uses a separate fixed FIR state. Likely users: more FIR filter families and future resampling filters. | Moved to `auralis-dsp` in Feature 7.3. `auralis-effects` keeps coefficient text/file/stdin semantics, diagnostics, command parsing, registry entries, typed effect wrappers, and public compatibility wrappers. | Scalar stateful reference exists for shared FIR. SIMD remains N/A until a vectorized convolution backend is deliberately added. | Preserve FIR analytical alignment tests, sinc/hilbert/loudness/effect regressions, chunk-state tests, SoX-ng goldens, and explicit tail/finish behavior tests. |
 | Window design helpers for FIR filters | `sinc.rs`, `hilbert.rs`, `loudness.rs`, and `noisered.rs` | Current users: Kaiser windowed `sinc`, Blackman-windowed `hilbert`, equal-loudness FIR, Hann-windowed noise reduction. Likely users: future FIR/filter design features. | Keep effect-local until at least two concrete effects need the same parameterized helper. The current formulas are tightly coupled to SoX-ng command semantics and accepted ranges. | Scalar coefficient math only. SIMD not applicable. | Extraction would need analytical tests for window coefficients and unchanged SoX-ng goldens for every affected effect. |
-| Envelope followers, attack/decay smoothing, and dB transfer curves | `compand.rs` and `mcompand.rs` | Current users: `compand`, `mcompand`. Likely users: compressor/expander or limiter effects. | Candidate for later extraction after FIR. The transfer curve and follower are reusable, but current behavior is heavily SoX-ng-shaped and still easiest to review with compand tests. | Scalar stateful reference exists. SIMD N/A until a backend can process independent channels or bands without changing envelope ordering. | Preserve transfer-curve analytical tests, shared/per-channel envelope tests, mcompand crossover tests, L5 chunk-invariance if a streaming state is exposed, and SoX-ng goldens. |
+| Envelope followers, attack/decay smoothing, and dB transfer curves | `compand.rs` and `mcompand.rs` | Current users: `compand`, `mcompand`. Likely users: compressor/expander or limiter effects. | Deferred by Feature 7.4. The transfer curve and follower are reusable, but current behavior is heavily SoX-ng-shaped, `mcompand` reuses whole `Compand` command configs, and delay/look-ahead state is intertwined with planar/interleaved conversion. Extract only after a narrower streaming-state contract exists. | Scalar stateful reference exists. SIMD N/A until a backend can process independent channels or bands without changing envelope ordering. | Preserve transfer-curve analytical tests, shared/per-channel envelope tests, mcompand crossover tests, L5 chunk-invariance if a streaming state is exposed, and SoX-ng goldens. |
 | Modulation oscillators, waveform generation, and phase handling | `chorus.rs`, `flanger.rs`, `phaser.rs`, `tremolo.rs`, `synth.rs` | Current users: chorus/flanger/phaser LFOs, tremolo envelope, synth waveform/noise generation. Likely users: vibrato, more modulation effects. | Audit again after biquad/FIR. There is clear duplication pressure, but each effect currently uses slightly different phase, range, and interpolation semantics. Start by extracting only a tiny waveform helper if a future feature needs it. | Scalar math exists in effect-local code. SIMD mostly N/A for stateful LFO setup; generated sample loops might later get differential tests. | Need waveform analytical tests, phase-wrap tests, effect regressions, SoX-ng goldens, and fuzz seeds for waveform option parsing where command surfaces are touched. |
 | Delay lines, interpolation, feedback, and explicit flush state | `delay.rs`, `echo.rs`, `echos.rs`, `chorus.rs`, `flanger.rs`, `phaser.rs`, `synth.rs` | Current users: fixed delay, echo taps, chorus/flanger/phaser feedback buffers, synth variable delay. Likely users: vibrato, reverb/all-pass comb helpers. | Candidate after modulation audit. Keep whole-buffer `delay` effect local for now; a reusable primitive should be a streaming/channel-local delay line with explicit interpolation and flush contracts. | Scalar stateful code exists in several effect-local forms. SIMD N/A until the API separates per-sample state from channel-parallel dispatch. | Need analytical delay-line tests, interpolation tests, tail/flush tests, effect-level regressions, and SoX-ng goldens for each affected effect. |
 | Windows, overlap-add/search, crossfade curves, and time-scale state | `stretch.rs`, `tempo.rs`, `pitch.rs`, `splice.rs`, `bend.rs` | Current users: time-domain stretch/tempo/pitch, splice crossfades, bend segment resampling. Likely users: higher quality time-scale and pitch work. | Keep effect-local until the tempo/stretch implementations stabilize further. These routines are algorithm-specific and extraction would be high-risk without a smaller shared kernel. | Scalar whole-buffer reference exists. SIMD N/A for current search/overlap state. | Need deterministic window/crossfade analytical tests, whole-buffer shape tests, chunk-state design before L5 can apply, and SoX-ng goldens. |
 | FFT/STFT spectral profiles and overlap state | `noiseprof.rs` and `noisered.rs` | Current users: noise profile collection and noise reduction. Likely users: spectral analysis, spectral gating, future STFT effects. | Blocked from immediate extraction. The current code depends on `rustfft` inside `auralis-effects`; moving it would require deciding whether `auralis-dsp` owns FFT dependencies and spectral profile formats. | Scalar FFT-domain reference through `rustfft`. SIMD/backend dispatch not currently controlled by Auralis. | First record dependency ownership, profile serialization boundaries, golden coverage, and regression tests for profile text compatibility. |
-| Deterministic noise, dither, noise shaping, and quantization | `dither.rs` and `synth.rs` | Current users: `dither`, synth noise waveforms. Likely users: automatic output dither, future noise generators, quantizers, and format boundaries. | Candidate after FIR if automatic dither insertion or more noise generators need shared state. Keep SoX-ng `dither` command options in `auralis-effects`. | Scalar stateful reference exists. SIMD N/A for the stateful PRNG/noise-shaping loop. | Preserve deterministic seed tests, quantization bounds, noise-shape regression, output-policy integration tests if added, and SoX-ng goldens. |
+| Deterministic noise, dither, noise shaping, and quantization | `dither.rs` and `synth.rs` | Current users: `dither`, explicit output-boundary dither policy, synth noise waveforms. Likely users: automatic output dither, future noise generators, quantizers, and format boundaries. | Selected by Feature 7.4 as the next extraction target. Move the deterministic dither configuration, PRNG/noise-shaped state, and quantization helper into `auralis-dsp`; keep SoX-ng command parsing, CLI/output-policy choices, diagnostics, and compatibility re-exports in boundary crates. | Scalar stateful reference exists. SIMD N/A for the stateful PRNG/noise-shaping loop. | Preserve deterministic seed tests, quantization bounds, noise-shape regression, output-policy integration tests, chunk invariance, explicit dither SoX-ng goldens, and automatic output-dither goldens. |
 | Resampling scaffolds, interpolation, and rate metadata transforms | `rate.rs`, `speed.rs`, `pitch.rs`, `bend.rs`, `downsample.rs`, `upsample.rs` | Current users: scalar linear `rate`, metadata speed, pitch/tempo composition, bend segment resampling, simple up/downsample effects. Likely users: future polyphase resampler. | Keep current scaffolds effect-local until the format/effect roadmap asks for a real resampling primitive. A future polyphase core should start in `auralis-dsp`, but the current linear scaffold is not the desired long-term API. | Scalar whole-buffer reference exists; future polyphase may need scalar-vs-SIMD tests. | Need analytical interpolation tests, sample-rate metadata tests, output-policy/effect equivalence tests, SoX-ng goldens where comparable, and scalar-vs-SIMD differential tests for a future kernel. |
 | Mixing, channel mapping, gain staging, clipping, and full-scale policies | `remix.rs`, `channels.rs`, `gain.rs`, `norm.rs`, `vol.rs`, `softvol.rs`, chain/output-policy modules, existing kernels in `auralis-dsp`/`auralis-simd` | Current users: channel conversion, remix, combiners, gain/headroom, output guard/norm/dither policies. Likely users: additional mix/combine and format-boundary work. | Partially extracted already for simple gain/dc/fade/mix/multiply kernels. Keep policy-heavy pieces in `auralis-effects` or pipeline modules; only leaf sample kernels should move to `auralis-dsp`/`auralis-simd`. | Scalar and SIMD exist for simple data-parallel kernels. Policy scans and routing are scalar/structural. | Preserve scalar-vs-SIMD differential tests, effect/CLI equivalence, output-policy goldens, and property tests for clipping/finite output. |
 | Analyzer metrics, RMS/peak windows, and report accumulation state | `stat.rs`, `stats.rs`, `noiseprof.rs` | Current users: `stat`, `stats`, noise profile collection. Likely users: meters, loudness reports, coverage metrics. | Keep effect-local until a second non-SoX report surface needs the same accumulator. Report formats and field names are command-facing and should not leak into `auralis-dsp`. | Scalar whole-buffer analyzers. SIMD N/A unless a future scan kernel is backend-dispatched. | Need report-field analytical tests, JSON/text rendering regressions, non-finite sample diagnostics, and SoX-ng parity tests where comparable. |
@@ -73,9 +73,14 @@ diagnostics, registry entries, and compatibility quirks remain in
 2. Completed: split the FIR numeric primitive from command-style coefficient
    sources, then move the reusable validated coefficient container and centered
    `FirState` into `auralis-dsp`.
-3. Revisit dither/noise state or compand transfer state only after the first
-   two extraction commits prove the crate-boundary pattern.
-4. Keep spectral/FFT, time-scale, resampling, and analyzer report primitives in
+3. Selected: extract deterministic dither/noise state next. It has two current
+   call surfaces (`dither` and output-boundary dither), a small self-contained
+   state type, and existing seed/chunk/golden coverage. Preserve
+   `auralis-effects` re-exports and keep command parsing at the effect boundary.
+4. Deferred: compand envelope/transfer extraction needs a narrower streaming
+   state contract first because `compand` and `mcompand` currently share
+   command-shaped configs and delay/crossover behavior.
+5. Keep spectral/FFT, time-scale, resampling, and analyzer report primitives in
    their current owners until a later feature narrows dependency ownership and
    streaming-state contracts.
 
@@ -162,7 +167,7 @@ Required tests:
 
 ### Feature 7.4: next reusable primitive family selection
 
-Status: planned.
+Status: completed.
 
 Choose the next primitive family after the successful biquad and FIR boundary
 moves. The next leaf should narrow whether deterministic dither/noise state or
@@ -173,3 +178,54 @@ moving code.
 If an audited primitive has only one effect user, no foreseeable reuse, no
 backend-dispatch need, and no independent analytical-test value, leave it
 effect-local and record that decision instead of moving code for its own sake.
+
+Feature 7.4 selects deterministic dither/noise as the next reusable primitive
+family. The extraction has the lower-risk path because the current `Dither`
+configuration and `DitherState` are compact, deterministic, chunk-invariant,
+already used by both the `dither` effect and explicit output-boundary dither,
+and do not depend on effect command parsing. The selected owner is
+`auralis-dsp`: it should own the reusable dither configuration, deterministic
+PRNG state, Shibata-style noise-shaping feedback state, normalized-to-internal
+quantization helpers, and scalar processing loop.
+
+`auralis-effects` must keep SoX-ng command parsing, option rendering,
+diagnostics, registry entries, and public compatibility re-exports so existing
+typed-effect users can continue to use `auralis_effects::{Dither, DitherState,
+DitherMode, DitherNoiseShape, DEFAULT_DITHER_SEED}`. The high-level `auralis`
+output-dither policy may either call the DSP primitive directly or continue
+through a compatibility wrapper, but public APIs must remain Auralis-owned and
+must not expose implementation crate details through `auralis-core`.
+
+Compand envelope/transfer extraction is deliberately deferred. Although the
+transfer curve and envelope follower are reusable, the current implementation
+shares whole command-shaped `Compand` configs with `mcompand`, mixes
+shared/per-channel envelope grouping with look-ahead delay buffers, and still
+needs a smaller streaming-state contract before a low-risk owner move.
+
+Required tests for the dither/noise extraction:
+
+- analytical primitive tests in `auralis-dsp` for invalid precision,
+  deterministic seed sequences, quantization bounds, non-finite input policy,
+  and Shibata feedback state;
+- chunk-invariance tests for plain TPDF, sloped TPDF, and Shibata-shaped
+  processing through the new DSP owner;
+- effect-level regression tests proving command parsing, rendering, typed
+  construction, registry visibility, and chain execution are unchanged;
+- `auralis` output-policy integration tests proving explicit output dither
+  remains deterministic and happens at the same boundary;
+- existing explicit `dither` SoX-ng goldens and automatic output-dither goldens;
+- SIMD N/A documented for the stateful PRNG/noise-shaping loop unless a later
+  vectorized design can prove identical state ordering.
+
+### Feature 7.5: deterministic dither/noise primitive extraction
+
+Status: planned.
+
+Move the reusable deterministic dither/noise primitive selected by Feature 7.4
+into `auralis-dsp`. Preserve the existing `auralis-effects` public names as
+re-exports or compatibility wrappers, keep SoX-ng command parsing and
+diagnostics in `auralis-effects`, and keep high-level output-dither policy
+behavior unchanged.
+
+This feature must not move synth waveform generation or command-specific
+dither options into `auralis-dsp`; those remain separate boundary concerns.
