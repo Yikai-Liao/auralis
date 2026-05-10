@@ -99,6 +99,9 @@ pub enum EffectKind {
     /// Zero padding before and after the input.
     Pad,
 
+    /// SoX-ng-style phaser swept delay with feedback.
+    Phaser,
+
     /// SoX-ng-style finite output repetition.
     Repeat,
 
@@ -414,6 +417,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Pad",
         "pad {length[@position]}",
         "add zero-valued frames before, after, or inside the input",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Phaser,
+        "phaser",
+        &[],
+        "Phaser",
+        "phaser [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay [regen [speed [-s|-t]]]]]]",
+        "apply a swept-delay phaser with feedback",
     ),
     EffectDescriptor::new(
         EffectKind::Repeat,
@@ -911,18 +922,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("phaser").unwrap_err();
+        let error = EffectRegistry::resolve("reverb").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "phaser".to_owned(),
+                name: "reverb".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `phaser`")
+                .contains("missing SoX-ng coverage entry for `reverb`")
         );
     }
 

@@ -87,6 +87,16 @@ pub enum EffectError {
     #[error("flanger delay line exceeds representable audio buffer length")]
     FlangerLengthOverflow,
 
+    /// A phaser processor had invalid gains, delay parameters, or modulation settings.
+    #[error(
+        "phaser gains and regen must be finite in -1..=1, delay must be finite in 0..=1000 ms, speed finite and positive, and the resolved delay line must fit the output buffer"
+    )]
+    InvalidPhaser,
+
+    /// A phaser processor would create a delay-line shape that cannot be represented.
+    #[error("phaser delay line exceeds representable audio buffer length")]
+    PhaserLengthOverflow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

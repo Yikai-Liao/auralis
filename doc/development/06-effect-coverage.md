@@ -903,6 +903,24 @@ Implementation notes:
 
 ### Feature 6.5.7: `phaser`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Phaser` effect with SoX-ng's gain-in, gain-out, delay,
+  regeneration, speed, sine/triangle modulation, and none/linear/quadratic
+  interpolation parameters. Defaults match SoX-ng: gain-in 0.4, gain-out 0.74,
+  3 ms delay, 0.4 regeneration, 0.5 Hz speed, sine wave, and no interpolation.
+- Wired `phaser [-n|-l|-q] [-s|-t] [gain-in [gain-out [delay [regen [speed
+  [-s|-t]]]]]]` through the effect registry, typed command parser, effect-chain
+  execution, effects-file diagnostics, CLI positional chain path, and parser
+  fuzz corpus.
+- Processing uses channel-local feedback delay lines, clips after output gain,
+  preserves input length, and intentionally does not emit a delayed tail.
+- Coverage includes analytical/unit, integration, L4 finite-output property,
+  parser fuzz, layered coverage metadata, and standalone SoX-ng golden cases
+  for linear mono and triangle/no-interpolation stereo phaser commands.
+
 ### Feature 6.5.8: `reverb`
 
 These effects are stateful. Each feature must document latency, tail behavior,

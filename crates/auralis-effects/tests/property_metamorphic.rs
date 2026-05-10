@@ -7,8 +7,9 @@ use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
     Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos,
     EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass,
-    Norm, Oops, Overdrive, Pad, Remix, RemixOutputSpec, RemixSource, Repeat, Reverse, Riaa,
-    Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix, RemixOutputSpec,
+    RemixSource, Repeat, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap, Treble, Tremolo,
+    Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -433,6 +434,20 @@ proptest! {
         .process_buffer(&source)
         .expect("small generated flanger cannot overflow");
         prop_assert_all_finite(&flanged)?;
+
+        let phased = Phaser::new(
+            0.4,
+            0.74,
+            1.0,
+            0.4,
+            1.0,
+            PhaserWave::Sine,
+            PhaserInterpolation::None,
+        )
+        .expect("phaser fixture is valid")
+        .process_buffer(&source)
+        .expect("small generated phaser cannot overflow");
+        prop_assert_all_finite(&phased)?;
 
         let repeated = Repeat::new(2)
             .expect("small repeat count is valid")

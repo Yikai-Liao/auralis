@@ -40,6 +40,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Norm(_)
         | EffectCommand::Oops(_)
         | EffectCommand::Pad(_)
+        | EffectCommand::Phaser(_)
         | EffectCommand::Repeat(_)
         | EffectCommand::Remix(_)
         | EffectCommand::Trim(_) => unreachable!("buffer commands returned early"),
@@ -112,6 +113,11 @@ fn apply_buffer_command(
             *audio = flanger
                 .process_buffer(audio)
                 .map_err(|source| ("flanger", source))?;
+        }
+        EffectCommand::Phaser(phaser) => {
+            *audio = phaser
+                .process_buffer(audio)
+                .map_err(|source| ("phaser", source))?;
         }
         EffectCommand::Norm(norm) => norm
             .process_buffer_with_backend(audio, requested_backend)
@@ -218,6 +224,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Chorus => chorus_arg_end(tokens, args_start),
         EffectKind::Fade => fade_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
+        EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
         EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {
             optional_arg_end(tokens, args_start, 1)
@@ -297,6 +304,10 @@ fn chorus_arg_end(tokens: &[&str], args_start: usize) -> usize {
 }
 
 fn flanger_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    chorus_arg_end(tokens, args_start)
+}
+
+fn phaser_arg_end(tokens: &[&str], args_start: usize) -> usize {
     chorus_arg_end(tokens, args_start)
 }
 

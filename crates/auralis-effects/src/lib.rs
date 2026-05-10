@@ -63,6 +63,7 @@ mod command_norm;
 mod command_oops;
 mod command_overdrive;
 mod command_pad;
+mod command_phaser;
 mod command_remix;
 mod command_repeat;
 mod command_reverse;
@@ -92,6 +93,7 @@ mod norm;
 mod oops;
 mod overdrive;
 mod pad;
+mod phaser;
 mod registry;
 mod remix;
 mod repeat;
@@ -143,6 +145,7 @@ pub use norm::Norm;
 pub use oops::Oops;
 pub use overdrive::{Overdrive, OverdriveState};
 pub use pad::{Pad, PositionedPad};
+pub use phaser::{Phaser, PhaserInterpolation, PhaserWave};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,

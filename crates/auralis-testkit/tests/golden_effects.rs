@@ -5,6 +5,7 @@ use auralis_testkit::golden::GoldenManifest;
 const EFFECTS_MANIFEST: &str = include_str!("../../../tests/golden/effects.toml");
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn effects_golden_manifest_records_standalone_effect_cases() {
     let manifest = GoldenManifest::parse_toml(EFFECTS_MANIFEST).unwrap();
     let ids = manifest.iter().map(|(id, _)| id).collect::<Vec<_>>();
@@ -76,6 +77,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_pad_mono_positioned",
             "effect_pad_stereo_both_sides",
             "effect_pad_stereo_positioned",
+            "effect_phaser_mono_linear",
+            "effect_phaser_stereo_triangle",
             "effect_remix_mono_silent_copy",
             "effect_remix_stereo_auto_power",
             "effect_remix_stereo_gain_modifiers",
@@ -136,6 +139,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "riaa",
         "fade",
         "flanger",
+        "phaser",
         "vol",
         "norm",
         "oops",
