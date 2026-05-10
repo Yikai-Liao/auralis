@@ -139,30 +139,37 @@ native LADSPA plugins in the current pure-Rust effect registry.
 Record whether a safe, testable implementation path exists. If blocked, the CLI
 diagnostic must be stable and actionable.
 
-Status: planned feasibility/classification leaf.
+Status: not planned for the Auralis effect registry.
 
-The feasibility pass must decide whether `sdm` has a MIT-compatible pure Rust
-specification and whether it belongs in the effect registry. Native wrappers,
-GPL-derived implementations, or unverifiable external references are blockers.
-Do not start Feature 6.9.7 until this feature records an implementation-safe
-classification.
+SoX-ng's `sdm` is a DSD-oriented sigma-delta modulator. It exposes
+`-f {clans|sdm}-[45678]`, trellis order, trellis path count, and output latency
+options, selects sample-rate-specific filter tables, and forces the output
+precision to 1 bit. SoX-ng also routes `dither -p 1` through the same SDM core.
+That behavior is not representable as an ordinary PCM16 WAV effect in Auralis'
+current planar `f32` processing model and PCM16 output boundary.
 
-Expected output:
+The only currently available SoX-ng-compatible implementation details are the
+LGPL `sdm.c` / `sdm.h` source, its static filter coefficient tables, and its
+trellis search behavior. Auralis should not port those implementation details
+into the MIT-licensed effect registry, and a clean-room pure-Rust implementation
+would still need a future DSD/1-bit format boundary before SoX-ng golden
+coverage could be meaningful.
 
-- Record `implemented`, `partial`, `blocked`, or `not planned`.
-- Identify the accepted behavior, unsupported options, and diagnostic wording.
-- Define the test matrix before implementation: deterministic fixtures, parser
-  coverage, SoX-ng golden comparisons where comparable, numerical/property
-  checks, chunk invariance, and scalar-vs-SIMD parity if SIMD applies.
+Parser, registry visibility, and CLI diagnostics are locked by Rust tests:
+`sdm` is a known SoX-ng effect, resolves to
+`UnsupportedSoxNgEffect { name: "sdm" }`, and tells users to run
+`sox_ng ... sdm ...` for SDM processing or wait for future DSD/1-bit format
+support. L0 deterministic fixtures, L2 SoX-ng golden comparisons, scalar DSP,
+chunk invariance, and SIMD are N/A in the current effect registry because the
+accepted SoX-ng behavior emits 1-bit output outside the PCM16 golden harness.
 
 ### Feature 6.9.7: `sdm` implementation
 
 Implement only if Feature 6.9.6 records a safe implementation path.
 
-Status: blocked until Feature 6.9.6 records a MIT-compatible pure Rust path.
+Status: not planned by Feature 6.9.6.
 
-Implementation is allowed only after Feature 6.9.6 proves that no GPL code,
-native wrapper, or external host is required. The implementation leaf must keep
-public APIs Auralis-owned, add stable diagnostics for unsupported options, and
-ship the tests defined by the feasibility pass before the feature can be marked
-implemented or partial.
+Implementation is not part of the current PCM16 effect registry. Reconsider SDM
+only if a future roadmap adds a DSD/1-bit format boundary and a clean-room,
+MIT-compatible pure-Rust specification for the modulator, filter tables, and
+trellis behavior.

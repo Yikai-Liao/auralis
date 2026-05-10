@@ -128,6 +128,10 @@ fn blocked_known_effects_return_actionable_diagnostics() {
             "ladspa",
             "known SoX-ng effect `ladspa` is blocked in Auralis: LADSPA support requires loading native external plugins through LADSPA_PATH and a plugin-host ABI, while Auralis currently accepts only MIT-compatible pure Rust effects; use `sox_ng ... ladspa ...` for LADSPA plugins or wait for a future external-host boundary",
         ),
+        (
+            "sdm",
+            "known SoX-ng effect `sdm` is not planned in the Auralis effect registry: SDM is a DSD-oriented sigma-delta modulator that emits 1-bit output using SoX-ng's LGPL filter tables and trellis behavior, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... sdm ...` for SDM processing or wait for future DSD/1-bit format support",
+        ),
     ];
 
     for (name, message) in cases {

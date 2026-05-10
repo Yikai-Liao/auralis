@@ -40,5 +40,9 @@ Every effect feature must still follow the test contract in [`03-test-infrastruc
   requires an external native LADSPA plugin host, dynamic module loading through
   `LADSPA_PATH`, and plugin-dependent code, parameters, channel counts, latency,
   and licensing.
-- The next plan adjustment should continue in Milestone 6.9 by classifying
-  `sdm` before implementation work resumes.
+- Feature 6.9.6 recorded `sdm` as not planned for the effect registry because
+  SoX-ng's SDM path emits 1-bit DSD-style output, depends on LGPL
+  implementation details for filter tables and trellis behavior, and is not
+  representable in the current PCM16 WAV golden harness. Feature 6.9.7 is not
+  planned unless a future DSD/1-bit format boundary and clean-room
+  MIT-compatible specification are added.

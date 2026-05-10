@@ -84,6 +84,9 @@ pub(crate) fn classified_sox_ng_effect_diagnostic(name: &str) -> Option<&'static
         "ladspa" => Some(
             "blocked in Auralis: LADSPA support requires loading native external plugins through LADSPA_PATH and a plugin-host ABI, while Auralis currently accepts only MIT-compatible pure Rust effects; use `sox_ng ... ladspa ...` for LADSPA plugins or wait for a future external-host boundary",
         ),
+        "sdm" => Some(
+            "not planned in the Auralis effect registry: SDM is a DSD-oriented sigma-delta modulator that emits 1-bit output using SoX-ng's LGPL filter tables and trellis behavior, while Auralis currently processes PCM16 WAV audio effects; use `sox_ng ... sdm ...` for SDM processing or wait for future DSD/1-bit format support",
+        ),
         _ => None,
     }
 }

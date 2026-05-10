@@ -12,10 +12,10 @@ The core rule:
 
 ## Current priority
 
-The current development queue is blocked on specialized-effect classification
-and test-gate debt, not on the old `18d002f` dither-order correction. Recent
-gnhf work classified `dolbyb`, `dop`, `earwax`, and `ladspa`; the remaining 6.9
-work must continue with `sdm` before normal implementation planning resumes.
+The current development queue has completed the specialized-effect
+classification pass for `dolbyb`, `dop`, `earwax`, `ladspa`, and `sdm`.
+Implementation planning should now move through the 7.x reusable DSP primitive
+audit before adding more effect families.
 
 The current order is:
 

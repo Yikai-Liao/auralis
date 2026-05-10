@@ -360,7 +360,12 @@ the CLI points users to `sox_ng ... dolbyb ...` or a compatible
 pure-Rust/public-domain spec. `dop` is a stable not-planned effect-registry
 exception: it is DSD-over-PCM transport packing from 1-bit DSD into 24-bit
 samples, which belongs at a future DSD/DoP format boundary rather than in the
-current PCM16 WAV effect pipeline. Tokenized commands such
+current PCM16 WAV effect pipeline. `ladspa` is a stable blocked exception:
+SoX-ng-compatible LADSPA support requires loading native external plugins and
+exposing a plugin-host ABI. `sdm` is a stable not-planned effect-registry
+exception: it emits 1-bit DSD-style output through LGPL SoX-ng filter tables and
+trellis behavior, which belongs behind a future DSD/1-bit format boundary
+rather than in the current PCM16 WAV effect pipeline. Tokenized commands such
 as `["gain", "-3"]`, `["trim", "48000", "48000"]`, and `["fade", "t",
 "24000", "0", "24000"]` parse into typed `EffectCommand` variants. The parser
 accepts the frame-count subset implemented by Auralis and supports SoX-ng fade
