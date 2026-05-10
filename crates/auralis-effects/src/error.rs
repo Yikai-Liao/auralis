@@ -231,6 +231,10 @@ pub enum EffectError {
     #[error("fir output frame count exceeds representable audio buffer length")]
     FirLengthOverflow,
 
+    /// A Hilbert transform command had an invalid tap count.
+    #[error("hilbert taps must be an odd value in the SoX-ng range 3..=1073741823")]
+    InvalidHilbert,
+
     /// A silence command had invalid periods, durations, thresholds, or options.
     #[error(
         "silence periods, durations, thresholds, and -l usage must match SoX-ng-compatible ranges"

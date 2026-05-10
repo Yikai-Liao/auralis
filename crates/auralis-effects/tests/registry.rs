@@ -28,6 +28,7 @@ fn supported_canonical_names_resolve_to_descriptors() {
         ("flanger", EffectKind::Flanger),
         ("gain", EffectKind::Gain),
         ("highpass", EffectKind::HighPass),
+        ("hilbert", EffectKind::Hilbert),
         ("loudness", EffectKind::Loudness),
         ("lowpass", EffectKind::LowPass),
         ("mcompand", EffectKind::MCompand),

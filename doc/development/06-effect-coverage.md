@@ -1488,6 +1488,23 @@ Implementation notes:
 
 ### Feature 6.8.4: `hilbert`
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered `hilbert [-n taps]` as an executable SoX-ng-style effect command
+  with parser/rendering, registry metadata, effect-chain grouping and
+  dispatch, CLI positional-chain support, L7 fuzz seed coverage, and standalone
+  SoX-ng golden rows.
+- Added a public `Hilbert` processor that validates SoX-ng's odd tap-count
+  range, derives default taps from the input sample rate using the 75 Hz cutoff
+  heuristic, generates the Blackman-windowed Hilbert FIR coefficients, and
+  delegates length-preserving scalar processing to the shared FIR executor.
+- Coverage includes tap validation, default tap derivation, analytical
+  coefficient checks, chain equivalence with typed processing, finite-output
+  coverage, chunked FIR-state equivalence, and mono/stereo explicit-tap golden
+  cases. SIMD remains N/A until a future vectorized FIR backend is planned.
+
 ### Feature 6.8.5: `sinc` low-pass and high-pass
 
 ### Feature 6.8.6: `sinc` band-pass and band-reject

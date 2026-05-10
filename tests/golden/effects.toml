@@ -222,6 +222,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_hilbert_mono_5_taps]
+input = "effects/hilbert_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["hilbert", "-n", "5"]
+sox_ng = ["hilbert", "-n", "5"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_hilbert_stereo_7_taps]
+input = "effects/hilbert_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["hilbert", "-n", "7"]
+sox_ng = ["hilbert", "-n", "7"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_loudness_mono_identity]
 input = "effects/loudness_mono.wav"
 corpus_id = "l0/sine_mono_32"

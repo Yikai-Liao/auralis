@@ -31,10 +31,10 @@ positions, frame-level
 reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
 linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
-`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
+`Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `Hilbert`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 `Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Fir`, `FirFit`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
-gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, fir, firfit, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/firfit/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
+gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, hilbert, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
+fade, fir, firfit, noiseprof, noisered, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/hilbert/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/fir/firfit/noiseprof/noisered/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -101,6 +101,9 @@ The implemented `lowpass` command covers SoX-ng's default RBJ two-pole low-pass
 filter with optional width units and the single-pole `-1` form.
 The implemented `highpass` command covers SoX-ng's default RBJ two-pole
 high-pass filter with optional width units and the single-pole `-1` form.
+The implemented `hilbert` command covers SoX-ng's Blackman-windowed Hilbert
+transform FIR filter with default sample-rate-derived taps and explicit
+odd tap-count overrides.
 The implemented `loudness` command covers SoX-ng's ISO 226 equal-loudness
 FIR compensation with gain, reference-level, and half-length arguments.
 The implemented `riaa` command covers SoX-ng's no-argument RIAA playback

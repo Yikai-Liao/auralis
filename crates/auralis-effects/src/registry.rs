@@ -74,6 +74,8 @@ pub enum EffectKind {
     Gain,
     /// SoX-ng-style high-pass filter family.
     HighPass,
+    /// SoX-ng-style Hilbert transform FIR filter.
+    Hilbert,
     /// SoX-ng-style ISO 226 loudness compensation.
     Loudness,
     /// SoX-ng-style low-pass filter family.
@@ -443,6 +445,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "HighPass",
         "highpass [-1|-2] frequency [width]",
         "apply a high-pass filter",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Hilbert,
+        "hilbert",
+        &[],
+        "Hilbert",
+        "hilbert [-n taps]",
+        "apply a Hilbert transform FIR filter",
     ),
     EffectDescriptor::new(
         EffectKind::Loudness,

@@ -76,6 +76,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_gain_stereo_minus_6",
             "effect_highpass_mono_default",
             "effect_highpass_stereo_one_pole",
+            "effect_hilbert_mono_5_taps",
+            "effect_hilbert_stereo_7_taps",
             "effect_loudness_mono_identity",
             "effect_loudness_stereo_short_filter",
             "effect_lowpass_mono_default",

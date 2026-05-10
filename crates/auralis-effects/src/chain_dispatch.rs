@@ -42,6 +42,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Fir(_)
         | EffectCommand::FirFit(_)
         | EffectCommand::Flanger(_)
+        | EffectCommand::Hilbert(_)
         | EffectCommand::Loudness(_)
         | EffectCommand::MCompand(_)
         | EffectCommand::NoiseProf(_)
@@ -171,6 +172,11 @@ fn apply_buffer_command(
             *audio = firfit
                 .process_buffer(audio)
                 .map_err(|source| ("knots", source))?;
+        }
+        EffectCommand::Hilbert(hilbert) => {
+            *audio = hilbert
+                .process_buffer(audio)
+                .map_err(|source| ("taps", source))?;
         }
         EffectCommand::Flanger(flanger) => {
             *audio = flanger
@@ -355,6 +361,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Fir => fir_arg_end(tokens, args_start),
         EffectKind::FirFit => firfit_arg_end(tokens, args_start),
         EffectKind::Flanger => flanger_arg_end(tokens, args_start),
+        EffectKind::Hilbert => hilbert_arg_end(tokens, args_start),
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Pitch => pitch_arg_end(tokens, args_start),
         EffectKind::Reverb => reverb_arg_end(tokens, args_start),
@@ -703,6 +710,20 @@ fn fir_arg_end(tokens: &[&str], args_start: usize) -> usize {
 
 fn firfit_arg_end(tokens: &[&str], args_start: usize) -> usize {
     fir_arg_end(tokens, args_start)
+}
+
+fn hilbert_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    if let Some(token) = tokens.get(end).copied()
+        && token.starts_with("-n")
+    {
+        end += 1;
+        if token == "-n" && end < tokens.len() && !is_command_boundary(tokens[end]) {
+            end += 1;
+        }
+    }
+
+    include_unexpected_argument(tokens, end)
 }
 
 fn include_unexpected_argument(tokens: &[&str], end: usize) -> usize {
