@@ -1670,6 +1670,24 @@ Implementation notes:
 
 ### Feature 6.8.12: `synth` basic waveforms
 
+Implemented in this branch.
+
+- Added public `Synth`, `SynthChannel`, `SynthLength`, and `SynthWaveform`
+  APIs for create-mode tonal waveform generation over decoded audio shapes.
+- Supported deterministic SoX-ng-style `sine`, `square`, `sawtooth`,
+  `triangle`, `trapezium`, and `exp` oscillators with optional length,
+  frequency, offset, phase, and shape parameters.
+- Registered `synth [-n] [length] waveform [frequency ...]` across the effect
+  registry, typed command parser/renderer, effect-chain dispatch, CLI
+  positional-chain path, fuzz corpus, standalone SoX-ng golden manifest, and
+  L0-L7 layered coverage metadata.
+- Coverage includes waveform formula tests, parser/rendering tests,
+  chain-grouping and execution tests, finite-output property coverage,
+  mono/stereo standalone golden cases, invalid parameter rejection, and stable
+  unsupported diagnostics for noise, sweeps, and input-combine modes. SIMD is
+  documented as N/A because this feature is scalar phase evaluation rather than
+  a backend-dispatched sample transform.
+
 ### Feature 6.8.13: `synth` noise, sweep, and combine modes
 
 Analysis and generation effects must define deterministic output and metadata

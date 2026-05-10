@@ -622,6 +622,21 @@ l6 = { status = "not_applicable", reason = "Stats is scalar analysis over decode
 l7 = { status = "covered", reason = "Effect command fuzzing covers stats option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/stats"] }
 
 [[subject]]
+id = "effect.synth"
+kind = "effect"
+name = "synth"
+summary = "SoX-ng-style basic tonal waveform synthesizer."
+[subject.layers]
+l0 = { status = "covered", reason = "Standalone golden cases reuse deterministic mono and stereo L0 corpus IDs for input shape while synth creates the decoded samples.", tests = ["tests/golden/effects.toml", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l1 = { status = "not_applicable", reason = "The typed effect operates on decoded AudioBuffer shape and metadata; WAV container behavior is covered by WAV I/O features.", tests = [] }
+l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono sine and stereo sine/square create-mode command forms with automatic headroom disabled.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
+l3 = { status = "covered", reason = "Analytical and integration tests cover waveform formulas, command parsing, command rendering, chain grouping, output-length resolution, channel-spec repetition, invalid parameter rejection, and deferred noise/sweep/combine diagnostics.", tests = ["crates/auralis-effects/src/synth.rs", "crates/auralis-effects/src/command_synth.rs", "crates/auralis-effects/tests/synth.rs"] }
+l4 = { status = "covered", reason = "Property coverage checks finite deterministic synth output for bounded generated audio shapes.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
+l5 = { status = "not_applicable", reason = "Feature 6.8.12 implements whole-buffer create-mode synthesis; chunk-exact oscillator state belongs to a future streaming synth API.", tests = [] }
+l6 = { status = "not_applicable", reason = "Basic synth oscillator generation is scalar phase evaluation and has no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "covered", reason = "Effect command fuzzing covers synth length, waveform, and channel-spec parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/synth"] }
+
+[[subject]]
 id = "effect.contrast"
 kind = "effect"
 name = "contrast"

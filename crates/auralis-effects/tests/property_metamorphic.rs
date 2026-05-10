@@ -11,7 +11,8 @@ use auralis_effects::{
     Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Pitch, Rate, Remix,
     RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
     Silence, Sinc, SincBand, SincOptions, SoftVol, Speed, Splice, SpliceAmount, SplicePoint,
-    SplicePosition, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
+    SplicePosition, Stretch, Swap, Synth, SynthChannel, SynthWaveform, Tempo, Treble, Tremolo,
+    Trim, Upsample, Vad, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -474,6 +475,16 @@ proptest! {
             .expect("generated tremolo settings are valid")
             .process_buffer(&mut tremolo_modulated);
         prop_assert_all_finite(&tremolo_modulated)?;
+
+        let synthesized = Synth::with_channels(
+            None,
+            [SynthChannel::new(SynthWaveform::Sine, 1_000.0)
+                .expect("fixture synth channel is valid")],
+        )
+        .expect("fixture synth is valid")
+        .process_buffer(&source)
+        .expect("generated synth output shape is representable");
+        prop_assert_all_finite(&synthesized)?;
 
         let mut overdriven = source.clone();
         Overdrive::new(12.0, 25.0)

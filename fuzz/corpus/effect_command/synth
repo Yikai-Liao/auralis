@@ -1,0 +1,1 @@
+synth -n 16s sine 1000 square 500

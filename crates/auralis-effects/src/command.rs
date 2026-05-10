@@ -62,6 +62,7 @@ use crate::command_stat::{parse_stat, render_stat};
 use crate::command_stats::{parse_stats, render_stats};
 use crate::command_stretch::{parse_stretch, render_stretch};
 use crate::command_swap::parse_swap;
+use crate::command_synth::{parse_synth, render_synth};
 use crate::command_tempo::{parse_tempo, render_tempo};
 use crate::command_treble::{parse_treble, render_treble};
 use crate::command_tremolo::{parse_tremolo, render_tremolo};
@@ -75,7 +76,7 @@ use crate::{
     EffectNameError, EffectRegistry, Equalizer, Fade, Fir, FirFit, Flanger, Gain, HighPass,
     Hilbert, Loudness, LowPass, MCompand, NoiseProf, NoiseRed, Norm, Oops, Overdrive, Pad, Phaser,
     Pitch, Rate, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, Silence, Sinc, SoftVol, Speed,
-    Splice, Stat, Stats, Stretch, Swap, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
+    Splice, Stat, Stats, Stretch, Swap, Synth, Tempo, Treble, Tremolo, Trim, Upsample, Vad, Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -193,6 +194,8 @@ pub enum EffectCommand {
     Stats(Stats),
     /// SoX-ng-style basic time stretcher.
     Stretch(Stretch),
+    /// SoX-ng-style basic waveform synthesizer.
+    Synth(Synth),
     /// SoX-ng-style adjacent channel-pair swapping.
     Swap(Swap),
     /// SoX-ng-style tempo adjustment that preserves pitch.
@@ -278,6 +281,7 @@ impl EffectCommand {
             EffectKind::Stat => parse_stat(effect, args),
             EffectKind::Stats => parse_stats(effect, args),
             EffectKind::Stretch => parse_stretch(effect, args),
+            EffectKind::Synth => parse_synth(effect, args),
             EffectKind::Swap => parse_swap(effect, args),
             EffectKind::Tempo => parse_tempo(effect, args),
             EffectKind::Treble => parse_treble(effect, args),
@@ -346,6 +350,7 @@ impl EffectCommand {
             Self::Stat(_) => EffectKind::Stat,
             Self::Stats(_) => EffectKind::Stats,
             Self::Stretch(_) => EffectKind::Stretch,
+            Self::Synth(_) => EffectKind::Synth,
             Self::Swap(_) => EffectKind::Swap,
             Self::Tempo(_) => EffectKind::Tempo,
             Self::Treble(_) => EffectKind::Treble,
@@ -420,6 +425,7 @@ impl EffectCommand {
             Self::Stat(stat) => render_stat(*stat),
             Self::Stats(stats) => render_stats(*stats),
             Self::Stretch(stretch) => render_stretch(*stretch),
+            Self::Synth(synth) => render_synth(synth),
             Self::Swap(_) => vec!["swap".to_owned()],
             Self::Tempo(tempo) => render_tempo(*tempo),
             Self::Treble(treble) => render_treble(*treble),

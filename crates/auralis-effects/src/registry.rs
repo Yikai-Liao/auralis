@@ -130,6 +130,8 @@ pub enum EffectKind {
     Stats,
     #[doc = "SoX-ng-style basic time stretcher."]
     Stretch,
+    #[doc = "SoX-ng-style basic waveform synthesizer."]
+    Synth,
     #[doc = "SoX-ng-style adjacent channel-pair swapping."]
     Swap,
     #[doc = "SoX-ng-style tempo adjustment that preserves pitch."]
@@ -669,6 +671,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Swap",
         "swap",
         "swap adjacent decoded channel pairs",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Synth,
+        "synth",
+        &[],
+        "Synth",
+        "synth [-n] [length] {sine|square|sawtooth|triangle|trapezium|exp} [frequency]",
+        "create deterministic tonal waveforms over decoded audio",
     ),
     EffectDescriptor::new(
         EffectKind::Tempo,

@@ -827,6 +827,7 @@ mod tests {
                 | EffectCommand::Stat(_)
                 | EffectCommand::Stats(_)
                 | EffectCommand::Stretch(_)
+                | EffectCommand::Synth(_)
                 | EffectCommand::Swap(_)
                 | EffectCommand::Tempo(_)
                 | EffectCommand::Tremolo(_)

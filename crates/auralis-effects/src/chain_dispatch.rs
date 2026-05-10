@@ -6,6 +6,7 @@ use crate::{
     chain::{is_chain_boundary_token, is_effect_boundary, is_unsupported_boundary_control},
     chain_gain::{GainHeadroomState, apply_gain_command},
     command::is_option_like,
+    command_synth::{is_synth_combine_mode, is_synth_waveform, starts_like_synth_length},
 };
 
 pub(crate) fn apply_command(
@@ -63,6 +64,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Stat(_)
         | EffectCommand::Stats(_)
         | EffectCommand::Stretch(_)
+        | EffectCommand::Synth(_)
         | EffectCommand::Tempo(_)
         | EffectCommand::Trim(_)
         | EffectCommand::Upsample(_)
@@ -247,6 +249,11 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("stretch", source))?;
         }
+        EffectCommand::Synth(synth) => {
+            *audio = synth
+                .process_buffer(audio)
+                .map_err(|source| ("synth", source))?;
+        }
         EffectCommand::Tempo(tempo) => {
             *audio = tempo
                 .process_buffer(audio)
@@ -390,6 +397,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Splice => splice_arg_end(tokens, args_start),
         EffectKind::Stat => stat_arg_end(tokens, args_start),
         EffectKind::Stats => stats_arg_end(tokens, args_start),
+        EffectKind::Synth => synth_arg_end(tokens, args_start),
         EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Compand | EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::MCompand => mcompand_arg_end(tokens, args_start),
@@ -425,6 +433,32 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn synth_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while matches!(tokens.get(end).copied(), Some("-n")) {
+        end += 1;
+    }
+    if end < tokens.len() && starts_like_synth_length(tokens[end]) {
+        end += 1;
+    }
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        if !is_synth_waveform(tokens[end]) {
+            return include_unexpected_argument(tokens, end + 1);
+        }
+        end += 1;
+        if end < tokens.len() && is_synth_combine_mode(tokens[end]) {
+            return include_unexpected_argument(tokens, end + 1);
+        }
+        while end < tokens.len()
+            && !is_command_boundary(tokens[end])
+            && !is_synth_waveform(tokens[end])
+        {
+            end += 1;
+        }
+    }
+    end
 }
 
 fn stat_arg_end(tokens: &[&str], args_start: usize) -> usize {

@@ -227,6 +227,12 @@ pub enum EffectError {
     )]
     InvalidStats,
 
+    /// A synth command had invalid waveform, timing, frequency, or shape parameters.
+    #[error(
+        "synth waveform, length, frequency, offset, phase, and shape parameters must be finite SoX-ng-compatible values"
+    )]
+    InvalidSynth,
+
     /// A loudness command had invalid gain, reference level, or filter length.
     #[error("loudness gain must be in -50..=15 dB, reference in 50..=75 dB, and n in 127..=2047")]
     InvalidLoudness,

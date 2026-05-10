@@ -1296,6 +1296,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_synth_mono_sine]
+input = "effects/synth_mono.wav"
+corpus_id = "l0/sine_mono_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["synth", "-n", "sine", "1000"]
+sox_ng = ["synth", "-n", "sine", "1000"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_synth_stereo_sine_square]
+input = "effects/synth_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["synth", "-n", "sine", "1000", "square", "500"]
+sox_ng = ["synth", "-n", "sine", "1000", "square", "500"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_stretch_mono_lengthen]
 input = "effects/stretch_mono.wav"
 corpus_id = "l0/sine_mono_8192"
