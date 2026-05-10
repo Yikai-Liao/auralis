@@ -1,12 +1,13 @@
 use auralis_core::SampleRate;
 
-use crate::Rate;
 use crate::command::{
     CommandResult, EffectCommand, EffectCommandParseError, is_option_like, reject_extra_arguments,
     required_arg,
 };
+use crate::{Rate, RateQuality};
 
 pub(super) fn parse_rate(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
+    let (quality, args) = parse_quality(effect, args)?;
     let value = required_arg(effect, args, "frequency")?;
     if is_option_like(value) {
         return Err(EffectCommandParseError::UnsupportedOption {
@@ -16,14 +17,42 @@ pub(super) fn parse_rate(effect: &'static str, args: &[&str]) -> CommandResult<E
     }
     reject_extra_arguments(effect, args.get(1..).unwrap_or_default())?;
 
-    parse_sample_rate(effect, value).map(|sample_rate| EffectCommand::Rate(Rate::new(sample_rate)))
+    parse_sample_rate(effect, value)
+        .map(|sample_rate| EffectCommand::Rate(Rate::with_quality(sample_rate, quality)))
 }
 
 pub(super) fn render_rate(rate: Rate) -> Vec<String> {
-    vec![
-        "rate".to_owned(),
-        rate.target_sample_rate.as_u32().to_string(),
-    ]
+    let mut tokens = vec!["rate".to_owned()];
+    if let Some(option) = rate.quality.command_option() {
+        tokens.push(option.to_owned());
+    }
+    tokens.push(rate.target_sample_rate.as_u32().to_string());
+    tokens
+}
+
+fn parse_quality<'a>(
+    effect: &'static str,
+    args: &'a [&'a str],
+) -> CommandResult<(RateQuality, &'a [&'a str])> {
+    match args {
+        ["-q", rest @ ..] => Ok((RateQuality::Quick, rest)),
+        ["-l", rest @ ..] => Ok((RateQuality::Low, rest)),
+        ["-Q", value, rest @ ..] => match *value {
+            "0" => Ok((RateQuality::Quick, rest)),
+            "1" => Ok((RateQuality::Low, rest)),
+            _ => Err(EffectCommandParseError::UnsupportedOption {
+                effect,
+                option: format!("-Q {value}"),
+            }),
+        },
+        [value, ..] if matches!(*value, "-m" | "-g" | "-h" | "-e" | "-v" | "-u") => {
+            Err(EffectCommandParseError::UnsupportedOption {
+                effect,
+                option: (*value).to_owned(),
+            })
+        }
+        _ => Ok((RateQuality::Default, args)),
+    }
 }
 
 fn parse_sample_rate(effect: &'static str, value: &str) -> CommandResult<SampleRate> {
@@ -65,6 +94,16 @@ fn parse_sample_rate(effect: &'static str, value: &str) -> CommandResult<SampleR
     })
 }
 
+impl RateQuality {
+    fn command_option(self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::Quick => Some("-q"),
+            Self::Low => Some("-l"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_rate;
@@ -84,6 +123,30 @@ mod tests {
         assert_eq!(
             parse_rate("rate", &["44.1k"]).unwrap().render_tokens(),
             ["rate", "44100"]
+        );
+    }
+
+    #[test]
+    fn parses_quick_and_low_quality_modes() {
+        assert_eq!(
+            parse_rate("rate", &["-q", "24000"]).unwrap(),
+            EffectCommand::Rate(Rate::quick(SampleRate::new(24_000).unwrap()))
+        );
+        assert_eq!(
+            parse_rate("rate", &["-Q", "0", "24k"])
+                .unwrap()
+                .render_tokens(),
+            ["rate", "-q", "24000"]
+        );
+        assert_eq!(
+            parse_rate("rate", &["-l", "48000"]).unwrap(),
+            EffectCommand::Rate(Rate::low(SampleRate::new(48_000).unwrap()))
+        );
+        assert_eq!(
+            parse_rate("rate", &["-Q", "1", "48k"])
+                .unwrap()
+                .render_tokens(),
+            ["rate", "-l", "48000"]
         );
     }
 
@@ -114,9 +177,16 @@ mod tests {
         );
         assert_eq!(
             parse_rate("rate", &["-q"]).unwrap_err(),
+            EffectCommandParseError::MissingArgument {
+                effect: "rate",
+                argument: "frequency",
+            }
+        );
+        assert_eq!(
+            parse_rate("rate", &["-Q", "4", "24000"]).unwrap_err(),
             EffectCommandParseError::UnsupportedOption {
                 effect: "rate",
-                option: "-q".to_owned(),
+                option: "-Q 4".to_owned(),
             }
         );
         assert_eq!(

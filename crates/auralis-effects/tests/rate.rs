@@ -23,6 +23,27 @@ fn rate_chain_parses_integer_and_kilohertz_frequency() {
 }
 
 #[test]
+fn rate_chain_parses_quick_and_low_quality_modes() {
+    let quick = parse_effect_chain(&["rate", "-q", "24000"]).unwrap();
+    assert_eq!(
+        quick.commands(),
+        &[EffectCommand::Rate(Rate::quick(
+            SampleRate::new(24_000).unwrap()
+        ))]
+    );
+    assert_eq!(quick.render_tokens(), ["rate", "-q", "24000"]);
+
+    let low = parse_effect_chain(&["rate", "-Q", "1", "44.1k"]).unwrap();
+    assert_eq!(
+        low.commands(),
+        &[EffectCommand::Rate(Rate::low(
+            SampleRate::new(44_100).unwrap()
+        ))]
+    );
+    assert_eq!(low.render_tokens(), ["rate", "-l", "44100"]);
+}
+
+#[test]
 fn rate_changes_sample_rate_and_resamples_decoded_audio() {
     let mut audio = stereo_audio(vec![0.0, 1.0, 0.0], vec![1.0, 0.0, -1.0]);
 
@@ -82,9 +103,18 @@ fn rate_rejects_missing_invalid_options() {
         }
     ));
 
-    let quality = parse_effect_chain(&["rate", "-q", "24000"]).unwrap_err();
+    let unsupported_quality = parse_effect_chain(&["rate", "-m", "24000"]).unwrap_err();
     assert!(matches!(
-        quality,
+        unsupported_quality,
+        EffectChainParseError::CommandParseFailed {
+            source: EffectCommandParseError::UnsupportedOption { effect: "rate", .. },
+            ..
+        }
+    ));
+
+    let higher_quality = parse_effect_chain(&["rate", "-Q", "4", "24000"]).unwrap_err();
+    assert!(matches!(
+        higher_quality,
         EffectChainParseError::CommandParseFailed {
             source: EffectCommandParseError::UnsupportedOption { effect: "rate", .. },
             ..

@@ -1034,6 +1034,22 @@ Implementation notes:
 
 ### Feature 6.6.5: `rate` quick and low-quality modes
 
+Status: implemented.
+
+Implementation notes:
+
+- `Rate` now records a `RateQuality` family in its typed API, with default,
+  SoX-ng `-q` quick, and SoX-ng `-l` low-quality modes.
+- The command parser accepts `rate -q frequency`, `rate -l frequency`, and the
+  equivalent `rate -Q 0 frequency` / `rate -Q 1 frequency` forms, rendering
+  them canonically as `-q` or `-l`.
+- Quick and low-quality modes currently use the same deterministic scalar
+  linear resampling scaffold as the default mode. Higher-quality modes and
+  override options remain scheduled for Features 6.6.6 and 6.6.7.
+- Coverage includes parser/rendering tests, chain integration tests, fuzz seeds,
+  and narrow standalone SoX-ng golden cases for quick mono silence conversion
+  and low-quality stereo identity behavior.
+
 ### Feature 6.6.6: `rate` high-quality modes
 
 ### Feature 6.6.7: `rate` override options

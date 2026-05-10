@@ -275,10 +275,10 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Channels
         | EffectKind::Downsample
         | EffectKind::Norm
-        | EffectKind::Rate
         | EffectKind::Repeat
         | EffectKind::Speed
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Rate => rate_arg_end(tokens, args_start),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
             optional_arg_end(tokens, args_start, 2)
         }
@@ -305,6 +305,29 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn rate_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    match tokens.get(end).copied() {
+        Some("-q" | "-l") => {
+            end += 1;
+        }
+        Some("-Q") => {
+            end += 1;
+            if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                end += 1;
+            }
+        }
+        _ => {}
+    }
+
+    if end < tokens.len() && !is_command_boundary(tokens[end]) {
+        end += 1;
+    }
+
+    include_unexpected_argument(tokens, end)
 }
 
 fn centercut_arg_end(tokens: &[&str], args_start: usize) -> usize {

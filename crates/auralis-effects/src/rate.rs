@@ -2,12 +2,13 @@ use auralis_core::{AudioBuffer, AudioSpec, FrameCount, SampleRate};
 
 use crate::{EffectError, Result};
 
-/// SoX-ng-style sample-rate conversion scaffold.
+/// SoX-ng-style sample-rate conversion.
 ///
-/// `Rate` changes decoded audio to an explicit target sample rate. This first
-/// implementation provides the shared command/API surface and deterministic
-/// scalar linear resampling; later `rate` features own SoX-ng quality modes,
-/// override options, and sharper pass-band/aliasing behavior.
+/// `Rate` changes decoded audio to an explicit target sample rate. Quick and
+/// low-quality modes are part of the typed command model and currently share
+/// the deterministic scalar linear resampler; later `rate` features own the
+/// higher-quality filter families, override options, and sharper pass-band or
+/// aliasing behavior.
 ///
 /// # Errors
 ///
@@ -34,7 +35,7 @@ use crate::{EffectError, Result};
 ///     vec![0.0, 0.5, 1.0],
 /// )?;
 ///
-/// let converted = Rate::new(SampleRate::new(96_000)?).process_buffer(&audio)?;
+/// let converted = Rate::quick(SampleRate::new(96_000)?).process_buffer(&audio)?;
 ///
 /// assert_eq!(converted.spec().sample_rate().as_u32(), 96_000);
 /// assert_eq!(converted.frames(), FrameCount::new(6));
@@ -44,13 +45,51 @@ use crate::{EffectError, Result};
 pub struct Rate {
     /// Target sample rate in frames per second.
     pub target_sample_rate: SampleRate,
+    /// Requested SoX-ng quality family.
+    pub quality: RateQuality,
+}
+
+/// SoX-ng `rate` quality modes implemented by Auralis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RateQuality {
+    /// Default Auralis scaffold quality, selected when no SoX-ng quality flag
+    /// is present.
+    Default,
+    /// SoX-ng `-q` / `-Q 0` quick mode.
+    Quick,
+    /// SoX-ng `-l` / `-Q 1` low-quality mode.
+    Low,
 }
 
 impl Rate {
-    /// Creates a sample-rate conversion scaffold for `target_sample_rate`.
+    /// Creates a sample-rate conversion using the default quality mode.
     #[must_use]
     pub const fn new(target_sample_rate: SampleRate) -> Self {
-        Self { target_sample_rate }
+        Self {
+            target_sample_rate,
+            quality: RateQuality::Default,
+        }
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-q` quick mode.
+    #[must_use]
+    pub const fn quick(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Quick)
+    }
+
+    /// Creates a sample-rate conversion using SoX-ng `-l` low-quality mode.
+    #[must_use]
+    pub const fn low(target_sample_rate: SampleRate) -> Self {
+        Self::with_quality(target_sample_rate, RateQuality::Low)
+    }
+
+    /// Creates a sample-rate conversion with an explicit quality family.
+    #[must_use]
+    pub const fn with_quality(target_sample_rate: SampleRate, quality: RateQuality) -> Self {
+        Self {
+            target_sample_rate,
+            quality,
+        }
     }
 
     /// Converts `audio` to the configured target sample rate.
@@ -172,7 +211,7 @@ fn resample_channel_linear(
 
 #[cfg(test)]
 mod tests {
-    use super::{Rate, converted_frame_count};
+    use super::{Rate, RateQuality, converted_frame_count};
     use crate::EffectError;
     use auralis_core::{AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 
@@ -211,6 +250,29 @@ mod tests {
             .unwrap();
 
         assert_eq!(converted, audio);
+    }
+
+    #[test]
+    fn quick_and_low_modes_use_the_same_deterministic_scaffold() {
+        let audio = audio_buffer(48_000, vec![0.0, 1.0, 0.0]);
+
+        let quick = Rate::quick(SampleRate::new(96_000).unwrap())
+            .process_buffer(&audio)
+            .unwrap();
+        let low = Rate::low(SampleRate::new(96_000).unwrap())
+            .process_buffer(&audio)
+            .unwrap();
+
+        assert_eq!(
+            Rate::quick(SampleRate::new(96_000).unwrap()).quality,
+            RateQuality::Quick
+        );
+        assert_eq!(
+            Rate::low(SampleRate::new(96_000).unwrap()).quality,
+            RateQuality::Low
+        );
+        assert_eq!(quick.as_planar_f32(), &[0.0, 0.5, 1.0, 0.5, 0.0, 0.0]);
+        assert_eq!(low.as_planar_f32(), quick.as_planar_f32());
     }
 
     #[test]

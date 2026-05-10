@@ -157,7 +157,7 @@ pub use oops::Oops;
 pub use overdrive::{Overdrive, OverdriveState};
 pub use pad::{Pad, PositionedPad};
 pub use phaser::{Phaser, PhaserInterpolation, PhaserWave};
-pub use rate::Rate;
+pub use rate::{Rate, RateQuality};
 pub use registry::{
     EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, KNOWN_SOX_NG_EFFECTS,
     SUPPORTED_EFFECTS, resolve_effect_name,

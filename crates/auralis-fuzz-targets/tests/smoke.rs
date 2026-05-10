@@ -45,6 +45,8 @@ fn seeds() -> Vec<&'static [u8]> {
         b"upsample 3",
         b"speed 100c",
         b"rate 44.1k",
+        b"rate -q 24k",
+        b"rate -Q 1 48000",
         b"chorus -l -t 0.5 1 1 0.25 1 0 -sine",
         b"flanger -q -t 1 2 25 100 1 sine 50 none",
         b"phaser -q -t 0.8 0.74 3 0.4 0.5 -s",

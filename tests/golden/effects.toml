@@ -965,6 +965,28 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_rate_quick_mono_to_24000]
+input = "effects/rate_quick_mono.wav"
+corpus_id = "l0/silence_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["rate", "-q", "24000"]
+sox_ng = ["rate", "-q", "24000"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_rate_low_stereo_identity]
+input = "effects/rate_low_stereo.wav"
+corpus_id = "l0/short_stereo_2"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["rate", "-l", "48000"]
+sox_ng = ["rate", "-l", "48000"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_rate_stereo_identity]
 input = "effects/rate_stereo.wav"
 corpus_id = "l0/short_stereo_2"
