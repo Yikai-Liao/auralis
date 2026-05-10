@@ -1018,6 +1018,28 @@ max_abs = 0.000031
 rms = 0.000031
 snr_db = 90.0
 
+[id.effect_vad_mono_silence_trim]
+input = "effects/vad_mono.wav"
+corpus_id = "l0/silence_mono_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vad", "-T", "0.01", "-t", "1"]
+sox_ng = ["vad", "-T", "0.01", "-t", "1"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
+[id.effect_vad_stereo_silence_trim]
+input = "effects/vad_stereo.wav"
+corpus_id = "l0/silence_stereo_16"
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["vad", "-T", "0.01", "-t", "1", "-g", "0.1"]
+sox_ng = ["vad", "-T", "0.01", "-t", "1", "-g", "0.1"]
+max_abs = 0.000031
+rms = 0.000031
+snr_db = 90.0
+
 [id.effect_softvol_mono_gain_1_5]
 input = "effects/softvol_mono.wav"
 corpus_id = "l0/step_mono_16"

@@ -664,12 +664,12 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_effect_names_are_reported_at_file_position() {
-        let error = parse_effects_file_str("gain -3\nvad").unwrap_err();
+    fn command_parse_errors_are_reported_at_file_position() {
+        let error = parse_effects_file_str("gain -3\nvad -t 21").unwrap_err();
 
         assert_eq!(
             error.to_string(),
-            "effects file line 2, column 1: command `vad` failed to parse: known SoX-ng effect `vad` is not implemented by Auralis; missing SoX-ng coverage entry for `vad`"
+            "effects file line 2, column 1: command `vad -t 21` failed to parse: invalid `vad` for effect `vad`: vad threshold must be finite in 0..=1 and timing settings must be representable"
         );
     }
 

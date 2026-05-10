@@ -16,6 +16,7 @@ pub const DEFAULT_SAMPLE_RATE: u32 = 48_000;
 /// used by existing golden manifests.
 pub const CORPUS_IDS: &[&str] = &[
     "l0/silence_mono_16",
+    "l0/silence_stereo_16",
     "l0/impulse_mono_16",
     "l0/step_mono_16",
     "l0/sine_mono_32",
@@ -161,6 +162,7 @@ pub fn is_known_corpus_id(id: &str) -> bool {
 pub fn corpus_case(id: &str) -> Result<CorpusCase, CorpusError> {
     let case = match id {
         "l0/silence_mono_16" => mono(id, vec![0.0; 16]),
+        "l0/silence_stereo_16" => stereo(id, vec![0.0; 16], vec![0.0; 16]),
         "l0/impulse_mono_16" => {
             let mut samples = vec![0.0; 16];
             samples[0] = 1.0;

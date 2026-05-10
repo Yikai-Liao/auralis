@@ -13,6 +13,7 @@ DEFAULT_SAMPLE_RATE = 48_000
 
 CORPUS_IDS = (
     "l0/silence_mono_16",
+    "l0/silence_stereo_16",
     "l0/impulse_mono_16",
     "l0/step_mono_16",
     "l0/sine_mono_32",
@@ -67,6 +68,10 @@ def corpus_case(corpus_id: str) -> CorpusCase:
 
     generators = {
         "l0/silence_mono_16": lambda: _mono(np.zeros(16, dtype=np.float32)),
+        "l0/silence_stereo_16": lambda: _stereo(
+            np.zeros(16, dtype=np.float32),
+            np.zeros(16, dtype=np.float32),
+        ),
         "l0/impulse_mono_16": _impulse_mono_16,
         "l0/step_mono_16": _step_mono_16,
         "l0/sine_mono_32": lambda: _mono(_sine(32, 1_000.0, 0.5, 0.0)),

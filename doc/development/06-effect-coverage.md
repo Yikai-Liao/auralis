@@ -1356,6 +1356,24 @@ Implementation notes:
 
 ### Feature 6.7.7: `vad` advanced options
 
+Status: implemented.
+
+Implementation notes:
+
+- Registered `vad` as an executable SoX-ng-style effect command with parser,
+  canonical rendering, registry metadata, chain/CLI dispatch, effects-file
+  diagnostics, and fuzz seed coverage.
+- Added a validated `VadOptions` profile for SoX-ng's advanced VAD options:
+  boot/noise timing, measurement controls, spectral and cepstral frequency
+  windows, trigger timing/level, search/gap timing, and pre-trigger retention.
+  The profile is resolved against the input sample rate at processing time and
+  mapped onto the deterministic whole-buffer VAD core from Feature 6.7.6.
+- Coverage includes command parser/rendering tests, chain execution, invalid
+  option ranges, the existing typed detector behavior, L4 finite-output
+  property coverage, mono/stereo SoX-ng golden rows for no-voice trimming, and
+  a layered coverage matrix row. SIMD remains N/A because VAD is a structural
+  detector/trim operation rather than a data-parallel sample transform.
+
 ### Feature 6.7.8: `noiseprof`
 
 ### Feature 6.7.9: `noisered`

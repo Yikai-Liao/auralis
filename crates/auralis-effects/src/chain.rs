@@ -816,7 +816,8 @@ mod tests {
                 | EffectCommand::Tempo(_)
                 | EffectCommand::Tremolo(_)
                 | EffectCommand::Trim(_)
-                | EffectCommand::Upsample(_) => {
+                | EffectCommand::Upsample(_)
+                | EffectCommand::Vad(_) => {
                     panic!("test helper only supports streaming-safe commands")
                 }
             }

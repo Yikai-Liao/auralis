@@ -57,7 +57,8 @@ pub(crate) fn apply_command(
         | EffectCommand::Stretch(_)
         | EffectCommand::Tempo(_)
         | EffectCommand::Trim(_)
-        | EffectCommand::Upsample(_) => unreachable!("buffer commands returned early"),
+        | EffectCommand::Upsample(_)
+        | EffectCommand::Vad(_) => unreachable!("buffer commands returned early"),
         EffectCommand::Biquad(_)
         | EffectCommand::Contrast(_)
         | EffectCommand::DcShift(_)
@@ -219,6 +220,11 @@ fn apply_buffer_command(
                 .process_buffer(audio)
                 .map_err(|source| ("frame-range", source))?;
         }
+        EffectCommand::Vad(vad) => {
+            *audio = vad
+                .process_buffer(audio)
+                .map_err(|source| ("vad", source))?;
+        }
         _ => return Ok(false),
     }
 
@@ -358,6 +364,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Saturation => optional_arg_end(tokens, args_start, 4),
         EffectKind::Silence => silence_arg_end(tokens, args_start),
         EffectKind::Trim => trim_arg_end(tokens, args_start),
+        EffectKind::Vad => vad_arg_end(tokens, args_start),
         EffectKind::AllPass
         | EffectKind::Band
         | EffectKind::BandPass
@@ -371,6 +378,18 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn vad_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        if is_option_like(tokens[end]) && end + 1 < tokens.len() {
+            end += 2;
+        } else {
+            end += 1;
+        }
+    }
+    end
 }
 
 fn mcompand_arg_end(tokens: &[&str], args_start: usize) -> usize {

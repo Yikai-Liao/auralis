@@ -34,7 +34,7 @@ The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 `Compand`, `MCompand`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
 gain, channels, norm, contrast, softvol, loudness, centercut, allpass, band, bandpass, bandreject, bass, treble, equalizer, highpass, lowpass, deemph, riaa, delay, downsample, upsample, speed, splice, stretch, tempo, pitch, rate, chorus, compand, mcompand, flanger, phaser, reverb, echo, echos, biquad, oops, swap, tremolo, overdrive, saturation, repeat, remix, dcshift, trim, pad, reverse,
-fade, silence, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vol transforms are implemented. The Rust
+fade, silence, vad, and vol, and the CLI gain/channels/norm/contrast/softvol/loudness/centercut/allpass/band/bandpass/bandreject/bass/treble/equalizer/highpass/lowpass/deemph/riaa/delay/downsample/upsample/speed/splice/stretch/tempo/pitch/rate/chorus/compand/mcompand/flanger/phaser/reverb/echo/echos/biquad/oops/swap/tremolo/overdrive/saturation/repeat/remix/dcshift/trim/pad/reverse/fade/silence/vad/vol transforms are implemented. The Rust
 effects crate also exposes a deterministic name registry and typed command
 parser for the implemented effect subset; supported names and aliases resolve
 to typed descriptors, parsed command tokens become typed effect configs, and
@@ -60,7 +60,7 @@ clipping-avoidant volume control with optional recovery and headroom,
 `tremolo speed [depth]` sinusoidal amplitude modulation, and
 `overdrive [gain [color]]` cubic soft-clipping distortion, and
 `saturation [type [blend [offset [drive|color|threshold]]]]` nonlinear
-saturation, `silence [-l] above-periods ...` leading/trailing/middle silence trimming, finite `repeat [count]` output duplication, `oops` out-of-phase stereo extraction, `swap` adjacent channel-pair exchange, and
+saturation, `silence [-l] above-periods ...` leading/trailing/middle silence trimming, `vad` leading non-voice trimming with SoX-ng-style advanced option parsing, finite `repeat [count]` output duplication, `oops` out-of-phase stereo extraction, `swap` adjacent channel-pair exchange, and
 `remix [-a|-m] [-p] out-spec...` channel routing with source gain modifiers.
 The chain path also supports SoX-ng-style `reverb [-w]` with reverberance,
 HF damping, room scale, stereo depth, pre-delay, and wet-gain parameters. It is
@@ -582,6 +582,9 @@ equal-loudness compensation.
 The implemented `silence` command accepts `-l`, `above-periods`, sample-count
 or seconds durations, percent or dB thresholds, and negative `below-periods`
 for restart-based middle-silence removal.
+The implemented `vad` command accepts SoX-ng's advanced timing, noise,
+measurement, filter/lifter, trigger, search, gap, and pre-trigger options and
+maps them onto Auralis' deterministic whole-buffer leading-trim detector.
 The implemented `tremolo` command accepts a required speed in hertz and an
 optional depth percentage, defaulting to SoX-ng's `40`.
 The implemented `overdrive` command accepts optional `gain` and `color`
@@ -961,7 +964,7 @@ headroom/reclaim, and the currently implemented fade/gain filter-style chain.
 lengths and stereo combine-before-reverse chains.
 `tests/golden/effects.toml` records standalone mono and stereo SoX-ng coverage
 for each implemented effect: `gain`, `dcshift`, `trim`, `pad`, `reverse`,
-`fade`, `vol`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `splice`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
+`fade`, `vol`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `splice`, `stretch`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `repeat`, and `remix`, including standalone `gain -h`, `gain -n`, and `gain -l` cases for
 headroom attenuation, peak normalization, and limiting, stereo `gain -e`,
 `gain -B`, and `gain -b` cases for channel equalization and balancing,
 multi-range `trim` cases with absolute and end-relative positions, and
@@ -973,7 +976,8 @@ default and target-level normalization; `contrast` coverage includes default
 and explicit-amount forms; `softvol` coverage includes fixed volume plus
 recovery/headroom forms; `loudness` coverage includes identity mono and
 short-filter stereo ISO 226 compensation forms; `silence` coverage includes
-mono and stereo leading-trim command forms; `tremolo` coverage includes default-depth mono and
+mono and stereo leading-trim command forms; `vad` coverage includes mono and
+stereo no-voice trimming with advanced trigger options; `tremolo` coverage includes default-depth mono and
 explicit-depth stereo modulation forms; `overdrive` coverage includes default
 mono and explicit-argument stereo distortion forms; `saturation` coverage
 includes default tanh mono and explicit sqrt stereo distortion forms; `repeat`
@@ -1214,8 +1218,9 @@ Examples:
   reference-level, and half-length arguments
 - `silence`: leading, trailing, and restart-based middle-silence trimming with
   sample-count or seconds durations and percent or dB thresholds
-- `vad`: deterministic leading non-voice trimming with a frame-domain trigger,
-  configurable pre-trigger retention, and quiet-gap tolerance
+- `vad`: deterministic leading non-voice trimming with SoX-ng-style advanced
+  option parsing, a frame-domain trigger, configurable pre-trigger retention,
+  and quiet-gap tolerance
 - `compand`: envelope-followed dB transfer with shared or per-channel attack
   and decay, optional post gain, initial volume, and look-ahead delay
 - `mcompand`: multiband companding with quoted compand band groups, ascending

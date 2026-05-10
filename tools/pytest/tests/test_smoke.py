@@ -55,6 +55,7 @@ def test_sine_wave_is_planar_and_deterministic() -> None:
 def test_l0_corpus_cases_are_stable_and_cover_required_families() -> None:
     required_ids = {
         "l0/silence_mono_16",
+        "l0/silence_stereo_16",
         "l0/impulse_mono_16",
         "l0/step_mono_16",
         "l0/sine_mono_32",

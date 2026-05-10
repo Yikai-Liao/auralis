@@ -124,6 +124,8 @@ pub enum EffectKind {
     Trim,
     /// SoX-ng-style zero-stuffing upsample.
     Upsample,
+    /// SoX-ng-style voice activity leading trim.
+    Vad,
     /// SoX-ng-style volume scaling.
     Vol,
 }
@@ -531,6 +533,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "trim leading, trailing, or middle silence",
     ),
     EffectDescriptor::new(
+        EffectKind::Vad,
+        "vad",
+        &[],
+        "Vad",
+        "vad [-b time] [-N time] [-n time] [-r amount] [-f freq] [-m time] [-M time] [-h freq] [-l freq] [-H freq] [-L freq] [-T time] [-t level] [-s time] [-g time] [-p time]",
+        "trim leading non-voice audio using a SoX-ng-style VAD command profile",
+    ),
+    EffectDescriptor::new(
         EffectKind::SoftVol,
         "softvol",
         &["soft-volume", "soft_volume"],
@@ -906,6 +916,7 @@ mod tests {
             ("treble", EffectKind::Treble),
             ("tremolo", EffectKind::Tremolo),
             ("trim", EffectKind::Trim),
+            ("vad", EffectKind::Vad),
             ("vol", EffectKind::Vol),
         ];
         for (name, kind) in expected {
@@ -950,23 +961,6 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "unknown effect `gian`; did you mean one of `gain`, `riaa`?"
-        );
-    }
-
-    #[test]
-    fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("vad").unwrap_err();
-
-        assert_eq!(
-            error,
-            EffectNameError::UnsupportedSoxNgEffect {
-                name: "vad".to_owned(),
-            }
-        );
-        assert!(
-            error
-                .to_string()
-                .contains("missing SoX-ng coverage entry for `vad`")
         );
     }
 
