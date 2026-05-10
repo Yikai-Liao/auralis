@@ -46,6 +46,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
     input_path = _write_fixture(case["corpus_id"], tmp_path / case["input"])
     auralis_output = tmp_path / f"{case_id}.auralis.wav"
     sox_output = tmp_path / f"{case_id}.sox.wav"
+    output_sample_rate = case.get("output_sample_rate")
 
     auralis_command = [
         "cargo",
@@ -57,6 +58,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
         "run",
         str(input_path),
         str(auralis_output),
+        *(["--rate", str(output_sample_rate)] if output_sample_rate is not None else []),
         *case["auralis"],
     ]
     auralis_result = subprocess.run(
@@ -68,7 +70,12 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
     )
 
     try:
-        sox_result = run_sox_ng(input_path, sox_output, case["sox_ng"])
+        sox_result = run_sox_ng(
+            input_path,
+            sox_output,
+            case["sox_ng"],
+            output_sample_rate=output_sample_rate,
+        )
     except SoxNgUnavailable as error:
         pytest.skip(str(error))
 
@@ -100,7 +107,7 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
         )
         report["sox_ng_automatic_behavior"] = {
             "channels": "absent",
-            "rate": "absent",
+            "rate": "explicit-output-rate" if output_sample_rate is not None else "absent",
             "guard": "absent",
             "norm": "absent",
             "dither": "disabled",

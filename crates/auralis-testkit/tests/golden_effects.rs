@@ -40,6 +40,8 @@ fn effects_golden_manifest_records_standalone_effect_cases() {
             "effect_deemph_stereo_48000",
             "effect_delay_mono_frames",
             "effect_delay_stereo_per_channel",
+            "effect_downsample_mono_default",
+            "effect_downsample_stereo_factor_3",
             "effect_echo_mono_delay",
             "effect_echo_stereo_zero_delay",
             "effect_echos_mono_cascaded",
@@ -131,6 +133,7 @@ fn effects_golden_manifest_covers_each_effect_in_mono_and_stereo() {
         "centercut",
         "dcshift",
         "delay",
+        "downsample",
         "echo",
         "echos",
         "deemph",
@@ -209,11 +212,18 @@ fn effects_golden_manifest_keeps_automatic_rate_and_channels_absent() {
             None,
             "{id} should not request output channel conversion"
         );
-        assert_eq!(
-            case.output_sample_rate(),
-            None,
-            "{id} should not request output rate conversion"
-        );
+        if id.starts_with("effect_downsample_") {
+            assert!(
+                case.output_sample_rate().is_some(),
+                "{id} should request the downsampled output rate explicitly"
+            );
+        } else {
+            assert_eq!(
+                case.output_sample_rate(),
+                None,
+                "{id} should not request output rate conversion"
+            );
+        }
         assert!(
             !case.sox_ng_auto_channels_inserted(),
             "{id} should record SoX-ng channel auto-conversion as absent"

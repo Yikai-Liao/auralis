@@ -485,6 +485,7 @@ fn process_streaming_safe_chain_by_chunks(
             EffectCommand::Centercut(_)
             | EffectCommand::Channels(_)
             | EffectCommand::Chorus(_)
+            | EffectCommand::Downsample(_)
             | EffectCommand::Echo(_)
             | EffectCommand::Echos(_)
             | EffectCommand::Flanger(_)

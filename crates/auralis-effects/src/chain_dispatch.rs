@@ -33,6 +33,7 @@ pub(crate) fn apply_command(
         | EffectCommand::Channels(_)
         | EffectCommand::Chorus(_)
         | EffectCommand::Delay(_)
+        | EffectCommand::Downsample(_)
         | EffectCommand::Echo(_)
         | EffectCommand::Echos(_)
         | EffectCommand::Fade(_)
@@ -90,6 +91,11 @@ fn apply_buffer_command(
             *audio = delay
                 .process_buffer(audio)
                 .map_err(|source| ("position", source))?;
+        }
+        EffectCommand::Downsample(downsample) => {
+            *audio = downsample
+                .process_buffer(audio)
+                .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Echo(echo) => {
             *audio = echo
@@ -233,7 +239,7 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         EffectKind::Phaser => phaser_arg_end(tokens, args_start),
         EffectKind::Reverb => reverb_arg_end(tokens, args_start),
         EffectKind::Gain => gain_arg_end(tokens, args_start),
-        EffectKind::Contrast | EffectKind::Norm | EffectKind::Repeat => {
+        EffectKind::Contrast | EffectKind::Downsample | EffectKind::Norm | EffectKind::Repeat => {
             optional_arg_end(tokens, args_start, 1)
         }
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {

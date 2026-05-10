@@ -21,6 +21,7 @@ use crate::command_contrast::{parse_contrast, render_contrast};
 use crate::command_dcshift::{parse_dc_shift, render_dc_shift};
 use crate::command_deemph::parse_deemph;
 use crate::command_delay::{parse_delay, render_delay};
+use crate::command_downsample::{parse_downsample, render_downsample};
 use crate::command_echo::{parse_echo, render_echo};
 use crate::command_echos::{parse_echos, render_echos};
 use crate::command_equalizer::{parse_equalizer, render_equalizer};
@@ -48,9 +49,10 @@ use crate::command_trim::{parse_trim, render_trim};
 use crate::command_vol::{parse_vol, render_vol};
 use crate::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, Centercut, Channels, Chorus, Contrast,
-    DcShift, Deemph, Delay, Echo, Echos, EffectError, EffectKind, EffectNameError, EffectRegistry,
-    Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad, Phaser, Remix,
-    Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim, Vol,
+    DcShift, Deemph, Delay, Downsample, Echo, Echos, EffectError, EffectKind, EffectNameError,
+    EffectRegistry, Equalizer, Fade, Flanger, Gain, HighPass, LowPass, Norm, Oops, Overdrive, Pad,
+    Phaser, Remix, Repeat, Reverb, Reverse, Riaa, Saturation, SoftVol, Swap, Treble, Tremolo, Trim,
+    Vol,
 };
 
 /// Crate-local result type for command parsing.
@@ -88,6 +90,8 @@ pub enum EffectCommand {
     Deemph(Deemph),
     /// SoX-ng-style per-channel delay.
     Delay(Delay),
+    /// SoX-ng-style decimating downsample.
+    Downsample(Downsample),
     /// SoX-ng-style parallel echo delay line.
     Echo(Echo),
     /// SoX-ng-style cascaded echo delay line.
@@ -167,6 +171,7 @@ impl EffectCommand {
             EffectKind::DcShift => parse_dc_shift(effect, args),
             EffectKind::Deemph => parse_deemph(effect, args),
             EffectKind::Delay => parse_delay(effect, args),
+            EffectKind::Downsample => parse_downsample(effect, args),
             EffectKind::Echo => parse_echo(effect, args),
             EffectKind::Echos => parse_echos(effect, args),
             EffectKind::Equalizer => parse_equalizer(effect, args),
@@ -212,6 +217,7 @@ impl EffectCommand {
             Self::DcShift(_) => EffectKind::DcShift,
             Self::Deemph(_) => EffectKind::Deemph,
             Self::Delay(_) => EffectKind::Delay,
+            Self::Downsample(_) => EffectKind::Downsample,
             Self::Echo(_) => EffectKind::Echo,
             Self::Echos(_) => EffectKind::Echos,
             Self::Equalizer(_) => EffectKind::Equalizer,
@@ -263,6 +269,7 @@ impl EffectCommand {
             Self::DcShift(dc_shift) => render_dc_shift(*dc_shift),
             Self::Deemph(_) => vec!["deemph".to_owned()],
             Self::Delay(delay) => render_delay(delay),
+            Self::Downsample(downsample) => render_downsample(*downsample),
             Self::Echo(echo) => render_echo(echo),
             Self::Echos(echos) => render_echos(echos),
             Self::Equalizer(equalizer) => render_equalizer(*equalizer),

@@ -60,6 +60,9 @@ pub enum EffectKind {
     /// SoX-ng-style per-channel delay.
     Delay,
 
+    /// SoX-ng-style decimating downsample.
+    Downsample,
+
     /// SoX-ng-style parallel echo delay line.
     Echo,
 
@@ -316,6 +319,14 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
         "Delay",
         "delay {position}",
         "delay decoded channels by independent positions",
+    ),
+    EffectDescriptor::new(
+        EffectKind::Downsample,
+        "downsample",
+        &[],
+        "Downsample",
+        "downsample [factor]",
+        "drop frames by a fixed integer decimation factor",
     ),
     EffectDescriptor::new(
         EffectKind::Echo,
@@ -934,18 +945,18 @@ mod tests {
 
     #[test]
     fn known_but_unsupported_sox_ng_names_report_missing_coverage() {
-        let error = EffectRegistry::resolve("downsample").unwrap_err();
+        let error = EffectRegistry::resolve("upsample").unwrap_err();
 
         assert_eq!(
             error,
             EffectNameError::UnsupportedSoxNgEffect {
-                name: "downsample".to_owned(),
+                name: "upsample".to_owned(),
             }
         );
         assert!(
             error
                 .to_string()
-                .contains("missing SoX-ng coverage entry for `downsample`")
+                .contains("missing SoX-ng coverage entry for `upsample`")
         );
     }
 

@@ -107,6 +107,14 @@ pub enum EffectError {
     #[error("reverb delay or output shape exceeds representable audio buffer length")]
     ReverbLengthOverflow,
 
+    /// A downsample factor was outside SoX-ng's supported range.
+    #[error("downsample factor must be in the SoX-ng range 1..=16384")]
+    InvalidDownsampleFactor,
+
+    /// A downsample command would produce an unrepresentable sample rate.
+    #[error("downsample output sample rate must be at least 1 Hz")]
+    DownsampleRateTooLow,
+
     /// A biquad coefficient was not finite or had an invalid `a0` normalizer.
     #[error("biquad coefficients must be finite and a0 must be nonzero")]
     InvalidBiquadCoefficients,

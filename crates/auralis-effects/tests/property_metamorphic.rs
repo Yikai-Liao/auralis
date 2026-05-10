@@ -5,11 +5,11 @@ use auralis_core::{
 };
 use auralis_effects::{
     AllPass, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut,
-    Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Echo, EchoTap, Echos,
-    EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass, LowPass,
-    Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix, RemixOutputSpec,
-    RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType, SoftVol, Swap, Treble,
-    Tremolo, Trim, Vol,
+    Channels, Chorus, ChorusStage, Contrast, DcShift, Deemph, Delay, Downsample, Echo, EchoTap,
+    Echos, EchosTap, Equalizer, Fade, Flanger, FlangerInterpolation, FlangerWave, Gain, HighPass,
+    LowPass, Norm, Oops, Overdrive, Pad, Phaser, PhaserInterpolation, PhaserWave, Remix,
+    RemixOutputSpec, RemixSource, Repeat, Reverb, Reverse, Riaa, Saturation, SaturationType,
+    SoftVol, Swap, Treble, Tremolo, Trim, Vol,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -173,6 +173,14 @@ proptest! {
         prop_assert_sample_bits_eq(repeated.as_planar_f32(), source.as_planar_f32())?;
         prop_assert_eq!(repeated.frames(), source.frames());
         prop_assert_eq!(repeated.channels(), source.channels());
+
+        let downsampled = Downsample::new(1)
+            .expect("factor one is valid")
+            .process_buffer(&source)
+            .expect("factor one downsample cannot fail");
+        prop_assert_sample_bits_eq(downsampled.as_planar_f32(), source.as_planar_f32())?;
+        prop_assert_eq!(downsampled.frames(), source.frames());
+        prop_assert_eq!(downsampled.channels(), source.channels());
 
         let channel_converted = Channels::new(source.channels())
             .process_buffer(&source)
@@ -396,6 +404,12 @@ proptest! {
             .process_buffer(&source)
             .expect("small generated delay cannot overflow");
         prop_assert_all_finite(&delayed)?;
+
+        let downsampled = Downsample::new(2)
+            .expect("factor two is valid")
+            .process_buffer(&source)
+            .expect("fixture sample rate can be halved");
+        prop_assert_all_finite(&downsampled)?;
 
         let echoed = Echo::new(0.5, 0.5, [EchoTap::new(1.0, 0.25).expect("tap is valid")])
             .expect("echo fixture is valid")

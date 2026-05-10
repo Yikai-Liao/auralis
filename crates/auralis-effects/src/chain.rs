@@ -786,6 +786,7 @@ mod tests {
                 | EffectCommand::Chorus(_)
                 | EffectCommand::Contrast(_)
                 | EffectCommand::Delay(_)
+                | EffectCommand::Downsample(_)
                 | EffectCommand::Echo(_)
                 | EffectCommand::Echos(_)
                 | EffectCommand::Flanger(_)

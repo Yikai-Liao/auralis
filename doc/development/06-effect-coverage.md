@@ -948,6 +948,24 @@ flush behavior, and whether chunked output is exact or tolerance-based.
 
 ### Feature 6.6.1: `downsample`
 
+Status: implemented.
+
+Implementation notes:
+
+- Added a public `Downsample` effect with SoX-ng's optional integer factor,
+  default factor `2`, and supported range `1..=16384`.
+- Wired `downsample [factor]` through the effect registry, typed command
+  parser, effect-chain execution, effects-file diagnostics, CLI positional
+  chain path, and parser fuzz corpus.
+- Processing is simple decimation: keep frames `0, factor, 2 * factor, ...`,
+  preserve channel count, update sample-rate metadata to `input_rate / factor`,
+  and perform no anti-alias filtering.
+- Coverage includes unit/integration tests, L4 finite-output and factor-one
+  identity properties, parser fuzz, layered coverage metadata, and standalone
+  SoX-ng golden cases for default mono and explicit-factor stereo commands.
+- The current API is whole-buffer. It has no delay tail or flush phase, and
+  chunk-exact streaming would require exposing the SoX-ng-style carry state.
+
 ### Feature 6.6.2: `upsample`
 
 ### Feature 6.6.3: `speed`

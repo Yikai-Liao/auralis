@@ -530,6 +530,30 @@ max_abs = 0.0
 rms = 0.0
 snr_db = 120.0
 
+[id.effect_downsample_mono_default]
+input = "effects/downsample_mono.wav"
+corpus_id = "l0/impulse_mono_16"
+output_sample_rate = 24000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["downsample"]
+sox_ng = ["downsample"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
+[id.effect_downsample_stereo_factor_3]
+input = "effects/downsample_stereo.wav"
+corpus_id = "l0/sine_stereo_32"
+output_sample_rate = 16000
+sox_ng_auto_channels = false
+sox_ng_auto_rate = false
+auralis = ["downsample", "3"]
+sox_ng = ["downsample", "3"]
+max_abs = 0.0
+rms = 0.0
+snr_db = 120.0
+
 [id.effect_chorus_mono_linear]
 input = "effects/chorus_mono.wav"
 corpus_id = "l0/sine_mono_32"
