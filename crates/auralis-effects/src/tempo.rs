@@ -11,9 +11,8 @@ const DEFAULT_SEARCH_DIVISOR: f64 = 5.587;
 /// `Tempo` changes decoded duration by overlap-adding similar windows while
 /// keeping the input sample rate unchanged. A factor greater than `1` speeds
 /// audio up and reduces frame count; a factor below `1` slows audio down and
-/// increases frame count. Feature 6.6.9 implements the default SoX-ng profile;
-/// tuning flags and explicit segment/search/overlap options are reserved for
-/// the following roadmap feature.
+/// increases frame count. The tuning profile and optional
+/// segment/search/overlap sizes use SoX-ng's millisecond units.
 ///
 /// # Examples
 ///
@@ -45,12 +44,42 @@ const DEFAULT_SEARCH_DIVISOR: f64 = 5.587;
 ///
 /// [`Self::new`] returns [`EffectError::InvalidTempoFactor`] for non-finite
 /// factors or values outside SoX-ng's `0.1..=100` range.
+/// [`Self::with_tuning`] also returns [`EffectError::InvalidTempoTuning`] for
+/// segment/search/overlap values outside SoX-ng's accepted ranges.
 /// [`Self::process_buffer`] returns [`EffectError::TempoLengthOverflow`] when
 /// the derived state or output shape cannot be represented.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tempo {
     /// Ratio of new tempo to old tempo.
     pub factor: f64,
+
+    /// Whether to use SoX-ng's hierarchical quick overlap search.
+    pub quick_search: bool,
+
+    /// Tuning profile used to derive unspecified timing parameters.
+    pub profile: TempoProfile,
+
+    /// Explicit segment size in milliseconds.
+    pub segment_ms: Option<f64>,
+
+    /// Explicit overlap-search span in milliseconds.
+    pub search_ms: Option<f64>,
+
+    /// Explicit overlap size in milliseconds.
+    pub overlap_ms: Option<f64>,
+}
+
+/// SoX-ng tuning profile for [`Tempo`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TempoProfile {
+    /// Default SoX-ng tempo profile.
+    Default,
+    /// `tempo -m`, optimized for music.
+    Music,
+    /// `tempo -s`, optimized for speech.
+    Speech,
+    /// `tempo -l`, optimized for linear processing with a zero default search span.
+    Linear,
 }
 
 impl Tempo {
@@ -61,10 +90,53 @@ impl Tempo {
     /// Returns [`EffectError::InvalidTempoFactor`] when `factor` is not finite
     /// or is outside SoX-ng's supported `0.1..=100` range.
     pub fn new(factor: f64) -> Result<Self> {
+        Self::with_tuning(factor, false, TempoProfile::Default, None, None, None)
+    }
+
+    /// Creates a tempo processor using one of SoX-ng's named tuning profiles.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidTempoFactor`] when `factor` is not finite
+    /// or is outside SoX-ng's supported `0.1..=100` range.
+    pub fn with_profile(factor: f64, profile: TempoProfile) -> Result<Self> {
+        Self::with_tuning(factor, false, profile, None, None, None)
+    }
+
+    /// Creates a tempo processor with explicit SoX-ng tuning options.
+    ///
+    /// `segment_ms`, `search_ms`, and `overlap_ms` are optional positional
+    /// values in milliseconds and use SoX-ng's accepted ranges: segment
+    /// `10..=120`, search `0..=30`, and overlap `0..=30`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::InvalidTempoFactor`] when `factor` is invalid or
+    /// [`EffectError::InvalidTempoTuning`] when a supplied timing value is
+    /// outside SoX-ng's supported range.
+    pub fn with_tuning(
+        factor: f64,
+        quick_search: bool,
+        profile: TempoProfile,
+        segment_ms: Option<f64>,
+        search_ms: Option<f64>,
+        overlap_ms: Option<f64>,
+    ) -> Result<Self> {
         if !factor.is_finite() || !(0.1..=100.0).contains(&factor) {
             return Err(EffectError::InvalidTempoFactor);
         }
-        Ok(Self { factor })
+        validate_optional_range(segment_ms, 10.0, 120.0)?;
+        validate_optional_range(search_ms, 0.0, 30.0)?;
+        validate_optional_range(overlap_ms, 0.0, 30.0)?;
+
+        Ok(Self {
+            factor,
+            quick_search,
+            profile,
+            segment_ms,
+            search_ms,
+            overlap_ms,
+        })
     }
 
     /// Applies default-profile tempo processing.
@@ -84,6 +156,8 @@ impl Tempo {
             audio.spec().sample_rate().as_u32(),
             audio.channels().as_usize(),
             self.factor,
+            self.quick_search,
+            self.resolved_tuning(),
         )?;
         let interleaved = interleave(audio)?;
         let output = state.process(&interleaved, audio.frames())?;
@@ -100,12 +174,76 @@ impl Tempo {
 
         Ok(AudioBuffer::from_planar_f32(spec, output_frames, planar)?)
     }
+
+    fn resolved_tuning(self) -> TempoTuning {
+        let segment_ms = self
+            .segment_ms
+            .unwrap_or_else(|| self.profile.default_segment_ms(self.factor));
+        let search_ms = self
+            .search_ms
+            .unwrap_or_else(|| self.profile.default_search_ms(segment_ms));
+        let overlap_ms = self
+            .overlap_ms
+            .unwrap_or_else(|| segment_ms / self.profile.overlap_divisor())
+            .min(segment_ms / 2.0);
+
+        TempoTuning {
+            segment: segment_ms,
+            search: search_ms,
+            overlap: overlap_ms,
+        }
+    }
+}
+
+impl TempoProfile {
+    pub(crate) fn default_segment_ms(self, factor: f64) -> f64 {
+        let (base_ms, exponent) = match self {
+            Self::Default => (DEFAULT_SEGMENT_MS, 0.0),
+            Self::Music => (82.0, 1.0),
+            Self::Speech => (35.0, 0.33),
+            Self::Linear => (20.0, 1.0),
+        };
+        (base_ms / factor.powf(exponent).max(1.0)).max(10.0)
+    }
+
+    pub(crate) fn default_search_ms(self, segment_ms: f64) -> f64 {
+        match self {
+            Self::Linear => 0.0,
+            _ => segment_ms / self.search_divisor(),
+        }
+    }
+
+    fn search_divisor(self) -> f64 {
+        match self {
+            Self::Default => DEFAULT_SEARCH_DIVISOR,
+            Self::Music => 6.0,
+            Self::Speech => 2.14,
+            Self::Linear => 2.0,
+        }
+    }
+
+    fn overlap_divisor(self) -> f64 {
+        match self {
+            Self::Default => DEFAULT_OVERLAP_DIVISOR,
+            Self::Music => 7.0,
+            Self::Speech => 2.5,
+            Self::Linear => 2.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TempoTuning {
+    segment: f64,
+    search: f64,
+    overlap: f64,
 }
 
 #[derive(Debug, Clone)]
 struct TempoState {
     channels: usize,
     factor: f64,
+    quick_search: bool,
     search: usize,
     segment: usize,
     overlap: usize,
@@ -119,12 +257,17 @@ impl TempoState {
         clippy::cast_sign_loss,
         reason = "SoX-ng derives tempo window sizes by rounding validated floating-point sample counts to size_t"
     )]
-    fn new(sample_rate: u32, channels: usize, factor: f64) -> Result<Self> {
-        let segment = ((f64::from(sample_rate) * DEFAULT_SEGMENT_MS / 1000.0) + 0.5) as usize;
-        let search_ms = DEFAULT_SEGMENT_MS / DEFAULT_SEARCH_DIVISOR;
-        let search = ((f64::from(sample_rate) * search_ms / 1000.0) + 0.5) as usize;
-        let overlap_ms = DEFAULT_SEGMENT_MS / DEFAULT_OVERLAP_DIVISOR;
-        let mut overlap = (((f64::from(sample_rate) * overlap_ms / 1000.0) + 4.5) as usize).max(16);
+    fn new(
+        sample_rate: u32,
+        channels: usize,
+        factor: f64,
+        quick_search: bool,
+        tuning: TempoTuning,
+    ) -> Result<Self> {
+        let segment = ((f64::from(sample_rate) * tuning.segment / 1000.0) + 0.5) as usize;
+        let search = ((f64::from(sample_rate) * tuning.search / 1000.0) + 0.5) as usize;
+        let mut overlap =
+            (((f64::from(sample_rate) * tuning.overlap / 1000.0) + 4.5) as usize).max(16);
         overlap &= !7;
         if overlap * 2 > segment {
             overlap = overlap
@@ -138,13 +281,14 @@ impl TempoState {
             .and_then(|size| size.checked_add(search))
             .ok_or(EffectError::TempoLengthOverflow)?;
 
-        if channels == 0 || search == 0 || segment == 0 || overlap == 0 || process_size == 0 {
+        if channels == 0 || segment == 0 || overlap == 0 || process_size == 0 {
             return Err(EffectError::TempoLengthOverflow);
         }
 
         Ok(Self {
             channels,
             factor,
+            quick_search,
             search,
             segment,
             overlap,
@@ -235,6 +379,13 @@ impl<'state> TempoMachine<'state> {
     }
 
     fn best_overlap_position(&self) -> Result<usize> {
+        if self.state.search == 0 {
+            return Ok(0);
+        }
+        if self.state.quick_search {
+            return self.quick_best_overlap_position();
+        }
+
         let mut best_pos = 0;
         let mut least_diff = self.difference_at(0)?;
         for offset in 1..self.state.search {
@@ -244,6 +395,47 @@ impl<'state> TempoMachine<'state> {
                 best_pos = offset;
             }
         }
+        Ok(best_pos)
+    }
+
+    fn quick_best_overlap_position(&self) -> Result<usize> {
+        let mut prev_best_pos = (self.state.search + 1) >> 1;
+        let mut best_pos = prev_best_pos;
+        let mut least_diff = self.difference_at(best_pos)?;
+        let mut step = 64_usize;
+
+        loop {
+            for subtract in [true, false] {
+                let mut probe = 1_usize;
+                while probe < 4 || step == 64 {
+                    let distance = probe
+                        .checked_mul(step)
+                        .ok_or(EffectError::TempoLengthOverflow)?;
+                    let Some(offset) = (if subtract {
+                        prev_best_pos.checked_sub(distance)
+                    } else {
+                        prev_best_pos.checked_add(distance)
+                    }) else {
+                        break;
+                    };
+                    if offset >= self.state.search {
+                        break;
+                    }
+                    let diff = self.difference_at(offset)?;
+                    if diff < least_diff {
+                        least_diff = diff;
+                        best_pos = offset;
+                    }
+                    probe += 1;
+                }
+            }
+            prev_best_pos = best_pos;
+            step >>= 2;
+            if step == 0 {
+                break;
+            }
+        }
+
         Ok(best_pos)
     }
 
@@ -405,9 +597,20 @@ fn clip(sample: f32) -> f32 {
     sample.clamp(-1.0, 1.0)
 }
 
+fn validate_optional_range(value: Option<f64>, min: f64, max: f64) -> Result<()> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    if value.is_finite() && (min..=max).contains(&value) {
+        Ok(())
+    } else {
+        Err(EffectError::InvalidTempoTuning)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Tempo;
+    use super::{Tempo, TempoProfile};
     use crate::{
         EffectError,
         test_support::{audio_buffer, stereo_audio_buffer},
@@ -454,6 +657,59 @@ mod tests {
 
         assert_eq!(processed.channels(), audio.channels());
         assert_eq!(processed.frames().as_u64(), 10923);
+    }
+
+    #[test]
+    fn tuning_profiles_change_overlap_state_but_preserve_target_length() {
+        let audio = audio_buffer(
+            (0_u16..8192)
+                .map(|frame| f32::from(frame % 128) / 128.0)
+                .collect(),
+        );
+
+        let music = Tempo::with_profile(1.5, TempoProfile::Music)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+        let speech = Tempo::with_tuning(1.5, true, TempoProfile::Speech, None, None, None)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+        let linear = Tempo::with_profile(1.5, TempoProfile::Linear)
+            .unwrap()
+            .process_buffer(&audio)
+            .unwrap();
+
+        assert_eq!(music.frames().as_u64(), 5461);
+        assert_eq!(speech.frames().as_u64(), 5461);
+        assert_eq!(linear.frames().as_u64(), 5461);
+        assert!(music.as_planar_f32() != speech.as_planar_f32());
+    }
+
+    #[test]
+    fn explicit_tuning_options_are_validated() {
+        assert_eq!(
+            Tempo::with_tuning(1.25, false, TempoProfile::Default, Some(9.0), None, None)
+                .unwrap_err(),
+            EffectError::InvalidTempoTuning
+        );
+        assert_eq!(
+            Tempo::with_tuning(1.25, false, TempoProfile::Default, None, Some(31.0), None)
+                .unwrap_err(),
+            EffectError::InvalidTempoTuning
+        );
+        assert_eq!(
+            Tempo::with_tuning(
+                1.25,
+                false,
+                TempoProfile::Default,
+                None,
+                None,
+                Some(f64::NAN)
+            )
+            .unwrap_err(),
+            EffectError::InvalidTempoTuning
+        );
     }
 
     #[test]

@@ -145,6 +145,12 @@ pub enum EffectError {
     #[error("tempo factor must be finite and in the SoX-ng range 0.1..=100")]
     InvalidTempoFactor,
 
+    /// A tempo command had invalid tuning parameters.
+    #[error(
+        "tempo segment/search/overlap must be finite and in the SoX-ng ranges segment 10..=120 ms, search 0..=30 ms, and overlap 0..=30 ms"
+    )]
+    InvalidTempoTuning,
+
     /// A tempo command would create an unrepresentable state or output shape.
     #[error("tempo state or output frame count exceeds representable audio buffer length")]
     TempoLengthOverflow,

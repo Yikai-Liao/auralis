@@ -3,7 +3,7 @@
 use auralis_core::{AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_effects::{
     EffectChainParseError, EffectCommand, EffectCommandParseError, EffectError, Reverse, Tempo,
-    parse_effect_chain,
+    TempoProfile, parse_effect_chain,
 };
 
 #[test]
@@ -18,6 +18,34 @@ fn tempo_chain_parses_factor_and_stops_before_next_effect() {
         ]
     );
     assert_eq!(chain.render_tokens(), ["tempo", "1.25", "reverse"]);
+}
+
+#[test]
+fn tempo_chain_parses_tuning_options_and_stops_before_next_effect() {
+    let chain =
+        parse_effect_chain(&["tempo", "-q", "-m", "1.25", "60", "10", "8", "reverse"]).unwrap();
+
+    assert_eq!(
+        chain.commands(),
+        &[
+            EffectCommand::Tempo(
+                Tempo::with_tuning(
+                    1.25,
+                    true,
+                    TempoProfile::Music,
+                    Some(60.0),
+                    Some(10.0),
+                    Some(8.0)
+                )
+                .unwrap()
+            ),
+            EffectCommand::Reverse(Reverse::new())
+        ]
+    );
+    assert_eq!(
+        chain.render_tokens(),
+        ["tempo", "-q", "-m", "1.25", "60", "10", "8", "reverse"]
+    );
 }
 
 #[test]
@@ -64,7 +92,7 @@ fn tempo_chain_preserves_stereo_channel_count() {
 }
 
 #[test]
-fn tempo_chain_rejects_missing_tuning_options_and_invalid_values() {
+fn tempo_chain_rejects_missing_unsupported_options_and_invalid_values() {
     assert_eq!(
         parse_effect_chain(&["tempo"]).unwrap_err(),
         EffectChainParseError::CommandParseFailed {
@@ -77,13 +105,13 @@ fn tempo_chain_rejects_missing_tuning_options_and_invalid_values() {
         }
     );
     assert_eq!(
-        parse_effect_chain(&["tempo", "-q", "1.25"]).unwrap_err(),
+        parse_effect_chain(&["tempo", "-x", "1.25"]).unwrap_err(),
         EffectChainParseError::CommandParseFailed {
             index: 0,
-            command: "tempo -q 1.25".to_owned(),
+            command: "tempo -x 1.25".to_owned(),
             source: EffectCommandParseError::UnsupportedOption {
                 effect: "tempo",
-                option: "-q".to_owned(),
+                option: "-x".to_owned(),
             },
         }
     );
@@ -94,8 +122,20 @@ fn tempo_chain_rejects_missing_tuning_options_and_invalid_values() {
             command: "tempo 101".to_owned(),
             source: EffectCommandParseError::InvalidEffectConfig {
                 effect: "tempo",
-                argument: "factor",
+                argument: "tempo",
                 source: EffectError::InvalidTempoFactor,
+            },
+        }
+    );
+    assert_eq!(
+        parse_effect_chain(&["tempo", "1.25", "9"]).unwrap_err(),
+        EffectChainParseError::CommandParseFailed {
+            index: 0,
+            command: "tempo 1.25 9".to_owned(),
+            source: EffectCommandParseError::InvalidEffectConfig {
+                effect: "tempo",
+                argument: "tempo",
+                source: EffectError::InvalidTempoTuning,
             },
         }
     );

@@ -289,8 +289,8 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::Norm
         | EffectKind::Repeat
         | EffectKind::Speed
-        | EffectKind::Tempo
         | EffectKind::Upsample => optional_arg_end(tokens, args_start, 1),
+        EffectKind::Tempo => tempo_arg_end(tokens, args_start),
         EffectKind::Stretch => optional_arg_end(tokens, args_start, 5),
         EffectKind::Rate => rate_arg_end(tokens, args_start),
         EffectKind::DcShift | EffectKind::Overdrive | EffectKind::Tremolo => {
@@ -319,6 +319,26 @@ pub(crate) fn command_end(kind: EffectKind, tokens: &[&str], command_start: usiz
         | EffectKind::SoftVol
         | EffectKind::Vol => optional_arg_end(tokens, args_start, 3),
     }
+}
+
+fn tempo_arg_end(tokens: &[&str], args_start: usize) -> usize {
+    let mut end = args_start;
+
+    while end < tokens.len() && !is_command_boundary(tokens[end]) {
+        match tokens[end] {
+            "-q" | "-m" | "-s" | "-l" => end += 1,
+            token if is_option_like(token) => {
+                end += 1;
+                if end < tokens.len() && !is_command_boundary(tokens[end]) {
+                    end += 1;
+                }
+                return include_unexpected_argument(tokens, end);
+            }
+            _ => break,
+        }
+    }
+
+    optional_arg_end(tokens, end, 4)
 }
 
 fn rate_arg_end(tokens: &[&str], args_start: usize) -> usize {

@@ -591,10 +591,10 @@ The implemented `stretch` command accepts SoX-ng's basic cross-fade
 `factor`, `window`, `fade`, `shift`, and `fading` arguments, preserves the
 sample-rate metadata, and changes duration through channel-local scalar
 window overlap processing.
-The implemented `tempo` command accepts the required default-profile SoX-ng
-`factor` argument, preserves sample-rate metadata and pitch, changes duration
-through scalar overlap-search processing, and leaves tuning flags and explicit
-segment/search/overlap options for the next tempo feature.
+The implemented `tempo` command accepts SoX-ng's `[-q] [-m|-s|-l] factor
+[segment [search [overlap]]]` surface, preserves sample-rate metadata and
+pitch, changes duration through scalar overlap-search processing, and uses
+millisecond units for explicit segment/search/overlap tuning.
 The implemented `rate` scaffold accepts a required target frequency such as
 `rate 44100` or `rate 44.1k`, plus SoX-ng quality selectors `-q`, `-l`, `-m`,
 `-g`, `-h`, `-e`, `-v`, `-u`, and equivalent `-Q 0` through `-Q 7` forms.

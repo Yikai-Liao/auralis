@@ -1130,6 +1130,26 @@ Implementation notes:
 
 ### Feature 6.6.10: `tempo` tuning options
 
+Status: implemented.
+
+Implementation notes:
+
+- Extended the public `Tempo` model with SoX-ng's quick hierarchical search
+  flag, `default`/`music`/`speech`/`linear` tuning profiles, and explicit
+  millisecond `segment`, `search`, and `overlap` parameters.
+- Wired `tempo [-q] [-m|-s|-l] factor [segment [search [overlap]]]` through
+  the typed command parser, canonical rendering, effect-chain token grouping,
+  CLI positional chain path, parser fuzz corpus, and standalone golden
+  manifests.
+- Processing derives unspecified tuning values with SoX-ng's profile formulas
+  before building the scalar overlap-search state. `-l` uses a zero default
+  search span, explicit overlap is capped to half the segment length, and
+  output frame count remains `round(input_frames / factor)`.
+- Coverage includes parser/rendering tests, chain integration tests, profile
+  and explicit-tuning processor coverage, parser fuzz seeds, L0-L7 coverage
+  metadata, and standalone SoX-ng golden cases for quick speech and explicit
+  linear tuning.
+
 ### Feature 6.6.11: `pitch`
 
 ### Feature 6.6.12: `bend`

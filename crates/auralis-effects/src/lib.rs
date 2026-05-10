@@ -178,7 +178,7 @@ pub use softvol::SoftVol;
 pub use speed::Speed;
 pub use stretch::{Stretch, StretchFade};
 pub use swap::Swap;
-pub use tempo::Tempo;
+pub use tempo::{Tempo, TempoProfile};
 pub use treble::Treble;
 pub use tremolo::Tremolo;
 pub use trim::{Trim, TrimPosition};
