@@ -8,7 +8,9 @@ line effects while rebuilding the core around deterministic behavior, typed
 Rust APIs, explicit test contracts, and maintainable modules.
 
 Initial scope is deliberately narrow: **PCM16 WAV only**. Additional formats are
-planned only after effect and pipeline behavior are broad and stable.
+planned only after effect and pipeline behavior are broad and stable, and new
+codec backends must stay pure Rust unless a later development-plan change says
+otherwise.
 
 ## Current Status
 
@@ -26,7 +28,11 @@ Auralis is pre-alpha. The repository already contains:
   chain/boundary cases, L0-L7 layered coverage metadata, fuzz/parser seeds,
   optional Python helpers for cross-tool golden execution and reporting, and a
   7.x primitive ownership audit with reusable biquad, FIR, and deterministic
-  dither/noise primitive extractions into `auralis-dsp`.
+  dither/noise primitive extractions into `auralis-dsp`;
+- an 8.0 codec-backend policy that keeps WAV and future format work behind
+  Auralis-owned adapters, classifies AIFF/AIFC as optional pure Rust adapter
+  work, FLAC as experimental pure Rust adapter work, and native or `ffmpeg`
+  codec backends as not planned under the current roadmap.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

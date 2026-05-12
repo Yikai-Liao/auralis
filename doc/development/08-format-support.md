@@ -29,7 +29,7 @@ Each format leaf feature uses the shared acceptance tests below.
 
 ### Feature 8.0.1: pure Rust codec backend policy
 
-Status: planned.
+Status: completed.
 
 Document the decode/import and encode/export backend policy before adding any
 new format dependency.
@@ -45,6 +45,33 @@ Acceptance tests:
   metadata behavior, and fuzz/security risk;
 - no backend crate type leaks into `auralis-core` or public high-level APIs;
 - no new lossy encoder dependency is added by this policy feature.
+
+Implementation notes:
+
+- README now states that future codec backends stay pure Rust by default and
+  that additional formats remain blocked until their backend audit is recorded.
+- This roadmap now classifies the currently selected backend direction for each
+  planned or intentionally unplanned format family using the four buckets
+  required by this feature: built-in, feature-gated pure Rust, experimental
+  pure Rust, and not planned.
+- The backend audit notes below are policy records only. They do not add any
+  new dependencies, and they explicitly keep backend crate details behind
+  Auralis-owned adapter modules instead of exposing them through public APIs.
+
+### Feature 8.0.1 backend audit
+
+| Format family | Candidate backend | Classification | License and maintenance note | Native dependency note | Streaming and sample-format note | Metadata and fuzz/security note |
+|---|---|---|---|---|---|---|
+| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path. | Pure Rust crate; no external codec libraries or system tools. | Current stage remains PCM16-only at the Auralis boundary; richer WAV sample types stay as later leaf features. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
+| RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
+| AIFF / AIFC | pure Rust crate candidate such as `aifc`, behind a feature-gated adapter | feature-gated pure Rust | Accept only after a crate-level audit confirms MIT/Apache-compatible licensing, active enough maintenance, and reviewable transitive footprint. | Must remain pure Rust with no libsndfile or other native wrapper path. | Needs a streaming decode/encode story for PCM AIFF first; compressed AIFC encodings are later and may stay narrower if the backend cannot cover them safely. | Chunk metadata behavior must stay behind Auralis-owned option/report types; add parser/fuzz coverage before enabling broad import/export support. |
+| FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
+| MP3 | none selected | not planned | No credible pure Rust encoder is selected today, and adding one is outside the current roadmap. | Native-backed paths such as LAME are outside policy. | Lossy psychoacoustic streaming complexity is intentionally out of scope for the initial format roadmap. | Security and metadata considerations are deferred because no backend is being considered in this phase. |
+| Ogg Vorbis | none selected | not planned | No credible pure Rust encoder/muxer combination is selected today. | libvorbis and other native wrapper paths are outside policy. | Streaming container plus codec complexity is out of scope until a future policy change or strong pure Rust backend appears. | Ogg page parsing and Vorbis comment handling are deferred with the format itself. |
+| Ogg Opus | none selected | not planned | No credible pure Rust Opus encoder plus Ogg muxing path is selected today. | `libopusenc` and wrapper paths are outside policy. | Real support would require both codec and container decisions, which are intentionally postponed. | Ogg/Opus parser and metadata risks are deferred with the format itself. |
+| AAC / M4A | none selected | not planned | No credible pure Rust AAC encoder plus MP4 muxing path is selected today. | FDK-AAC, FFmpeg, and similar native-backed solutions are outside policy. | Lossy codec plus MP4 container work is explicitly outside first-stage scope. | MP4 atom parsing and metadata handling are deferred with the format itself. |
+| ALAC / MP4 | none selected | not planned | No credible pure Rust ALAC plus MP4 muxing path is selected today. | FFmpeg and native wrapper paths are outside policy. | Container plus codec scope is deferred until far after core WAV/PCM/AIFF/FLAC work. | MP4 parser and metadata risks are deferred with the format itself. |
+| WavPack | none selected | not planned | No backend has been selected, and it is not part of the first-stage roadmap. | Native-backed shortcuts remain outside policy even if a wrapper exists later. | Streaming and hybrid-lossy mode semantics would need their own audit before any selection. | Container/metadata/fuzz considerations are postponed until a future selection exists. |
 
 ### Feature 8.0.2: encoder trait and output format model
 
@@ -82,16 +109,16 @@ Acceptance tests:
 
 | Output format | Backend policy | Status | Notes |
 |---|---|---|---|
-| WAV | `hound` behind Auralis adapter | implemented / stage 1 | default output format |
-| RAW PCM | Auralis-owned sample layout and endian conversion | planned | small boundary; not a complex codec |
-| AIFF / AIFC | pure Rust crate candidate, such as `aifc`, after audit | planned | feature-gated adapter |
-| FLAC | pure Rust encoder candidate, such as `flacenc`, after audit | planned experimental | no libFLAC wrapper under current policy |
-| MP3 | pure Rust encoder only if a credible backend is selected | not planned now | no LAME wrapper |
-| Ogg Vorbis | pure Rust encoder only if a credible backend is selected | not planned now | no libvorbis wrapper |
-| Ogg Opus | pure Rust encoder and Ogg muxing only if credible backends are selected | not planned now | no libopusenc wrapper |
-| AAC / M4A | pure Rust encoder and MP4 muxing only if credible backends are selected | not planned now | no `ffmpeg` or FDK-AAC |
-| ALAC / MP4 | pure Rust encoder and muxing only if credible backends are selected | not planned now | no `ffmpeg` |
-| WavPack | pure Rust backend only if selected later | future / not selected | not first-stage scope |
+| WAV | `hound` behind Auralis adapter | built-in | default output format |
+| RAW PCM | Auralis-owned sample layout and endian conversion | built-in | small boundary; not a complex codec |
+| AIFF / AIFC | pure Rust crate candidate, such as `aifc`, after audit | feature-gated pure Rust | adapter stays optional until the crate audit is accepted |
+| FLAC | pure Rust encoder candidate, such as `flacenc`, after audit | experimental pure Rust | no libFLAC wrapper under current policy |
+| MP3 | pure Rust encoder only if a credible backend is selected | not planned | no LAME wrapper |
+| Ogg Vorbis | pure Rust encoder only if a credible backend is selected | not planned | no libvorbis wrapper |
+| Ogg Opus | pure Rust encoder and Ogg muxing only if credible backends are selected | not planned | no libopusenc wrapper |
+| AAC / M4A | pure Rust encoder and MP4 muxing only if credible backends are selected | not planned | no `ffmpeg` or FDK-AAC |
+| ALAC / MP4 | pure Rust encoder and muxing only if credible backends are selected | not planned | no `ffmpeg` |
+| WavPack | pure Rust backend only if selected later | not planned | not first-stage scope |
 
 The exact crate and version are selected during the leaf feature with
 `cargo add` / `cargo check` and a dependency audit. A 0.x pure Rust crate may be

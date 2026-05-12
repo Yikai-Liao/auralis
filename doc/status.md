@@ -197,6 +197,12 @@ FIR state, and deterministic dither/noise state plus quantization helpers into
 `auralis-dsp` while preserving `auralis-effects` command parsing and public
 compatibility wrappers. Dither SIMD remains intentionally not applicable
 because the PRNG and noise-shaping state order is semantically observable.
+The 8.0 format-support policy now records that future codec backends must stay
+pure Rust unless the development plan changes explicitly. WAV remains the
+built-in adapter path, RAW PCM is planned as an Auralis-owned boundary,
+AIFF/AIFC is classified as feature-gated pure Rust adapter work, FLAC is
+classified as experimental pure Rust adapter work, and external `ffmpeg` or
+native codec wrappers remain not planned under the current roadmap.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
