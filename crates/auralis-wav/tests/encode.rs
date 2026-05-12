@@ -2,9 +2,11 @@
 
 use std::{fs, io::Cursor};
 
-use auralis_codec::{AudioWriter, CodecError, CodecKind};
+use auralis_codec::{AudioEncoder, AudioWriter, CodecError, CodecKind, WavEncodeOptions};
 use auralis_simd::BackendKind;
-use auralis_wav::{Pcm16WavWriter, WavError, decode_pcm16_path, encode_pcm16_path};
+use auralis_wav::{
+    Pcm16WavEncoder, Pcm16WavWriter, WavError, decode_pcm16_path, encode_pcm16_path,
+};
 
 mod support;
 
@@ -136,4 +138,19 @@ fn implements_codec_writer_boundary() {
             ..
         })
     ));
+}
+
+#[test]
+fn implements_codec_encoder_boundary() {
+    let audio = audio_buffer(1, 2, &[0.0, 0.25]);
+    let encoder = Pcm16WavEncoder::new(WavEncodeOptions, BackendKind::Scalar);
+    let mut output = Cursor::new(Vec::new());
+
+    let summary = encoder.encode(&audio, &mut output).unwrap();
+    let decoded = auralis_wav::decode_pcm16(Cursor::new(output.into_inner())).unwrap();
+
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), audio.spec());
+    assert_eq!(summary.frames(), audio.frames());
+    assert_eq!(decoded, audio);
 }

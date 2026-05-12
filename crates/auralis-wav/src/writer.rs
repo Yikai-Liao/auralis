@@ -3,7 +3,9 @@ use std::{
     path::Path,
 };
 
-use auralis_codec::{AudioWriter, CodecError, CodecKind};
+use auralis_codec::{
+    AudioEncoder, AudioOutput, AudioWriter, CodecError, CodecKind, EncodeSummary, WavEncodeOptions,
+};
 use auralis_core::AudioBuffer;
 use auralis_simd::BackendKind;
 
@@ -89,6 +91,55 @@ pub fn encode_pcm16_path_with_backend(
     })?;
 
     write_pcm16_samples_with_backend(writer, audio, requested_backend)
+}
+
+/// Configured PCM16 WAV encoder behind the Auralis codec boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pcm16WavEncoder {
+    _options: WavEncodeOptions,
+    requested_backend: BackendKind,
+}
+
+impl Pcm16WavEncoder {
+    /// Creates a configured PCM16 WAV encoder.
+    #[must_use]
+    pub const fn new(options: WavEncodeOptions, requested_backend: BackendKind) -> Self {
+        Self {
+            _options: options,
+            requested_backend,
+        }
+    }
+}
+
+impl AudioEncoder for Pcm16WavEncoder {
+    fn codec_kind(&self) -> CodecKind {
+        CodecKind::Wav
+    }
+
+    fn encode(
+        &self,
+        input: &AudioBuffer,
+        output: &mut dyn AudioOutput,
+    ) -> auralis_codec::Result<EncodeSummary> {
+        let writer = hound::WavWriter::new(output, hound_spec(input)).map_err(|error| {
+            CodecError::EncodeFailed {
+                kind: CodecKind::Wav,
+                message: error.to_string(),
+            }
+        })?;
+        write_pcm16_samples_with_backend(writer, input, self.requested_backend).map_err(
+            |error| CodecError::EncodeFailed {
+                kind: CodecKind::Wav,
+                message: error.to_string(),
+            },
+        )?;
+
+        Ok(EncodeSummary::new(
+            CodecKind::Wav,
+            input.spec(),
+            input.frames(),
+        ))
+    }
 }
 
 /// Writer for PCM16 WAV streams.

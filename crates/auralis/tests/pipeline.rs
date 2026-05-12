@@ -5,9 +5,11 @@ mod support;
 
 use std::fs;
 
-use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error};
+use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
+use auralis_codec::{CodecError, CodecKind, RawPcmEncodeOptions, WavEncodeOptions};
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
+use auralis_wav::decode_pcm16_path;
 
 use support::{
     assert_sample_bits_eq, assert_samples_close, audio_buffer, stereo_audio_buffer, temp_dir,
@@ -243,6 +245,50 @@ fn apply_effect_chain_matches_repeated_fluent_pipeline_calls() {
     assert_samples_close(actual.as_planar_f32(), expected.as_planar_f32());
     assert_eq!(actual.frames(), expected.frames());
     assert_eq!(actual.channels(), expected.channels());
+}
+
+#[test]
+fn write_output_format_wav_matches_write_wav() {
+    let source = stereo_audio_buffer(vec![0.25, -0.5, 0.75, 1.0, -0.25, 0.5]);
+    let baseline_path = support::temp_path("auralis-pipeline-write-wav-baseline", "wav");
+    let format_path = support::temp_path("auralis-pipeline-write-wav-format", "wav");
+
+    AudioFile::from_audio_buffer(source.clone())
+        .into_pipeline()
+        .gain_db(-3.0)
+        .write_wav(&baseline_path)
+        .unwrap();
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .gain_db(-3.0)
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions))
+        .unwrap();
+
+    let baseline = decode_pcm16_path(&baseline_path).unwrap();
+    let format_output = decode_pcm16_path(&format_path).unwrap();
+
+    fs::remove_file(baseline_path).unwrap();
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.frames(), baseline.frames());
+    assert_eq!(format_output, baseline);
+}
+
+#[test]
+fn write_output_format_rejects_unsupported_formats() {
+    let path = support::temp_path("auralis-pipeline-write-raw", "raw");
+    let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
+        .into_pipeline()
+        .write(&path, OutputFormat::RawPcm(RawPcmEncodeOptions))
+        .unwrap_err();
+
+    let _ = fs::remove_file(path);
+    assert_eq!(
+        error,
+        Error::Codec(CodecError::UnsupportedFormat(
+            auralis_codec::UnsupportedFormat::new(CodecKind::RawPcm)
+        ))
+    );
 }
 
 #[test]

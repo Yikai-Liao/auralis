@@ -56,6 +56,7 @@ dependencies = [
 name = "auralis"
 version = "0.0.0"
 dependencies = [
+ "auralis-codec",
  "auralis-core",
  "auralis-effects",
  "auralis-simd",

@@ -75,7 +75,7 @@ Implementation notes:
 
 ### Feature 8.0.2: encoder trait and output format model
 
-Status: planned.
+Status: completed.
 
 Define Auralis-owned encode abstractions before adding more encoders.
 
@@ -104,6 +104,20 @@ Acceptance tests:
 - backend-specific crate types remain private to adapter modules or crates;
 - unsupported output formats fail with typed errors;
 - WAV behavior remains unchanged.
+
+Implementation notes:
+
+- `auralis-codec` now owns `OutputFormat`, `WavEncodeOptions`,
+  `RawPcmEncodeOptions`, `AiffEncodeOptions`, `FlacEncodeOptions`,
+  `EncodeSummary`, and the `AudioEncoder`/`AudioOutput` boundary traits.
+- `auralis-wav` now exposes a configured `Pcm16WavEncoder` adapter behind that
+  trait while keeping the existing PCM16 writer and path helpers private to the
+  WAV adapter crate.
+- The high-level `auralis::Pipeline` now has `write(path, format)` for the new
+  output-format model, returning typed codec unsupported-format errors for
+  RAW PCM, AIFF/AIFC, and FLAC until their later roadmap leaves land.
+- `Pipeline::write_wav` remains on the existing PCM16 WAV path so current WAV
+  behavior and diagnostics stay unchanged while the new abstraction settles.
 
 ## Pure Rust encode/export roadmap
 

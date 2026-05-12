@@ -202,7 +202,11 @@ pure Rust unless the development plan changes explicitly. WAV remains the
 built-in adapter path, RAW PCM is planned as an Auralis-owned boundary,
 AIFF/AIFC is classified as feature-gated pure Rust adapter work, FLAC is
 classified as experimental pure Rust adapter work, and external `ffmpeg` or
-native codec wrappers remain not planned under the current roadmap.
+native codec wrappers remain not planned under the current roadmap. The codec
+boundary now also owns `OutputFormat`, per-format encode option models,
+`EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
+into that surface while future RAW PCM, AIFF/AIFC, and FLAC writes return
+typed unsupported-format errors until their individual format leaves land.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

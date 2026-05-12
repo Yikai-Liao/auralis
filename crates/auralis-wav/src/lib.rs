@@ -45,6 +45,6 @@ pub use reader::{
     decode_pcm16_with_backend,
 };
 pub use writer::{
-    Pcm16WavWriter, encode_pcm16, encode_pcm16_path, encode_pcm16_path_with_backend,
-    encode_pcm16_with_backend,
+    Pcm16WavEncoder, Pcm16WavWriter, encode_pcm16, encode_pcm16_path,
+    encode_pcm16_path_with_backend, encode_pcm16_with_backend,
 };

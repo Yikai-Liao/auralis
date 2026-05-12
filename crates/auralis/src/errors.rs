@@ -16,6 +16,10 @@ pub enum Error {
     #[error(transparent)]
     Wav(#[from] auralis_wav::WavError),
 
+    /// Generic codec dispatch or unsupported-format failure.
+    #[error(transparent)]
+    Codec(#[from] auralis_codec::CodecError),
+
     /// A typed effect processor rejected its configuration or input buffer.
     #[error(transparent)]
     Effect(#[from] auralis_effects::EffectError),
@@ -54,6 +58,7 @@ impl PartialEq for Error {
         match (self, other) {
             (Self::Core(left), Self::Core(right)) => left == right,
             (Self::Wav(left), Self::Wav(right)) => left == right,
+            (Self::Codec(left), Self::Codec(right)) => left == right,
             (Self::Effect(left), Self::Effect(right)) => left == right,
             (Self::Chain(left), Self::Chain(right)) => left == right,
             (Self::InputCombine(left), Self::InputCombine(right)) => left == right,

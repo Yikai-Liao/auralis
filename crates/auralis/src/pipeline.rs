@@ -1,5 +1,8 @@
-use std::path::Path;
+use std::{fs::File, path::Path};
 
+use auralis_codec::{
+    AudioEncoder, CodecKind, EncodeSummary, OutputFormat, UnsupportedEncoder, WavEncodeOptions,
+};
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 
 use crate::channel_policy::apply_channel_conversion_policy_with_backend;
@@ -376,6 +379,73 @@ impl Pipeline {
         self.audio
     }
 
+    fn finalize_output_audio(self) -> Result<AudioBuffer> {
+        let audio = self.audio?;
+        let audio = apply_sample_rate_conversion_policy(audio, self.sample_rate_conversion_policy)?;
+        let audio = apply_channel_conversion_policy_with_backend(
+            audio,
+            self.channel_conversion_policy,
+            self.requested_backend,
+        )?;
+        let audio = apply_output_level_policy_with_backend(
+            audio,
+            self.output_level_policy,
+            self.requested_backend,
+        )?;
+
+        Ok(apply_output_dither_policy(
+            audio,
+            self.output_dither_policy,
+        )?)
+    }
+
+    /// Encodes the processed audio using an explicit output format model.
+    ///
+    /// WAV currently remains the only implemented encoder. Other planned
+    /// formats return typed [`crate::Error::Codec`] unsupported-format
+    /// diagnostics until their own roadmap leaves land.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first deferred configuration error from the chain, any
+    /// output-boundary policy error, or a typed codec dispatch/encode error.
+    pub fn write(self, path: impl AsRef<Path>, format: OutputFormat) -> Result<EncodeSummary> {
+        let kind = format.codec_kind();
+        match format {
+            OutputFormat::Wav(options) => self.write_wav_with_options(path, options),
+            OutputFormat::RawPcm(_) => self.write_unsupported(path, CodecKind::RawPcm),
+            OutputFormat::Aiff(_) => self.write_unsupported(path, CodecKind::Aiff),
+            OutputFormat::Flac(_) => self.write_unsupported(path, CodecKind::Flac),
+            _ => self.write_unsupported(path, kind),
+        }
+    }
+
+    fn write_wav_with_options(
+        self,
+        path: impl AsRef<Path>,
+        options: WavEncodeOptions,
+    ) -> Result<EncodeSummary> {
+        let path = path.as_ref();
+        let requested_backend = self.requested_backend;
+        let audio = self.finalize_output_audio()?;
+        let mut output =
+            File::create(path).map_err(|error| auralis_codec::CodecError::EncodeFailed {
+                kind: CodecKind::Wav,
+                message: error.to_string(),
+            })?;
+        let encoder = auralis_wav::Pcm16WavEncoder::new(options, requested_backend);
+
+        Ok(encoder.encode(&audio, &mut output)?)
+    }
+
+    fn write_unsupported(self, _path: impl AsRef<Path>, kind: CodecKind) -> Result<EncodeSummary> {
+        let audio = self.finalize_output_audio()?;
+        let encoder = UnsupportedEncoder::new(kind);
+        let mut output = std::io::Cursor::new(Vec::new());
+
+        Ok(encoder.encode(&audio, &mut output)?)
+    }
+
     /// Encodes the processed audio as a PCM16 WAV file.
     ///
     /// Existing files at `path` are overwritten. Encoding clips finite samples
@@ -389,20 +459,9 @@ impl Pipeline {
     /// policies plus explicit output level policy are applied only here and can
     /// also return typed policy errors.
     pub fn write_wav(self, path: impl AsRef<Path>) -> Result<()> {
-        let audio = self.audio?;
-        let audio = apply_sample_rate_conversion_policy(audio, self.sample_rate_conversion_policy)?;
-        let audio = apply_channel_conversion_policy_with_backend(
-            audio,
-            self.channel_conversion_policy,
-            self.requested_backend,
-        )?;
-        let audio = apply_output_level_policy_with_backend(
-            audio,
-            self.output_level_policy,
-            self.requested_backend,
-        )?;
-        let audio = apply_output_dither_policy(audio, self.output_dither_policy)?;
-        auralis_wav::encode_pcm16_path_with_backend(path, &audio, self.requested_backend)?;
+        let requested_backend = self.requested_backend;
+        let audio = self.finalize_output_audio()?;
+        auralis_wav::encode_pcm16_path_with_backend(path, &audio, requested_backend)?;
 
         Ok(())
     }

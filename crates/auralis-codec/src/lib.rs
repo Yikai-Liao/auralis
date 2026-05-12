@@ -17,9 +17,12 @@
 //! assert!(matches!(error, CodecError::UnsupportedFormat(_)));
 //! ```
 
-use std::fmt;
+use std::{
+    fmt,
+    io::{Seek, Write},
+};
 
-use auralis_core::AudioBuffer;
+use auralis_core::{AudioBuffer, AudioSpec, FrameCount};
 use thiserror::Error;
 
 /// Crate-local result type using [`CodecError`].
@@ -86,6 +89,12 @@ pub enum CodecKind {
     /// RIFF/WAVE audio.
     Wav,
 
+    /// Headerless raw PCM audio.
+    RawPcm,
+
+    /// AIFF or AIFC audio.
+    Aiff,
+
     /// FLAC audio, represented for explicit unsupported-format reporting.
     Flac,
 
@@ -97,11 +106,104 @@ impl fmt::Display for CodecKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Wav => formatter.write_str("wav"),
+            Self::RawPcm => formatter.write_str("raw-pcm"),
+            Self::Aiff => formatter.write_str("aiff"),
             Self::Flac => formatter.write_str("flac"),
             Self::Mp3 => formatter.write_str("mp3"),
         }
     }
 }
+
+/// Auralis-owned options for PCM16 WAV export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct WavEncodeOptions;
+
+/// Auralis-owned options for raw PCM export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct RawPcmEncodeOptions;
+
+/// Auralis-owned options for AIFF/AIFC export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct AiffEncodeOptions;
+
+/// Auralis-owned options for FLAC export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct FlacEncodeOptions;
+
+/// High-level format selection for audio export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OutputFormat {
+    /// RIFF/WAVE export using the built-in WAV adapter path.
+    Wav(WavEncodeOptions),
+
+    /// Headerless raw PCM export.
+    RawPcm(RawPcmEncodeOptions),
+
+    /// AIFF or AIFC export.
+    Aiff(AiffEncodeOptions),
+
+    /// FLAC export.
+    Flac(FlacEncodeOptions),
+}
+
+impl OutputFormat {
+    /// Returns the codec family selected by this output format.
+    #[must_use]
+    pub const fn codec_kind(self) -> CodecKind {
+        match self {
+            Self::Wav(_) => CodecKind::Wav,
+            Self::RawPcm(_) => CodecKind::RawPcm,
+            Self::Aiff(_) => CodecKind::Aiff,
+            Self::Flac(_) => CodecKind::Flac,
+        }
+    }
+}
+
+impl Default for OutputFormat {
+    fn default() -> Self {
+        Self::Wav(WavEncodeOptions)
+    }
+}
+
+/// Deterministic metadata returned after one encode request completes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncodeSummary {
+    kind: CodecKind,
+    spec: AudioSpec,
+    frames: FrameCount,
+}
+
+impl EncodeSummary {
+    /// Builds an encode summary for a completed output.
+    #[must_use]
+    pub const fn new(kind: CodecKind, spec: AudioSpec, frames: FrameCount) -> Self {
+        Self { kind, spec, frames }
+    }
+
+    /// Returns the output codec family.
+    #[must_use]
+    pub const fn codec_kind(self) -> CodecKind {
+        self.kind
+    }
+
+    /// Returns the encoded audio spec.
+    #[must_use]
+    pub const fn spec(self) -> AudioSpec {
+        self.spec
+    }
+
+    /// Returns the encoded frame count.
+    #[must_use]
+    pub const fn frames(self) -> FrameCount {
+        self.frames
+    }
+}
+
+/// Seekable byte sink used by codec encoders.
+pub trait AudioOutput: Write + Seek {}
+
+impl<T> AudioOutput for T where T: Write + Seek + ?Sized {}
 
 /// Declared read/write support for a codec kind in the active build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,6 +287,25 @@ pub trait AudioWriter {
     fn write_audio(&mut self, audio: &AudioBuffer) -> Result<()>;
 }
 
+/// Boundary implemented by high-level audio encoders.
+///
+/// Implementations are deterministic for a fixed input buffer, selected
+/// options, and active codec build. They write to a seekable byte sink so the
+/// current WAV backend can finalize its header without leaking backend details
+/// into the public API.
+pub trait AudioEncoder {
+    /// Returns the codec kind produced by this encoder.
+    fn codec_kind(&self) -> CodecKind;
+
+    /// Encodes an entire internal planar `f32` buffer into `output`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CodecError::UnsupportedFormat`] when the encoder is a
+    /// placeholder for a codec kind that is not available in the active build.
+    fn encode(&self, input: &AudioBuffer, output: &mut dyn AudioOutput) -> Result<EncodeSummary>;
+}
+
 /// Reader implementation that always reports an unsupported codec kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnsupportedReader {
@@ -237,6 +358,32 @@ impl AudioWriter for UnsupportedWriter {
     }
 }
 
+/// Encoder implementation that always reports an unsupported codec kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnsupportedEncoder {
+    kind: CodecKind,
+}
+
+impl UnsupportedEncoder {
+    /// Creates an encoder placeholder for `kind`.
+    #[must_use]
+    pub const fn new(kind: CodecKind) -> Self {
+        Self { kind }
+    }
+}
+
+impl AudioEncoder for UnsupportedEncoder {
+    fn codec_kind(&self) -> CodecKind {
+        self.kind
+    }
+
+    fn encode(&self, _input: &AudioBuffer, _output: &mut dyn AudioOutput) -> Result<EncodeSummary> {
+        Err(CodecError::UnsupportedFormat(UnsupportedFormat::new(
+            self.kind,
+        )))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use auralis_core::{
@@ -244,8 +391,9 @@ mod tests {
     };
 
     use super::{
-        AudioReader, AudioWriter, CodecCapabilities, CodecError, CodecKind, UnsupportedFormat,
-        UnsupportedReader, UnsupportedWriter,
+        AiffEncodeOptions, AudioEncoder, AudioReader, AudioWriter, CodecCapabilities, CodecError,
+        CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmEncodeOptions,
+        UnsupportedEncoder, UnsupportedFormat, UnsupportedReader, UnsupportedWriter,
     };
 
     fn mono_buffer() -> AudioBuffer {
@@ -302,5 +450,46 @@ mod tests {
         assert_eq!(capabilities.kind(), CodecKind::Wav);
         assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-wav"));
         assert_eq!(capabilities.can_write(), cfg!(feature = "auralis-wav"));
+    }
+
+    #[test]
+    fn output_format_maps_to_codec_kind() {
+        assert_eq!(OutputFormat::default().codec_kind(), CodecKind::Wav);
+        assert_eq!(
+            OutputFormat::RawPcm(RawPcmEncodeOptions).codec_kind(),
+            CodecKind::RawPcm
+        );
+        assert_eq!(
+            OutputFormat::Aiff(AiffEncodeOptions).codec_kind(),
+            CodecKind::Aiff
+        );
+        assert_eq!(
+            OutputFormat::Flac(FlacEncodeOptions).codec_kind(),
+            CodecKind::Flac
+        );
+    }
+
+    #[test]
+    fn encode_summary_reports_kind_spec_and_frames() {
+        let audio = mono_buffer();
+        let summary = EncodeSummary::new(CodecKind::Wav, audio.spec(), audio.frames());
+
+        assert_eq!(summary.codec_kind(), CodecKind::Wav);
+        assert_eq!(summary.spec(), audio.spec());
+        assert_eq!(summary.frames(), audio.frames());
+    }
+
+    #[test]
+    fn unsupported_encoder_returns_typed_error() {
+        let audio = mono_buffer();
+        let encoder = UnsupportedEncoder::new(CodecKind::Aiff);
+        let mut output = std::io::Cursor::new(Vec::new());
+        let error = encoder.encode(&audio, &mut output).unwrap_err();
+
+        assert_eq!(encoder.codec_kind(), CodecKind::Aiff);
+        assert_eq!(
+            error,
+            CodecError::UnsupportedFormat(UnsupportedFormat::new(CodecKind::Aiff))
+        );
     }
 }

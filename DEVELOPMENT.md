@@ -37,10 +37,9 @@ The current order is:
    only after the above planning and test-gate corrections are in place.
 5. Continue
    [`8.x format support`](doc/development/08-format-support.md)
-   after the completed pure-Rust codec backend policy record in Feature 8.0.1.
-   The next unchecked leaf is Feature 8.0.2, which must define Auralis-owned
-   encoder traits and output-format option models before any new encoder
-   backend is added.
+   after the completed pure-Rust codec backend policy record in Feature 8.0.1
+   and the completed encoder/output-format boundary in Feature 8.0.2. The next
+   unchecked leaf is Feature 8.1.1: WAV PCM8.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.
