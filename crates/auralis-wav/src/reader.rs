@@ -11,20 +11,20 @@ use auralis_simd::BackendKind;
 use crate::{
     Result, WavError,
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
-    sample_conversion::{pcm8_to_f32, pcm16_to_f32_with_backend},
+    sample_conversion::{pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32},
 };
 
 /// Decodes an entire supported linear PCM WAV stream into a planar `f32`
 /// buffer.
 ///
-/// Currently supported sample formats are PCM8 and PCM16. The returned
+/// Currently supported sample formats are PCM8, PCM16, and PCM24. The returned
 /// [`AudioSpec`] always uses [`SampleFormat::Float32`] because that is
 /// Auralis' internal processing format.
 ///
 /// # Errors
 ///
 /// Returns [`WavError::UnsupportedSampleFormat`] for any WAV stream that is not
-/// integer PCM with 8 or 16 bits per sample. Returns [`WavError::Malformed`]
+/// integer PCM with 8, 16, or 24 bits per sample. Returns [`WavError::Malformed`]
 /// when the RIFF/WAVE container or sample payload cannot be parsed.
 pub fn decode_wav<R>(reader: R) -> Result<AudioBuffer>
 where
@@ -36,8 +36,9 @@ where
 /// Decodes an entire supported linear PCM WAV stream with an explicit
 /// sample-conversion backend.
 ///
-/// PCM16 uses the requested PCM16-to-`f32` backend. PCM8 conversion is a small
-/// scalar normalization step because there is no separate SIMD primitive yet.
+/// PCM16 uses the requested PCM16-to-`f32` backend. PCM8 and PCM24 conversion
+/// are small scalar normalization steps because there is no separate SIMD
+/// primitive yet.
 ///
 /// # Errors
 ///
@@ -213,6 +214,71 @@ pub fn decode_pcm8_path_with_backend(
     decode_pcm8_with_backend(BufReader::new(file), requested_backend)
 }
 
+/// Decodes an entire PCM24 WAV stream into a planar `f32` buffer.
+///
+/// Samples are interpreted as signed 24-bit PCM values stored in 32-bit
+/// containers, then scaled by dividing by `8_388_608.0`.
+///
+/// # Errors
+///
+/// Returns [`WavError::UnsupportedSampleFormat`] when the stream is not PCM24.
+/// Returns [`WavError::Malformed`] when the RIFF/WAVE container or sample
+/// payload cannot be parsed.
+pub fn decode_pcm24<R>(reader: R) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    decode_pcm24_with_backend(reader, BackendKind::Scalar)
+}
+
+/// Decodes an entire PCM24 WAV stream with an explicit sample-conversion
+/// backend.
+///
+/// PCM24 normalization is deterministic scalar logic, so `requested_backend`
+/// does not currently change the produced samples.
+///
+/// # Errors
+///
+/// Returns the same parsing, format, and shape errors as [`decode_pcm24`].
+pub fn decode_pcm24_with_backend<R>(
+    reader: R,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    let mut reader = AnyPcmWavReader::new(reader)?;
+    reader.read_expected_format_with_backend(WavSampleFormat::Pcm24, requested_backend)
+}
+
+/// Decodes a PCM24 WAV file from disk into a planar `f32` buffer.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_pcm24`].
+pub fn decode_pcm24_path(path: impl AsRef<Path>) -> Result<AudioBuffer> {
+    decode_pcm24_path_with_backend(path, BackendKind::Scalar)
+}
+
+/// Decodes a PCM24 WAV file from disk with an explicit sample-conversion
+/// backend.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_pcm24_with_backend`].
+pub fn decode_pcm24_path_with_backend(
+    path: impl AsRef<Path>,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer> {
+    let file = File::open(path).map_err(|error| WavError::OpenFailed {
+        message: error.to_string(),
+    })?;
+
+    decode_pcm24_with_backend(BufReader::new(file), requested_backend)
+}
+
 /// Reader for PCM16 WAV streams.
 ///
 /// The reader owns the underlying stream and decodes it at most once. It
@@ -332,6 +398,13 @@ where
                     &interleaved_pcm16,
                     &mut interleaved_f32,
                 )?;
+            }
+            WavSampleFormat::Pcm24 => {
+                let mut interleaved_pcm24 = Vec::with_capacity(sample_capacity);
+                for sample in self.inner.samples::<i32>() {
+                    interleaved_pcm24.push(sample.map_err(|error| malformed(&error))?);
+                }
+                pcm24_to_f32(&interleaved_pcm24, &mut interleaved_f32)?;
             }
             _ => unreachable!("unsupported WAV sample format already rejected"),
         }

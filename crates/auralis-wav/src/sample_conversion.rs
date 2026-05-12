@@ -26,6 +26,22 @@ pub(crate) fn pcm8_to_f32(input: &[i8], output: &mut [f32]) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn pcm24_to_f32(input: &[i32], output: &mut [f32]) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::InvalidBufferShape);
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "PCM24 samples are bounded to 24 significant bits, which remain exactly representable in f32 before normalization."
+    )]
+    for (source, destination) in input.iter().zip(output.iter_mut()) {
+        *destination = (*source as f32) / 8_388_608.0;
+    }
+
+    Ok(())
+}
+
 pub(crate) fn f32_to_pcm16_with_backend(
     requested_backend: BackendKind,
     input: &[f32],
@@ -60,6 +76,36 @@ pub(crate) fn f32_to_pcm8(input: &[f32], output: &mut [i8], channels: usize) -> 
         let quantized = quantized.clamp(i16::from(i8::MIN), i16::from(i8::MAX));
         *destination = i8::try_from(quantized).map_err(|_| WavError::WriteFailed {
             message: "PCM8 sample quantization overflowed".to_owned(),
+        })?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn f32_to_pcm24(input: &[f32], output: &mut [i32], channels: usize) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::WriteFailed {
+            message: "sample conversion buffer length mismatch".to_owned(),
+        });
+    }
+
+    for (sample_index, (&sample, destination)) in input.iter().zip(output.iter_mut()).enumerate() {
+        if !sample.is_finite() {
+            return Err(WavError::NonFiniteSample {
+                channel_index: sample_index % channels,
+                frame_index: sample_index / channels,
+            });
+        }
+
+        let clipped = sample.clamp(-1.0, 1.0);
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "The value is rounded and clamped to the valid PCM24 integer range immediately before the cast."
+        )]
+        let quantized = (clipped * 8_388_608.0).round() as i64;
+        let quantized = quantized.clamp(i64::from(-8_388_608), i64::from(8_388_607));
+        *destination = i32::try_from(quantized).map_err(|_| WavError::WriteFailed {
+            message: "PCM24 sample quantization overflowed".to_owned(),
         })?;
     }
 

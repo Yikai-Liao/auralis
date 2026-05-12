@@ -8,7 +8,7 @@ use crate::{
 
 /// Decoded audio file ready to enter an effect pipeline.
 ///
-/// `AudioFile` currently supports linear PCM8 and PCM16 WAV input. Decoding
+/// `AudioFile` currently supports linear PCM8, PCM16, and PCM24 WAV input. Decoding
 /// always uses Auralis' internal planar `f32` [`AudioBuffer`] representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioFile {

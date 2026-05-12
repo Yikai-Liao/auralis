@@ -301,6 +301,33 @@ fn write_output_format_pcm8_wav_uses_pcm8_encoder() {
 }
 
 #[test]
+fn write_output_format_pcm24_wav_uses_pcm24_encoder() {
+    let source = stereo_audio_buffer(vec![-1.0, 0.0, 0.5, 8_388_607.0 / 8_388_608.0]);
+    let format_path = support::temp_path("auralis-pipeline-write-wav-pcm24", "wav");
+
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions::pcm24()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_pcm24_path(&format_path).unwrap();
+
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(summary.frames(), decoded.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0]);
+    assert_eq!(
+        decoded.channel(1).unwrap(),
+        &[0.5, 8_388_607.0 / 8_388_608.0]
+    );
+    assert_eq!(
+        WavEncodeOptions::pcm24().sample_format(),
+        WavSampleFormat::Pcm24
+    );
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-raw", "raw");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
@@ -461,6 +488,28 @@ fn wav_chain_round_trips_through_file_boundary() {
         .unwrap();
 
     let decoded = auralis_wav::decode_pcm16_path(output).unwrap();
+    assert_samples_close(decoded.as_planar_f32(), source.as_planar_f32());
+    fs::remove_dir_all(tempdir).unwrap();
+}
+
+#[test]
+fn open_wav_accepts_pcm24_input() {
+    let tempdir = temp_dir();
+    fs::create_dir(&tempdir).unwrap();
+    let input = tempdir.join("input-pcm24.wav");
+    let output = tempdir.join("output-pcm24.wav");
+    let source = audio_buffer(vec![-1.0, 0.0, 8_388_607.0 / 8_388_608.0]);
+
+    auralis_wav::encode_pcm24_path(&input, &source).unwrap();
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .gain_db(0.0)
+        .write(&output, OutputFormat::Wav(WavEncodeOptions::pcm24()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_pcm24_path(output).unwrap();
     assert_samples_close(decoded.as_planar_f32(), source.as_planar_f32());
     fs::remove_dir_all(tempdir).unwrap();
 }

@@ -6,14 +6,14 @@ use auralis_codec::{AudioReader, CodecKind};
 use auralis_simd::BackendKind;
 use auralis_wav::{
     AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_pcm8, decode_pcm16,
-    decode_pcm16_path, decode_pcm16_with_backend, decode_wav,
+    decode_pcm16_path, decode_pcm16_with_backend, decode_pcm24, decode_pcm24_path, decode_wav,
 };
 
 mod support;
 
 use support::{
-    assert_audio_bits_eq, riff_header, wav_bytes, wav_bytes_pcm8, wav_bytes_with_bits,
-    write_temp_wav,
+    assert_audio_bits_eq, riff_header, wav_bytes, wav_bytes_pcm8, wav_bytes_pcm24,
+    wav_bytes_with_bits, write_temp_wav,
 };
 
 #[test]
@@ -30,11 +30,16 @@ fn decodes_mono_pcm8_to_planar_f32() {
 fn generic_decoder_accepts_pcm8_and_pcm16() {
     let pcm8 = decode_wav(Cursor::new(wav_bytes_pcm8(1, &[-128, 127]))).unwrap();
     let pcm16 = decode_wav(Cursor::new(wav_bytes(1, &[i16::MIN, i16::MAX]))).unwrap();
+    let pcm24 = decode_wav(Cursor::new(wav_bytes_pcm24(1, &[-8_388_608, 8_388_607]))).unwrap();
 
     assert_eq!(pcm8.channel(0).unwrap(), &[-1.0, 127.0 / 128.0]);
     assert_eq!(
         pcm16.channel(0).unwrap(),
         &[-1.0, f32::from(i16::MAX) / 32768.0]
+    );
+    assert_eq!(
+        pcm24.channel(0).unwrap(),
+        &[-1.0, 8_388_607.0 / 8_388_608.0]
     );
 }
 
@@ -65,6 +70,23 @@ fn decodes_stereo_pcm16_to_channel_major_storage() {
     assert_eq!(
         audio.channel(1).unwrap(),
         &[f32::from(32_767_i16) / 32768.0, 0.5, 0.25]
+    );
+}
+
+#[test]
+fn decodes_mono_pcm24_to_planar_f32() {
+    let audio = decode_pcm24(Cursor::new(wav_bytes_pcm24(
+        1,
+        &[-8_388_608, 0, 4_194_304, 8_388_607],
+    )))
+    .unwrap();
+
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 4);
+    assert_eq!(
+        audio.channel(0).unwrap(),
+        &[-1.0, 0.0, 0.5, 8_388_607.0 / 8_388_608.0]
     );
 }
 
@@ -136,6 +158,19 @@ fn path_decoder_preserves_sample_rate_and_channels() {
     fs::remove_file(path).unwrap();
     assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
     assert_eq!(audio.spec().channels().as_u16(), 2);
+}
+
+#[test]
+fn path_decoder_accepts_pcm24() {
+    let path = support::temp_path("auralis-wav-path-pcm24", "wav");
+    fs::write(&path, wav_bytes_pcm24(2, &[-8_388_608, 8_388_607])).unwrap();
+    let audio = decode_pcm24_path(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 2);
+    assert_eq!(audio.channel(0).unwrap(), &[-1.0]);
+    assert_eq!(audio.channel(1).unwrap(), &[8_388_607.0 / 8_388_608.0]);
 }
 
 #[test]

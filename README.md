@@ -7,8 +7,8 @@ SoX clone, but it uses SoX-ng as the behavioral oracle for comparable command
 line effects while rebuilding the core around deterministic behavior, typed
 Rust APIs, explicit test contracts, and maintainable modules.
 
-Initial scope is deliberately narrow: **linear PCM WAV first**, with PCM8 and
-PCM16 currently implemented. Additional formats are planned only after effect
+Initial scope is deliberately narrow: **linear PCM WAV first**, with PCM8,
+PCM16, and PCM24 currently implemented. Additional formats are planned only after effect
 and pipeline behavior are broad and stable, and new codec backends must stay
 pure Rust unless a later development-plan change says otherwise.
 
@@ -19,8 +19,8 @@ Auralis is pre-alpha. The repository already contains:
 - a Rust workspace with `auralis`, `auralis-core`, `auralis-wav`,
   `auralis-dsp`, `auralis-effects`, `auralis-simd`, `auralis-testkit`, and
   `auralis-cli` crates;
-- PCM8/PCM16 WAV decode plus PCM16 legacy output and PCM8/PCM16 output through
-  the newer `OutputFormat::Wav(WavEncodeOptions)` boundary, alongside
+- PCM8/PCM16/PCM24 WAV decode plus PCM16 legacy output and PCM8/PCM16/PCM24
+  output through the newer `OutputFormat::Wav(WavEncodeOptions)` boundary, alongside
   `auralis inspect`;
 - `auralis run` with positional SoX-ng-style effect chains, effects files,
   input combiners, output channel/rate/level/dither policies, and many typed

@@ -124,6 +124,9 @@ pub enum WavSampleFormat {
     /// Signed 16-bit PCM samples.
     #[default]
     Pcm16,
+
+    /// Signed 24-bit PCM samples stored in 32-bit containers.
+    Pcm24,
 }
 
 /// Auralis-owned options for WAV export.
@@ -149,6 +152,12 @@ impl WavEncodeOptions {
     #[must_use]
     pub const fn pcm16() -> Self {
         Self::new(WavSampleFormat::Pcm16)
+    }
+
+    /// Creates WAV encode options for signed 24-bit PCM.
+    #[must_use]
+    pub const fn pcm24() -> Self {
+        Self::new(WavSampleFormat::Pcm24)
     }
 
     /// Returns the configured WAV sample format.

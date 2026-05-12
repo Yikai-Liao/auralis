@@ -62,7 +62,7 @@ Implementation notes:
 
 | Format family | Candidate backend | Classification | License and maintenance note | Native dependency note | Streaming and sample-format note | Metadata and fuzz/security note |
 |---|---|---|---|---|---|---|
-| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path. | Pure Rust crate; no external codec libraries or system tools. | Current stage supports linear PCM8 and PCM16 at the Auralis boundary; later WAV leaves still cover PCM24/PCM32/float/companded variants. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
+| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path. | Pure Rust crate; no external codec libraries or system tools. | Current stage supports linear PCM8, PCM16, and PCM24 at the Auralis boundary; later WAV leaves still cover PCM32/float/companded variants. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
 | RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
 | AIFF / AIFC | pure Rust crate candidate such as `aifc`, behind a feature-gated adapter | feature-gated pure Rust | Accept only after a crate-level audit confirms MIT/Apache-compatible licensing, active enough maintenance, and reviewable transitive footprint. | Must remain pure Rust with no libsndfile or other native wrapper path. | Needs a streaming decode/encode story for PCM AIFF first; compressed AIFC encodings are later and may stay narrower if the backend cannot cover them safely. | Chunk metadata behavior must stay behind Auralis-owned option/report types; add parser/fuzz coverage before enabling broad import/export support. |
 | FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
@@ -187,6 +187,35 @@ Implementation notes:
   legacy `write_wav` API intentionally stays PCM16-only.
 
 ### Feature 8.1.2: WAV PCM24
+
+Status: completed.
+
+Add deterministic WAV PCM24 decode and encode support without regressing the
+existing PCM8/PCM16 paths.
+
+Acceptance tests:
+
+- `auralis-wav` decodes PCM24 WAV bytes and files into the same planar `f32`
+  buffer model used by PCM8 and PCM16;
+- the generic supported-WAV path accepts PCM24 while the PCM16-specific path
+  still rejects PCM24 with the existing typed unsupported sample-format
+  diagnostic;
+- `OutputFormat::Wav(WavEncodeOptions::pcm24())` writes PCM24 WAV output
+  through the codec boundary while `Pipeline::write_wav` remains the existing
+  PCM16 compatibility path;
+- codec-boundary reader/writer tests cover PCM24 end to end;
+- README and status/development docs record PCM24 as complete and point the
+  next unchecked leaf to WAV PCM32.
+
+Implementation notes:
+
+- `auralis-codec` now extends `WavSampleFormat`/`WavEncodeOptions` with PCM24
+  and keeps PCM16 as the backward-compatible default.
+- `auralis-wav` now supports generic linear PCM WAV decode for PCM8, PCM16,
+  and PCM24, explicit PCM24 encode/decode helpers, and PCM24 codec-boundary
+  reader/writer coverage alongside the existing PCM8/PCM16 paths.
+- `auralis::AudioFile::open_wav` and `Pipeline::write(OutputFormat::Wav(...))`
+  now accept PCM24 without changing the legacy `write_wav` PCM16-only surface.
 
 ### Feature 8.1.3: WAV PCM32
 
