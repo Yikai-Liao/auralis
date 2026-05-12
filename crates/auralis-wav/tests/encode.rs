@@ -8,15 +8,16 @@ use auralis_codec::{
 use auralis_simd::BackendKind;
 use auralis_wav::{
     Pcm8WavEncoder, Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter, Pcm24WavEncoder,
-    Pcm24WavWriter, WavError, decode_pcm16_path, encode_pcm16_path,
+    Pcm24WavWriter, Pcm32WavEncoder, Pcm32WavWriter, WavError, decode_pcm16_path,
+    encode_pcm16_path,
 };
 
 mod support;
 
 use support::{
     assert_audio_bits_eq, audio_buffer, decode_path, decode_path_pcm8, decode_path_pcm24,
-    encode_temp_wav, encode_temp_wav_pcm8, encode_temp_wav_pcm24, encode_temp_wav_with_backend,
-    temp_path,
+    decode_path_pcm32, encode_temp_wav, encode_temp_wav_pcm8, encode_temp_wav_pcm24,
+    encode_temp_wav_pcm32, encode_temp_wav_with_backend, temp_path,
 };
 
 #[test]
@@ -65,6 +66,19 @@ fn encodes_mono_pcm24_from_planar_f32() {
         decoded.channel(0).unwrap(),
         &[-1.0, 0.0, 0.5, 8_388_607.0 / 8_388_608.0]
     );
+}
+
+#[test]
+fn encodes_mono_pcm32_from_planar_f32() {
+    let audio = audio_buffer(1, 4, &[-1.0, 0.0, 0.5, 1.0]);
+    let path = encode_temp_wav_pcm32("auralis-wav-encode-mono-pcm32", &audio);
+    let decoded = decode_path_pcm32(&path);
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(decoded.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(decoded.spec().channels().as_u16(), 1);
+    assert_eq!(decoded.frames().as_u64(), 4);
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0, 0.5, 1.0]);
 }
 
 #[test]
@@ -225,6 +239,21 @@ fn implements_pcm24_codec_encoder_boundary() {
 }
 
 #[test]
+fn implements_pcm32_codec_encoder_boundary() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 1.0]);
+    let encoder = Pcm32WavEncoder::new(WavEncodeOptions::pcm32(), BackendKind::Scalar);
+    let mut output = Cursor::new(Vec::new());
+
+    let summary = encoder.encode(&audio, &mut output).unwrap();
+    let decoded = auralis_wav::decode_pcm32(Cursor::new(output.into_inner())).unwrap();
+
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), audio.spec());
+    assert_eq!(summary.frames(), audio.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0, 1.0]);
+}
+
+#[test]
 fn pcm8_writer_boundary_is_one_shot() {
     let audio = audio_buffer(1, 1, &[0.0]);
     let mut writer = Pcm8WavWriter::new(Cursor::new(Vec::new()));
@@ -257,6 +286,22 @@ fn pcm24_writer_boundary_is_one_shot() {
 }
 
 #[test]
+fn pcm32_writer_boundary_is_one_shot() {
+    let audio = audio_buffer(1, 1, &[0.0]);
+    let mut writer = Pcm32WavWriter::new(Cursor::new(Vec::new()));
+
+    writer.write_audio(&audio).unwrap();
+    assert_eq!(writer.codec_kind(), CodecKind::Wav);
+    assert!(matches!(
+        writer.write_audio(&audio),
+        Err(CodecError::EncodeFailed {
+            kind: CodecKind::Wav,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn wav_encode_options_default_to_pcm16() {
     assert_eq!(
         WavEncodeOptions::default().sample_format(),
@@ -269,5 +314,13 @@ fn wav_encode_options_can_target_pcm24() {
     assert_eq!(
         WavEncodeOptions::pcm24().sample_format(),
         WavSampleFormat::Pcm24
+    );
+}
+
+#[test]
+fn wav_encode_options_can_target_pcm32() {
+    assert_eq!(
+        WavEncodeOptions::pcm32().sample_format(),
+        WavSampleFormat::Pcm32
     );
 }

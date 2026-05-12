@@ -328,6 +328,30 @@ fn write_output_format_pcm24_wav_uses_pcm24_encoder() {
 }
 
 #[test]
+fn write_output_format_pcm32_wav_uses_pcm32_encoder() {
+    let source = stereo_audio_buffer(vec![-1.0, 0.0, 0.5, 1.0]);
+    let format_path = support::temp_path("auralis-pipeline-write-wav-pcm32", "wav");
+
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions::pcm32()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_pcm32_path(&format_path).unwrap();
+
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(summary.frames(), decoded.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0]);
+    assert_eq!(decoded.channel(1).unwrap(), &[0.5, 1.0]);
+    assert_eq!(
+        WavEncodeOptions::pcm32().sample_format(),
+        WavSampleFormat::Pcm32
+    );
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-raw", "raw");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
