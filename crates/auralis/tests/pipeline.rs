@@ -6,7 +6,9 @@ mod support;
 use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
-use auralis_codec::{CodecError, CodecKind, RawPcmEncodeOptions, WavEncodeOptions};
+use auralis_codec::{
+    CodecError, CodecKind, RawPcmEncodeOptions, WavEncodeOptions, WavSampleFormat,
+};
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
 use auralis_wav::decode_pcm16_path;
@@ -261,7 +263,7 @@ fn write_output_format_wav_matches_write_wav() {
     let summary = AudioFile::from_audio_buffer(source)
         .into_pipeline()
         .gain_db(-3.0)
-        .write(&format_path, OutputFormat::Wav(WavEncodeOptions))
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions::default()))
         .unwrap();
 
     let baseline = decode_pcm16_path(&baseline_path).unwrap();
@@ -272,6 +274,30 @@ fn write_output_format_wav_matches_write_wav() {
     assert_eq!(summary.codec_kind(), CodecKind::Wav);
     assert_eq!(summary.frames(), baseline.frames());
     assert_eq!(format_output, baseline);
+}
+
+#[test]
+fn write_output_format_pcm8_wav_uses_pcm8_encoder() {
+    let source = stereo_audio_buffer(vec![-1.0, 0.0, 0.5, 1.0]);
+    let format_path = support::temp_path("auralis-pipeline-write-wav-pcm8", "wav");
+
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions::pcm8()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_pcm8_path(&format_path).unwrap();
+
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(summary.frames(), decoded.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0]);
+    assert_eq!(decoded.channel(1).unwrap(), &[0.5, 127.0 / 128.0]);
+    assert_eq!(
+        WavEncodeOptions::pcm8().sample_format(),
+        WavSampleFormat::Pcm8
+    );
 }
 
 #[test]

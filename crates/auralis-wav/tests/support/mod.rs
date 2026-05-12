@@ -8,12 +8,23 @@ use std::{
 
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_simd::BackendKind;
-use auralis_wav::{decode_pcm16_path, encode_pcm16_path, encode_pcm16_path_with_backend};
+use auralis_wav::{
+    decode_pcm8_path, decode_pcm16_path, encode_pcm8_path, encode_pcm16_path,
+    encode_pcm16_path_with_backend,
+};
 
 pub(crate) fn wav_bytes(channels: u16, samples: &[i16]) -> Vec<u8> {
     let mut bytes = riff_header(channels, 16, 1, u32::try_from(samples.len() * 2).unwrap());
     for sample in samples {
         bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    bytes
+}
+
+pub(crate) fn wav_bytes_pcm8(channels: u16, samples: &[i8]) -> Vec<u8> {
+    let mut bytes = riff_header(channels, 8, 1, u32::try_from(samples.len()).unwrap());
+    for sample in samples {
+        bytes.push(u8::try_from(i16::from(*sample) + 128).unwrap());
     }
     bytes
 }
@@ -121,6 +132,12 @@ pub(crate) fn encode_temp_wav(prefix: &str, audio: &AudioBuffer) -> PathBuf {
     path
 }
 
+pub(crate) fn encode_temp_wav_pcm8(prefix: &str, audio: &AudioBuffer) -> PathBuf {
+    let path = temp_path(prefix, "wav");
+    encode_pcm8_path(&path, audio).unwrap();
+    path
+}
+
 pub(crate) fn encode_temp_wav_with_backend(
     prefix: &str,
     audio: &AudioBuffer,
@@ -163,4 +180,8 @@ pub(crate) fn assert_close_by_one_lsb(left: &[f32], right: &[f32]) {
 
 pub(crate) fn decode_path(path: &Path) -> AudioBuffer {
     decode_pcm16_path(path).unwrap()
+}
+
+pub(crate) fn decode_path_pcm8(path: &Path) -> AudioBuffer {
+    decode_pcm8_path(path).unwrap()
 }

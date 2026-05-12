@@ -1,17 +1,42 @@
-//! PCM16 WAV decode, format validation, and reader-boundary tests.
+//! WAV decode, format validation, and reader-boundary tests.
 
 use std::{fs, io::Cursor};
 
 use auralis_codec::{AudioReader, CodecKind};
 use auralis_simd::BackendKind;
 use auralis_wav::{
-    Pcm16WavReader, WavError, WavSampleEncoding, decode_pcm16, decode_pcm16_path,
-    decode_pcm16_with_backend,
+    AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_pcm8, decode_pcm16,
+    decode_pcm16_path, decode_pcm16_with_backend, decode_wav,
 };
 
 mod support;
 
-use support::{assert_audio_bits_eq, riff_header, wav_bytes, wav_bytes_with_bits, write_temp_wav};
+use support::{
+    assert_audio_bits_eq, riff_header, wav_bytes, wav_bytes_pcm8, wav_bytes_with_bits,
+    write_temp_wav,
+};
+
+#[test]
+fn decodes_mono_pcm8_to_planar_f32() {
+    let audio = decode_pcm8(Cursor::new(wav_bytes_pcm8(1, &[-128, 0, 64, 127]))).unwrap();
+
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 4);
+    assert_eq!(audio.channel(0).unwrap(), &[-1.0, 0.0, 0.5, 127.0 / 128.0]);
+}
+
+#[test]
+fn generic_decoder_accepts_pcm8_and_pcm16() {
+    let pcm8 = decode_wav(Cursor::new(wav_bytes_pcm8(1, &[-128, 127]))).unwrap();
+    let pcm16 = decode_wav(Cursor::new(wav_bytes(1, &[i16::MIN, i16::MAX]))).unwrap();
+
+    assert_eq!(pcm8.channel(0).unwrap(), &[-1.0, 127.0 / 128.0]);
+    assert_eq!(
+        pcm16.channel(0).unwrap(),
+        &[-1.0, f32::from(i16::MAX) / 32768.0]
+    );
+}
 
 #[test]
 fn decodes_mono_pcm16_to_planar_f32() {
@@ -120,4 +145,13 @@ fn implements_codec_reader_boundary() {
 
     assert_eq!(reader.codec_kind(), CodecKind::Wav);
     assert_eq!(audio.sample(0, 0), Some(0.0));
+}
+
+#[test]
+fn generic_reader_boundary_decodes_pcm8() {
+    let mut reader = AnyPcmWavReader::new(Cursor::new(wav_bytes_pcm8(1, &[0, 127]))).unwrap();
+    let audio = reader.read_audio().unwrap();
+
+    assert_eq!(reader.codec_kind(), CodecKind::Wav);
+    assert_eq!(audio.channel(0).unwrap(), &[0.0, 127.0 / 128.0]);
 }

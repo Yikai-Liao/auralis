@@ -114,9 +114,55 @@ impl fmt::Display for CodecKind {
     }
 }
 
-/// Auralis-owned options for PCM16 WAV export.
+/// Linear PCM sample format for WAV export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct WavEncodeOptions;
+#[non_exhaustive]
+pub enum WavSampleFormat {
+    /// Unsigned 8-bit PCM samples.
+    Pcm8,
+
+    /// Signed 16-bit PCM samples.
+    #[default]
+    Pcm16,
+}
+
+/// Auralis-owned options for WAV export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WavEncodeOptions {
+    sample_format: WavSampleFormat,
+}
+
+impl WavEncodeOptions {
+    /// Creates WAV encode options for `sample_format`.
+    #[must_use]
+    pub const fn new(sample_format: WavSampleFormat) -> Self {
+        Self { sample_format }
+    }
+
+    /// Creates WAV encode options for unsigned 8-bit PCM.
+    #[must_use]
+    pub const fn pcm8() -> Self {
+        Self::new(WavSampleFormat::Pcm8)
+    }
+
+    /// Creates WAV encode options for signed 16-bit PCM.
+    #[must_use]
+    pub const fn pcm16() -> Self {
+        Self::new(WavSampleFormat::Pcm16)
+    }
+
+    /// Returns the configured WAV sample format.
+    #[must_use]
+    pub const fn sample_format(self) -> WavSampleFormat {
+        self.sample_format
+    }
+}
+
+impl Default for WavEncodeOptions {
+    fn default() -> Self {
+        Self::pcm16()
+    }
+}
 
 /// Auralis-owned options for raw PCM export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -162,7 +208,7 @@ impl OutputFormat {
 
 impl Default for OutputFormat {
     fn default() -> Self {
-        Self::Wav(WavEncodeOptions)
+        Self::Wav(WavEncodeOptions::default())
     }
 }
 

@@ -2,6 +2,7 @@ use std::{fs::File, path::Path};
 
 use auralis_codec::{
     AudioEncoder, CodecKind, EncodeSummary, OutputFormat, UnsupportedEncoder, WavEncodeOptions,
+    WavSampleFormat,
 };
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 
@@ -433,9 +434,20 @@ impl Pipeline {
                 kind: CodecKind::Wav,
                 message: error.to_string(),
             })?;
-        let encoder = auralis_wav::Pcm16WavEncoder::new(options, requested_backend);
-
-        Ok(encoder.encode(&audio, &mut output)?)
+        match options.sample_format() {
+            WavSampleFormat::Pcm8 => {
+                let encoder = auralis_wav::Pcm8WavEncoder::new(options, requested_backend);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
+            WavSampleFormat::Pcm16 => {
+                let encoder = auralis_wav::Pcm16WavEncoder::new(options, requested_backend);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
+            _ => {
+                let encoder = UnsupportedEncoder::new(CodecKind::Wav);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
+        }
     }
 
     fn write_unsupported(self, _path: impl AsRef<Path>, kind: CodecKind) -> Result<EncodeSummary> {

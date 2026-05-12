@@ -5,9 +5,10 @@
 Auralis is currently pre-alpha. The repository contains the initial Rust
 workspace skeleton, uv-based Python test harness, and core audio type
 vocabulary with planar internal audio buffers. The codec trait boundary is in
-place for WAV-only scope and explicit unsupported-format reporting. PCM16 WAV
-decoding into planar `f32` buffers and encoding back to PCM16 WAV are
-implemented, the `auralis inspect` CLI reports PCM16 WAV metadata, and
+place for WAV-first scope and explicit unsupported-format reporting. PCM8 and
+PCM16 WAV decoding into planar `f32` buffers are implemented, PCM16 legacy WAV
+writing remains in place, PCM8/PCM16 writing is available through the newer
+output-format boundary, the `auralis inspect` CLI reports PCM16 WAV metadata, and
 `auralis run input.wav output.wav` performs a decode-through-buffer copy
 pipeline and can apply constant gain with `--gain-db <DB>`, SoX-ng-style
 multi-range trim positions, zero padding with frame counts and insertion
@@ -207,6 +208,10 @@ boundary now also owns `OutputFormat`, per-format encode option models,
 `EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
 into that surface while future RAW PCM, AIFF/AIFC, and FLAC writes return
 typed unsupported-format errors until their individual format leaves land.
+Feature 8.1.1 is now complete: WAV PCM8 decode support has joined the generic
+high-level WAV open path, and WAV writes can now target PCM8 or PCM16 through
+`WavEncodeOptions` while the legacy `write_wav` path stays PCM16-only for
+backward compatibility.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

@@ -33,7 +33,7 @@ mod rate_policy;
 
 pub use auralis_codec::{
     AiffEncodeOptions, CodecCapabilities, CodecError, CodecKind, EncodeSummary, FlacEncodeOptions,
-    OutputFormat, RawPcmEncodeOptions, WavEncodeOptions,
+    OutputFormat, RawPcmEncodeOptions, WavEncodeOptions, WavSampleFormat,
 };
 pub use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,

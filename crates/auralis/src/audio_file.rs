@@ -8,8 +8,8 @@ use crate::{
 
 /// Decoded audio file ready to enter an effect pipeline.
 ///
-/// `AudioFile` currently supports PCM16 WAV input only. Decoding always uses
-/// Auralis' internal planar `f32` [`AudioBuffer`] representation.
+/// `AudioFile` currently supports linear PCM8 and PCM16 WAV input. Decoding
+/// always uses Auralis' internal planar `f32` [`AudioBuffer`] representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioFile {
     audio: AudioBuffer,
@@ -17,7 +17,8 @@ pub struct AudioFile {
 }
 
 impl AudioFile {
-    /// Opens a PCM16 WAV file and decodes it into planar `f32` samples.
+    /// Opens a supported linear PCM WAV file and decodes it into planar `f32`
+    /// samples.
     ///
     /// # Errors
     ///
@@ -27,7 +28,8 @@ impl AudioFile {
         Self::open_wav_with_backend(path, BackendKind::Scalar)
     }
 
-    /// Opens a PCM16 WAV file using the requested sample-conversion backend.
+    /// Opens a supported linear PCM WAV file using the requested
+    /// sample-conversion backend.
     ///
     /// The decoded audio is identical to [`Self::open_wav`]. `requested_backend`
     /// controls only backend-aware decode, later backend-aware effect kernels,
@@ -43,12 +45,13 @@ impl AudioFile {
         requested_backend: BackendKind,
     ) -> Result<Self> {
         Ok(Self {
-            audio: auralis_wav::decode_pcm16_path_with_backend(path, requested_backend)?,
+            audio: auralis_wav::decode_wav_path_with_backend(path, requested_backend)?,
             requested_backend,
         })
     }
 
-    /// Opens multiple PCM16 WAV files and concatenates them in caller order.
+    /// Opens multiple supported linear PCM WAV files and concatenates them in
+    /// caller order.
     ///
     /// This is the library counterpart to `auralis run --combine concatenate`.
     /// Each input is decoded into planar `f32`, then the buffers are
@@ -69,7 +72,8 @@ impl AudioFile {
         Self::open_wavs_concatenated_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and concatenates them with a requested backend.
+    /// Opens multiple supported linear PCM WAV files and concatenates them with
+    /// a requested backend.
     ///
     /// `requested_backend` controls decode conversion, later backend-aware
     /// effects, and output encoding after [`Self::into_pipeline`]. The
@@ -91,7 +95,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
@@ -100,7 +104,8 @@ impl AudioFile {
         Self::from_audio_buffers_concatenated_with_backend(&inputs, requested_backend)
     }
 
-    /// Opens multiple PCM16 WAV files and sequences them in caller order.
+    /// Opens multiple supported linear PCM WAV files and sequences them in
+    /// caller order.
     ///
     /// This is the library counterpart to `auralis run --combine sequence`.
     /// Auralis writes one output buffer/file, so sequence boundaries must keep
@@ -121,7 +126,8 @@ impl AudioFile {
         Self::open_wavs_sequenced_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and sequences them with a requested backend.
+    /// Opens multiple supported linear PCM WAV files and sequences them with a
+    /// requested backend.
     ///
     /// `requested_backend` controls decode conversion, later backend-aware
     /// effects, and output encoding after [`Self::into_pipeline`]. Sequencing
@@ -143,7 +149,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
@@ -152,7 +158,8 @@ impl AudioFile {
         Self::from_audio_buffers_sequenced_with_backend(&inputs, requested_backend)
     }
 
-    /// Opens multiple PCM16 WAV files and mixes them into one buffer.
+    /// Opens multiple supported linear PCM WAV files and mixes them into one
+    /// buffer.
     ///
     /// This is the library counterpart to `auralis run --combine mix`. Each
     /// input is decoded into planar `f32`, scaled by `1 / input_count`, and
@@ -174,7 +181,8 @@ impl AudioFile {
         Self::open_wavs_mixed_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and mixes them with a requested backend.
+    /// Opens multiple supported linear PCM WAV files and mixes them with a
+    /// requested backend.
     ///
     /// `requested_backend` controls decode conversion, the scalar/SIMD mix
     /// kernel, later backend-aware effects, and output encoding after
@@ -197,7 +205,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
@@ -206,7 +214,8 @@ impl AudioFile {
         Self::from_audio_buffers_mixed_with_backend(&inputs, requested_backend)
     }
 
-    /// Opens multiple PCM16 WAV files and mixes them with equal-power balancing.
+    /// Opens multiple supported linear PCM WAV files and mixes them with
+    /// equal-power balancing.
     ///
     /// This is the library counterpart to `auralis run --combine mix-power`.
     /// Each input is decoded into planar `f32`, scaled by
@@ -228,7 +237,8 @@ impl AudioFile {
         Self::open_wavs_mix_powered_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and mixes them with equal-power balancing and a requested backend.
+    /// Opens multiple supported linear PCM WAV files and mixes them with
+    /// equal-power balancing and a requested backend.
     ///
     /// `requested_backend` controls decode conversion, the scalar/SIMD mix
     /// kernel, later backend-aware effects, and output encoding after
@@ -251,7 +261,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
@@ -260,7 +270,8 @@ impl AudioFile {
         Self::from_audio_buffers_mix_powered_with_backend(&inputs, requested_backend)
     }
 
-    /// Opens multiple PCM16 WAV files and merges all input channels.
+    /// Opens multiple supported linear PCM WAV files and merges all input
+    /// channels.
     ///
     /// This is the library counterpart to `auralis run --combine merge`. Each
     /// input is decoded into planar `f32`; output channels contain all channels
@@ -281,7 +292,8 @@ impl AudioFile {
         Self::open_wavs_merged_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and merges all input channels with a requested backend.
+    /// Opens multiple supported linear PCM WAV files and merges all input
+    /// channels with a requested backend.
     ///
     /// `requested_backend` controls decode conversion, later backend-aware
     /// effects, and output encoding after [`Self::into_pipeline`]. Merge itself
@@ -303,7 +315,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
@@ -312,7 +324,8 @@ impl AudioFile {
         Self::from_audio_buffers_merged_with_backend(&inputs, requested_backend)
     }
 
-    /// Opens multiple PCM16 WAV files and multiplies corresponding samples.
+    /// Opens multiple supported linear PCM WAV files and multiplies
+    /// corresponding samples.
     ///
     /// This is the library counterpart to `auralis run --combine multiply`.
     /// Each input is decoded into planar `f32`; output samples are the product
@@ -334,7 +347,8 @@ impl AudioFile {
         Self::open_wavs_multiplied_with_backend(paths, BackendKind::Scalar)
     }
 
-    /// Opens multiple PCM16 WAV files and multiplies corresponding samples with a requested backend.
+    /// Opens multiple supported linear PCM WAV files and multiplies
+    /// corresponding samples with a requested backend.
     ///
     /// `requested_backend` controls decode conversion, the scalar/SIMD multiply
     /// kernel, later backend-aware effects, and output encoding after
@@ -357,7 +371,7 @@ impl AudioFile {
     {
         let mut inputs = Vec::new();
         for path in paths {
-            inputs.push(auralis_wav::decode_pcm16_path_with_backend(
+            inputs.push(auralis_wav::decode_wav_path_with_backend(
                 path,
                 requested_backend,
             )?);
