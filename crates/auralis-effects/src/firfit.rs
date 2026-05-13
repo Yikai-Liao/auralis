@@ -274,10 +274,8 @@ fn design_coefficients(knots: &[FirFitKnot], sample_rate: SampleRate) -> Result<
         response.push(db_to_linear(interpolated_gain_db(knots, frequency)));
     }
 
-    let mut coefficients = Vec::with_capacity(FIRFIT_TAP_COUNT);
-    for tap in 0..FIRFIT_TAP_COUNT {
-        let offset = isize::try_from(tap).expect("tap count fits isize")
-            - isize::try_from(FIRFIT_CENTER_TAP).expect("tap count fits isize");
+    let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
+    for distance in 0..=FIRFIT_CENTER_TAP {
         let mut sum = 0.0;
         for (index, amplitude) in response.iter().copied().enumerate() {
             let weight = if index == 0 || index == FIRFIT_RESPONSE_STEPS {
@@ -286,10 +284,14 @@ fn design_coefficients(knots: &[FirFitKnot], sample_rate: SampleRate) -> Result<
                 1.0
             };
             let phase =
-                std::f64::consts::PI * index as f64 * offset as f64 / FIRFIT_RESPONSE_STEPS as f64;
+                std::f64::consts::PI * index as f64 * distance as f64
+                    / FIRFIT_RESPONSE_STEPS as f64;
             sum += weight * amplitude * phase.cos();
         }
-        coefficients.push(sum / FIRFIT_RESPONSE_STEPS as f64 * blackman_nuttall(tap));
+        let tap = FIRFIT_CENTER_TAP + distance;
+        let coefficient = sum / FIRFIT_RESPONSE_STEPS as f64 * blackman_nuttall(tap);
+        coefficients[tap] = coefficient;
+        coefficients[FIRFIT_CENTER_TAP - distance] = coefficient;
     }
 
     FirCoefficients::new(coefficients)
