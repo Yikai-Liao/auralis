@@ -285,8 +285,10 @@ fn process_channel(
     output: &mut Vec<f32>,
 ) {
     let mut state = FlangerChannelState::new(resolved);
+    let delay_offsets = resolved.delay_offsets(channel_index);
     for (frame, sample) in input.iter().copied().enumerate() {
-        output.push(state.process(f64::from(sample), frame, channel_index));
+        let delay = delay_offsets[frame % delay_offsets.len()];
+        output.push(state.process(f64::from(sample), delay));
     }
 }
 
@@ -300,13 +302,12 @@ impl FlangerChannelState {
         }
     }
 
-    fn process(&mut self, input_sample: f64, frame: usize, channel_index: usize) -> f32 {
+    fn process(&mut self, input_sample: f64, delay: f64) -> f32 {
         self.delay_line_index = (self.delay_line_index + self.resolved.delay_line_length - 1)
             % self.resolved.delay_line_length;
         self.delay_line[self.delay_line_index] =
             input_sample + self.delay_last * self.resolved.regen;
 
-        let delay = self.resolved.delay_offset(frame, channel_index);
         let delayed = match self.resolved.interpolation {
             FlangerInterpolation::None => self.process_none(delay),
             FlangerInterpolation::Linear => self.process_linear(delay),
@@ -353,8 +354,10 @@ impl FlangerChannelState {
 }
 
 impl ResolvedFlanger {
-    fn delay_offset(self, frame: usize, channel_index: usize) -> f64 {
-        self.delay + self.depth * self.wave_value(frame, channel_index)
+    fn delay_offsets(self, channel_index: usize) -> Vec<f64> {
+        (0..self.lfo_length)
+            .map(|frame| self.delay + self.depth * self.wave_value(frame, channel_index))
+            .collect()
     }
 
     #[allow(
