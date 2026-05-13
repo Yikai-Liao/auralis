@@ -297,10 +297,12 @@ impl TempoState {
     }
 
     fn process(&self, input: &[f32], input_frames: FrameCount) -> Result<Vec<f32>> {
-        let mut machine = TempoMachine::new(self);
+        let target_frames = rounded_output_frames(input_frames, self.factor)?;
+        let target_samples = self.wide_to_flat(target_frames)?;
+        let mut machine = TempoMachine::new(self, target_samples);
         machine.feed(input)?;
         machine.process()?;
-        machine.flush(input_frames)?;
+        machine.flush(target_samples)?;
         Ok(machine.output_fifo)
     }
 
@@ -322,13 +324,13 @@ struct TempoMachine<'state> {
 }
 
 impl<'state> TempoMachine<'state> {
-    fn new(state: &'state TempoState) -> Self {
+    fn new(state: &'state TempoState, output_capacity: usize) -> Self {
         let input_fifo = vec![0.0; (state.search / 2) * state.channels];
         Self {
             state,
             input_fifo,
             input_start: 0,
-            output_fifo: Vec::new(),
+            output_fifo: Vec::with_capacity(output_capacity),
             overlap_buf: vec![0.0; state.overlap * state.channels],
             segments_total: 0,
             skip_total: 0,
@@ -343,9 +345,7 @@ impl<'state> TempoMachine<'state> {
         Ok(())
     }
 
-    fn flush(&mut self, input_frames: FrameCount) -> Result<()> {
-        let target_frames = rounded_output_frames(input_frames, self.state.factor)?;
-        let target_samples = self.state.wide_to_flat(target_frames)?;
+    fn flush(&mut self, target_samples: usize) -> Result<()> {
         let zeros = vec![0.0; 128 * self.state.channels];
         while self.output_fifo.len() < target_samples {
             self.feed(&zeros)?;
@@ -577,12 +577,23 @@ fn interleave(audio: &AudioBuffer) -> Result<Vec<f32>> {
     let channels = audio.channels().as_usize();
     let frames =
         usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::TempoLengthOverflow)?;
-    let mut interleaved = Vec::with_capacity(audio.as_planar_f32().len());
-    for frame in 0..frames {
-        for channel in 0..channels {
-            let samples = audio
+    let channel_data = (0..channels)
+        .map(|channel| {
+            audio
                 .channel(channel)
-                .ok_or(EffectError::TempoLengthOverflow)?;
+                .ok_or(EffectError::TempoLengthOverflow)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut interleaved = Vec::with_capacity(audio.as_planar_f32().len());
+    if let [left, right] = channel_data.as_slice() {
+        for frame in 0..frames {
+            interleaved.push(left[frame]);
+            interleaved.push(right[frame]);
+        }
+        return Ok(interleaved);
+    }
+    for frame in 0..frames {
+        for samples in &channel_data {
             interleaved.push(samples[frame]);
         }
     }
@@ -593,6 +604,14 @@ fn deinterleave(input: &[f32], channels: usize, frames: FrameCount) -> Result<Ve
     let frames_usize =
         usize::try_from(frames.as_u64()).map_err(|_| EffectError::TempoLengthOverflow)?;
     let mut planar = vec![0.0; input.len()];
+    if channels == 2 {
+        let (left, right) = planar.split_at_mut(frames_usize);
+        for (frame, samples) in input.chunks_exact(2).enumerate() {
+            left[frame] = samples[0];
+            right[frame] = samples[1];
+        }
+        return Ok(planar);
+    }
     for frame in 0..frames_usize {
         for channel in 0..channels {
             planar[channel * frames_usize + frame] = input[frame * channels + channel];
