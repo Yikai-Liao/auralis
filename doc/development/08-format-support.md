@@ -114,8 +114,9 @@ Implementation notes:
   trait while keeping the existing PCM16 writer and path helpers private to the
   WAV adapter crate.
 - The high-level `auralis::Pipeline` now has `write(path, format)` for the new
-  output-format model, returning typed codec unsupported-format errors for
-  RAW PCM, AIFF/AIFC, and FLAC until their later roadmap leaves land.
+  output-format model, with WAV and raw signed/unsigned integer PCM routed to
+  concrete built-in adapters and AIFF/AIFC plus FLAC still returning typed codec
+  unsupported-format errors until their later roadmap leaves land.
 - `Pipeline::write_wav` remains on the existing PCM16 WAV path so current WAV
   behavior and diagnostics stay unchanged while the new abstraction settles.
 
@@ -393,6 +394,40 @@ Implementation notes:
 ## Milestone 8.2: raw formats
 
 ### Feature 8.2.1: raw signed and unsigned PCM
+
+Status: completed.
+
+Add deterministic headerless raw integer PCM export for signed and unsigned
+sample formats without introducing external codec dependencies.
+
+Acceptance tests:
+
+- `auralis-codec` exposes Auralis-owned raw PCM sample-format options for
+  signed and unsigned 8/16/24/32-bit integer PCM;
+- multi-byte raw integer samples use documented little-endian byte order until
+  Feature 8.2.3 adds explicit endian and bit-order options;
+- `auralis-raw` writes interleaved headerless bytes from the internal planar
+  `f32` buffer, rejects non-finite samples with channel/frame diagnostics, and
+  covers codec-boundary encoder behavior;
+- `Pipeline::write(OutputFormat::RawPcm(...))` dispatches through the raw PCM
+  encoder and returns an `EncodeSummary`, while AIFF/AIFC and FLAC remain typed
+  unsupported formats until their later leaves;
+- README and status/development docs record raw signed/unsigned PCM as
+  complete and point the next unchecked leaf to raw float32 and float64.
+
+Implementation notes:
+
+- `auralis-codec` now owns `RawPcmSampleFormat` and configurable
+  `RawPcmEncodeOptions`, defaulting to signed little-endian 16-bit raw PCM.
+- `auralis-raw` is a narrow built-in adapter for headerless raw integer PCM
+  export. It performs deterministic clipping and quantization for signed and
+  unsigned 8/16/24/32-bit samples, interleaving frames from planar channel
+  storage.
+- Raw signed/unsigned PCM is scalar format-boundary serialization, so SIMD is
+  not applicable for this leaf beyond earlier sample-processing backends.
+- Raw decode is intentionally deferred because headerless input requires an
+  input-format model carrying sample rate, channels, sample format, and later
+  endian/bit-order options.
 
 ### Feature 8.2.2: raw float32 and float64
 

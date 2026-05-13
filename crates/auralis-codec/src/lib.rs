@@ -247,9 +247,112 @@ impl Default for WavEncodeOptions {
     }
 }
 
-/// Auralis-owned options for raw PCM export.
+/// Integer sample format for headerless raw PCM export.
+///
+/// Multi-byte samples are little-endian until explicit raw endian options land
+/// in the format roadmap.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct RawPcmEncodeOptions;
+#[non_exhaustive]
+pub enum RawPcmSampleFormat {
+    /// Signed 8-bit PCM samples.
+    Signed8,
+
+    /// Unsigned 8-bit PCM samples.
+    Unsigned8,
+
+    /// Signed 16-bit PCM samples.
+    #[default]
+    Signed16,
+
+    /// Unsigned 16-bit PCM samples.
+    Unsigned16,
+
+    /// Signed 24-bit PCM samples.
+    Signed24,
+
+    /// Unsigned 24-bit PCM samples.
+    Unsigned24,
+
+    /// Signed 32-bit PCM samples.
+    Signed32,
+
+    /// Unsigned 32-bit PCM samples.
+    Unsigned32,
+}
+
+/// Auralis-owned options for raw PCM export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RawPcmEncodeOptions {
+    sample_format: RawPcmSampleFormat,
+}
+
+impl RawPcmEncodeOptions {
+    /// Creates raw PCM encode options for `sample_format`.
+    #[must_use]
+    pub const fn new(sample_format: RawPcmSampleFormat) -> Self {
+        Self { sample_format }
+    }
+
+    /// Creates options for signed 8-bit raw PCM.
+    #[must_use]
+    pub const fn signed8() -> Self {
+        Self::new(RawPcmSampleFormat::Signed8)
+    }
+
+    /// Creates options for unsigned 8-bit raw PCM.
+    #[must_use]
+    pub const fn unsigned8() -> Self {
+        Self::new(RawPcmSampleFormat::Unsigned8)
+    }
+
+    /// Creates options for signed little-endian 16-bit raw PCM.
+    #[must_use]
+    pub const fn signed16() -> Self {
+        Self::new(RawPcmSampleFormat::Signed16)
+    }
+
+    /// Creates options for unsigned little-endian 16-bit raw PCM.
+    #[must_use]
+    pub const fn unsigned16() -> Self {
+        Self::new(RawPcmSampleFormat::Unsigned16)
+    }
+
+    /// Creates options for signed little-endian 24-bit raw PCM.
+    #[must_use]
+    pub const fn signed24() -> Self {
+        Self::new(RawPcmSampleFormat::Signed24)
+    }
+
+    /// Creates options for unsigned little-endian 24-bit raw PCM.
+    #[must_use]
+    pub const fn unsigned24() -> Self {
+        Self::new(RawPcmSampleFormat::Unsigned24)
+    }
+
+    /// Creates options for signed little-endian 32-bit raw PCM.
+    #[must_use]
+    pub const fn signed32() -> Self {
+        Self::new(RawPcmSampleFormat::Signed32)
+    }
+
+    /// Creates options for unsigned little-endian 32-bit raw PCM.
+    #[must_use]
+    pub const fn unsigned32() -> Self {
+        Self::new(RawPcmSampleFormat::Unsigned32)
+    }
+
+    /// Returns the configured raw PCM sample format.
+    #[must_use]
+    pub const fn sample_format(self) -> RawPcmSampleFormat {
+        self.sample_format
+    }
+}
+
+impl Default for RawPcmEncodeOptions {
+    fn default() -> Self {
+        Self::signed16()
+    }
+}
 
 /// Auralis-owned options for AIFF/AIFC export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -522,7 +625,8 @@ mod tests {
     use super::{
         AiffEncodeOptions, AudioEncoder, AudioReader, AudioWriter, CodecCapabilities, CodecError,
         CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmEncodeOptions,
-        UnsupportedEncoder, UnsupportedFormat, UnsupportedReader, UnsupportedWriter,
+        RawPcmSampleFormat, UnsupportedEncoder, UnsupportedFormat, UnsupportedReader,
+        UnsupportedWriter,
     };
 
     fn mono_buffer() -> AudioBuffer {
@@ -585,8 +689,12 @@ mod tests {
     fn output_format_maps_to_codec_kind() {
         assert_eq!(OutputFormat::default().codec_kind(), CodecKind::Wav);
         assert_eq!(
-            OutputFormat::RawPcm(RawPcmEncodeOptions).codec_kind(),
+            OutputFormat::RawPcm(RawPcmEncodeOptions::default()).codec_kind(),
             CodecKind::RawPcm
+        );
+        assert_eq!(
+            RawPcmEncodeOptions::unsigned24().sample_format(),
+            RawPcmSampleFormat::Unsigned24
         );
         assert_eq!(
             OutputFormat::Aiff(AiffEncodeOptions).codec_kind(),

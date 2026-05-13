@@ -59,6 +59,7 @@ dependencies = [
  "auralis-codec",
  "auralis-core",
  "auralis-effects",
+ "auralis-raw",
  "auralis-simd",
  "auralis-wav",
  "thiserror",
@@ -117,6 +118,15 @@ dependencies = [
  "auralis-effects",
  "auralis-testkit",
  "auralis-wav",
+]
+
+[[package]]
+name = "auralis-raw"
+version = "0.0.0"
+dependencies = [
+ "auralis-codec",
+ "auralis-core",
+ "thiserror",
 ]
 
 [[package]]

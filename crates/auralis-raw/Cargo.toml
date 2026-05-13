@@ -1,0 +1,19 @@
+[package]
+name = "auralis-raw"
+description = "Headerless raw PCM codec implementation for Auralis."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+auralis-codec = { path = "../auralis-codec" }
+auralis-core = { path = "../auralis-core" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

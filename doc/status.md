@@ -206,15 +206,17 @@ classified as experimental pure Rust adapter work, and external `ffmpeg` or
 native codec wrappers remain not planned under the current roadmap. The codec
 boundary now also owns `OutputFormat`, per-format encode option models,
 `EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
-into that surface while future RAW PCM, AIFF/AIFC, and FLAC writes return
-typed unsupported-format errors until their individual format leaves land.
+into that surface while the raw adapter now writes signed and unsigned integer
+PCM bytes through `OutputFormat::RawPcm`, and future AIFF/AIFC and FLAC writes
+return typed unsupported-format errors until their individual format leaves
+land.
 Feature 8.1.1 through Feature 8.1.7 are now complete: generic WAV
 decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
 u-law, A-law, and RIFX containers, and WAV writes can now target PCM8, PCM16,
 PCM24, PCM32, float32, float64, u-law, or A-law through RIFF or RIFX
 `WavEncodeOptions` while the legacy `write_wav` path stays PCM16-only for
-backward compatibility. The next unchecked 8.x leaf is raw signed and unsigned
-PCM.
+backward compatibility. Feature 8.2.1 is now complete for signed and unsigned
+integer raw PCM export; the next unchecked 8.x leaf is raw float32 and float64.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

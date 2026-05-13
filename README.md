@@ -18,8 +18,8 @@ development-plan change says otherwise.
 Auralis is pre-alpha. The repository already contains:
 
 - a Rust workspace with `auralis`, `auralis-core`, `auralis-wav`,
-  `auralis-dsp`, `auralis-effects`, `auralis-simd`, `auralis-testkit`, and
-  `auralis-cli` crates;
+  `auralis-raw`, `auralis-dsp`, `auralis-effects`, `auralis-simd`,
+  `auralis-testkit`, and `auralis-cli` crates;
 - PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law WAV decode plus RIFX
   container decode, PCM16 legacy output, and
   PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law RIFF or RIFX output through
@@ -40,8 +40,9 @@ Auralis is pre-alpha. The repository already contains:
   codec backends as not planned under the current roadmap;
 - an Auralis-owned output-format boundary with `OutputFormat`,
   per-format encode option types, `AudioEncoder`/`EncodeSummary`, a WAV encoder
-  adapter, and typed unsupported-format errors for future RAW PCM, AIFF/AIFC,
-  and FLAC export leaves.
+  adapter, raw signed/unsigned integer PCM export through an Auralis-owned
+  adapter, and typed unsupported-format errors for future AIFF/AIFC and FLAC
+  export leaves.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

@@ -7,7 +7,8 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    CodecError, CodecKind, RawPcmEncodeOptions, WavContainer, WavEncodeOptions, WavSampleFormat,
+    AiffEncodeOptions, CodecError, CodecKind, RawPcmEncodeOptions, WavContainer, WavEncodeOptions,
+    WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -452,18 +453,34 @@ fn write_output_format_rifx_wav_uses_rifx_encoder() {
 }
 
 #[test]
-fn write_output_format_rejects_unsupported_formats() {
+fn write_output_format_raw_pcm_uses_raw_encoder() {
     let path = support::temp_path("auralis-pipeline-write-raw", "raw");
+    let summary = AudioFile::from_audio_buffer(stereo_audio_buffer(vec![0.0, 0.5, -0.5, 1.0]))
+        .into_pipeline()
+        .write(&path, OutputFormat::RawPcm(RawPcmEncodeOptions::signed8()))
+        .unwrap();
+
+    let bytes = fs::read(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::RawPcm);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(bytes, vec![0x00, 0xc0, 0x40, 0x7f]);
+}
+
+#[test]
+fn write_output_format_rejects_unsupported_formats() {
+    let path = support::temp_path("auralis-pipeline-write-aiff", "aiff");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
         .into_pipeline()
-        .write(&path, OutputFormat::RawPcm(RawPcmEncodeOptions))
+        .write(&path, OutputFormat::Aiff(AiffEncodeOptions))
         .unwrap_err();
 
     let _ = fs::remove_file(path);
     assert_eq!(
         error,
         Error::Codec(CodecError::UnsupportedFormat(
-            auralis_codec::UnsupportedFormat::new(CodecKind::RawPcm)
+            auralis_codec::UnsupportedFormat::new(CodecKind::Aiff)
         ))
     );
 }

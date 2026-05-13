@@ -7,6 +7,7 @@ members = [
     "crates/auralis-dsp",
     "crates/auralis-effects",
     "crates/auralis-fuzz-targets",
+    "crates/auralis-raw",
     "crates/auralis-simd",
     "crates/auralis-testkit",
     "crates/auralis-wav",

@@ -18,6 +18,7 @@ simd = ["auralis-effects/simd", "auralis-simd/simd", "auralis-wav/simd"]
 auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
 auralis-effects = { path = "../auralis-effects" }
+auralis-raw = { path = "../auralis-raw" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
 auralis-wav = { path = "../auralis-wav" }
 thiserror.workspace = true
