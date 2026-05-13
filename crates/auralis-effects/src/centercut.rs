@@ -215,15 +215,12 @@ fn extract_center(
         );
         inverse.process(&mut center_spectrum);
 
-        for (window_index, (center_bin, (&analysis_weight, &post_weight))) in center_spectrum
-            .iter()
-            .zip(analysis.iter().zip(&post))
-            .enumerate()
-        {
+        let active_len = (left.len() - block_start).min(window_size);
+        for window_index in 0..active_len {
+            let center_bin = center_spectrum[window_index];
+            let analysis_weight = analysis[window_index];
+            let post_weight = post[window_index];
             let output_index = block_start + window_index;
-            if output_index >= left.len() {
-                break;
-            }
             center_accumulator[output_index] += center_bin.re * post_weight / window_size as f64;
             weight_accumulator[output_index] += analysis_weight * post_weight;
         }
@@ -250,12 +247,13 @@ fn fill_windowed_spectrum(
     block_start: usize,
     window: &[f64],
 ) {
-    for (index, bin) in spectrum.iter_mut().enumerate() {
-        let sample = samples
-            .get(block_start + index)
-            .copied()
-            .map_or(0.0, f64::from);
-        *bin = Complex::new(sample * window[index], 0.0);
+    let active_len = (samples.len() - block_start).min(spectrum.len());
+    for index in 0..active_len {
+        spectrum[index] =
+            Complex::new(f64::from(samples[block_start + index]) * window[index], 0.0);
+    }
+    for bin in &mut spectrum[active_len..] {
+        *bin = Complex::default();
     }
 }
 
