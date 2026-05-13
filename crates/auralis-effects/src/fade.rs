@@ -311,33 +311,63 @@ impl Fade {
             return;
         }
 
-        for (offset, sample) in samples.iter_mut().enumerate() {
-            let Ok(offset) = u64::try_from(offset) else {
-                return;
-            };
-            let Some(frame_index) = start_frame.as_u64().checked_add(offset) else {
-                return;
-            };
+        let segment_start = start_frame.as_u64();
+        let Ok(segment_len) = u64::try_from(samples.len()) else {
+            return;
+        };
+        let Some(segment_end) = segment_start.checked_add(segment_len) else {
+            return;
+        };
 
-            *sample *= self.coefficient(frame_index, total_frames);
+        self.apply_fade_in(samples, segment_start, segment_end);
+        self.apply_fade_out(samples, total_frames, segment_start, segment_end);
+    }
+
+    fn apply_fade_in(self, samples: &mut [f32], segment_start: u64, segment_end: u64) {
+        let fade_in = self.fade_in.as_u64();
+        if fade_in == 0 {
+            return;
+        }
+
+        let start = segment_start;
+        let end = segment_end.min(fade_in);
+        if start >= end {
+            return;
+        }
+
+        for frame_index in start..end {
+            let Some(sample) = sample_at_frame(samples, segment_start, frame_index) else {
+                return;
+            };
+            *sample *= self.curve.coefficient(frame_index, fade_in);
         }
     }
 
-    fn coefficient(self, frame_index: u64, total_frames: u64) -> f32 {
-        let mut coefficient = 1.0;
-
-        if self.fade_in.as_u64() != 0 && frame_index < self.fade_in.as_u64() {
-            coefficient *= self.curve.coefficient(frame_index, self.fade_in.as_u64());
+    fn apply_fade_out(
+        self,
+        samples: &mut [f32],
+        total_frames: u64,
+        segment_start: u64,
+        segment_end: u64,
+    ) {
+        let fade_out = self.fade_out.as_u64();
+        if fade_out == 0 {
+            return;
         }
 
-        if self.fade_out.as_u64() != 0 && frame_index < total_frames {
+        let start = segment_start.max(total_frames.saturating_sub(fade_out));
+        let end = segment_end.min(total_frames);
+        if start >= end {
+            return;
+        }
+
+        for frame_index in start..end {
+            let Some(sample) = sample_at_frame(samples, segment_start, frame_index) else {
+                return;
+            };
             let remaining = total_frames - frame_index - 1;
-            if remaining < self.fade_out.as_u64() {
-                coefficient *= self.curve.coefficient(remaining, self.fade_out.as_u64());
-            }
+            *sample *= self.curve.coefficient(remaining, fade_out);
         }
-
-        coefficient
     }
 
     fn positioned_plan(
@@ -418,6 +448,15 @@ fn ratio(numerator: u64, denominator: u64) -> f32 {
     {
         numerator as f32 / denominator as f32
     }
+}
+
+fn sample_at_frame(
+    samples: &mut [f32],
+    segment_start: u64,
+    frame_index: u64,
+) -> Option<&mut f32> {
+    let offset = frame_index.checked_sub(segment_start)?;
+    samples.get_mut(usize::try_from(offset).ok()?)
 }
 
 #[cfg(test)]
