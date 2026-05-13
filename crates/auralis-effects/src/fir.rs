@@ -255,6 +255,9 @@ impl Fir {
         if backend == FirBackend::Direct && coefficients.len() <= 2 {
             return process_short_direct_fir(audio, coefficients.as_slice());
         }
+        if backend == FirBackend::Direct && coefficients.len() == 11 {
+            return process_eleven_tap_direct_fir(audio, coefficients.as_slice());
+        }
 
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
@@ -359,6 +362,84 @@ fn process_short_direct_fir(audio: &AudioBuffer, coefficients: &[f64]) -> Result
 
     AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), planar)
         .map_err(|_| EffectError::FirLengthOverflow)
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "FIR coefficients are cached as f32 in the DSP direct path; this mirrors that sample-domain precision"
+)]
+fn process_eleven_tap_direct_fir(audio: &AudioBuffer, coefficients: &[f64]) -> Result<AudioBuffer> {
+    let frames =
+        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+    let mut planar = vec![0.0; audio.as_planar_f32().len()];
+    let coefficients = coefficients
+        .iter()
+        .map(|coefficient| *coefficient as f32)
+        .collect::<Vec<_>>();
+    let [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]: [f32; 11] = coefficients
+        .try_into()
+        .expect("eleven-tap direct FIR is only called for eleven coefficients");
+
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let start = channel_index
+            .checked_mul(frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let output = planar
+            .get_mut(start..start + frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+
+        let edge = 5.min(frames);
+        for (frame, sample) in output.iter_mut().take(edge).enumerate() {
+            *sample = eleven_tap_edge_sample(
+                channel,
+                frame,
+                [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10],
+            );
+        }
+
+        let middle_end = frames.saturating_sub(5);
+        for frame in edge..middle_end {
+            output[frame] = channel[frame + 5] * c0
+                + channel[frame + 4] * c1
+                + channel[frame + 3] * c2
+                + channel[frame + 2] * c3
+                + channel[frame + 1] * c4
+                + channel[frame] * c5
+                + channel[frame - 1] * c6
+                + channel[frame - 2] * c7
+                + channel[frame - 3] * c8
+                + channel[frame - 4] * c9
+                + channel[frame - 5] * c10;
+        }
+
+        for (frame, sample) in output.iter_mut().enumerate().take(frames).skip(middle_end) {
+            *sample = eleven_tap_edge_sample(
+                channel,
+                frame,
+                [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10],
+            );
+        }
+    }
+
+    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), planar)
+        .map_err(|_| EffectError::FirLengthOverflow)
+}
+
+fn eleven_tap_edge_sample(channel: &[f32], frame: usize, coefficients: [f32; 11]) -> f32 {
+    let center = frame + 5;
+    let mut value = 0.0_f32;
+    for (index, coefficient) in coefficients.into_iter().enumerate() {
+        if center >= index {
+            let input_index = center - index;
+            if input_index < channel.len() {
+                value += channel[input_index] * coefficient;
+            }
+        }
+    }
+    value
 }
 
 /// Stateful scalar FIR processor for one mono sample stream.
