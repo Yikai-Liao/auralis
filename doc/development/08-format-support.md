@@ -128,6 +128,7 @@ Implementation notes:
 | RAW PCM | Auralis-owned sample layout and endian conversion | built-in | small boundary; not a complex codec |
 | AIFF / AIFC | `aifc` behind Auralis adapter types | feature-gated pure Rust | plain AIFF signed-integer PCM plus AIFC little-endian integer, float, and G.711 encodings are implemented |
 | FLAC | `claxon` decode plus `flacenc` encode | experimental pure Rust | decode/export implemented behind adapter-owned APIs with no libFLAC wrapper |
+| AU / SND | Auralis-owned `.snd` container adapter | built-in | linear PCM, IEEE float, u-law, and A-law decode/export implemented without a third-party codec dependency |
 | MP3 | pure Rust encoder only if a credible backend is selected | not planned | no LAME wrapper |
 | Ogg Vorbis | pure Rust encoder only if a credible backend is selected | not planned | no libvorbis wrapper |
 | Ogg Opus | pure Rust encoder and Ogg muxing only if credible backends are selected | not planned | no libopusenc wrapper |
@@ -643,8 +644,47 @@ Implementation notes:
 
 ### Feature 8.5.1: AU/SND
 
+Status: completed.
+
 Use a pure Rust AU/SND backend or a small Auralis-owned PCM container adapter
 only after the scope is documented.
+
+Scope: support the classic Sun/NeXT `.snd` container with a 24-byte big-endian
+header and encoding codes 1 through 7 plus 27: G.711 u-law, signed 8/16/24/32-bit
+linear PCM, IEEE float32/float64, and G.711 A-law. AU annotation bytes are
+accepted and ignored on decode; export writes no annotation bytes and records a
+known data size. ADPCM, DSP-specific, and non-audio AU encoding codes remain
+typed unsupported inputs until a future feature records compatibility and
+tolerance rules.
+
+Acceptance tests:
+
+- `auralis-codec` exposes Auralis-owned `AuSampleFormat` and
+  `AuEncodeOptions` types plus `OutputFormat::Au(...)` and `CodecKind::Au`
+  without leaking backend-specific types;
+- `auralis-au` decodes supported `.snd` AU/SND streams into the shared planar
+  `f32` buffer model and returns typed diagnostics for malformed headers,
+  unsupported encodings, invalid stream shape, and invalid sample metadata;
+- `auralis-au` exports deterministic AU/SND streams for u-law, signed integer
+  PCM, IEEE float, and A-law sample formats, with non-finite sample diagnostics
+  carrying channel/frame positions;
+- `AudioFile::open_au` opens AU/SND input into the high-level pipeline and
+  `Pipeline::write(OutputFormat::Au(...))` writes through the codec boundary
+  with `EncodeSummary` metadata;
+- README, status, development docs, and layered coverage metadata record
+  AU/SND as complete.
+
+Implementation notes:
+
+- `auralis-au` is an in-tree adapter because AU/SND is a compact container and
+  the selected scope is deterministic PCM/float/G.711 boundary work rather than
+  a complex codec algorithm.
+- AU/SND multi-byte samples are big-endian. Decode normalizes signed integer
+  samples with the same full-scale denominators used by the existing WAV and
+  raw boundaries; float64 decode intentionally narrows into Auralis' internal
+  `f32` processing buffer.
+- AU/SND conversion is scalar format-boundary work, so SIMD is not separately
+  applicable for this leaf.
 
 ## Milestone 8.6: external and native codec backends
 

@@ -72,6 +72,7 @@ name = "auralis"
 version = "0.0.0"
 dependencies = [
  "auralis-aiff",
+ "auralis-au",
  "auralis-codec",
  "auralis-core",
  "auralis-effects",
@@ -87,6 +88,15 @@ name = "auralis-aiff"
 version = "0.0.0"
 dependencies = [
  "aifc",
+ "auralis-codec",
+ "auralis-core",
+ "thiserror",
+]
+
+[[package]]
+name = "auralis-au"
+version = "0.0.0"
+dependencies = [
  "auralis-codec",
  "auralis-core",
  "thiserror",

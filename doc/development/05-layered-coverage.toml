@@ -1250,3 +1250,18 @@ l4 = { status = "not_applicable", reason = "FLAC encode is deterministic format 
 l5 = { status = "not_applicable", reason = "The current adapter encodes an already materialized buffer and does not expose streaming encoder state.", tests = [] }
 l6 = { status = "not_applicable", reason = "FLAC encode is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "FLAC output options are typed Rust values today; no CLI parser or fuzz target consumes serialized FLAC option text.", tests = [] }
+
+[[subject]]
+id = "primitive.au_snd_codec"
+kind = "primitive"
+name = "au-snd-codec"
+summary = "AU/SND decode and export boundary through an Auralis-owned .snd container adapter."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "AU/SND codec tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
+l1 = { status = "covered", reason = "AU/SND codec tests cover in-memory encode/decode, path helpers, supported sample encoding headers, high-level AudioFile::open_au, and pipeline OutputFormat dispatch.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
+l2 = { status = "not_applicable", reason = "AU/SND is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
+l3 = { status = "covered", reason = "Analytical codec-boundary tests cover AU header metadata, interleaved-to-planar conversion, integer quantization, float pass-through, G.711 round trips, malformed and unsupported diagnostics, non-finite diagnostics, and EncodeSummary metadata.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
+l4 = { status = "not_applicable", reason = "The current AU/SND feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
+l6 = { status = "not_applicable", reason = "AU/SND conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "not_applicable", reason = "AU/SND output options are typed Rust values today; no CLI parser or fuzz target consumes serialized AU option text.", tests = [] }

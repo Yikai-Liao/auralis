@@ -31,10 +31,12 @@ mod level_policy;
 mod pipeline;
 mod rate_policy;
 
+pub use auralis_au::AuError;
 pub use auralis_codec::{
-    AiffContainer, AiffEncodeOptions, AiffSampleFormat, CodecCapabilities, CodecError, CodecKind,
-    EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmBitOrder, RawPcmByteOrder,
-    RawPcmEncodeOptions, RawPcmNibbleOrder, RawPcmSampleFormat, WavEncodeOptions, WavSampleFormat,
+    AiffContainer, AiffEncodeOptions, AiffSampleFormat, AuEncodeOptions, AuSampleFormat,
+    CodecCapabilities, CodecError, CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat,
+    RawPcmBitOrder, RawPcmByteOrder, RawPcmEncodeOptions, RawPcmNibbleOrder, RawPcmSampleFormat,
+    WavEncodeOptions, WavSampleFormat,
 };
 pub use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, Decibels, FrameCount, SampleFormat, SampleRate,

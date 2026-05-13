@@ -7,8 +7,8 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    AiffEncodeOptions, CodecKind, FlacEncodeOptions, RawPcmByteOrder, RawPcmEncodeOptions,
-    WavContainer, WavEncodeOptions, WavSampleFormat,
+    AiffEncodeOptions, AuEncodeOptions, CodecKind, FlacEncodeOptions, RawPcmByteOrder,
+    RawPcmEncodeOptions, WavContainer, WavEncodeOptions, WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -560,6 +560,46 @@ fn write_output_format_flac_uses_flac_encoder() {
     assert_eq!(summary.frames(), FrameCount::new(16));
     assert_eq!(summary.spec(), decoded.spec());
     assert_eq!(&decoded.channel(0).unwrap()[..4], &[0.0, 0.25, 0.0, 0.25]);
+}
+
+#[test]
+fn write_output_format_au_uses_au_encoder() {
+    let path = support::temp_path("auralis-pipeline-write-au", "au");
+    let summary = AudioFile::from_audio_buffer(stereo_audio_buffer(vec![0.0, 0.5, -0.5, 1.0]))
+        .into_pipeline()
+        .write(&path, OutputFormat::Au(AuEncodeOptions::signed16()))
+        .unwrap();
+
+    let decoded = auralis_au::decode_au_path(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Au);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(decoded.channel(0).unwrap(), &[0.0, 0.5]);
+    assert_eq!(decoded.channel(1).unwrap(), &[-0.5, 32_767.0 / 32_768.0]);
+}
+
+#[test]
+fn open_au_enters_pipeline_and_writes_wav() {
+    let dir = temp_dir();
+    fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("input.au");
+    let output = dir.join("output.wav");
+    let audio = audio_buffer(vec![0.0, 0.25, -0.25]);
+    auralis_au::encode_au_path(&input, &audio, AuEncodeOptions::float32()).unwrap();
+
+    let summary = AudioFile::open_au(&input)
+        .unwrap()
+        .into_pipeline()
+        .write(&output, OutputFormat::Wav(WavEncodeOptions::pcm16()))
+        .unwrap();
+    let decoded = decode_pcm16_path(&output).unwrap();
+
+    fs::remove_dir_all(dir).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.frames(), FrameCount::new(3));
+    assert_eq!(decoded.channel(0).unwrap(), &[0.0, 0.25, -0.25]);
 }
 
 #[test]

@@ -20,6 +20,10 @@ pub enum Error {
     #[error(transparent)]
     Flac(#[from] auralis_flac::FlacError),
 
+    /// AU/SND decoding or encoding failed.
+    #[error(transparent)]
+    Au(#[from] auralis_au::AuError),
+
     /// Generic codec dispatch or unsupported-format failure.
     #[error(transparent)]
     Codec(#[from] auralis_codec::CodecError),
@@ -63,6 +67,7 @@ impl PartialEq for Error {
             (Self::Core(left), Self::Core(right)) => left == right,
             (Self::Wav(left), Self::Wav(right)) => left == right,
             (Self::Flac(left), Self::Flac(right)) => left == right,
+            (Self::Au(left), Self::Au(right)) => left == right,
             (Self::Codec(left), Self::Codec(right)) => left == right,
             (Self::Effect(left), Self::Effect(right)) => left == right,
             (Self::Chain(left), Self::Chain(right)) => left == right,

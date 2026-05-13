@@ -8,7 +8,7 @@ use crate::{
 
 /// Decoded audio file ready to enter an effect pipeline.
 ///
-/// `AudioFile` supports the checked-in WAV family and FLAC decode paths.
+/// `AudioFile` supports the checked-in WAV family, FLAC, and AU/SND decode paths.
 /// Decoding always uses Auralis' internal planar `f32` [`AudioBuffer`]
 /// representation.
 #[derive(Debug, Clone, PartialEq)]
@@ -61,6 +61,20 @@ impl AudioFile {
     pub fn open_flac(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
             audio: auralis_flac::decode_flac_path(path)?,
+            requested_backend: BackendKind::Scalar,
+        })
+    }
+
+    /// Opens a supported AU/SND file and decodes it into planar `f32` samples.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Au`] when the path cannot be opened, the input
+    /// is not a well-formed AU/SND stream, or the sample encoding is outside
+    /// the supported PCM, float, and G.711 set.
+    pub fn open_au(path: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self {
+            audio: auralis_au::decode_au_path(path)?,
             requested_backend: BackendKind::Scalar,
         })
     }

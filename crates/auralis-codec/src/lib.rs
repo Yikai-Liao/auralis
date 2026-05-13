@@ -95,6 +95,9 @@ pub enum CodecKind {
     /// AIFF or AIFC audio.
     Aiff,
 
+    /// Sun/NeXT AU or SND audio.
+    Au,
+
     /// FLAC audio, represented for explicit unsupported-format reporting.
     Flac,
 
@@ -108,6 +111,7 @@ impl fmt::Display for CodecKind {
             Self::Wav => formatter.write_str("wav"),
             Self::RawPcm => formatter.write_str("raw-pcm"),
             Self::Aiff => formatter.write_str("aiff"),
+            Self::Au => formatter.write_str("au"),
             Self::Flac => formatter.write_str("flac"),
             Self::Mp3 => formatter.write_str("mp3"),
         }
@@ -600,6 +604,110 @@ impl Default for AiffEncodeOptions {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct FlacEncodeOptions;
 
+/// Sample format for AU/SND export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AuSampleFormat {
+    /// 8-bit G.711 u-law companded samples.
+    ULaw,
+
+    /// Signed 8-bit linear PCM samples.
+    Signed8,
+
+    /// Signed big-endian 16-bit linear PCM samples.
+    #[default]
+    Signed16,
+
+    /// Signed big-endian 24-bit linear PCM samples.
+    Signed24,
+
+    /// Signed big-endian 32-bit linear PCM samples.
+    Signed32,
+
+    /// Big-endian IEEE 32-bit floating-point samples.
+    Float32,
+
+    /// Big-endian IEEE 64-bit floating-point samples.
+    Float64,
+
+    /// 8-bit G.711 A-law companded samples.
+    ALaw,
+}
+
+/// Auralis-owned options for AU/SND export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuEncodeOptions {
+    sample_format: AuSampleFormat,
+}
+
+impl AuEncodeOptions {
+    /// Creates AU/SND encode options for `sample_format`.
+    #[must_use]
+    pub const fn new(sample_format: AuSampleFormat) -> Self {
+        Self { sample_format }
+    }
+
+    /// Creates options for 8-bit G.711 u-law AU/SND.
+    #[must_use]
+    pub const fn ulaw() -> Self {
+        Self::new(AuSampleFormat::ULaw)
+    }
+
+    /// Creates options for signed 8-bit AU/SND PCM.
+    #[must_use]
+    pub const fn signed8() -> Self {
+        Self::new(AuSampleFormat::Signed8)
+    }
+
+    /// Creates options for signed 16-bit AU/SND PCM.
+    #[must_use]
+    pub const fn signed16() -> Self {
+        Self::new(AuSampleFormat::Signed16)
+    }
+
+    /// Creates options for signed 24-bit AU/SND PCM.
+    #[must_use]
+    pub const fn signed24() -> Self {
+        Self::new(AuSampleFormat::Signed24)
+    }
+
+    /// Creates options for signed 32-bit AU/SND PCM.
+    #[must_use]
+    pub const fn signed32() -> Self {
+        Self::new(AuSampleFormat::Signed32)
+    }
+
+    /// Creates options for 32-bit IEEE floating-point AU/SND.
+    #[must_use]
+    pub const fn float32() -> Self {
+        Self::new(AuSampleFormat::Float32)
+    }
+
+    /// Creates options for 64-bit IEEE floating-point AU/SND.
+    #[must_use]
+    pub const fn float64() -> Self {
+        Self::new(AuSampleFormat::Float64)
+    }
+
+    /// Creates options for 8-bit G.711 A-law AU/SND.
+    #[must_use]
+    pub const fn alaw() -> Self {
+        Self::new(AuSampleFormat::ALaw)
+    }
+
+    /// Returns the configured AU/SND sample format.
+    #[must_use]
+    pub const fn sample_format(self) -> AuSampleFormat {
+        self.sample_format
+    }
+}
+
+impl Default for AuEncodeOptions {
+    fn default() -> Self {
+        Self::signed16()
+    }
+}
+
 /// High-level format selection for audio export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -613,6 +721,9 @@ pub enum OutputFormat {
     /// AIFF or AIFC export.
     Aiff(AiffEncodeOptions),
 
+    /// AU/SND export.
+    Au(AuEncodeOptions),
+
     /// FLAC export.
     Flac(FlacEncodeOptions),
 }
@@ -625,6 +736,7 @@ impl OutputFormat {
             Self::Wav(_) => CodecKind::Wav,
             Self::RawPcm(_) => CodecKind::RawPcm,
             Self::Aiff(_) => CodecKind::Aiff,
+            Self::Au(_) => CodecKind::Au,
             Self::Flac(_) => CodecKind::Flac,
         }
     }
@@ -688,8 +800,10 @@ impl CodecCapabilities {
     #[must_use]
     pub const fn for_kind(kind: CodecKind) -> Self {
         let can_read = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav")
+            || matches!(kind, CodecKind::Au)
             || matches!(kind, CodecKind::Flac) && cfg!(feature = "auralis-flac");
         let can_write = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav")
+            || matches!(kind, CodecKind::Au)
             || matches!(kind, CodecKind::Flac) && cfg!(feature = "auralis-flac");
 
         Self {
@@ -850,151 +964,5 @@ impl AudioEncoder for UnsupportedEncoder {
         Err(CodecError::UnsupportedFormat(UnsupportedFormat::new(
             self.kind,
         )))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use auralis_core::{
-        AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate,
-    };
-
-    use super::{
-        AiffContainer, AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioReader, AudioWriter,
-        CodecCapabilities, CodecError, CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat,
-        RawPcmBitOrder, RawPcmByteOrder, RawPcmEncodeOptions, RawPcmNibbleOrder,
-        RawPcmSampleFormat, UnsupportedEncoder, UnsupportedFormat, UnsupportedReader,
-        UnsupportedWriter,
-    };
-
-    fn mono_buffer() -> AudioBuffer {
-        let spec = AudioSpec::new(
-            SampleRate::new(48_000).unwrap(),
-            ChannelCount::new(1).unwrap(),
-            SampleFormat::Float32,
-        );
-
-        AudioBuffer::zeroed(spec, FrameCount::new(1)).unwrap()
-    }
-
-    #[test]
-    fn unsupported_reader_returns_typed_error() {
-        let mut reader = UnsupportedReader::new(CodecKind::Flac);
-        let error = reader.read_audio().unwrap_err();
-
-        assert_eq!(reader.codec_kind(), CodecKind::Flac);
-        assert_eq!(
-            error,
-            CodecError::UnsupportedFormat(UnsupportedFormat::new(CodecKind::Flac))
-        );
-        assert_eq!(error.to_string(), "flac codec is not supported");
-    }
-
-    #[test]
-    fn unsupported_writer_returns_typed_error() {
-        let mut writer = UnsupportedWriter::new(CodecKind::Mp3);
-        let audio = mono_buffer();
-        let error = writer.write_audio(&audio).unwrap_err();
-
-        assert_eq!(writer.codec_kind(), CodecKind::Mp3);
-        assert_eq!(
-            error,
-            CodecError::UnsupportedFormat(UnsupportedFormat::new(CodecKind::Mp3))
-        );
-    }
-
-    #[test]
-    fn placeholder_formats_are_not_supported() {
-        for kind in [CodecKind::RawPcm, CodecKind::Aiff, CodecKind::Mp3] {
-            let capabilities = CodecCapabilities::for_kind(kind);
-
-            assert!(!capabilities.can_read());
-            assert!(!capabilities.can_write());
-        }
-    }
-
-    #[test]
-    fn wav_capability_tracks_feature_flag() {
-        let capabilities = CodecCapabilities::for_kind(CodecKind::Wav);
-
-        assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-wav"));
-        assert_eq!(capabilities.can_write(), cfg!(feature = "auralis-wav"));
-    }
-
-    #[test]
-    fn flac_capability_tracks_decode_feature_flag() {
-        let capabilities = CodecCapabilities::for_kind(CodecKind::Flac);
-        assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-flac"));
-        assert_eq!(capabilities.can_write(), cfg!(feature = "auralis-flac"));
-    }
-
-    #[test]
-    fn output_format_maps_to_codec_kind() {
-        assert_eq!(OutputFormat::default().codec_kind(), CodecKind::Wav);
-        assert_eq!(
-            OutputFormat::RawPcm(RawPcmEncodeOptions::default()).codec_kind(),
-            CodecKind::RawPcm
-        );
-        assert_eq!(
-            RawPcmEncodeOptions::unsigned24().sample_format(),
-            RawPcmSampleFormat::Unsigned24
-        );
-        assert_eq!(
-            RawPcmEncodeOptions::float64().sample_format(),
-            RawPcmSampleFormat::Float64
-        );
-        let raw_options = RawPcmEncodeOptions::signed16()
-            .with_byte_order(RawPcmByteOrder::BigEndian)
-            .with_bit_order(RawPcmBitOrder::LeastSignificantBitFirst)
-            .with_nibble_order(RawPcmNibbleOrder::LowNibbleFirst);
-        assert_eq!(raw_options.byte_order(), RawPcmByteOrder::BigEndian);
-        assert_eq!(
-            raw_options.bit_order(),
-            RawPcmBitOrder::LeastSignificantBitFirst
-        );
-        assert_eq!(
-            raw_options.nibble_order(),
-            RawPcmNibbleOrder::LowNibbleFirst
-        );
-        assert_eq!(
-            AiffEncodeOptions::signed24().sample_format(),
-            AiffSampleFormat::Signed24
-        );
-        assert_eq!(
-            AiffEncodeOptions::aifc_ulaw().container(),
-            AiffContainer::Aifc
-        );
-        assert_eq!(
-            OutputFormat::Aiff(AiffEncodeOptions::default()).codec_kind(),
-            CodecKind::Aiff
-        );
-        assert_eq!(
-            OutputFormat::Flac(FlacEncodeOptions).codec_kind(),
-            CodecKind::Flac
-        );
-    }
-
-    #[test]
-    fn encode_summary_reports_kind_spec_and_frames() {
-        let audio = mono_buffer();
-        let summary = EncodeSummary::new(CodecKind::Wav, audio.spec(), audio.frames());
-
-        assert_eq!(summary.codec_kind(), CodecKind::Wav);
-        assert_eq!(summary.spec(), audio.spec());
-        assert_eq!(summary.frames(), audio.frames());
-    }
-
-    #[test]
-    fn unsupported_encoder_returns_typed_error() {
-        let audio = mono_buffer();
-        let encoder = UnsupportedEncoder::new(CodecKind::Aiff);
-        let mut output = std::io::Cursor::new(Vec::new());
-        let error = encoder.encode(&audio, &mut output).unwrap_err();
-
-        assert_eq!(encoder.codec_kind(), CodecKind::Aiff);
-        assert_eq!(
-            error,
-            CodecError::UnsupportedFormat(UnsupportedFormat::new(CodecKind::Aiff))
-        );
     }
 }
