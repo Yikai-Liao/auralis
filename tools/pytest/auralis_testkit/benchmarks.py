@@ -268,6 +268,7 @@ def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             "build_command": list(RELEASE_BUILD_COMMAND),
         },
         "cases": case_reports,
+        "summary": build_report_summary(case_reports),
     }
     return report
 
@@ -582,9 +583,118 @@ def write_report_files(report: dict[str, Any], output_dir: Path) -> tuple[Path, 
     return json_path, markdown_path
 
 
+def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate report-level outcome and performance counts."""
+
+    summary: dict[str, Any] = {
+        "total_cases": len(cases),
+        "ok_cases": 0,
+        "failed_cases": 0,
+        "preparation_failed_cases": 0,
+        "scalar_faster_than_sox_ng": 0,
+        "scalar_slower_than_sox_ng": 0,
+        "scalar_equal_to_sox_ng": 0,
+        "simd_faster_than_sox_ng": 0,
+        "simd_slower_than_sox_ng": 0,
+        "simd_equal_to_sox_ng": 0,
+        "simd_not_applicable_cases": 0,
+        "fastest_scalar_vs_sox_ng": None,
+        "fastest_simd_vs_sox_ng": None,
+    }
+
+    fastest_scalar: tuple[float, str] | None = None
+    fastest_simd: tuple[float, str] | None = None
+
+    for case in cases:
+        status = case.get("status")
+        if status == "ok":
+            summary["ok_cases"] += 1
+        elif status == "preparation_failed":
+            summary["failed_cases"] += 1
+            summary["preparation_failed_cases"] += 1
+            continue
+        else:
+            summary["failed_cases"] += 1
+            continue
+
+        runs = case.get("runs", {})
+        if runs.get("auralis_simd", {}).get("status") == "not_applicable":
+            summary["simd_not_applicable_cases"] += 1
+
+        scalar_ratio = case.get("comparisons", {}).get("scalar_vs_sox_ng")
+        scalar_key = ratio_summary_key("scalar", scalar_ratio)
+        if scalar_key is not None:
+            summary[scalar_key] += 1
+            fastest_scalar = lower_ratio_case(fastest_scalar, scalar_ratio, case["effect_name"])
+
+        simd_ratio = case.get("comparisons", {}).get("simd_vs_sox_ng")
+        simd_key = ratio_summary_key("simd", simd_ratio)
+        if simd_key is not None:
+            summary[simd_key] += 1
+            fastest_simd = lower_ratio_case(fastest_simd, simd_ratio, case["effect_name"])
+
+    summary["fastest_scalar_vs_sox_ng"] = fastest_case_payload(fastest_scalar)
+    summary["fastest_simd_vs_sox_ng"] = fastest_case_payload(fastest_simd)
+    return summary
+
+
+def ratio_summary_key(prefix: str, comparison: dict[str, Any] | None) -> str | None:
+    """Return the report summary key for a ratio comparison."""
+
+    if comparison is None:
+        return None
+    interpretation = comparison.get("interpretation")
+    if interpretation is None:
+        ratio = comparison.get("median_ratio")
+        if isinstance(ratio, int | float):
+            if ratio < 1.0:
+                interpretation = "faster"
+            elif ratio > 1.0:
+                interpretation = "slower"
+            else:
+                interpretation = "equal"
+    if interpretation == "faster":
+        return f"{prefix}_faster_than_sox_ng"
+    if interpretation == "slower":
+        return f"{prefix}_slower_than_sox_ng"
+    if interpretation == "equal":
+        return f"{prefix}_equal_to_sox_ng"
+    return None
+
+
+def lower_ratio_case(
+    current: tuple[float, str] | None,
+    comparison: dict[str, Any],
+    effect_name: str,
+) -> tuple[float, str] | None:
+    """Keep the case with the lowest successful ratio."""
+
+    ratio = comparison.get("median_ratio")
+    if not isinstance(ratio, int | float):
+        return current
+    candidate = (float(ratio), effect_name)
+    if current is None or candidate[0] < current[0]:
+        return candidate
+    return current
+
+
+def fastest_case_payload(case: tuple[float, str] | None) -> dict[str, Any] | None:
+    """Render a fastest-case tuple into JSON-safe report data."""
+
+    if case is None:
+        return None
+    ratio, effect_name = case
+    return {
+        "effect_name": effect_name,
+        "median_ratio": round(ratio, 3),
+        "speedup": json_number(round(1.0 / ratio, 3)) if ratio > 0.0 else "inf",
+    }
+
+
 def render_markdown_report(report: dict[str, Any]) -> str:
     """Render the benchmark report as a compact Markdown summary."""
 
+    summary = report.get("summary") or build_report_summary(report["cases"])
     lines = [
         "# SoX-ng Benchmark Report",
         "",
@@ -593,10 +703,28 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- SoX-ng version: {report['sox_ng_version']}",
         f"- Input: {report['config']['duration_seconds']}s @ {report['config']['sample_rate']} Hz",
         f"- Iterations: {report['config']['iterations']} measured, {report['config']['warmups']} warmup",
+        f"- Cases: {summary['ok_cases']}/{summary['total_cases']} completed successfully",
+        f"- Scalar vs SoX-ng: {summary['scalar_faster_than_sox_ng']} faster, {summary['scalar_slower_than_sox_ng']} slower, {summary['scalar_equal_to_sox_ng']} equal",
+        f"- SIMD vs SoX-ng: {summary['simd_faster_than_sox_ng']} faster, {summary['simd_slower_than_sox_ng']} slower, {summary['simd_equal_to_sox_ng']} equal, {summary['simd_not_applicable_cases']} not applicable",
         "",
-        "| Effect | Backend Mode | SoX median ms | Scalar median ms | SIMD median ms | Scalar/SoX | SIMD/SoX | SIMD/Scalar |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+    scalar_best = summary.get("fastest_scalar_vs_sox_ng")
+    if scalar_best is not None:
+        lines.append(
+            f"- Best scalar speedup vs SoX-ng: {scalar_best['effect_name']} ({scalar_best['speedup']}x, ratio {scalar_best['median_ratio']})"
+        )
+    simd_best = summary.get("fastest_simd_vs_sox_ng")
+    if simd_best is not None:
+        lines.append(
+            f"- Best SIMD speedup vs SoX-ng: {simd_best['effect_name']} ({simd_best['speedup']}x, ratio {simd_best['median_ratio']})"
+        )
+    lines.extend(
+        [
+            "",
+            "| Effect | Backend Mode | SoX median ms | Scalar median ms | SIMD median ms | Scalar/SoX | SIMD/SoX | SIMD/Scalar |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
 
     for case in report["cases"]:
         if case.get("status") != "ok":

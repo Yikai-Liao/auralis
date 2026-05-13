@@ -5,6 +5,7 @@ from pathlib import Path
 from auralis_testkit.benchmarks import (
     BackendMode,
     benchmark_case_catalog,
+    build_report_summary,
     render_markdown_report,
     supported_effect_names,
 )
@@ -47,6 +48,7 @@ def test_render_markdown_report_smoke() -> None:
         },
         "cases": [
             {
+                "case_id": "gain",
                 "effect_name": "gain",
                 "backend_mode": "scalar_and_simd",
                 "status": "ok",
@@ -63,8 +65,76 @@ def test_render_markdown_report_smoke() -> None:
             }
         ],
     }
+    report["summary"] = build_report_summary(report["cases"])
 
     markdown = render_markdown_report(report)
 
     assert "SoX-ng Benchmark Report" in markdown
+    assert "- Cases: 1/1 completed successfully" in markdown
+    assert "- Scalar vs SoX-ng: 1 faster, 0 slower, 0 equal" in markdown
+    assert "- Best SIMD speedup vs SoX-ng: gain (2.198x, ratio 0.455)" in markdown
     assert "| gain | scalar_and_simd | 11.0 | 8.0 | 5.0 | 0.727 | 0.455 | 0.625 |" in markdown
+
+
+def test_build_report_summary_counts_faster_slower_and_na() -> None:
+    cases = [
+        {
+            "case_id": "gain",
+            "effect_name": "gain",
+            "backend_mode": "scalar_and_simd",
+            "status": "ok",
+            "runs": {
+                "auralis_simd": {"status": "ok", "summary": {"median_ms": 5.0}},
+            },
+            "comparisons": {
+                "scalar_vs_sox_ng": {"median_ratio": 0.727, "interpretation": "faster"},
+                "simd_vs_sox_ng": {"median_ratio": 0.455, "interpretation": "faster"},
+            },
+        },
+        {
+            "case_id": "chorus",
+            "effect_name": "chorus",
+            "backend_mode": "scalar_only",
+            "status": "ok",
+            "runs": {
+                "auralis_simd": {
+                    "status": "not_applicable",
+                    "reason": "scalar only",
+                },
+            },
+            "comparisons": {
+                "scalar_vs_sox_ng": {"median_ratio": 1.1, "interpretation": "slower"},
+                "simd_vs_sox_ng": None,
+            },
+        },
+        {
+            "case_id": "oops",
+            "effect_name": "oops",
+            "backend_mode": "scalar_only",
+            "status": "preparation_failed",
+        },
+    ]
+
+    summary = build_report_summary(cases)
+
+    assert summary["total_cases"] == 3
+    assert summary["ok_cases"] == 2
+    assert summary["failed_cases"] == 1
+    assert summary["preparation_failed_cases"] == 1
+    assert summary["scalar_faster_than_sox_ng"] == 1
+    assert summary["scalar_slower_than_sox_ng"] == 1
+    assert summary["scalar_equal_to_sox_ng"] == 0
+    assert summary["simd_faster_than_sox_ng"] == 1
+    assert summary["simd_slower_than_sox_ng"] == 0
+    assert summary["simd_equal_to_sox_ng"] == 0
+    assert summary["simd_not_applicable_cases"] == 1
+    assert summary["fastest_scalar_vs_sox_ng"] == {
+        "effect_name": "gain",
+        "median_ratio": 0.727,
+        "speedup": 1.376,
+    }
+    assert summary["fastest_simd_vs_sox_ng"] == {
+        "effect_name": "gain",
+        "median_ratio": 0.455,
+        "speedup": 2.198,
+    }
