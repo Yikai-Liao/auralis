@@ -198,10 +198,10 @@ impl DitherState {
         let precision = self.dither.precision_bits;
         UnshapedDitherParams {
             precision,
-            denominator: f64::from(1_u32 << u32::from(32 - precision)),
+            denominator_recip: 1.0 / f64::from(1_u32 << u32::from(32 - precision)),
             minimum: -(1_i64 << u32::from(precision - 1)),
             maximum: (1_i64 << u32::from(precision - 1)) - 1,
-            output_shift: u32::from(32 - precision),
+            output_scale: f64::from(1_u32 << u32::from(32 - precision)) / SOX_SAMPLE_SCALE,
         }
     }
 
@@ -220,12 +220,11 @@ impl DitherState {
 
         let internal = normalized_to_sox_sample(sample);
         let scaled =
-            (internal as f64 + f64::from(random) + f64::from(second)) / params.denominator;
+            (internal as f64 + f64::from(random) + f64::from(second)) * params.denominator_recip;
         let quantized = round_half_away_from_zero(scaled);
         let clamped = quantized.clamp(params.minimum, params.maximum);
-        let output = clamped << params.output_shift;
 
-        (output as f64 / SOX_SAMPLE_SCALE) as f32
+        (clamped as f64 * params.output_scale) as f32
     }
 
     #[allow(
@@ -280,10 +279,10 @@ impl DitherState {
 #[derive(Debug, Clone, Copy)]
 struct UnshapedDitherParams {
     precision: u8,
-    denominator: f64,
+    denominator_recip: f64,
     minimum: i64,
     maximum: i64,
-    output_shift: u32,
+    output_scale: f64,
 }
 
 const SHIBATA_48KHZ: [f64; 16] = [
