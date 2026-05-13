@@ -690,10 +690,28 @@ Implementation notes:
 
 ### Feature 8.6.1: external `ffmpeg` backend
 
-Status: not planned.
+Status: closed as not planned.
 
 External `ffmpeg` decode or encode backends are outside the current pure Rust
 policy.
+
+Acceptance notes:
+
+- no `ffmpeg` command runner, `ffmpeg-next`, or similar external-process/native
+  bridge is added to the public API, high-level facade, CLI, or codec boundary;
+- existing unsupported-format diagnostics remain the supported path for formats
+  that would require `ffmpeg` under the current roadmap;
+- README, status, and development docs record this as a deliberate policy
+  closure and point the next unchecked leaf to native codec wrapper backends.
+
+Implementation notes:
+
+- The selected format path is pure Rust adapters behind Auralis-owned boundary
+  types. Adding an external `ffmpeg` backend would introduce runtime toolchain
+  dependency, deployment drift, and command-line behavior outside the current
+  deterministic codec contract.
+- This feature is a classification closure rather than implementation work, so
+  there is no scalar/SIMD backend and no SoX-ng golden comparison to add.
 
 ### Feature 8.6.2: native codec wrapper backends
 
