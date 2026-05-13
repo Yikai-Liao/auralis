@@ -532,31 +532,42 @@ impl Synth {
             .ok_or(EffectError::InvalidSynth)?;
         let mut output = vec![0.0; capacity];
         let mut random = SynthRandom::new(DEFAULT_SYNTH_RANDOM_SEED);
+        let sample_rate = audio.spec().sample_rate();
+        let input_frames =
+            usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidSynth)?;
+        let input = audio.as_planar_f32();
+        let channel_specs = (0..channels)
+            .map(|channel_index| self.channels[channel_index % self.channels.len()])
+            .collect::<Vec<_>>();
         let mut runtimes = self
             .channels
             .iter()
             .cycle()
             .take(channels)
-            .map(|channel| SynthChannelRuntime::new(*channel, audio.spec().sample_rate()))
+            .map(|channel| SynthChannelRuntime::new(*channel, sample_rate))
             .collect::<Result<Vec<_>>>()?;
 
-        for frame in 0..frames.as_u64() {
-            let frame_index = usize::try_from(frame).map_err(|_| EffectError::InvalidSynth)?;
+        for frame_index in 0..frame_count {
+            let frame = u64::try_from(frame_index).map_err(|_| EffectError::InvalidSynth)?;
             for channel_index in 0..channels {
-                let spec = self.channels[channel_index % self.channels.len()];
+                let spec = channel_specs[channel_index];
                 let generated = spec.generated_sample(
                     frame,
                     frames,
-                    audio.spec().sample_rate(),
+                    sample_rate,
                     &mut random,
                     &mut runtimes[channel_index],
                 );
-                let input = input_sample(audio, channel_index, frame_index)?;
+                let input_sample = if frame_index < input_frames {
+                    input[channel_index * input_frames + frame_index]
+                } else {
+                    0.0
+                };
                 let output_sample = runtimes[channel_index].combine(
                     spec.combine,
                     generated,
-                    input,
-                    audio.spec().sample_rate(),
+                    input_sample,
+                    sample_rate,
                 );
                 output[channel_index * frame_count + frame_index] = output_sample.clamp(-1.0, 1.0);
             }
@@ -568,16 +579,6 @@ impl Synth {
             audio.spec().sample_format(),
         );
         Ok(AudioBuffer::from_planar_f32(spec, frames, output)?)
-    }
-}
-
-fn input_sample(audio: &AudioBuffer, channel_index: usize, frame_index: usize) -> Result<f32> {
-    let input_frames =
-        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidSynth)?;
-    if frame_index < input_frames {
-        Ok(audio.as_planar_f32()[channel_index * input_frames + frame_index])
-    } else {
-        Ok(0.0)
     }
 }
 
