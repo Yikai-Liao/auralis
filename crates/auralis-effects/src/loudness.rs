@@ -1,4 +1,5 @@
 use auralis_core::AudioBuffer;
+use auralis_dsp::{DftFir, FirCoefficients as DspFirCoefficients};
 use rustfft::{FftPlanner, num_complex::Complex};
 
 use crate::{EffectError, Result};
@@ -150,6 +151,8 @@ impl Loudness {
 
         let sample_rate = f64::from(audio.spec().sample_rate().as_u32());
         let taps = self.filter_taps(sample_rate)?;
+        let dft =
+            DftFir::new(DspFirCoefficients::new(taps).map_err(|_| EffectError::InvalidLoudness)?);
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidLoudness)?;
         let channels = audio.channels().as_usize();
@@ -157,7 +160,9 @@ impl Loudness {
 
         for channel in 0..channels {
             let start = channel * frames;
-            process_channel(&mut samples[start..start + frames], &taps);
+            let end = start + frames;
+            let source = samples[start..end].to_vec();
+            dft.process_into(&source, &mut samples[start..end]);
         }
 
         Ok(())
@@ -180,27 +185,6 @@ impl Loudness {
 impl Default for Loudness {
     fn default() -> Self {
         Self::default_settings()
-    }
-}
-
-fn process_channel(samples: &mut [f32], taps: &[f64]) {
-    let source = samples.to_vec();
-    let half = taps.len() / 2;
-
-    for (frame, output) in samples.iter_mut().enumerate() {
-        let mut sum = 0.0_f64;
-        for (tap_index, &tap) in taps.iter().enumerate() {
-            let Some(input_index) = frame
-                .checked_add(tap_index)
-                .and_then(|index| index.checked_sub(half))
-            else {
-                continue;
-            };
-            if let Some(&sample) = source.get(input_index) {
-                sum += f64::from(sample) * tap;
-            }
-        }
-        *output = f64_to_f32_clamped(sum);
     }
 }
 
@@ -417,14 +401,6 @@ fn bessel_i_0(x: f64) -> f64 {
         }
     }
     unreachable!("Bessel I0 series converges before integer exhaustion")
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "Auralis' effect buffer format is f32 and output is clipped to normalized full scale"
-)]
-fn f64_to_f32_clamped(sample: f64) -> f32 {
-    sample.clamp(-1.0, 1.0) as f32
 }
 
 #[cfg(test)]

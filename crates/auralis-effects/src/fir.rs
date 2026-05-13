@@ -1,7 +1,9 @@
 use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, FrameCount};
-use auralis_dsp::{FirCoefficients as DspFirCoefficients, FirState as DspFirState};
+use auralis_dsp::{
+    DftFir as DspDftFir, FirCoefficients as DspFirCoefficients, FirState as DspFirState,
+};
 
 use crate::{EffectError, Result};
 
@@ -106,6 +108,12 @@ impl From<DspFirCoefficients> for FirCoefficients {
     fn from(inner: DspFirCoefficients) -> Self {
         Self { inner }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FirBackend {
+    Direct,
+    Dft,
 }
 
 /// The source of coefficients for a SoX-ng-style `fir` command.
@@ -232,6 +240,14 @@ impl Fir {
     /// coefficient loading fails, or [`EffectError::FirLengthOverflow`] when
     /// the output shape cannot be represented.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
+        self.process_buffer_with_backend(audio, FirBackend::Direct)
+    }
+
+    pub(crate) fn process_buffer_with_backend(
+        &self,
+        audio: &AudioBuffer,
+        backend: FirBackend,
+    ) -> Result<AudioBuffer> {
         let coefficients = self.resolved_coefficients()?;
         if coefficients.is_empty() {
             return Ok(audio.clone());
@@ -241,6 +257,10 @@ impl Fir {
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
         let mut planar = vec![0.0; audio.as_planar_f32().len()];
         let input = audio.as_planar_f32();
+        let dft = match backend {
+            FirBackend::Direct => None,
+            FirBackend::Dft => Some(DspDftFir::new(coefficients.clone().into_dsp())),
+        };
 
         for channel_index in 0..audio.channels().as_usize() {
             let start = channel_index
@@ -255,7 +275,16 @@ impl Fir {
             let output = planar
                 .get_mut(start..end)
                 .ok_or(EffectError::FirLengthOverflow)?;
-            FirState::new(coefficients.clone()).process_into(channel, output);
+            match backend {
+                FirBackend::Direct => {
+                    FirState::new(coefficients.clone()).process_into(channel, output);
+                }
+                FirBackend::Dft => {
+                    if let Some(dft) = &dft {
+                        dft.process_into(channel, output);
+                    }
+                }
+            }
         }
 
         AudioBuffer::from_planar_f32(

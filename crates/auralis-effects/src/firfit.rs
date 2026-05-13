@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, SampleRate};
 
-use crate::{EffectError, Fir, FirCoefficients, Result};
+use crate::{EffectError, Fir, FirCoefficients, Result, fir::FirBackend};
 
 const FIRFIT_TAP_COUNT: usize = 2047;
 const FIRFIT_CENTER_TAP: usize = FIRFIT_TAP_COUNT / 2;
@@ -222,7 +222,12 @@ impl FirFit {
     /// represented.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let coefficients = self.coefficients_for_sample_rate(audio.spec().sample_rate())?;
-        Fir::from_coefficients(coefficients).process_buffer(audio)
+        let backend = if is_centered_impulse(coefficients.as_slice()) {
+            FirBackend::Direct
+        } else {
+            FirBackend::Dft
+        };
+        Fir::from_coefficients(coefficients).process_buffer_with_backend(audio, backend)
     }
 
     fn resolved_knots(&self) -> Result<Vec<FirFitKnot>> {
@@ -306,6 +311,14 @@ fn centered_impulse(multiplier: f64) -> Vec<f64> {
     let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
     coefficients[FIRFIT_CENTER_TAP] = multiplier;
     coefficients
+}
+
+fn is_centered_impulse(coefficients: &[f64]) -> bool {
+    coefficients.len() == FIRFIT_TAP_COUNT
+        && coefficients
+            .iter()
+            .enumerate()
+            .all(|(index, coefficient)| index == FIRFIT_CENTER_TAP || *coefficient == 0.0)
 }
 
 fn interpolated_gain_db(knots: &[FirFitKnot], frequency_hz: f64) -> f64 {
