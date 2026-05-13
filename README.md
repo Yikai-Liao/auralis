@@ -42,9 +42,10 @@ Auralis is pre-alpha. The repository already contains:
   per-format encode option types, `AudioEncoder`/`EncodeSummary`, a WAV encoder
   adapter, raw signed/unsigned integer and float PCM export with explicit
   raw byte-order, bit-order, and nibble-order options through an
-  Auralis-owned adapter, plain AIFF signed-integer PCM decode/export through the
-  pure Rust `aifc` adapter, and typed unsupported-format errors for future AIFC
-  and FLAC export leaves.
+  Auralis-owned adapter, plain AIFF signed-integer PCM plus AIFC little-endian
+  integer, float32/float64, and G.711 u-law/A-law decode/export through the
+  pure Rust `aifc` adapter, and typed unsupported-format errors for future FLAC
+  leaves.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

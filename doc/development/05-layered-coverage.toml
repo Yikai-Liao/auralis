@@ -1210,13 +1210,13 @@ l7 = { status = "not_applicable", reason = "Raw output options are typed Rust va
 id = "primitive.aiff_pcm_codec"
 kind = "primitive"
 name = "aiff-pcm-codec"
-summary = "Plain AIFF signed-integer PCM decode and export boundary through the pure Rust aifc adapter."
+summary = "AIFF-family decode and export boundary through the pure Rust aifc adapter."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "AIFF codec tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
-l1 = { status = "covered", reason = "AIFF codec tests cover signed 8/16/24/32-bit PCM output headers, plain AIFF decode back into planar f32 buffers, pipeline OutputFormat dispatch, and AIFC rejection.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
+l1 = { status = "covered", reason = "AIFF codec tests cover signed 8/16/24/32-bit PCM output headers, AIFC little-endian integer, float32/float64, and G.711 output headers, AIFF/AIFC decode back into planar f32 buffers, pipeline OutputFormat dispatch, and unsupported AIFC rejection.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
 l2 = { status = "not_applicable", reason = "AIFF PCM is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
-l3 = { status = "covered", reason = "Analytical codec-boundary tests cover quantized sample values, interleaved-to-planar conversion, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
+l3 = { status = "covered", reason = "Analytical codec-boundary tests cover quantized sample values, interleaved-to-planar conversion, float pass-through, G.711 companding values, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
 l4 = { status = "not_applicable", reason = "The current AIFF PCM feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
 l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
-l6 = { status = "not_applicable", reason = "AIFF PCM conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
+l6 = { status = "not_applicable", reason = "AIFF/AIFC conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "AIFF output options are typed Rust values today; no CLI parser or fuzz target consumes serialized AIFF option text.", tests = [] }

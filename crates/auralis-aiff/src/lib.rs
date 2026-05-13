@@ -1,8 +1,9 @@
 //! AIFF PCM codec support for Auralis.
 //!
 //! This crate adapts the pure Rust `aifc` backend behind Auralis-owned codec
-//! option and error types. The current leaf supports plain AIFF signed integer
-//! PCM. AIFC compression variants stay reserved for the next feature.
+//! option and error types. The current implementation supports plain AIFF
+//! signed integer PCM plus selected AIFC little-endian, float, and G.711
+//! encodings.
 
 use std::{
     fs::File,
@@ -12,8 +13,8 @@ use std::{
 
 use aifc::{AifcReadInfo, AifcReader, AifcWriteInfo, AifcWriter, FileFormat};
 use auralis_codec::{
-    AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioOutput, CodecError, CodecKind,
-    EncodeSummary,
+    AiffContainer, AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioOutput, CodecError,
+    CodecKind, EncodeSummary,
 };
 use auralis_core::{
     AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat as AuralisSampleFormat,
@@ -35,10 +36,10 @@ pub enum AiffError {
         sample_format: aifc::SampleFormat,
     },
 
-    /// The input was AIFC or another non-AIFF container.
+    /// The input used an unsupported AIFF-family container.
     #[error("unsupported AIFF container: {file_format:?}")]
     UnsupportedContainer {
-        /// Backend file format that is not covered by this AIFF PCM leaf.
+        /// Backend file format that is not covered by this AIFF-family adapter.
         file_format: FileFormat,
     },
 
@@ -101,16 +102,15 @@ impl From<AiffError> for CodecError {
     }
 }
 
-/// Decodes an entire plain AIFF signed-integer PCM stream.
+/// Decodes an entire supported AIFF or AIFC stream.
 ///
 /// The returned [`AudioBuffer`] uses planar `f32` samples, matching Auralis'
-/// internal processing format. AIFC and compressed encodings are intentionally
-/// rejected until their dedicated roadmap leaf.
+/// internal processing format.
 ///
 /// # Errors
 ///
-/// Returns [`AiffError::UnsupportedContainer`] for AIFC and
-/// [`AiffError::UnsupportedSampleFormat`] for non-signed-integer PCM.
+/// Returns [`AiffError::UnsupportedSampleFormat`] for formats outside the
+/// supported signed-integer, floating-point, and G.711 set.
 pub fn decode_aiff<R>(reader: R) -> Result<AudioBuffer>
 where
     R: Read + Seek,
@@ -157,7 +157,7 @@ where
         .map_err(|_| AiffError::InvalidBufferShape)
 }
 
-/// Decodes a plain AIFF signed-integer PCM file.
+/// Decodes a supported AIFF or AIFC file.
 ///
 /// # Errors
 ///
@@ -169,7 +169,7 @@ pub fn decode_aiff_path(path: impl AsRef<Path>) -> Result<AudioBuffer> {
     decode_aiff(BufReader::new(file))
 }
 
-/// Encodes `audio` as plain AIFF signed-integer PCM.
+/// Encodes `audio` as a supported AIFF-family stream.
 ///
 /// # Errors
 ///
@@ -185,7 +185,7 @@ where
         });
     };
     let info = AifcWriteInfo {
-        file_format: FileFormat::Aiff,
+        file_format: backend_container(options.container()),
         channels: i16::try_from(audio.channels().as_u16())
             .map_err(|_| AiffError::InvalidChannelCount)?,
         sample_rate: f64::from(audio.spec().sample_rate().as_u32()),
@@ -196,9 +196,16 @@ where
     })?;
     match options.sample_format() {
         AiffSampleFormat::Signed8 => writer.write_samples_i8(&interleaved_i8(audio)?),
-        AiffSampleFormat::Signed16 => writer.write_samples_i16(&interleaved_i16(audio)?),
+        AiffSampleFormat::Signed16
+        | AiffSampleFormat::Signed16LittleEndian
+        | AiffSampleFormat::ULaw
+        | AiffSampleFormat::ALaw => writer.write_samples_i16(&interleaved_i16(audio)?),
         AiffSampleFormat::Signed24 => writer.write_samples_i24(&interleaved_i24(audio)?),
-        AiffSampleFormat::Signed32 => writer.write_samples_i32(&interleaved_i32(audio)?),
+        AiffSampleFormat::Signed32 | AiffSampleFormat::Signed32LittleEndian => {
+            writer.write_samples_i32(&interleaved_i32(audio)?)
+        }
+        AiffSampleFormat::Float32 => writer.write_samples_f32(&interleaved_f32(audio)?),
+        AiffSampleFormat::Float64 => writer.write_samples_f64(&interleaved_f64(audio)?),
         _ => Err(aifc::AifcError::InvalidSampleFormat),
     }
     .map_err(|error| AiffError::WriteFailed {
@@ -209,7 +216,7 @@ where
     })
 }
 
-/// Encodes `audio` as a plain AIFF signed-integer PCM file.
+/// Encodes `audio` as a supported AIFF-family file.
 ///
 /// Existing files at `path` are overwritten.
 ///
@@ -227,7 +234,7 @@ pub fn encode_aiff_path(
     encode_aiff(BufWriter::new(file), audio, options)
 }
 
-/// Codec-boundary encoder for plain AIFF PCM output.
+/// Codec-boundary encoder for supported AIFF-family output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AiffPcmEncoder {
     options: AiffEncodeOptions,
@@ -270,7 +277,7 @@ impl AudioEncoder for AiffPcmEncoder {
 }
 
 fn validate_pcm_aiff_info(info: &AifcReadInfo) -> Result<()> {
-    if info.file_format != FileFormat::Aiff {
+    if !matches!(info.file_format, FileFormat::Aiff | FileFormat::Aifc) {
         return Err(AiffError::UnsupportedContainer {
             file_format: info.file_format,
         });
@@ -278,8 +285,14 @@ fn validate_pcm_aiff_info(info: &AifcReadInfo) -> Result<()> {
     match info.sample_format {
         aifc::SampleFormat::I8
         | aifc::SampleFormat::I16
+        | aifc::SampleFormat::I16LE
         | aifc::SampleFormat::I24
-        | aifc::SampleFormat::I32 => Ok(()),
+        | aifc::SampleFormat::I32
+        | aifc::SampleFormat::I32LE
+        | aifc::SampleFormat::F32
+        | aifc::SampleFormat::F64
+        | aifc::SampleFormat::CompressedUlaw
+        | aifc::SampleFormat::CompressedAlaw => Ok(()),
         sample_format => Err(AiffError::UnsupportedSampleFormat { sample_format }),
     }
 }
@@ -324,9 +337,28 @@ fn sample_to_f32(sample: aifc::Sample) -> Result<f32> {
                 Ok((f64::from(sample) / 2_147_483_648.0) as f32)
             }
         }
-        aifc::Sample::U8(_) | aifc::Sample::F32(_) | aifc::Sample::F64(_) => {
-            Err(AiffError::InvalidBufferShape)
+        aifc::Sample::F32(sample) => Ok(sample),
+        aifc::Sample::F64(sample) => {
+            if !sample.is_finite() || sample < f64::from(f32::MIN) || sample > f64::from(f32::MAX) {
+                return Err(AiffError::InvalidBufferShape);
+            }
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "AIFC float64 decode intentionally narrows to Auralis' internal f32 processing format after range validation."
+            )]
+            {
+                Ok(sample as f32)
+            }
         }
+        aifc::Sample::U8(_) => Err(AiffError::InvalidBufferShape),
+    }
+}
+
+fn backend_container(container: AiffContainer) -> FileFormat {
+    if container == AiffContainer::Aiff {
+        FileFormat::Aiff
+    } else {
+        FileFormat::Aifc
     }
 }
 
@@ -336,6 +368,12 @@ fn backend_sample_format(sample_format: AiffSampleFormat) -> Option<aifc::Sample
         AiffSampleFormat::Signed16 => Some(aifc::SampleFormat::I16),
         AiffSampleFormat::Signed24 => Some(aifc::SampleFormat::I24),
         AiffSampleFormat::Signed32 => Some(aifc::SampleFormat::I32),
+        AiffSampleFormat::Signed16LittleEndian => Some(aifc::SampleFormat::I16LE),
+        AiffSampleFormat::Signed32LittleEndian => Some(aifc::SampleFormat::I32LE),
+        AiffSampleFormat::Float32 => Some(aifc::SampleFormat::F32),
+        AiffSampleFormat::Float64 => Some(aifc::SampleFormat::F64),
+        AiffSampleFormat::ULaw => Some(aifc::SampleFormat::CompressedUlaw),
+        AiffSampleFormat::ALaw => Some(aifc::SampleFormat::CompressedAlaw),
         _ => None,
     }
 }
@@ -374,6 +412,42 @@ fn interleaved_i32(audio: &AudioBuffer) -> Result<Vec<i32>> {
             .map(|sample| i32::try_from(sample).expect("signed 32-bit quantization is bounded"))
             .collect()
     })
+}
+
+fn interleaved_f32(audio: &AudioBuffer) -> Result<Vec<f32>> {
+    interleaved_finite(audio)
+}
+
+fn interleaved_f64(audio: &AudioBuffer) -> Result<Vec<f64>> {
+    interleaved_finite(audio).map(|samples| samples.into_iter().map(f64::from).collect())
+}
+
+fn interleaved_finite(audio: &AudioBuffer) -> Result<Vec<f32>> {
+    let channels = audio.channels().as_usize();
+    let frames = usize::try_from(audio.frames().as_u64()).map_err(|_| AiffError::WriteFailed {
+        message: "frame count does not fit in memory on this platform".to_owned(),
+    })?;
+    let mut samples = Vec::with_capacity(frames.saturating_mul(channels));
+
+    for frame_index in 0..frames {
+        for channel_index in 0..channels {
+            let sample =
+                audio
+                    .sample(channel_index, frame_index)
+                    .ok_or_else(|| AiffError::WriteFailed {
+                        message: "audio buffer shape changed during AIFF write".to_owned(),
+                    })?;
+            if !sample.is_finite() {
+                return Err(AiffError::NonFiniteSample {
+                    channel_index,
+                    frame_index,
+                });
+            }
+            samples.push(sample);
+        }
+    }
+
+    Ok(samples)
 }
 
 fn interleaved_quantized(audio: &AudioBuffer, bits: u32) -> Result<Vec<i64>> {

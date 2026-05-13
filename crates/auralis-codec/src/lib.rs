@@ -452,7 +452,19 @@ impl Default for RawPcmEncodeOptions {
     }
 }
 
-/// Sample format for AIFF PCM export.
+/// AIFF-family container for export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AiffContainer {
+    /// Classic big-endian AIFF container.
+    #[default]
+    Aiff,
+
+    /// AIFF-C container for compressed, floating-point, and little-endian encodings.
+    Aifc,
+}
+
+/// Sample format for AIFF-family export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AiffSampleFormat {
@@ -468,46 +480,110 @@ pub enum AiffSampleFormat {
 
     /// Signed 32-bit PCM samples.
     Signed32,
+
+    /// Signed little-endian 16-bit PCM samples in an AIFC `sowt` stream.
+    Signed16LittleEndian,
+
+    /// Signed little-endian 32-bit PCM samples in an AIFC `23ni` stream.
+    Signed32LittleEndian,
+
+    /// Big-endian IEEE 32-bit floating-point samples in an AIFC stream.
+    Float32,
+
+    /// Big-endian IEEE 64-bit floating-point samples in an AIFC stream.
+    Float64,
+
+    /// G.711 u-law samples in an AIFC stream.
+    ULaw,
+
+    /// G.711 A-law samples in an AIFC stream.
+    ALaw,
 }
 
-/// Auralis-owned options for AIFF PCM export.
+/// Auralis-owned options for AIFF-family export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AiffEncodeOptions {
+    container: AiffContainer,
     sample_format: AiffSampleFormat,
 }
 
 impl AiffEncodeOptions {
-    /// Creates AIFF encode options for `sample_format`.
+    /// Creates AIFF-family encode options for `container` and `sample_format`.
     #[must_use]
-    pub const fn new(sample_format: AiffSampleFormat) -> Self {
-        Self { sample_format }
+    pub const fn new(container: AiffContainer, sample_format: AiffSampleFormat) -> Self {
+        Self {
+            container,
+            sample_format,
+        }
     }
 
     /// Creates options for signed 8-bit AIFF PCM.
     #[must_use]
     pub const fn signed8() -> Self {
-        Self::new(AiffSampleFormat::Signed8)
+        Self::new(AiffContainer::Aiff, AiffSampleFormat::Signed8)
     }
 
     /// Creates options for signed 16-bit AIFF PCM.
     #[must_use]
     pub const fn signed16() -> Self {
-        Self::new(AiffSampleFormat::Signed16)
+        Self::new(AiffContainer::Aiff, AiffSampleFormat::Signed16)
     }
 
     /// Creates options for signed 24-bit AIFF PCM.
     #[must_use]
     pub const fn signed24() -> Self {
-        Self::new(AiffSampleFormat::Signed24)
+        Self::new(AiffContainer::Aiff, AiffSampleFormat::Signed24)
     }
 
     /// Creates options for signed 32-bit AIFF PCM.
     #[must_use]
     pub const fn signed32() -> Self {
-        Self::new(AiffSampleFormat::Signed32)
+        Self::new(AiffContainer::Aiff, AiffSampleFormat::Signed32)
     }
 
-    /// Returns the configured AIFF PCM sample format.
+    /// Creates options for signed little-endian 16-bit AIFC PCM.
+    #[must_use]
+    pub const fn aifc_signed16_le() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::Signed16LittleEndian)
+    }
+
+    /// Creates options for signed little-endian 32-bit AIFC PCM.
+    #[must_use]
+    pub const fn aifc_signed32_le() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::Signed32LittleEndian)
+    }
+
+    /// Creates options for 32-bit floating-point AIFC.
+    #[must_use]
+    pub const fn aifc_float32() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::Float32)
+    }
+
+    /// Creates options for 64-bit floating-point AIFC.
+    #[must_use]
+    pub const fn aifc_float64() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::Float64)
+    }
+
+    /// Creates options for G.711 u-law AIFC.
+    #[must_use]
+    pub const fn aifc_ulaw() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::ULaw)
+    }
+
+    /// Creates options for G.711 A-law AIFC.
+    #[must_use]
+    pub const fn aifc_alaw() -> Self {
+        Self::new(AiffContainer::Aifc, AiffSampleFormat::ALaw)
+    }
+
+    /// Returns the configured AIFF-family container.
+    #[must_use]
+    pub const fn container(self) -> AiffContainer {
+        self.container
+    }
+
+    /// Returns the configured AIFF-family sample format.
     #[must_use]
     pub const fn sample_format(self) -> AiffSampleFormat {
         self.sample_format
@@ -785,7 +861,7 @@ mod tests {
     };
 
     use super::{
-        AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioReader, AudioWriter,
+        AiffContainer, AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioReader, AudioWriter,
         CodecCapabilities, CodecError, CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat,
         RawPcmBitOrder, RawPcmByteOrder, RawPcmEncodeOptions, RawPcmNibbleOrder,
         RawPcmSampleFormat, UnsupportedEncoder, UnsupportedFormat, UnsupportedReader,
@@ -879,6 +955,10 @@ mod tests {
         assert_eq!(
             AiffEncodeOptions::signed24().sample_format(),
             AiffSampleFormat::Signed24
+        );
+        assert_eq!(
+            AiffEncodeOptions::aifc_ulaw().container(),
+            AiffContainer::Aifc
         );
         assert_eq!(
             OutputFormat::Aiff(AiffEncodeOptions::default()).codec_kind(),

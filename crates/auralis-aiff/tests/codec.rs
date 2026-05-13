@@ -55,6 +55,26 @@ fn encodes_supported_aiff_pcm_widths() {
 }
 
 #[test]
+fn encodes_supported_aifc_encodings() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 1.0]);
+
+    for (options, expected_format) in [
+        (AiffEncodeOptions::aifc_signed16_le(), SampleFormat::I16LE),
+        (AiffEncodeOptions::aifc_signed32_le(), SampleFormat::I32LE),
+        (AiffEncodeOptions::aifc_float32(), SampleFormat::F32),
+        (AiffEncodeOptions::aifc_float64(), SampleFormat::F64),
+        (AiffEncodeOptions::aifc_ulaw(), SampleFormat::CompressedUlaw),
+        (AiffEncodeOptions::aifc_alaw(), SampleFormat::CompressedAlaw),
+    ] {
+        let mut bytes = Cursor::new(Vec::new());
+        encode_aiff(&mut bytes, &audio, options).unwrap();
+        let reader = AifcReader::new(Cursor::new(bytes.into_inner())).unwrap();
+        assert_eq!(reader.info().file_format, FileFormat::Aifc);
+        assert_eq!(reader.info().sample_format, expected_format);
+    }
+}
+
+#[test]
 fn decodes_plain_aiff_pcm_into_planar_f32() {
     let source = audio_buffer(2, 2, &[0.0, 0.5, -0.5, 1.0]);
     let mut bytes = Cursor::new(Vec::new());
@@ -68,13 +88,34 @@ fn decodes_plain_aiff_pcm_into_planar_f32() {
 }
 
 #[test]
-fn rejects_aifc_until_compressed_leaf_lands() {
+fn decodes_aifc_encodings_into_planar_f32() {
+    let source = audio_buffer(2, 2, &[0.0, 0.5, -0.5, 1.0]);
+
+    let mut float32 = Cursor::new(Vec::new());
+    encode_aiff(&mut float32, &source, AiffEncodeOptions::aifc_float32()).unwrap();
+    let decoded_float32 = decode_aiff(Cursor::new(float32.into_inner())).unwrap();
+
+    let mut ulaw = Cursor::new(Vec::new());
+    encode_aiff(&mut ulaw, &source, AiffEncodeOptions::aifc_ulaw()).unwrap();
+    let decoded_ulaw = decode_aiff(Cursor::new(ulaw.into_inner())).unwrap();
+
+    assert_eq!(decoded_float32.spec(), source.spec());
+    assert_eq!(decoded_float32.as_planar_f32(), source.as_planar_f32());
+    assert_eq!(decoded_ulaw.spec(), source.spec());
+    assert_eq!(
+        decoded_ulaw.as_planar_f32(),
+        &[0.0, 0.511_596_7, -0.511_596_7, 0.980_346_7]
+    );
+}
+
+#[test]
+fn still_rejects_unsupported_aifc_formats() {
     let mut bytes = Cursor::new(Vec::new());
     let info = aifc::AifcWriteInfo {
         file_format: FileFormat::Aifc,
         channels: 1,
         sample_rate: 48_000.0,
-        sample_format: SampleFormat::I16,
+        sample_format: SampleFormat::CompressedIma4,
     };
     let mut writer = aifc::AifcWriter::new(&mut bytes, &info).unwrap();
     writer.write_samples_i16(&[0]).unwrap();
@@ -82,7 +123,12 @@ fn rejects_aifc_until_compressed_leaf_lands() {
 
     let error = decode_aiff(Cursor::new(bytes.into_inner())).unwrap_err();
 
-    assert!(matches!(error, AiffError::UnsupportedContainer { .. }));
+    assert!(matches!(
+        error,
+        AiffError::UnsupportedSampleFormat {
+            sample_format: SampleFormat::CompressedIma4
+        }
+    ));
 }
 
 #[test]

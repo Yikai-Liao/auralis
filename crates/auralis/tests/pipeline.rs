@@ -527,6 +527,24 @@ fn write_output_format_aiff_uses_aiff_pcm_encoder() {
 }
 
 #[test]
+fn write_output_format_aifc_uses_aifc_encoder() {
+    let path = support::temp_path("auralis-pipeline-write-aifc-ulaw", "aifc");
+    let summary = AudioFile::from_audio_buffer(stereo_audio_buffer(vec![0.0, 0.5, -0.5, 1.0]))
+        .into_pipeline()
+        .write(&path, OutputFormat::Aiff(AiffEncodeOptions::aifc_ulaw()))
+        .unwrap();
+
+    let decoded = auralis_aiff::decode_aiff_path(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Aiff);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(decoded.channel(0).unwrap(), &[0.0, 0.511_596_7]);
+    assert_eq!(decoded.channel(1).unwrap(), &[-0.511_596_7, 0.980_346_7]);
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-flac", "flac");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
