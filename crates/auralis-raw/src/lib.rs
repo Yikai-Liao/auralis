@@ -2,8 +2,8 @@
 //!
 //! Raw PCM carries no metadata, so callers must supply stream shape out of band
 //! when decoding in a future feature. This crate currently implements
-//! deterministic signed and unsigned integer PCM export from Auralis' internal
-//! planar `f32` buffer into interleaved headerless bytes.
+//! deterministic signed/unsigned integer and IEEE float PCM export from
+//! Auralis' internal planar `f32` buffer into interleaved headerless bytes.
 
 use std::{
     fs::File,
@@ -61,8 +61,8 @@ impl From<RawPcmError> for CodecError {
 
 /// Encodes `audio` as interleaved headerless raw PCM bytes.
 ///
-/// Multi-byte integer samples are written little-endian until the raw endian
-/// roadmap leaf adds explicit options.
+/// Multi-byte integer and floating-point samples are written little-endian
+/// until the raw endian roadmap leaf adds explicit options.
 ///
 /// # Errors
 ///
@@ -203,6 +203,8 @@ where
                 u32::try_from(quantize_unsigned(sample, 32)).map_err(quantization_error)?;
             writer.write_all(&sample.to_le_bytes())?;
         }
+        RawPcmSampleFormat::Float32 => writer.write_all(&sample.to_le_bytes())?,
+        RawPcmSampleFormat::Float64 => writer.write_all(&f64::from(sample).to_le_bytes())?,
         _ => {
             return Err(RawPcmError::WriteFailed {
                 message: "raw PCM sample format is not supported".to_owned(),

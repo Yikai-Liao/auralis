@@ -431,6 +431,36 @@ Implementation notes:
 
 ### Feature 8.2.2: raw float32 and float64
 
+Status: completed.
+
+Add deterministic headerless raw floating-point PCM export for IEEE 754
+float32 and float64 sample formats without introducing external codec
+dependencies.
+
+Acceptance tests:
+
+- `auralis-codec` exposes Auralis-owned raw PCM sample-format options for
+  little-endian float32 and float64;
+- raw float output preserves the internal `f32` sample values directly for
+  float32 and widens them deterministically to `f64` for float64;
+- `auralis-raw` writes interleaved headerless little-endian IEEE float bytes
+  from the internal planar `f32` buffer and preserves the existing non-finite
+  channel/frame diagnostics;
+- `Pipeline::write(OutputFormat::RawPcm(...))` dispatches raw float options
+  through the raw PCM encoder and returns an `EncodeSummary`;
+- README and status/development docs record raw float32/float64 as complete and
+  point the next unchecked leaf to raw endian, bit-order, and nibble-order
+  options.
+
+Implementation notes:
+
+- `auralis-codec` now extends `RawPcmSampleFormat` and
+  `RawPcmEncodeOptions` with `Float32` and `Float64`.
+- `auralis-raw` writes float32 and float64 samples as little-endian IEEE bytes
+  in the same interleaved frame order as the integer raw PCM formats.
+- Raw float PCM is scalar format-boundary serialization, so SIMD is not
+  applicable for this leaf beyond earlier sample-processing backends.
+
 ### Feature 8.2.3: raw endian, bit-order, and nibble-order options
 
 ## Milestone 8.3: AIFF formats

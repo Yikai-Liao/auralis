@@ -75,6 +75,35 @@ fn encodes_24_and_32_bit_samples_little_endian() {
 }
 
 #[test]
+fn encodes_float_samples_little_endian() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.5, 1.0]);
+
+    let mut float32 = Vec::new();
+    encode_raw_pcm(&mut float32, &audio, RawPcmEncodeOptions::float32()).unwrap();
+    assert_eq!(
+        float32,
+        [
+            (-1.0_f32).to_le_bytes(),
+            0.5_f32.to_le_bytes(),
+            1.0_f32.to_le_bytes(),
+        ]
+        .concat()
+    );
+
+    let mut float64 = Vec::new();
+    encode_raw_pcm(&mut float64, &audio, RawPcmEncodeOptions::float64()).unwrap();
+    assert_eq!(
+        float64,
+        [
+            (-1.0_f64).to_le_bytes(),
+            0.5_f64.to_le_bytes(),
+            1.0_f64.to_le_bytes(),
+        ]
+        .concat()
+    );
+}
+
+#[test]
 fn rejects_non_finite_samples_with_position() {
     let audio = audio_buffer(2, 2, &[0.0, f32::NAN, 0.0, 1.0]);
     let error = encode_raw_pcm(Vec::new(), &audio, RawPcmEncodeOptions::signed16()).unwrap_err();

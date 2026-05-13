@@ -247,10 +247,10 @@ impl Default for WavEncodeOptions {
     }
 }
 
-/// Integer sample format for headerless raw PCM export.
+/// Sample format for headerless raw PCM export.
 ///
-/// Multi-byte samples are little-endian until explicit raw endian options land
-/// in the format roadmap.
+/// Multi-byte integer and floating-point samples are little-endian until
+/// explicit raw endian options land in the format roadmap.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RawPcmSampleFormat {
@@ -278,6 +278,12 @@ pub enum RawPcmSampleFormat {
 
     /// Unsigned 32-bit PCM samples.
     Unsigned32,
+
+    /// IEEE 754 little-endian 32-bit floating-point samples.
+    Float32,
+
+    /// IEEE 754 little-endian 64-bit floating-point samples.
+    Float64,
 }
 
 /// Auralis-owned options for raw PCM export.
@@ -339,6 +345,18 @@ impl RawPcmEncodeOptions {
     #[must_use]
     pub const fn unsigned32() -> Self {
         Self::new(RawPcmSampleFormat::Unsigned32)
+    }
+
+    /// Creates options for IEEE 754 little-endian 32-bit floating-point raw PCM.
+    #[must_use]
+    pub const fn float32() -> Self {
+        Self::new(RawPcmSampleFormat::Float32)
+    }
+
+    /// Creates options for IEEE 754 little-endian 64-bit floating-point raw PCM.
+    #[must_use]
+    pub const fn float64() -> Self {
+        Self::new(RawPcmSampleFormat::Float64)
     }
 
     /// Returns the configured raw PCM sample format.
@@ -695,6 +713,10 @@ mod tests {
         assert_eq!(
             RawPcmEncodeOptions::unsigned24().sample_format(),
             RawPcmSampleFormat::Unsigned24
+        );
+        assert_eq!(
+            RawPcmEncodeOptions::float64().sample_format(),
+            RawPcmSampleFormat::Float64
         );
         assert_eq!(
             OutputFormat::Aiff(AiffEncodeOptions).codec_kind(),

@@ -469,6 +469,25 @@ fn write_output_format_raw_pcm_uses_raw_encoder() {
 }
 
 #[test]
+fn write_output_format_raw_float_uses_raw_encoder() {
+    let path = support::temp_path("auralis-pipeline-write-raw-float", "f64");
+    let summary = AudioFile::from_audio_buffer(audio_buffer(vec![-1.0, 0.5]))
+        .into_pipeline()
+        .write(&path, OutputFormat::RawPcm(RawPcmEncodeOptions::float64()))
+        .unwrap();
+
+    let bytes = fs::read(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::RawPcm);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(
+        bytes,
+        [(-1.0_f64).to_le_bytes(), 0.5_f64.to_le_bytes()].concat()
+    );
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-aiff", "aiff");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
