@@ -39,6 +39,7 @@ mod g711;
 mod reader;
 mod reader_float64;
 mod reader_g711;
+mod reader_symphonia;
 mod rifx;
 mod sample_conversion;
 mod writer;

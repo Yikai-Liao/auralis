@@ -13,6 +13,7 @@ use crate::{
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
     reader_float64::is_float64_wav_bytes,
     reader_g711::{decode_wav_bytes_or_hound, is_g711_wav_bytes},
+    reader_symphonia::decode_symphonia_wav_bytes,
     rifx::{decode_rifx_bytes, is_rifx_wav_bytes},
     sample_conversion::{
         float32_to_f32, pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32,
@@ -63,6 +64,10 @@ where
         })?;
     if is_rifx_wav_bytes(&bytes) {
         decode_rifx_bytes(&bytes, requested_backend)
+    } else if is_float64_wav_bytes(&bytes) || is_g711_wav_bytes(&bytes) {
+        decode_wav_bytes_or_hound(&bytes, requested_backend)
+    } else if let Some(audio) = decode_symphonia_wav_bytes(&bytes, None, requested_backend)? {
+        Ok(audio)
     } else {
         decode_wav_bytes_or_hound(&bytes, requested_backend)
     }
@@ -117,7 +122,13 @@ where
         return Err(unsupported_specific_format(&bytes));
     }
 
-    Pcm16WavReader::new(Cursor::new(bytes))?.read_pcm16_with_backend(requested_backend)
+    if let Some(audio) =
+        decode_symphonia_wav_bytes(&bytes, Some(WavSampleFormat::Pcm16), requested_backend)?
+    {
+        Ok(audio)
+    } else {
+        Pcm16WavReader::new(Cursor::new(bytes))?.read_pcm16_with_backend(requested_backend)
+    }
 }
 
 fn unsupported_specific_format(bytes: &[u8]) -> WavError {
@@ -230,8 +241,7 @@ pub fn decode_pcm8_with_backend<R>(reader: R, requested_backend: BackendKind) ->
 where
     R: Read,
 {
-    let mut reader = AnyPcmWavReader::new(reader)?;
-    reader.read_expected_format_with_backend(WavSampleFormat::Pcm8, requested_backend)
+    decode_expected_with_backend(reader, WavSampleFormat::Pcm8, requested_backend)
 }
 
 /// Decodes a PCM8 WAV file from disk into a planar `f32` buffer.
@@ -295,8 +305,7 @@ pub fn decode_pcm24_with_backend<R>(
 where
     R: Read,
 {
-    let mut reader = AnyPcmWavReader::new(reader)?;
-    reader.read_expected_format_with_backend(WavSampleFormat::Pcm24, requested_backend)
+    decode_expected_with_backend(reader, WavSampleFormat::Pcm24, requested_backend)
 }
 
 /// Decodes a PCM24 WAV file from disk into a planar `f32` buffer.
@@ -360,8 +369,7 @@ pub fn decode_pcm32_with_backend<R>(
 where
     R: Read,
 {
-    let mut reader = AnyPcmWavReader::new(reader)?;
-    reader.read_expected_format_with_backend(WavSampleFormat::Pcm32, requested_backend)
+    decode_expected_with_backend(reader, WavSampleFormat::Pcm32, requested_backend)
 }
 
 /// Decodes a PCM32 WAV file from disk into a planar `f32` buffer.
@@ -424,8 +432,31 @@ pub fn decode_float32_with_backend<R>(
 where
     R: Read,
 {
-    let mut reader = AnyPcmWavReader::new(reader)?;
-    reader.read_expected_format_with_backend(WavSampleFormat::Float32, requested_backend)
+    decode_expected_with_backend(reader, WavSampleFormat::Float32, requested_backend)
+}
+
+fn decode_expected_with_backend<R>(
+    mut reader: R,
+    expected_format: WavSampleFormat,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| WavError::Malformed {
+            message: error.to_string(),
+        })?;
+    if let Some(audio) =
+        decode_symphonia_wav_bytes(&bytes, Some(expected_format), requested_backend)?
+    {
+        Ok(audio)
+    } else {
+        AnyPcmWavReader::new(Cursor::new(bytes))?
+            .read_expected_format_with_backend(expected_format, requested_backend)
+    }
 }
 
 /// Decodes a float32 WAV file from disk into a planar `f32` buffer.
