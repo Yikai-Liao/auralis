@@ -409,16 +409,17 @@ impl SilenceThreshold {
     }
 
     fn is_above(self, sample: f32) -> bool {
-        let scaled = f64::from(sample.abs());
+        sample.abs() > self.linear_amplitude_threshold()
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "silence thresholds are compared against normalized f32 samples"
+    )]
+    fn linear_amplitude_threshold(self) -> f32 {
         match self {
-            Self::Percent(percent) => scaled * 100.0 > percent,
-            Self::Decibels(db) => {
-                if scaled == 0.0 {
-                    false
-                } else {
-                    20.0 * scaled.log10() > db
-                }
-            }
+            Self::Percent(percent) => (percent / 100.0) as f32,
+            Self::Decibels(db) => 10.0_f64.powf(db / 20.0) as f32,
         }
     }
 }
