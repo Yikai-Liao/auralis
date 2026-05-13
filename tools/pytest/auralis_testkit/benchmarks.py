@@ -28,7 +28,9 @@ RELEASE_BUILD_COMMAND = ("cargo", "build", "--release", "-p", "auralis-cli", "--
 DEFAULT_ITERATIONS = 5
 DEFAULT_WARMUPS = 1
 DEFAULT_DURATION_SECONDS = 90
+MIN_DURATION_SECONDS = 30
 DEFAULT_SAMPLE_RATE = 48_000
+BENCHMARK_INPUT_CHANNELS = 2
 DEFAULT_OUTPUT_DIR = Path("target/benchmarks/sox_ng")
 REPORT_FILENAME = "report.json"
 PROFILE_PLACEHOLDER = "profile.prof"
@@ -127,9 +129,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--duration-seconds",
-        type=positive_int,
+        type=benchmark_duration_seconds,
         default=DEFAULT_DURATION_SECONDS,
-        help="shared benchmark input duration in seconds",
+        help=f"shared benchmark input duration in seconds; minimum {MIN_DURATION_SECONDS}s",
     )
     parser.add_argument(
         "--sample-rate",
@@ -292,6 +294,8 @@ def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             "input_path": str(input_path),
             "sample_rate": args.sample_rate,
             "duration_seconds": args.duration_seconds,
+            "input_channels": BENCHMARK_INPUT_CHANNELS,
+            "input_frames": args.sample_rate * args.duration_seconds,
             "iterations": args.iterations,
             "warmups": args.warmups,
             "auralis_binary": str(auralis_bin),
@@ -818,7 +822,9 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- Generated: {report['generated_at_utc']}",
         f"- Auralis version: {report['auralis_version']}",
         f"- SoX-ng version: {report['sox_ng_version']}",
-        f"- Input: {report['config']['duration_seconds']}s @ {report['config']['sample_rate']} Hz",
+        f"- Input: {report['config']['duration_seconds']}s @ {report['config']['sample_rate']} Hz, "
+        f"{report['config'].get('input_channels', BENCHMARK_INPUT_CHANNELS)} channels, "
+        f"{report['config'].get('input_frames', report['config']['sample_rate'] * report['config']['duration_seconds'])} frames",
         f"- Iterations: {report['config']['iterations']} measured, {report['config']['warmups']} warmup",
         f"- Cases: {summary['ok_cases']}/{summary['total_cases']} completed successfully",
         f"- Reused completed cases: {summary['reused_cases']}",
@@ -907,6 +913,17 @@ def positive_int(value: str) -> int:
     parsed = int(value)
     if parsed <= 0:
         raise argparse.ArgumentTypeError("value must be positive")
+    return parsed
+
+
+def benchmark_duration_seconds(value: str) -> int:
+    """Argparse type enforcing a long enough benchmark input duration."""
+
+    parsed = positive_int(value)
+    if parsed < MIN_DURATION_SECONDS:
+        raise argparse.ArgumentTypeError(
+            f"value must be at least {MIN_DURATION_SECONDS} seconds to avoid startup-dominated timings"
+        )
     return parsed
 
 

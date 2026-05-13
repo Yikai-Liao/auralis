@@ -10,6 +10,7 @@ from auralis_testkit.benchmarks import (
     build_report_summary,
     failed_required_run_keys,
     load_resume_cases,
+    parse_args,
     render_markdown_report,
     supported_effect_names,
 )
@@ -47,6 +48,8 @@ def test_render_markdown_report_smoke() -> None:
         "config": {
             "duration_seconds": 90,
             "sample_rate": 48_000,
+            "input_channels": 2,
+            "input_frames": 4_320_000,
             "iterations": 5,
             "warmups": 1,
         },
@@ -75,11 +78,21 @@ def test_render_markdown_report_smoke() -> None:
     markdown = render_markdown_report(report)
 
     assert "SoX-ng Benchmark Report" in markdown
+    assert "- Input: 90s @ 48000 Hz, 2 channels, 4320000 frames" in markdown
     assert "- Cases: 1/1 completed successfully" in markdown
     assert "- Reused completed cases: 1" in markdown
     assert "- Scalar vs SoX-ng: 1 faster, 0 slower, 0 equal" in markdown
     assert "- Best SIMD speedup vs SoX-ng: gain (2.198x, ratio 0.455)" in markdown
     assert "| gain | scalar_and_simd | 11.0 | 8.0 | 5.0 | 0.727 | 0.455 | 0.625 |" in markdown
+
+
+def test_parse_args_rejects_startup_dominated_duration() -> None:
+    try:
+        parse_args(["--duration-seconds", "3"])
+    except SystemExit as error:
+        assert error.code == 2
+    else:
+        raise AssertionError("expected tiny benchmark input duration to be rejected")
 
 
 def test_build_report_summary_counts_faster_slower_and_na() -> None:
