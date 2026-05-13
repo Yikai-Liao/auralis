@@ -153,41 +153,25 @@ impl Stretch {
         }
 
         let state = StretchState::new(self, audio.spec().sample_rate().as_u32())?;
-        let mut channels = Vec::with_capacity(audio.channels().as_usize());
+        let mut output = Vec::new();
+        let mut output_frames = None;
 
         for channel_index in 0..audio.channels().as_usize() {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(EffectError::StretchLengthOverflow)?;
-            channels.push(state.process_channel(channel));
+            let channel_frames = state.process_channel_into(channel, &mut output);
+            output_frames.get_or_insert(channel_frames);
+            if output_frames != Some(channel_frames) {
+                return Err(EffectError::StretchLengthOverflow);
+            }
         }
 
-        let output_frames = channels
-            .first()
-            .map_or(0, Vec::len)
+        let output_frames = output_frames
+            .unwrap_or(0)
             .try_into()
             .map(FrameCount::new)
             .map_err(|_| EffectError::StretchLengthOverflow)?;
-        let output_capacity = audio
-            .channels()
-            .as_usize()
-            .checked_mul(
-                usize::try_from(output_frames.as_u64())
-                    .map_err(|_| EffectError::StretchLengthOverflow)?,
-            )
-            .ok_or(EffectError::StretchLengthOverflow)?;
-        let mut output = Vec::with_capacity(output_capacity);
-
-        for channel in channels {
-            if channel.len()
-                != usize::try_from(output_frames.as_u64())
-                    .map_err(|_| EffectError::StretchLengthOverflow)?
-            {
-                return Err(EffectError::StretchLengthOverflow);
-            }
-            output.extend(channel);
-        }
-
         let spec = AudioSpec::new(
             audio.spec().sample_rate(),
             audio.channels(),
@@ -245,26 +229,27 @@ impl StretchState {
         })
     }
 
-    fn process_channel(&self, input: &[f32]) -> Vec<f32> {
-        let mut machine = StretchMachine::new(self);
+    fn process_channel_into(&self, input: &[f32], output: &mut Vec<f32>) -> usize {
+        let start_len = output.len();
+        let mut machine = StretchMachine::new(self, output);
         machine.feed_all(input);
         machine.drain();
-        machine.output
+        machine.output.len() - start_len
     }
 }
 
-struct StretchMachine<'state> {
+struct StretchMachine<'state, 'output> {
     state: &'state StretchState,
     input_state: bool,
     index: usize,
     oindex: usize,
     ibuf: Vec<f32>,
     obuf: Vec<f64>,
-    output: Vec<f32>,
+    output: &'output mut Vec<f32>,
 }
 
-impl<'state> StretchMachine<'state> {
-    fn new(state: &'state StretchState) -> Self {
+impl<'state, 'output> StretchMachine<'state, 'output> {
+    fn new(state: &'state StretchState, output: &'output mut Vec<f32>) -> Self {
         let index = state.segment / 2;
         Self {
             state,
@@ -273,7 +258,7 @@ impl<'state> StretchMachine<'state> {
             oindex: index,
             ibuf: vec![0.0; state.segment],
             obuf: vec![0.0; state.segment],
-            output: Vec::new(),
+            output,
         }
     }
 
