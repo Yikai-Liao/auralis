@@ -48,7 +48,10 @@ Auralis is pre-alpha. The repository already contains:
   integer, float32/float64, and G.711 u-law/A-law decode/export through the
   pure Rust `aifc` adapter, FLAC decode/export through pure Rust
   `claxon`/`flacenc` adapters, and AU/SND PCM, float, and G.711 decode/export
-  through an Auralis-owned container adapter.
+  through an Auralis-owned container adapter;
+- Python packaging is blocked until the Rust API, effect pipeline behavior,
+  error model, buffer model, and binding documentation are stable enough for a
+  public package contract.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

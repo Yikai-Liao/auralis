@@ -229,7 +229,10 @@ AIFC little-endian integer, float32/float64, and G.711 encodings, Feature
 8.4.1 is complete for FLAC decode, Feature 8.4.2 is complete for FLAC
 encode, Feature 8.5.1 is complete for AU/SND, and Features 8.6.1 and 8.6.2
 are closed as not planned for external `ffmpeg` and native codec wrapper
-backends under the pure-Rust codec policy.
+backends under the pure-Rust codec policy. Feature 9.1 is blocked: PyO3,
+maturin, NumPy buffer exposure, and Python package release work must wait until
+the Rust API, effect pipeline, error model, buffer model, and binding
+documentation preconditions are re-audited and pass.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

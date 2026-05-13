@@ -818,7 +818,10 @@ and the checked-in manifests under `tests/golden/`.
 
 ### `auralis-python` future placeholder
 
-Python support should be planned but not implemented until the Rust API is stable.
+Python support should be planned but not implemented until the Rust API is
+stable. Feature 9.1 is blocked until the Rust API, effect pipeline behavior,
+error model, buffer model, and binding documentation preconditions are
+re-audited and pass.
 
 Future direction:
 

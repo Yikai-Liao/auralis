@@ -42,6 +42,10 @@ The current order is:
    8.5.1 AU/SND is now complete, and Feature 8.6.1 external `ffmpeg` backend
    plus Feature 8.6.2 native codec wrapper backends are closed as not planned
    under the pure-Rust codec policy.
+6. Stop before
+   [`9.x Python packaging`](doc/development/09-python-package.md): Feature 9.1
+   is blocked until the Rust API, effect pipeline behavior, error model, buffer
+   model, and binding documentation preconditions are re-audited and pass.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.
@@ -88,7 +92,7 @@ parallel work on the same module until the core API is stable.
 | 6.x | [`06-effect-coverage.md`](doc/development/06-effect-coverage.md) | remaining SoX-ng effect coverage |
 | 7.x | [`07-dsp-primitives.md`](doc/development/07-dsp-primitives.md) | reusable DSP primitive audit and extraction roadmap |
 | 8.x | [`08-format-support.md`](doc/development/08-format-support.md) | richer WAV and additional formats |
-| 9.x | [`09-python-package.md`](doc/development/09-python-package.md) | future PyO3/maturin packaging |
+| 9.x | [`09-python-package.md`](doc/development/09-python-package.md) | blocked future PyO3/maturin packaging |
 
 Milestone headings group work only. A `Feature x.y.z` item is one gnhf
 iteration and one focused commit unless the plan explicitly says it is a
