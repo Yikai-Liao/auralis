@@ -2,7 +2,7 @@
 //!
 //! This crate currently implements deterministic PCM8, PCM16, PCM24, PCM32,
 //! float32, float64, u-law, and A-law WAV decoding and encoding between
-//! RIFF/WAVE files and Auralis' internal planar `f32`
+//! RIFF/WAVE or RIFX/WAVE files and Auralis' internal planar `f32`
 //! [`auralis_core::AudioBuffer`].
 //!
 //! # Examples
@@ -39,6 +39,7 @@ mod g711;
 mod reader;
 mod reader_float64;
 mod reader_g711;
+mod rifx;
 mod sample_conversion;
 mod writer;
 mod writer_float32;
@@ -63,6 +64,11 @@ pub use reader_float64::{
 pub use reader_g711::{
     decode_alaw, decode_alaw_path, decode_alaw_path_with_backend, decode_alaw_with_backend,
     decode_ulaw, decode_ulaw_path, decode_ulaw_path_with_backend, decode_ulaw_with_backend,
+};
+pub use rifx::{
+    RifxWavEncoder, RifxWavWriter, decode_rifx, decode_rifx_path, decode_rifx_path_with_backend,
+    decode_rifx_with_backend, encode_rifx, encode_rifx_path, encode_rifx_path_with_backend,
+    encode_rifx_with_backend,
 };
 pub use writer::{
     Pcm8WavEncoder, Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter, Pcm24WavEncoder,

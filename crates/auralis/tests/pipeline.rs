@@ -7,7 +7,7 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    CodecError, CodecKind, RawPcmEncodeOptions, WavEncodeOptions, WavSampleFormat,
+    CodecError, CodecKind, RawPcmEncodeOptions, WavContainer, WavEncodeOptions, WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -426,6 +426,29 @@ fn write_output_format_g711_wav_uses_g711_encoders() {
     assert_eq!(ulaw.channel(1).unwrap(), &[0.511_596_7, 0.980_346_7]);
     assert_eq!(alaw.channel(0).unwrap(), &[-0.984_375, 8.0 / 32768.0]);
     assert_eq!(alaw.channel(1).unwrap(), &[0.515_625, 0.984_375]);
+}
+
+#[test]
+fn write_output_format_rifx_wav_uses_rifx_encoder() {
+    let source = stereo_audio_buffer(vec![-1.0, 0.0, 0.5, 1.0]);
+    let format_path = support::temp_path("auralis-pipeline-write-wav-rifx", "wav");
+    let options = WavEncodeOptions::pcm16().with_container(WavContainer::Rifx);
+
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&format_path, OutputFormat::Wav(options))
+        .unwrap();
+
+    let bytes = fs::read(&format_path).unwrap();
+    let decoded = auralis_wav::decode_rifx_path(&format_path).unwrap();
+
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(&bytes[0..4], b"RIFX");
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(summary.frames(), decoded.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0]);
+    assert_eq!(decoded.channel(1).unwrap(), &[0.5, 32_767.0 / 32_768.0]);
 }
 
 #[test]

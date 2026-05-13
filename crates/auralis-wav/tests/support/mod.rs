@@ -48,10 +48,26 @@ pub(crate) fn wav_bytes_pcm32(channels: u16, samples: &[i32]) -> Vec<u8> {
     bytes
 }
 
+pub(crate) fn rifx_bytes_pcm16(channels: u16, samples: &[i16]) -> Vec<u8> {
+    let mut bytes = rifx_header(channels, 16, 1, u32::try_from(samples.len() * 2).unwrap());
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_be_bytes());
+    }
+    bytes
+}
+
 pub(crate) fn wav_bytes_float32(channels: u16, samples: &[f32]) -> Vec<u8> {
     let mut bytes = riff_header(channels, 32, 3, u32::try_from(samples.len() * 4).unwrap());
     for sample in samples {
         bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    bytes
+}
+
+pub(crate) fn rifx_bytes_float32(channels: u16, samples: &[f32]) -> Vec<u8> {
+    let mut bytes = rifx_header(channels, 32, 3, u32::try_from(samples.len() * 4).unwrap());
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_be_bytes());
     }
     bytes
 }
@@ -119,6 +135,34 @@ pub(crate) fn riff_header(
     bytes.extend_from_slice(&bits_per_sample.to_le_bytes());
     bytes.extend_from_slice(b"data");
     bytes.extend_from_slice(&data_bytes.to_le_bytes());
+    bytes
+}
+
+pub(crate) fn rifx_header(
+    channels: u16,
+    bits_per_sample: u16,
+    format_tag: u16,
+    data_bytes: u32,
+) -> Vec<u8> {
+    let bytes_per_sample = u32::from(bits_per_sample) / 8;
+    let byte_rate = 48_000 * u32::from(channels) * bytes_per_sample;
+    let block_align = channels * (bits_per_sample / 8);
+    let riff_size = 36 + data_bytes;
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(b"RIFX");
+    bytes.extend_from_slice(&riff_size.to_be_bytes());
+    bytes.extend_from_slice(b"WAVE");
+    bytes.extend_from_slice(b"fmt ");
+    bytes.extend_from_slice(&16_u32.to_be_bytes());
+    bytes.extend_from_slice(&format_tag.to_be_bytes());
+    bytes.extend_from_slice(&channels.to_be_bytes());
+    bytes.extend_from_slice(&48_000_u32.to_be_bytes());
+    bytes.extend_from_slice(&byte_rate.to_be_bytes());
+    bytes.extend_from_slice(&block_align.to_be_bytes());
+    bytes.extend_from_slice(&bits_per_sample.to_be_bytes());
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&data_bytes.to_be_bytes());
     bytes
 }
 

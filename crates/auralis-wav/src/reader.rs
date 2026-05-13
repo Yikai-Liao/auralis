@@ -13,6 +13,7 @@ use crate::{
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
     reader_float64::is_float64_wav_bytes,
     reader_g711::{decode_wav_bytes_or_hound, is_g711_wav_bytes},
+    rifx::{decode_rifx_bytes, is_rifx_wav_bytes},
     sample_conversion::{
         float32_to_f32, pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32,
     },
@@ -21,7 +22,8 @@ use crate::{
 /// Decodes an entire supported WAV stream into a planar `f32` buffer.
 ///
 /// Currently supported sample formats are PCM8, PCM16, PCM24, PCM32, float32,
-/// float64, u-law, and A-law. The returned [`AudioSpec`] always uses
+/// float64, u-law, and A-law in RIFF/WAVE or RIFX/WAVE containers. The
+/// returned [`AudioSpec`] always uses
 /// [`SampleFormat::Float32`] because that is Auralis' internal processing
 /// format.
 ///
@@ -59,7 +61,11 @@ where
         .map_err(|error| WavError::Malformed {
             message: error.to_string(),
         })?;
-    decode_wav_bytes_or_hound(&bytes, requested_backend)
+    if is_rifx_wav_bytes(&bytes) {
+        decode_rifx_bytes(&bytes, requested_backend)
+    } else {
+        decode_wav_bytes_or_hound(&bytes, requested_backend)
+    }
 }
 
 /// Decodes an entire PCM16 WAV stream into a planar `f32` buffer.
@@ -107,7 +113,7 @@ where
         .map_err(|error| WavError::Malformed {
             message: error.to_string(),
         })?;
-    if is_float64_wav_bytes(&bytes) || is_g711_wav_bytes(&bytes) {
+    if is_float64_wav_bytes(&bytes) || is_g711_wav_bytes(&bytes) || is_rifx_wav_bytes(&bytes) {
         return Err(unsupported_specific_format(&bytes));
     }
 
@@ -119,6 +125,11 @@ fn unsupported_specific_format(bytes: &[u8]) -> WavError {
         WavError::UnsupportedSampleFormat {
             bits_per_sample: 64,
             encoding: crate::WavSampleEncoding::Float,
+        }
+    } else if is_rifx_wav_bytes(bytes) {
+        WavError::UnsupportedSampleFormat {
+            bits_per_sample: 16,
+            encoding: crate::WavSampleEncoding::Integer,
         }
     } else {
         WavError::UnsupportedSampleFormat {

@@ -62,7 +62,7 @@ Implementation notes:
 
 | Format family | Candidate backend | Classification | License and maintenance note | Native dependency note | Streaming and sample-format note | Metadata and fuzz/security note |
 |---|---|---|---|---|---|---|
-| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters plus an Auralis-owned float64 RIFF/WAVE adapter | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path; float64 uses a narrow in-tree adapter because `hound` only exposes float32 sample I/O. | Pure Rust crate plus Auralis-owned parsing/writing; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, float32, and float64 at the Auralis boundary; later WAV leaves still cover companded variants. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
+| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters plus Auralis-owned float64, G.711, and RIFX adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path; RIFX and non-`hound` formats use narrow in-tree adapters. | Pure Rust crate plus Auralis-owned parsing/writing; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, float32, float64, u-law, A-law, and RIFF/RIFX container byte orders at the Auralis boundary. | RIFF/RIFX metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
 | RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
 | AIFF / AIFC | pure Rust crate candidate such as `aifc`, behind a feature-gated adapter | feature-gated pure Rust | Accept only after a crate-level audit confirms MIT/Apache-compatible licensing, active enough maintenance, and reviewable transitive footprint. | Must remain pure Rust with no libsndfile or other native wrapper path. | Needs a streaming decode/encode story for PCM AIFF first; compressed AIFC encodings are later and may stay narrower if the backend cannot cover them safely. | Chunk metadata behavior must stay behind Auralis-owned option/report types; add parser/fuzz coverage before enabling broad import/export support. |
 | FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
@@ -358,6 +358,37 @@ Implementation notes:
   PCM16-only surface.
 
 ### Feature 8.1.7: WAV RIFX
+
+Status: completed.
+
+Add deterministic RIFX/WAVE decode and encode support without regressing the
+existing little-endian RIFF/WAVE paths.
+
+Acceptance tests:
+
+- `auralis-wav` decodes RIFX/WAVE bytes and files into the same planar `f32`
+  buffer model used by RIFF/WAVE;
+- the generic supported-WAV path accepts RIFX containers for supported PCM,
+  IEEE-float, u-law, and A-law sample formats;
+- `WavEncodeOptions::with_container(WavContainer::Rifx)` writes big-endian
+  RIFX/WAVE output through the codec boundary while `Pipeline::write_wav`
+  remains the existing PCM16 RIFF compatibility path;
+- codec-boundary reader/writer tests cover RIFX end to end;
+- README and status/development docs record RIFX as complete and point the next
+  unchecked leaf to raw signed and unsigned PCM.
+
+Implementation notes:
+
+- `auralis-codec` now owns `WavContainer`, with `WavEncodeOptions` defaulting
+  to little-endian RIFF and opting into big-endian RIFX explicitly.
+- `auralis-wav` now includes a narrow Auralis-owned RIFX adapter because the
+  existing `hound` path is little-endian RIFF-oriented.
+- RIFX support is container byte-order handling around the existing sample
+  conversions, so SIMD is not applicable beyond the already shared PCM16
+  conversion backend.
+- `auralis::AudioFile::open_wav` and
+  `Pipeline::write(OutputFormat::Wav(...))` now accept RIFX without changing
+  the legacy `write_wav` PCM16-only surface.
 
 ## Milestone 8.2: raw formats
 

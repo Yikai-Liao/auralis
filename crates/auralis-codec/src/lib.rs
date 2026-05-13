@@ -144,17 +144,40 @@ pub enum WavSampleFormat {
     ALaw,
 }
 
+/// Container byte order for WAV export.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WavContainer {
+    /// Little-endian RIFF/WAVE.
+    #[default]
+    Riff,
+
+    /// Big-endian RIFX/WAVE.
+    Rifx,
+}
+
 /// Auralis-owned options for WAV export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WavEncodeOptions {
     sample_format: WavSampleFormat,
+    container: WavContainer,
 }
 
 impl WavEncodeOptions {
     /// Creates WAV encode options for `sample_format`.
     #[must_use]
     pub const fn new(sample_format: WavSampleFormat) -> Self {
-        Self { sample_format }
+        Self {
+            sample_format,
+            container: WavContainer::Riff,
+        }
+    }
+
+    /// Returns options with the requested container byte order.
+    #[must_use]
+    pub const fn with_container(mut self, container: WavContainer) -> Self {
+        self.container = container;
+        self
     }
 
     /// Creates WAV encode options for unsigned 8-bit PCM.
@@ -209,6 +232,12 @@ impl WavEncodeOptions {
     #[must_use]
     pub const fn sample_format(self) -> WavSampleFormat {
         self.sample_format
+    }
+
+    /// Returns the configured WAV container byte order.
+    #[must_use]
+    pub const fn container(self) -> WavContainer {
+        self.container
     }
 }
 

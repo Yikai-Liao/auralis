@@ -1,8 +1,8 @@
 use std::{fs::File, path::Path};
 
 use auralis_codec::{
-    AudioEncoder, CodecKind, EncodeSummary, OutputFormat, UnsupportedEncoder, WavEncodeOptions,
-    WavSampleFormat,
+    AudioEncoder, CodecKind, EncodeSummary, OutputFormat, UnsupportedEncoder, WavContainer,
+    WavEncodeOptions, WavSampleFormat,
 };
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 
@@ -434,6 +434,10 @@ impl Pipeline {
                 kind: CodecKind::Wav,
                 message: error.to_string(),
             })?;
+        if options.container() == WavContainer::Rifx {
+            let encoder = auralis_wav::RifxWavEncoder::new(options, requested_backend);
+            return Ok(encoder.encode(&audio, &mut output)?);
+        }
         match options.sample_format() {
             WavSampleFormat::Pcm8 => {
                 let encoder = auralis_wav::Pcm8WavEncoder::new(options, requested_backend);

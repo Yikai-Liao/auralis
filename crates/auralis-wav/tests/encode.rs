@@ -3,14 +3,16 @@
 use std::{fs, io::Cursor};
 
 use auralis_codec::{
-    AudioEncoder, AudioWriter, CodecError, CodecKind, WavEncodeOptions, WavSampleFormat,
+    AudioEncoder, AudioWriter, CodecError, CodecKind, WavContainer, WavEncodeOptions,
+    WavSampleFormat,
 };
 use auralis_simd::BackendKind;
 use auralis_wav::{
     ALawWavEncoder, ALawWavWriter, Float32WavEncoder, Float32WavWriter, Float64WavEncoder,
     Float64WavWriter, Pcm8WavEncoder, Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter,
-    Pcm24WavEncoder, Pcm24WavWriter, Pcm32WavEncoder, Pcm32WavWriter, ULawWavEncoder,
-    ULawWavWriter, WavError, decode_pcm16_path, encode_pcm16_path,
+    Pcm24WavEncoder, Pcm24WavWriter, Pcm32WavEncoder, Pcm32WavWriter, RifxWavEncoder,
+    RifxWavWriter, ULawWavEncoder, ULawWavWriter, WavError, decode_pcm16_path, decode_rifx,
+    encode_pcm16_path, encode_rifx,
 };
 
 mod support;
@@ -369,6 +371,38 @@ fn implements_g711_codec_encoder_boundaries() {
 }
 
 #[test]
+fn encodes_rifx_pcm16_with_big_endian_container() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 0.5]);
+    let mut output = Cursor::new(Vec::new());
+
+    encode_rifx(&mut output, &audio, WavEncodeOptions::pcm16()).unwrap();
+    let bytes = output.into_inner();
+    let decoded = decode_rifx(Cursor::new(bytes.clone())).unwrap();
+
+    assert_eq!(&bytes[0..4], b"RIFX");
+    assert_eq!(&bytes[8..12], b"WAVE");
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.0, 0.0, 0.5]);
+}
+
+#[test]
+fn implements_rifx_codec_encoder_boundary() {
+    let audio = audio_buffer(1, 3, &[-1.25, 0.0, 1.25]);
+    let options = WavEncodeOptions::float32().with_container(WavContainer::Rifx);
+    let encoder = RifxWavEncoder::new(options, BackendKind::Scalar);
+    let mut output = Cursor::new(Vec::new());
+
+    let summary = encoder.encode(&audio, &mut output).unwrap();
+    let bytes = output.into_inner();
+    let decoded = decode_rifx(Cursor::new(bytes.clone())).unwrap();
+
+    assert_eq!(&bytes[0..4], b"RIFX");
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), audio.spec());
+    assert_eq!(summary.frames(), audio.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.25, 0.0, 1.25]);
+}
+
+#[test]
 fn pcm8_writer_boundary_is_one_shot() {
     let audio = audio_buffer(1, 1, &[0.0]);
     let mut writer = Pcm8WavWriter::new(Cursor::new(Vec::new()));
@@ -476,6 +510,22 @@ fn g711_writer_boundaries_are_one_shot() {
 }
 
 #[test]
+fn rifx_writer_boundary_is_one_shot() {
+    let audio = audio_buffer(1, 1, &[0.0]);
+    let mut writer = RifxWavWriter::new(Cursor::new(Vec::new()), WavEncodeOptions::pcm16());
+
+    writer.write_audio(&audio).unwrap();
+    assert_eq!(writer.codec_kind(), CodecKind::Wav);
+    assert!(matches!(
+        writer.write_audio(&audio),
+        Err(CodecError::EncodeFailed {
+            kind: CodecKind::Wav,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn wav_encode_options_default_to_pcm16() {
     assert_eq!(
         WavEncodeOptions::default().sample_format(),
@@ -525,4 +575,12 @@ fn wav_encode_options_can_target_g711() {
         WavEncodeOptions::alaw().sample_format(),
         WavSampleFormat::ALaw
     );
+}
+
+#[test]
+fn wav_encode_options_can_target_rifx_container() {
+    let options = WavEncodeOptions::pcm16().with_container(WavContainer::Rifx);
+
+    assert_eq!(options.sample_format(), WavSampleFormat::Pcm16);
+    assert_eq!(options.container(), WavContainer::Rifx);
 }

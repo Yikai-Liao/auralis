@@ -7,15 +7,16 @@ use auralis_simd::BackendKind;
 use auralis_wav::{
     AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_alaw, decode_float32,
     decode_float64, decode_pcm8, decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend,
-    decode_pcm24, decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_ulaw, decode_wav,
+    decode_pcm24, decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_rifx, decode_ulaw,
+    decode_wav,
 };
 
 mod support;
 
 use support::{
-    assert_audio_bits_eq, wav_bytes, wav_bytes_alaw, wav_bytes_float32, wav_bytes_float64,
-    wav_bytes_pcm8, wav_bytes_pcm24, wav_bytes_pcm32, wav_bytes_ulaw, wav_bytes_with_bits,
-    write_temp_wav,
+    assert_audio_bits_eq, rifx_bytes_float32, rifx_bytes_pcm16, wav_bytes, wav_bytes_alaw,
+    wav_bytes_float32, wav_bytes_float64, wav_bytes_pcm8, wav_bytes_pcm24, wav_bytes_pcm32,
+    wav_bytes_ulaw, wav_bytes_with_bits, write_temp_wav,
 };
 
 #[test]
@@ -53,6 +54,35 @@ fn generic_decoder_accepts_pcm8_and_pcm16() {
     assert_eq!(float64.channel(0).unwrap(), &[-1.5, 0.75]);
     assert_eq!(ulaw.channel(0).unwrap(), &[0.0, 0.0]);
     assert_eq!(alaw.channel(0).unwrap(), &[8.0 / 32768.0, -8.0 / 32768.0]);
+}
+
+#[test]
+fn generic_decoder_accepts_rifx_pcm16_and_float32() {
+    let pcm16 = decode_wav(Cursor::new(rifx_bytes_pcm16(
+        2,
+        &[-32768, 32_767, -16_384, 16_384],
+    )))
+    .unwrap();
+    let float32 = decode_wav(Cursor::new(rifx_bytes_float32(1, &[-1.25, 0.25]))).unwrap();
+
+    assert_eq!(pcm16.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(pcm16.spec().channels().as_u16(), 2);
+    assert_eq!(pcm16.frames().as_u64(), 2);
+    assert_eq!(pcm16.channel(0).unwrap(), &[-1.0, -0.5]);
+    assert_eq!(
+        pcm16.channel(1).unwrap(),
+        &[f32::from(i16::MAX) / 32768.0, 0.5]
+    );
+    assert_eq!(float32.channel(0).unwrap(), &[-1.25, 0.25]);
+}
+
+#[test]
+fn explicit_rifx_decoder_reads_big_endian_pcm16() {
+    let audio = decode_rifx(Cursor::new(rifx_bytes_pcm16(1, &[-32768, 0, 16_384]))).unwrap();
+
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 3);
+    assert_eq!(audio.channel(0).unwrap(), &[-1.0, 0.0, 0.5]);
 }
 
 #[test]
