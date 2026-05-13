@@ -173,63 +173,26 @@ impl Splice {
         let frames = usize::try_from(audio.frames().as_u64())
             .map_err(|_| EffectError::SpliceLengthOverflow)?;
         let channels = audio.channels().as_usize();
-        let mut output = (0..channels)
-            .map(|_| Vec::with_capacity(frames))
-            .collect::<Vec<_>>();
-        let mut cursor = 0_usize;
+        let plan = splice_plan(audio, resolved, frames)?;
+        let mut output = Vec::with_capacity(audio.as_planar_f32().len());
+        let mut output_frames = None;
 
-        for point in resolved {
-            if point.start >= frames {
-                break;
-            }
-            if point.start < cursor {
-                continue;
-            }
-            copy_range(audio, &mut output, cursor, point.start);
-
-            let Some(buffer_end) = point
-                .start
-                .checked_add(
-                    point
-                        .overlap
-                        .checked_mul(2)
-                        .ok_or(EffectError::SpliceLengthOverflow)?,
-                )
-                .and_then(|end| end.checked_add(point.search))
-            else {
-                return Err(EffectError::SpliceLengthOverflow);
-            };
-
-            if buffer_end > frames {
-                cursor = point.start;
-                break;
-            }
-
-            let offset = if point.search == 0 {
-                0
-            } else {
-                best_overlap_position(audio, point.start, point.overlap, point.search)
-            };
-            flush_splice(audio, &mut output, self.fade, point, offset)?;
-            cursor = buffer_end;
+        for channel_index in 0..channels {
+            let channel = audio
+                .channel(channel_index)
+                .ok_or(EffectError::SpliceLengthOverflow)?;
+            let channel_start_len = output.len();
+            flush_channel(channel, &plan, self.fade, frames, &mut output)?;
+            let channel_frames = output.len() - channel_start_len;
+            output_frames.get_or_insert(channel_frames);
+            debug_assert_eq!(output_frames, Some(channel_frames));
         }
 
-        copy_range(audio, &mut output, cursor, frames);
-        let output_frames = output
-            .first()
-            .map_or(0_usize, Vec::len)
+        let output_frames = output_frames
+            .unwrap_or(0)
             .try_into()
             .map(FrameCount::new)
             .map_err(|_| EffectError::SpliceLengthOverflow)?;
-        let capacity = output
-            .first()
-            .map_or(0, Vec::len)
-            .checked_mul(channels)
-            .ok_or(EffectError::SpliceLengthOverflow)?;
-        let mut planar = Vec::with_capacity(capacity);
-        for channel in output {
-            planar.extend(channel);
-        }
         AudioBuffer::from_planar_f32(
             AudioSpec::new(
                 audio.spec().sample_rate(),
@@ -237,7 +200,7 @@ impl Splice {
                 audio.spec().sample_format(),
             ),
             output_frames,
-            planar,
+            output,
         )
         .map_err(|_| EffectError::SpliceLengthOverflow)
     }
@@ -309,18 +272,92 @@ struct ResolvedSplicePoint {
     search: usize,
 }
 
-fn copy_range(audio: &AudioBuffer, output: &mut [Vec<f32>], start_frame: usize, end_frame: usize) {
-    for (channel_index, channel_output) in output.iter_mut().enumerate() {
-        let channel = audio
-            .channel(channel_index)
-            .expect("output channel count mirrors input channel count");
-        channel_output.extend_from_slice(&channel[start_frame..end_frame]);
-    }
+#[derive(Debug, Clone, Copy)]
+struct SpliceAction {
+    point: ResolvedSplicePoint,
+    offset: usize,
+    buffer_end: usize,
 }
 
-fn flush_splice(
+struct SplicePlan {
+    actions: Vec<SpliceAction>,
+    tail_start: usize,
+}
+
+fn splice_plan(
     audio: &AudioBuffer,
-    output: &mut [Vec<f32>],
+    resolved: Vec<ResolvedSplicePoint>,
+    frames: usize,
+) -> Result<SplicePlan> {
+    let mut actions = Vec::with_capacity(resolved.len());
+    let mut cursor = 0_usize;
+
+    for point in resolved {
+        if point.start >= frames {
+            break;
+        }
+        if point.start < cursor {
+            continue;
+        }
+
+        let Some(buffer_end) = point
+            .start
+            .checked_add(
+                point
+                    .overlap
+                    .checked_mul(2)
+                    .ok_or(EffectError::SpliceLengthOverflow)?,
+            )
+            .and_then(|end| end.checked_add(point.search))
+        else {
+            return Err(EffectError::SpliceLengthOverflow);
+        };
+
+        if buffer_end > frames {
+            cursor = point.start;
+            break;
+        }
+
+        let offset = if point.search == 0 {
+            0
+        } else {
+            best_overlap_position(audio, point.start, point.overlap, point.search)
+        };
+        actions.push(SpliceAction {
+            point,
+            offset,
+            buffer_end,
+        });
+        cursor = buffer_end;
+    }
+
+    Ok(SplicePlan {
+        actions,
+        tail_start: cursor,
+    })
+}
+
+fn flush_channel(
+    channel: &[f32],
+    plan: &SplicePlan,
+    fade: SpliceFade,
+    frames: usize,
+    output: &mut Vec<f32>,
+) -> Result<()> {
+    let mut cursor = 0_usize;
+    for action in &plan.actions {
+        output.extend_from_slice(&channel[cursor..action.point.start]);
+        flush_channel_splice(channel, output, fade, action.point, action.offset)?;
+        cursor = action.buffer_end;
+    }
+    debug_assert!(plan.tail_start >= cursor);
+    output.extend_from_slice(&channel[plan.tail_start..frames]);
+    Ok(())
+}
+
+fn flush_channel_splice(
+    channel: &[f32],
+    output: &mut Vec<f32>,
     fade: SpliceFade,
     point: ResolvedSplicePoint,
     offset: usize,
@@ -343,20 +380,15 @@ fn flush_splice(
             .start
             .checked_add(local_frame)
             .ok_or(EffectError::SpliceLengthOverflow)?;
-        for (channel_index, channel_output) in output.iter_mut().enumerate() {
-            let channel = audio
-                .channel(channel_index)
-                .expect("output channel count mirrors input channel count");
-            let sample = if local_frame < crossfade_end {
-                let overlap_index = local_frame - flush_start;
-                let in1 = channel[point.start + overlap_index];
-                let in2 = channel[source_frame];
-                crossfade_sample(fade, overlap_index, point.overlap, in1, in2)
-            } else {
-                channel[source_frame]
-            };
-            channel_output.push(sample);
-        }
+        let sample = if local_frame < crossfade_end {
+            let overlap_index = local_frame - flush_start;
+            let in1 = channel[point.start + overlap_index];
+            let in2 = channel[source_frame];
+            crossfade_sample(fade, overlap_index, point.overlap, in1, in2)
+        } else {
+            channel[source_frame]
+        };
+        output.push(sample);
     }
 
     Ok(())
