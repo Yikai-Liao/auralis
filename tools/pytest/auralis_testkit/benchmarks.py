@@ -30,6 +30,7 @@ DEFAULT_WARMUPS = 1
 DEFAULT_DURATION_SECONDS = 90
 DEFAULT_SAMPLE_RATE = 48_000
 DEFAULT_OUTPUT_DIR = Path("target/benchmarks/sox_ng")
+REPORT_FILENAME = "report.json"
 PROFILE_PLACEHOLDER = "profile.prof"
 MANUAL_EFFECT_TOKENS = {
     "reverse": ("reverse",),
@@ -146,6 +147,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="assume target/release/auralis already exists instead of rebuilding it",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="reuse successful cases from an existing report.json with the same benchmark config",
+    )
     return parser.parse_args(argv)
 
 
@@ -237,25 +243,49 @@ def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
         duration_seconds=args.duration_seconds,
         sample_rate=args.sample_rate,
     )
-
-    case_reports = [
-        benchmark_case(
-            case,
+    auralis_version_text = auralis_version(repo_root)
+    sox_version_text = sox_ng_version(sox_executable)
+    resumed_cases = (
+        load_resume_cases(
+            output_dir / REPORT_FILENAME,
             repo_root=repo_root,
-            auralis_bin=auralis_bin,
-            sox_executable=sox_executable,
-            input_path=input_path,
             output_dir=output_dir,
+            input_path=input_path,
+            duration_seconds=args.duration_seconds,
+            sample_rate=args.sample_rate,
             iterations=args.iterations,
             warmups=args.warmups,
+            auralis_version_text=auralis_version_text,
+            sox_version_text=sox_version_text,
+            selected_effects={case.effect_name for case in cases},
         )
-        for case in cases
-    ]
+        if args.resume
+        else {}
+    )
+
+    case_reports = []
+    for case in cases:
+        resumed = resumed_cases.get(case.case_id)
+        if resumed is not None:
+            case_reports.append(resumed)
+            continue
+        case_reports.append(
+            benchmark_case(
+                case,
+                repo_root=repo_root,
+                auralis_bin=auralis_bin,
+                sox_executable=sox_executable,
+                input_path=input_path,
+                output_dir=output_dir,
+                iterations=args.iterations,
+                warmups=args.warmups,
+            )
+        )
     report = {
         "schema": BENCHMARK_REPORT_SCHEMA,
         "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
-        "auralis_version": auralis_version(repo_root),
-        "sox_ng_version": sox_ng_version(sox_executable),
+        "auralis_version": auralis_version_text,
+        "sox_ng_version": sox_version_text,
         "config": {
             "repo_root": str(repo_root),
             "output_dir": str(output_dir),
@@ -266,11 +296,75 @@ def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             "warmups": args.warmups,
             "auralis_binary": str(auralis_bin),
             "build_command": list(RELEASE_BUILD_COMMAND),
+            "resume_enabled": bool(args.resume),
         },
         "cases": case_reports,
         "summary": build_report_summary(case_reports),
     }
     return report
+
+
+def load_resume_cases(
+    report_path: Path,
+    *,
+    repo_root: Path,
+    output_dir: Path,
+    input_path: Path,
+    duration_seconds: int,
+    sample_rate: int,
+    iterations: int,
+    warmups: int,
+    auralis_version_text: str,
+    sox_version_text: str,
+    selected_effects: set[str],
+) -> dict[str, dict[str, Any]]:
+    """Reuse successful cases from a config-compatible prior report."""
+
+    if not report_path.is_file():
+        return {}
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("schema") != BENCHMARK_REPORT_SCHEMA:
+        raise ValueError(f"cannot resume from incompatible report schema: {report_path}")
+    if report.get("auralis_version") != auralis_version_text:
+        raise ValueError(
+            "cannot resume benchmark report with a different Auralis version; rerun without --resume"
+        )
+    if report.get("sox_ng_version") != sox_version_text:
+        raise ValueError(
+            "cannot resume benchmark report with a different SoX-ng version; rerun without --resume"
+        )
+
+    config = report.get("config", {})
+    expected_config = {
+        "repo_root": str(repo_root),
+        "output_dir": str(output_dir),
+        "input_path": str(input_path),
+        "sample_rate": sample_rate,
+        "duration_seconds": duration_seconds,
+        "iterations": iterations,
+        "warmups": warmups,
+    }
+    for key, expected in expected_config.items():
+        if config.get(key) != expected:
+            raise ValueError(
+                f"cannot resume benchmark report with different {key}: {config.get(key)!r} != {expected!r}"
+            )
+
+    resumed_cases: dict[str, dict[str, Any]] = {}
+    for case in report.get("cases", []):
+        if case.get("status") != "ok":
+            continue
+        effect_name = case.get("effect_name")
+        case_id = case.get("case_id")
+        if not isinstance(effect_name, str) or not isinstance(case_id, str):
+            continue
+        if effect_name not in selected_effects:
+            continue
+        resumed_case = dict(case)
+        resumed_case["result_source"] = "reused"
+        resumed_cases[case_id] = resumed_case
+    return resumed_cases
 
 
 def benchmark_case(
@@ -358,6 +452,7 @@ def benchmark_case(
         "backend_mode": case.backend_mode.value,
         "token_source": case.token_source,
         "status": "ok",
+        "result_source": "measured",
         "runs": runs,
         "comparisons": build_comparisons(runs),
     }
@@ -591,6 +686,7 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
         "ok_cases": 0,
         "failed_cases": 0,
         "preparation_failed_cases": 0,
+        "reused_cases": 0,
         "scalar_faster_than_sox_ng": 0,
         "scalar_slower_than_sox_ng": 0,
         "scalar_equal_to_sox_ng": 0,
@@ -609,6 +705,8 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
         status = case.get("status")
         if status == "ok":
             summary["ok_cases"] += 1
+            if case.get("result_source") == "reused":
+                summary["reused_cases"] += 1
         elif status == "preparation_failed":
             summary["failed_cases"] += 1
             summary["preparation_failed_cases"] += 1
@@ -704,6 +802,7 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- Input: {report['config']['duration_seconds']}s @ {report['config']['sample_rate']} Hz",
         f"- Iterations: {report['config']['iterations']} measured, {report['config']['warmups']} warmup",
         f"- Cases: {summary['ok_cases']}/{summary['total_cases']} completed successfully",
+        f"- Reused completed cases: {summary['reused_cases']}",
         f"- Scalar vs SoX-ng: {summary['scalar_faster_than_sox_ng']} faster, {summary['scalar_slower_than_sox_ng']} slower, {summary['scalar_equal_to_sox_ng']} equal",
         f"- SIMD vs SoX-ng: {summary['simd_faster_than_sox_ng']} faster, {summary['simd_slower_than_sox_ng']} slower, {summary['simd_equal_to_sox_ng']} equal, {summary['simd_not_applicable_cases']} not applicable",
         "",

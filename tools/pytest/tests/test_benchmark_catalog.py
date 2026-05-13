@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from auralis_testkit.benchmarks import (
     BackendMode,
     benchmark_case_catalog,
     build_report_summary,
+    load_resume_cases,
     render_markdown_report,
     supported_effect_names,
 )
@@ -52,6 +54,7 @@ def test_render_markdown_report_smoke() -> None:
                 "effect_name": "gain",
                 "backend_mode": "scalar_and_simd",
                 "status": "ok",
+                "result_source": "reused",
                 "runs": {
                     "sox_ng": {"status": "ok", "summary": {"median_ms": 11.0}},
                     "auralis_scalar": {"status": "ok", "summary": {"median_ms": 8.0}},
@@ -71,6 +74,7 @@ def test_render_markdown_report_smoke() -> None:
 
     assert "SoX-ng Benchmark Report" in markdown
     assert "- Cases: 1/1 completed successfully" in markdown
+    assert "- Reused completed cases: 1" in markdown
     assert "- Scalar vs SoX-ng: 1 faster, 0 slower, 0 equal" in markdown
     assert "- Best SIMD speedup vs SoX-ng: gain (2.198x, ratio 0.455)" in markdown
     assert "| gain | scalar_and_simd | 11.0 | 8.0 | 5.0 | 0.727 | 0.455 | 0.625 |" in markdown
@@ -83,6 +87,7 @@ def test_build_report_summary_counts_faster_slower_and_na() -> None:
             "effect_name": "gain",
             "backend_mode": "scalar_and_simd",
             "status": "ok",
+            "result_source": "reused",
             "runs": {
                 "auralis_simd": {"status": "ok", "summary": {"median_ms": 5.0}},
             },
@@ -121,6 +126,7 @@ def test_build_report_summary_counts_faster_slower_and_na() -> None:
     assert summary["ok_cases"] == 2
     assert summary["failed_cases"] == 1
     assert summary["preparation_failed_cases"] == 1
+    assert summary["reused_cases"] == 1
     assert summary["scalar_faster_than_sox_ng"] == 1
     assert summary["scalar_slower_than_sox_ng"] == 1
     assert summary["scalar_equal_to_sox_ng"] == 0
@@ -138,3 +144,95 @@ def test_build_report_summary_counts_faster_slower_and_na() -> None:
         "median_ratio": 0.455,
         "speedup": 2.198,
     }
+
+
+def test_load_resume_cases_reuses_matching_successes_only(tmp_path: Path) -> None:
+    output_dir = tmp_path / "bench"
+    output_dir.mkdir()
+    input_path = output_dir / "benchmark_input.wav"
+    report_path = output_dir / "report.json"
+    report = {
+        "schema": "auralis.sox_ng.benchmark.v1",
+        "auralis_version": "0.7.0",
+        "sox_ng_version": "sox_ng 14.4.3",
+        "config": {
+            "repo_root": str(REPO_ROOT),
+            "output_dir": str(output_dir),
+            "input_path": str(input_path),
+            "sample_rate": 48_000,
+            "duration_seconds": 90,
+            "iterations": 5,
+            "warmups": 1,
+        },
+        "cases": [
+            {"case_id": "gain", "effect_name": "gain", "status": "ok"},
+            {"case_id": "chorus", "effect_name": "chorus", "status": "failed"},
+            {"case_id": "trim", "effect_name": "trim", "status": "ok"},
+        ],
+    }
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    resumed = load_resume_cases(
+        report_path,
+        repo_root=REPO_ROOT,
+        output_dir=output_dir,
+        input_path=input_path,
+        duration_seconds=90,
+        sample_rate=48_000,
+        iterations=5,
+        warmups=1,
+        auralis_version_text="0.7.0",
+        sox_version_text="sox_ng 14.4.3",
+        selected_effects={"gain", "chorus"},
+    )
+
+    assert resumed == {
+        "gain": {
+            "case_id": "gain",
+            "effect_name": "gain",
+            "status": "ok",
+            "result_source": "reused",
+        }
+    }
+
+
+def test_load_resume_cases_rejects_mismatched_config(tmp_path: Path) -> None:
+    output_dir = tmp_path / "bench"
+    output_dir.mkdir()
+    input_path = output_dir / "benchmark_input.wav"
+    report_path = output_dir / "report.json"
+    report = {
+        "schema": "auralis.sox_ng.benchmark.v1",
+        "auralis_version": "0.7.0",
+        "sox_ng_version": "sox_ng 14.4.3",
+        "config": {
+            "repo_root": str(REPO_ROOT),
+            "output_dir": str(output_dir),
+            "input_path": str(input_path),
+            "sample_rate": 44_100,
+            "duration_seconds": 90,
+            "iterations": 5,
+            "warmups": 1,
+        },
+        "cases": [],
+    }
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    try:
+        load_resume_cases(
+            report_path,
+            repo_root=REPO_ROOT,
+            output_dir=output_dir,
+            input_path=input_path,
+            duration_seconds=90,
+            sample_rate=48_000,
+            iterations=5,
+            warmups=1,
+            auralis_version_text="0.7.0",
+            sox_version_text="sox_ng 14.4.3",
+            selected_effects={"gain"},
+        )
+    except ValueError as error:
+        assert "sample_rate" in str(error)
+    else:
+        raise AssertionError("expected mismatched resume config to be rejected")
