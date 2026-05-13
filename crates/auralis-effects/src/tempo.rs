@@ -314,6 +314,7 @@ impl TempoState {
 struct TempoMachine<'state> {
     state: &'state TempoState,
     input_fifo: Vec<f32>,
+    input_start: usize,
     output_fifo: Vec<f32>,
     overlap_buf: Vec<f32>,
     segments_total: u64,
@@ -326,6 +327,7 @@ impl<'state> TempoMachine<'state> {
         Self {
             state,
             input_fifo,
+            input_start: 0,
             output_fifo: Vec::new(),
             overlap_buf: vec![0.0; state.overlap * state.channels],
             segments_total: 0,
@@ -375,7 +377,7 @@ impl<'state> TempoMachine<'state> {
     }
 
     fn input_frames(&self) -> usize {
-        self.input_fifo.len() / self.state.channels
+        self.input_len() / self.state.channels
     }
 
     fn best_overlap_position(&self) -> Result<usize> {
@@ -445,10 +447,8 @@ impl<'state> TempoMachine<'state> {
             .state
             .wide_to_flat(self.state.overlap)
             .map_err(|_| EffectError::TempoLengthOverflow)?;
-        let input = self
-            .input_fifo
-            .get(start..start + length)
-            .ok_or(EffectError::TempoLengthOverflow)?;
+        let input_range = self.input_bounds(start, length)?;
+        let input = &self.input_fifo[input_range];
         Ok(input
             .iter()
             .zip(&self.overlap_buf)
@@ -462,10 +462,8 @@ impl<'state> TempoMachine<'state> {
     fn copy_overlap_to_output(&mut self, offset: usize) -> Result<()> {
         let start = self.state.wide_to_flat(offset)?;
         let length = self.state.wide_to_flat(self.state.overlap)?;
-        let chunk = self
-            .input_fifo
-            .get(start..start + length)
-            .ok_or(EffectError::TempoLengthOverflow)?;
+        let chunk_range = self.input_bounds(start, length)?;
+        let chunk = &self.input_fifo[chunk_range];
         self.output_fifo.extend(chunk.iter().copied().map(clip));
         Ok(())
     }
@@ -477,10 +475,8 @@ impl<'state> TempoMachine<'state> {
     fn overlap_to_output(&mut self, offset: usize) -> Result<()> {
         let start = self.state.wide_to_flat(offset)?;
         let length = self.state.wide_to_flat(self.state.overlap)?;
-        let input = self
-            .input_fifo
-            .get(start..start + length)
-            .ok_or(EffectError::TempoLengthOverflow)?;
+        let input_range = self.input_bounds(start, length)?;
+        let input = &self.input_fifo[input_range];
         let fade_step = 1.0_f32 / self.state.overlap as f32;
         for frame in 0..self.state.overlap {
             let fade_in = fade_step * frame as f32;
@@ -505,10 +501,8 @@ impl<'state> TempoMachine<'state> {
             .ok_or(EffectError::TempoLengthOverflow)?;
         let start = self.state.wide_to_flat(middle_start)?;
         let length = self.state.wide_to_flat(middle_frames)?;
-        let chunk = self
-            .input_fifo
-            .get(start..start + length)
-            .ok_or(EffectError::TempoLengthOverflow)?;
+        let chunk_range = self.input_bounds(start, length)?;
+        let chunk = &self.input_fifo[chunk_range];
         self.output_fifo.extend(chunk.iter().copied().map(clip));
         Ok(())
     }
@@ -519,11 +513,9 @@ impl<'state> TempoMachine<'state> {
             .ok_or(EffectError::TempoLengthOverflow)?;
         let start = self.state.wide_to_flat(overlap_start)?;
         let length = self.state.wide_to_flat(self.state.overlap)?;
-        self.overlap_buf.copy_from_slice(
-            self.input_fifo
-                .get(start..start + length)
-                .ok_or(EffectError::TempoLengthOverflow)?,
-        );
+        let input_range = self.input_bounds(start, length)?;
+        let input = &self.input_fifo[input_range];
+        self.overlap_buf.copy_from_slice(input);
         Ok(())
     }
 
@@ -546,11 +538,38 @@ impl<'state> TempoMachine<'state> {
         let skip_samples = self
             .state
             .wide_to_flat(usize::try_from(skip).map_err(|_| EffectError::TempoLengthOverflow)?)?;
-        if skip_samples > self.input_fifo.len() {
+        if skip_samples > self.input_len() {
             return Err(EffectError::TempoLengthOverflow);
         }
-        self.input_fifo.drain(..skip_samples);
+        self.input_start += skip_samples;
+        self.compact_input_if_needed();
         Ok(())
+    }
+
+    fn input_len(&self) -> usize {
+        self.input_fifo.len() - self.input_start
+    }
+
+    fn input_bounds(&self, start: usize, length: usize) -> Result<std::ops::Range<usize>> {
+        let absolute_start = self
+            .input_start
+            .checked_add(start)
+            .ok_or(EffectError::TempoLengthOverflow)?;
+        let absolute_end = absolute_start
+            .checked_add(length)
+            .ok_or(EffectError::TempoLengthOverflow)?;
+        if absolute_end <= self.input_fifo.len() {
+            Ok(absolute_start..absolute_end)
+        } else {
+            Err(EffectError::TempoLengthOverflow)
+        }
+    }
+
+    fn compact_input_if_needed(&mut self) {
+        if self.input_start > self.input_fifo.len() / 2 {
+            self.input_fifo.drain(..self.input_start);
+            self.input_start = 0;
+        }
     }
 }
 
