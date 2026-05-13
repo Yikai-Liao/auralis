@@ -75,6 +75,7 @@ dependencies = [
  "auralis-codec",
  "auralis-core",
  "auralis-effects",
+ "auralis-flac",
  "auralis-raw",
  "auralis-simd",
  "auralis-wav",
@@ -134,6 +135,16 @@ dependencies = [
  "auralis-testkit",
  "proptest",
  "rustfft",
+ "thiserror",
+]
+
+[[package]]
+name = "auralis-flac"
+version = "0.0.0"
+dependencies = [
+ "auralis-codec",
+ "auralis-core",
+ "claxon",
  "thiserror",
 ]
 
@@ -240,6 +251,12 @@ name = "clap_lex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
+
+[[package]]
+name = "claxon"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bfbf56724aa9eca8afa4fcfadeb479e722935bb2a0900c2d37e0cc477af0688"
 
 [[package]]
 name = "colorchoice"

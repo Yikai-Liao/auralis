@@ -16,9 +16,10 @@ simd = ["auralis-effects/simd", "auralis-simd/simd", "auralis-wav/simd"]
 
 [dependencies]
 auralis-aiff = { path = "../auralis-aiff" }
-auralis-codec = { path = "../auralis-codec" }
+auralis-codec = { path = "../auralis-codec", features = ["auralis-flac", "auralis-wav"] }
 auralis-core = { path = "../auralis-core" }
 auralis-effects = { path = "../auralis-effects" }
+auralis-flac = { path = "../auralis-flac" }
 auralis-raw = { path = "../auralis-raw" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
 auralis-wav = { path = "../auralis-wav" }

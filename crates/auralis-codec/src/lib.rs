@@ -684,19 +684,17 @@ pub struct CodecCapabilities {
 }
 
 impl CodecCapabilities {
-    /// Returns the active-build capabilities for `kind`.
-    ///
-    /// WAV is reported as readable and writable only when the `auralis-wav`
-    /// feature is enabled. Placeholder formats remain unsupported so callers
-    /// can surface typed errors before a concrete codec exists.
+    /// Returns active-build read/write capabilities for `kind`.
     #[must_use]
     pub const fn for_kind(kind: CodecKind) -> Self {
-        let supported = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav");
+        let can_read = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav")
+            || matches!(kind, CodecKind::Flac) && cfg!(feature = "auralis-flac");
+        let can_write = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav");
 
         Self {
             kind,
-            can_read: supported,
-            can_write: supported,
+            can_read,
+            can_write,
         }
     }
 
@@ -906,10 +904,9 @@ mod tests {
 
     #[test]
     fn placeholder_formats_are_not_supported() {
-        for kind in [CodecKind::Flac, CodecKind::Mp3] {
+        for kind in [CodecKind::RawPcm, CodecKind::Aiff, CodecKind::Mp3] {
             let capabilities = CodecCapabilities::for_kind(kind);
 
-            assert_eq!(capabilities.kind(), kind);
             assert!(!capabilities.can_read());
             assert!(!capabilities.can_write());
         }
@@ -919,9 +916,15 @@ mod tests {
     fn wav_capability_tracks_feature_flag() {
         let capabilities = CodecCapabilities::for_kind(CodecKind::Wav);
 
-        assert_eq!(capabilities.kind(), CodecKind::Wav);
         assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-wav"));
         assert_eq!(capabilities.can_write(), cfg!(feature = "auralis-wav"));
+    }
+
+    #[test]
+    fn flac_capability_tracks_decode_feature_flag() {
+        let capabilities = CodecCapabilities::for_kind(CodecKind::Flac);
+        assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-flac"));
+        assert!(!capabilities.can_write());
     }
 
     #[test]

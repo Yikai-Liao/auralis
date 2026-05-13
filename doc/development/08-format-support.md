@@ -65,7 +65,7 @@ Implementation notes:
 | WAV | `hound` through `auralis-wav` / `auralis-codec` adapters plus Auralis-owned float64, G.711, and RIFX adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path; RIFX and non-`hound` formats use narrow in-tree adapters. | Pure Rust crate plus Auralis-owned parsing/writing; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, float32, float64, u-law, A-law, and RIFF/RIFX container byte orders at the Auralis boundary. | RIFF/RIFX metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
 | RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
 | AIFF / AIFC | `aifc` behind Auralis-owned adapter types | feature-gated pure Rust | `aifc 0.7.0` is MIT OR Apache-2.0, targets Rust 1.87, and has focused AIFF/AIFC tests including the Toisto AIFF suite; keep its concrete types out of public Auralis APIs. | Pure Rust with no libsndfile or native wrapper path; its transitive codec helper is Rust-only and used by the backend for compressed AIFC support. | Plain AIFF signed-integer PCM plus selected AIFC little-endian integer, float, and G.711 encodings are implemented; IMA ADPCM remains deferred. | Chunk metadata stays behind the adapter and is not exposed yet; parser risk is covered by focused AIFF/AIFC round-trip/error tests plus the existing layered coverage gate. |
-| FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
+| FLAC | `claxon` for decode, pure Rust encoder candidate such as `flacenc` after a later encode audit | experimental pure Rust | `claxon 0.4.3` is Apache-2.0, pure Rust, and mature but older; it is acceptable behind the Auralis adapter for decode because its concrete types do not leak into public APIs. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | FLAC decode currently materializes complete integer streams into planar f32, supports the streaminfo channel/sample-rate constraints representable by Auralis, and accepts 4- through 32-bit integer samples; encode remains separate. | FLAC metadata stays private to the adapter for now; parser risk is covered by a small fixture, malformed-input coverage, and layered coverage metadata, while broader malformed-stream fuzzing remains future work. |
 | MP3 | none selected | not planned | No credible pure Rust encoder is selected today, and adding one is outside the current roadmap. | Native-backed paths such as LAME are outside policy. | Lossy psychoacoustic streaming complexity is intentionally out of scope for the initial format roadmap. | Security and metadata considerations are deferred because no backend is being considered in this phase. |
 | Ogg Vorbis | none selected | not planned | No credible pure Rust encoder/muxer combination is selected today. | libvorbis and other native wrapper paths are outside policy. | Streaming container plus codec complexity is out of scope until a future policy change or strong pure Rust backend appears. | Ogg page parsing and Vorbis comment handling are deferred with the format itself. |
 | Ogg Opus | none selected | not planned | No credible pure Rust Opus encoder plus Ogg muxing path is selected today. | `libopusenc` and wrapper paths are outside policy. | Real support would require both codec and container decisions, which are intentionally postponed. | Ogg/Opus parser and metadata risks are deferred with the format itself. |
@@ -127,7 +127,7 @@ Implementation notes:
 | WAV | `hound` behind Auralis adapter | built-in | default output format |
 | RAW PCM | Auralis-owned sample layout and endian conversion | built-in | small boundary; not a complex codec |
 | AIFF / AIFC | `aifc` behind Auralis adapter types | feature-gated pure Rust | plain AIFF signed-integer PCM plus AIFC little-endian integer, float, and G.711 encodings are implemented |
-| FLAC | pure Rust encoder candidate, such as `flacenc`, after audit | experimental pure Rust | no libFLAC wrapper under current policy |
+| FLAC | `claxon` decode plus pure Rust encoder candidate, such as `flacenc`, after audit | experimental pure Rust | decode implemented; encode still has no libFLAC wrapper under current policy |
 | MP3 | pure Rust encoder only if a credible backend is selected | not planned | no LAME wrapper |
 | Ogg Vorbis | pure Rust encoder only if a credible backend is selected | not planned | no libvorbis wrapper |
 | Ogg Opus | pure Rust encoder and Ogg muxing only if credible backends are selected | not planned | no libopusenc wrapper |
@@ -568,8 +568,39 @@ Implementation notes:
 
 ### Feature 8.4.1: FLAC decode
 
+Status: completed.
+
 Select a pure Rust FLAC decoder backend. Native libFLAC wrappers are not planned
 under the current policy.
+
+Acceptance tests:
+
+- `claxon 0.4.3` is selected as the pure Rust FLAC decoder and recorded in the
+  backend audit with its Apache-2.0 license, older maintenance profile, no
+  native dependencies, integer sample support, metadata boundary, and parser
+  risk notes;
+- `auralis-flac` decodes supported integer FLAC streams into the shared planar
+  `f32` buffer model and returns typed diagnostics for malformed input,
+  invalid shape metadata, and unsupported bit depths;
+- `AudioFile::open_flac` opens FLAC input into the high-level pipeline without
+  changing `AudioFile::open_wav` or FLAC export behavior;
+- FLAC export remains a typed unsupported `OutputFormat::Flac` path until
+  Feature 8.4.2;
+- README, status, development docs, and layered coverage metadata record FLAC
+  decode as complete and point the next unchecked leaf to FLAC encode.
+
+Implementation notes:
+
+- `auralis-flac` adapts `claxon` behind Auralis-owned errors and returns
+  `AudioBuffer` values. It materializes decoded streams today rather than
+  exposing a streaming reader contract.
+- FLAC integer samples normalize by `2^(bits_per_sample - 1)`, matching the
+  existing WAV PCM decode convention. The current adapter accepts 4- through
+  32-bit integer FLAC streams because `claxon` yields decoded samples as `i32`.
+- The locally installed SoX-ng has no FLAC format handler, so direct SoX-ng
+  FLAC decode comparison is not applicable in this environment; the checked
+  tests instead lock a tiny deterministic FLAC fixture and the high-level
+  pipeline path.
 
 ### Feature 8.4.2: FLAC encode
 

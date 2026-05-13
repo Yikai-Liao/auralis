@@ -8,8 +8,9 @@ use crate::{
 
 /// Decoded audio file ready to enter an effect pipeline.
 ///
-/// `AudioFile` currently supports linear PCM8, PCM16, and PCM24 WAV input. Decoding
-/// always uses Auralis' internal planar `f32` [`AudioBuffer`] representation.
+/// `AudioFile` supports the checked-in WAV family and FLAC decode paths.
+/// Decoding always uses Auralis' internal planar `f32` [`AudioBuffer`]
+/// representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioFile {
     audio: AudioBuffer,
@@ -47,6 +48,20 @@ impl AudioFile {
         Ok(Self {
             audio: auralis_wav::decode_wav_path_with_backend(path, requested_backend)?,
             requested_backend,
+        })
+    }
+
+    /// Opens a supported FLAC file and decodes it into planar `f32` samples.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Flac`] when the path cannot be opened, the input
+    /// is not a well-formed FLAC stream, or the sample format is outside the
+    /// supported integer range.
+    pub fn open_flac(path: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self {
+            audio: auralis_flac::decode_flac_path(path)?,
+            requested_backend: BackendKind::Scalar,
         })
     }
 

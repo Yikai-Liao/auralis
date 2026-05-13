@@ -16,6 +16,10 @@ pub enum Error {
     #[error(transparent)]
     Wav(#[from] auralis_wav::WavError),
 
+    /// FLAC decoding failed.
+    #[error(transparent)]
+    Flac(#[from] auralis_flac::FlacError),
+
     /// Generic codec dispatch or unsupported-format failure.
     #[error(transparent)]
     Codec(#[from] auralis_codec::CodecError),
@@ -58,6 +62,7 @@ impl PartialEq for Error {
         match (self, other) {
             (Self::Core(left), Self::Core(right)) => left == right,
             (Self::Wav(left), Self::Wav(right)) => left == right,
+            (Self::Flac(left), Self::Flac(right)) => left == right,
             (Self::Codec(left), Self::Codec(right)) => left == right,
             (Self::Effect(left), Self::Effect(right)) => left == right,
             (Self::Chain(left), Self::Chain(right)) => left == right,

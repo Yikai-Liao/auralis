@@ -1,6 +1,6 @@
 [package]
-name = "auralis-codec"
-description = "Codec trait boundaries for Auralis."
+name = "auralis-flac"
+description = "FLAC decoder implementation for Auralis."
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,13 +10,10 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
-[features]
-default = []
-auralis-flac = []
-auralis-wav = []
-
 [dependencies]
+auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
+claxon.workspace = true
 thiserror.workspace = true
 
 [lints]

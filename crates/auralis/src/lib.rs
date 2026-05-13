@@ -45,6 +45,7 @@ pub use auralis_effects::{
     EffectsFileParseError, EffectsFileReadError, parse_effect_chain, parse_effects_file,
     parse_effects_file_str,
 };
+pub use auralis_flac::FlacError;
 pub use auralis_simd::BackendKind;
 
 pub use audio_file::AudioFile;

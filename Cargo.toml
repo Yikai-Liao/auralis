@@ -7,6 +7,7 @@ members = [
     "crates/auralis-core",
     "crates/auralis-dsp",
     "crates/auralis-effects",
+    "crates/auralis-flac",
     "crates/auralis-fuzz-targets",
     "crates/auralis-raw",
     "crates/auralis-simd",
@@ -24,6 +25,7 @@ version = "0.0.0"
 
 [workspace.dependencies]
 aifc = "0.7.0"
+claxon = "0.4.3"
 clap = "4.5.53"
 hound = "3.5.1"
 serde = { version = "1.0.228", features = ["derive"] }

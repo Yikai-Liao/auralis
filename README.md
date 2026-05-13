@@ -8,7 +8,8 @@ line effects while rebuilding the core around deterministic behavior, typed
 Rust APIs, explicit test contracts, and maintainable modules.
 
 Initial scope is deliberately narrow: **WAV first**, with PCM8, PCM16, PCM24,
-PCM32, float32, float64, u-law, A-law, and RIFX currently implemented.
+PCM32, float32, float64, u-law, A-law, and RIFX currently implemented. Raw PCM,
+AIFF/AIFC, and FLAC are growing behind Auralis-owned pure Rust adapters.
 Additional formats are planned only after effect and pipeline behavior are broad
 and stable, and new codec backends must stay pure Rust unless a later
 development-plan change says otherwise.
@@ -17,9 +18,10 @@ development-plan change says otherwise.
 
 Auralis is pre-alpha. The repository already contains:
 
-- a Rust workspace with `auralis`, `auralis-aiff`, `auralis-core`,
-  `auralis-wav`, `auralis-raw`, `auralis-dsp`, `auralis-effects`, `auralis-simd`,
-  `auralis-testkit`, and `auralis-cli` crates;
+- a Rust workspace with `auralis`, `auralis-aiff`, `auralis-flac`,
+  `auralis-core`, `auralis-wav`, `auralis-raw`, `auralis-dsp`,
+  `auralis-effects`, `auralis-simd`, `auralis-testkit`, and `auralis-cli`
+  crates;
 - PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law WAV decode plus RIFX
   container decode, PCM16 legacy output, and
   PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law RIFF or RIFX output through
@@ -44,8 +46,8 @@ Auralis is pre-alpha. The repository already contains:
   raw byte-order, bit-order, and nibble-order options through an
   Auralis-owned adapter, plain AIFF signed-integer PCM plus AIFC little-endian
   integer, float32/float64, and G.711 u-law/A-law decode/export through the
-  pure Rust `aifc` adapter, and typed unsupported-format errors for future FLAC
-  leaves.
+  pure Rust `aifc` adapter, FLAC decode through the pure Rust `claxon`
+  adapter, and typed unsupported-format errors for future FLAC export.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

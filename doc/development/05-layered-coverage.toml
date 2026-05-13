@@ -1220,3 +1220,18 @@ l4 = { status = "not_applicable", reason = "The current AIFF PCM feature is dete
 l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
 l6 = { status = "not_applicable", reason = "AIFF/AIFC conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "AIFF output options are typed Rust values today; no CLI parser or fuzz target consumes serialized AIFF option text.", tests = [] }
+
+[[subject]]
+id = "primitive.flac_decoder"
+kind = "primitive"
+name = "flac-decoder"
+summary = "FLAC decode boundary through the pure Rust claxon adapter."
+[subject.layers]
+l0 = { status = "covered", reason = "FLAC decode tests embed a tiny deterministic FLAC fixture and verify decoded metadata plus normalized sample values.", tests = ["crates/auralis-flac/tests/decode.rs"] }
+l1 = { status = "covered", reason = "FLAC codec tests cover in-memory and path decode into planar f32 buffers, and high-level pipeline tests cover AudioFile::open_flac followed by WAV output dispatch.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
+l2 = { status = "not_applicable", reason = "The locally installed SoX-ng has no FLAC format handler, so direct FLAC decode comparison cannot be used as a gate for this leaf.", tests = [] }
+l3 = { status = "covered", reason = "Analytical codec-boundary tests cover streaminfo sample rate, channel count, frame count, integer normalization, malformed-input diagnostics, and pipeline metadata.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
+l4 = { status = "not_applicable", reason = "FLAC decode is deterministic parsing and sample normalization rather than a sample-processing property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current adapter materializes a full buffer and does not expose streaming decoder state.", tests = [] }
+l6 = { status = "not_applicable", reason = "FLAC decode is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "not_applicable", reason = "FLAC input fuzzing is not yet wired into the shared fuzz target set; malformed-input smoke coverage exists in unit tests.", tests = [] }
