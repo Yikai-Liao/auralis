@@ -252,6 +252,9 @@ impl Fir {
         if coefficients.is_empty() {
             return Ok(audio.clone());
         }
+        if backend == FirBackend::Direct && coefficients.len() <= 2 {
+            return process_short_direct_fir(audio, coefficients.as_slice());
+        }
 
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
@@ -306,6 +309,56 @@ impl Fir {
             FirCoefficientSource::Stdin => Err(EffectError::InvalidFirCoefficients),
         }
     }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "FIR coefficients are cached as f32 in the DSP direct path; this mirrors that sample-domain precision"
+)]
+fn process_short_direct_fir(audio: &AudioBuffer, coefficients: &[f64]) -> Result<AudioBuffer> {
+    let frames =
+        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+    let mut planar = vec![0.0; audio.as_planar_f32().len()];
+    let coefficients = coefficients
+        .iter()
+        .map(|coefficient| *coefficient as f32)
+        .collect::<Vec<_>>();
+
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let start = channel_index
+            .checked_mul(frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let output = planar
+            .get_mut(start..start + frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+
+        match coefficients.as_slice() {
+            [coefficient] => {
+                for (sample, &input) in output.iter_mut().zip(channel) {
+                    *sample = input * coefficient;
+                }
+            }
+            [current, previous] => {
+                if let Some((first_output, remaining_output)) = output.split_first_mut()
+                    && let Some((&first_input, remaining_input)) = channel.split_first()
+                {
+                    *first_output = first_input * current;
+                    let mut previous_input = first_input;
+                    for (sample, &input) in remaining_output.iter_mut().zip(remaining_input) {
+                        *sample = input.mul_add(*current, previous_input * previous);
+                        previous_input = input;
+                    }
+                }
+            }
+            _ => unreachable!("short direct FIR is only called for one or two coefficients"),
+        }
+    }
+
+    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), planar)
+        .map_err(|_| EffectError::FirLengthOverflow)
 }
 
 /// Stateful scalar FIR processor for one mono sample stream.
