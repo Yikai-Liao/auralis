@@ -36,7 +36,7 @@ pub use dither::{
     DEFAULT_DITHER_SEED, Dither, DitherError, DitherMode, DitherNoiseShape, DitherResult,
     DitherState,
 };
-pub use fir::{FirCoefficients, FirError, FirResult, FirState};
+pub use fir::{DftFir, FirCoefficients, FirError, FirResult, FirState};
 
 /// Applies constant gain to each sample in place.
 ///
