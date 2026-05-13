@@ -40,7 +40,8 @@ The current order is:
    after the completed pure-Rust codec backend policy record in Feature 8.0.1
    and the completed encoder/output-format boundary in Feature 8.0.2. Feature
    8.5.1 AU/SND is now complete, and Feature 8.6.1 external `ffmpeg` backend
-   is closed as not planned under the pure-Rust codec policy.
+   plus Feature 8.6.2 native codec wrapper backends are closed as not planned
+   under the pure-Rust codec policy.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.

@@ -715,10 +715,32 @@ Implementation notes:
 
 ### Feature 8.6.2: native codec wrapper backends
 
-Status: not planned.
+Status: closed as not planned.
 
 Native wrappers for libFLAC, LAME, libvorbis, libopusenc, FDK-AAC, FFmpeg, or
 similar codec libraries are outside the current pure Rust policy.
+
+Acceptance notes:
+
+- no native codec wrapper crate is added to the workspace or exposed through
+  `auralis-codec`, `auralis-core`, `auralis`, or `auralis-cli`;
+- existing pure Rust adapters remain the only implemented format backends, and
+  formats that would require native codec libraries stay unsupported or
+  explicitly not planned under the current roadmap;
+- README, status, and development docs record this as a deliberate policy
+  closure and identify Python packaging as the next milestone section, gated by
+  its documented preconditions rather than selected as immediate implementation
+  work.
+
+Implementation notes:
+
+- The current codec boundary already covers WAV, raw PCM, AIFF/AIFC, FLAC, and
+  AU/SND through Auralis-owned option and adapter types. Adding native wrappers
+  would introduce system-library availability, ABI, licensing, and deployment
+  drift that conflict with the pure-Rust backend policy recorded in Feature
+  8.0.1.
+- This feature is a classification closure rather than implementation work, so
+  there is no scalar/SIMD backend and no SoX-ng golden comparison to add.
 
 ## Format acceptance tests
 

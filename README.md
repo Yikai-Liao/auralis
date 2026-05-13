@@ -39,8 +39,7 @@ Auralis is pre-alpha. The repository already contains:
 - an 8.0 codec-backend policy that keeps WAV and future format work behind
   Auralis-owned adapters, classifies AIFF/AIFC as optional pure Rust adapter
   work, FLAC as experimental pure Rust adapter work, closes external `ffmpeg`
-  backends as not planned, and keeps native codec wrappers outside the current
-  roadmap;
+  backends and native codec wrappers as not planned under the current roadmap;
 - an Auralis-owned output-format boundary with `OutputFormat`,
   per-format encode option types, `AudioEncoder`/`EncodeSummary`, a WAV encoder
   adapter, raw signed/unsigned integer and float PCM export with explicit
