@@ -116,6 +116,9 @@ fn apply_buffer_command(
         }
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio)?,
         EffectCommand::Channels(channels) => {
+            if channels.target_channels == audio.channels() {
+                return Ok(true);
+            }
             *audio = channels
                 .process_buffer_with_backend(audio, requested_backend)
                 .map_err(|source| ("channels", source))?;
