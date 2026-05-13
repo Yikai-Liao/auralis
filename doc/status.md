@@ -208,12 +208,12 @@ boundary now also owns `OutputFormat`, per-format encode option models,
 `EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
 into that surface while future RAW PCM, AIFF/AIFC, and FLAC writes return
 typed unsupported-format errors until their individual format leaves land.
-Feature 8.1.1 through Feature 8.1.5 are now complete: generic WAV
-decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, and
-float64, and WAV writes can now target PCM8, PCM16, PCM24, PCM32, float32, or
-float64 through `WavEncodeOptions` while the legacy `write_wav` path stays
-PCM16-only for backward compatibility. The next unchecked 8.x leaf is WAV
-u-law and A-law.
+Feature 8.1.1 through Feature 8.1.6 are now complete: generic WAV
+decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
+u-law, and A-law, and WAV writes can now target PCM8, PCM16, PCM24, PCM32,
+float32, float64, u-law, or A-law through `WavEncodeOptions` while the legacy
+`write_wav` path stays PCM16-only for backward compatibility. The next
+unchecked 8.x leaf is WAV RIFX.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

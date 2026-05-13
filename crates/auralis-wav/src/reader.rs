@@ -11,23 +11,24 @@ use auralis_simd::BackendKind;
 use crate::{
     Result, WavError,
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
-    reader_float64::{decode_wav_bytes_or_hound, is_float64_wav_bytes},
+    reader_float64::is_float64_wav_bytes,
+    reader_g711::{decode_wav_bytes_or_hound, is_g711_wav_bytes},
     sample_conversion::{
         float32_to_f32, pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32,
     },
 };
 
-/// Decodes an entire supported linear PCM WAV stream into a planar `f32`
-/// buffer.
+/// Decodes an entire supported WAV stream into a planar `f32` buffer.
 ///
 /// Currently supported sample formats are PCM8, PCM16, PCM24, PCM32, float32,
-/// and float64. The returned [`AudioSpec`] always uses [`SampleFormat::Float32`]
-/// because that is Auralis' internal processing format.
+/// float64, u-law, and A-law. The returned [`AudioSpec`] always uses
+/// [`SampleFormat::Float32`] because that is Auralis' internal processing
+/// format.
 ///
 /// # Errors
 ///
 /// Returns [`WavError::UnsupportedSampleFormat`] for any WAV stream that is not
-/// PCM8, PCM16, PCM24, PCM32, float32, or float64. Returns
+/// PCM8, PCM16, PCM24, PCM32, float32, float64, u-law, or A-law. Returns
 /// [`WavError::Malformed`] when the RIFF/WAVE container or sample payload
 /// cannot be parsed.
 pub fn decode_wav<R>(reader: R) -> Result<AudioBuffer>
@@ -106,14 +107,25 @@ where
         .map_err(|error| WavError::Malformed {
             message: error.to_string(),
         })?;
-    if is_float64_wav_bytes(&bytes) {
-        return Err(WavError::UnsupportedSampleFormat {
-            bits_per_sample: 64,
-            encoding: crate::WavSampleEncoding::Float,
-        });
+    if is_float64_wav_bytes(&bytes) || is_g711_wav_bytes(&bytes) {
+        return Err(unsupported_specific_format(&bytes));
     }
 
     Pcm16WavReader::new(Cursor::new(bytes))?.read_pcm16_with_backend(requested_backend)
+}
+
+fn unsupported_specific_format(bytes: &[u8]) -> WavError {
+    if is_float64_wav_bytes(bytes) {
+        WavError::UnsupportedSampleFormat {
+            bits_per_sample: 64,
+            encoding: crate::WavSampleEncoding::Float,
+        }
+    } else {
+        WavError::UnsupportedSampleFormat {
+            bits_per_sample: 8,
+            encoding: crate::WavSampleEncoding::Companded,
+        }
+    }
 }
 
 /// Decodes a PCM16 WAV file from disk into a planar `f32` buffer.

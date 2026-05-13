@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufReader, Cursor, Read},
+    io::{BufReader, Read},
     path::Path,
 };
 
@@ -220,16 +220,4 @@ fn parse_float64_header(bytes: &[u8]) -> Result<Float64Header> {
     Err(WavError::Malformed {
         message: "missing data chunk".to_owned(),
     })
-}
-
-pub(crate) fn decode_wav_bytes_or_hound(
-    bytes: &[u8],
-    requested_backend: BackendKind,
-) -> Result<AudioBuffer> {
-    if is_float64_wav_bytes(bytes) {
-        decode_float64_bytes(bytes)
-    } else {
-        crate::reader::AnyPcmWavReader::new(Cursor::new(bytes))?
-            .read_wav_with_backend(requested_backend)
-    }
 }

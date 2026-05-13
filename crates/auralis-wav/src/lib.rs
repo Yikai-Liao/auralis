@@ -1,8 +1,9 @@
 //! WAV codec support for Auralis.
 //!
 //! This crate currently implements deterministic PCM8, PCM16, PCM24, PCM32,
-//! float32, and float64 WAV decoding and encoding between RIFF/WAVE files and
-//! Auralis' internal planar `f32` [`auralis_core::AudioBuffer`].
+//! float32, float64, u-law, and A-law WAV decoding and encoding between
+//! RIFF/WAVE files and Auralis' internal planar `f32`
+//! [`auralis_core::AudioBuffer`].
 //!
 //! # Examples
 //!
@@ -34,12 +35,15 @@
 
 mod error;
 mod format;
+mod g711;
 mod reader;
 mod reader_float64;
+mod reader_g711;
 mod sample_conversion;
 mod writer;
 mod writer_float32;
 mod writer_float64;
+mod writer_g711;
 
 pub use error::{Result, WavError};
 pub use format::WavSampleEncoding;
@@ -56,6 +60,10 @@ pub use reader_float64::{
     decode_float64, decode_float64_path, decode_float64_path_with_backend,
     decode_float64_with_backend,
 };
+pub use reader_g711::{
+    decode_alaw, decode_alaw_path, decode_alaw_path_with_backend, decode_alaw_with_backend,
+    decode_ulaw, decode_ulaw_path, decode_ulaw_path_with_backend, decode_ulaw_with_backend,
+};
 pub use writer::{
     Pcm8WavEncoder, Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter, Pcm24WavEncoder,
     Pcm24WavWriter, Pcm32WavEncoder, Pcm32WavWriter, encode_pcm8, encode_pcm8_path,
@@ -71,4 +79,9 @@ pub use writer_float32::{
 pub use writer_float64::{
     Float64WavEncoder, Float64WavWriter, encode_float64, encode_float64_path,
     encode_float64_path_with_backend, encode_float64_with_backend,
+};
+pub use writer_g711::{
+    ALawWavEncoder, ALawWavWriter, ULawWavEncoder, ULawWavWriter, encode_alaw, encode_alaw_path,
+    encode_alaw_path_with_backend, encode_alaw_with_backend, encode_ulaw, encode_ulaw_path,
+    encode_ulaw_path_with_backend, encode_ulaw_with_backend,
 };

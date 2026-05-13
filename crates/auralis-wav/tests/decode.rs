@@ -5,16 +5,17 @@ use std::{fs, io::Cursor};
 use auralis_codec::{AudioReader, CodecKind};
 use auralis_simd::BackendKind;
 use auralis_wav::{
-    AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_float32, decode_float64,
-    decode_pcm8, decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend, decode_pcm24,
-    decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_wav,
+    AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_alaw, decode_float32,
+    decode_float64, decode_pcm8, decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend,
+    decode_pcm24, decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_ulaw, decode_wav,
 };
 
 mod support;
 
 use support::{
-    assert_audio_bits_eq, wav_bytes, wav_bytes_float32, wav_bytes_float64, wav_bytes_pcm8,
-    wav_bytes_pcm24, wav_bytes_pcm32, wav_bytes_with_bits, write_temp_wav,
+    assert_audio_bits_eq, wav_bytes, wav_bytes_alaw, wav_bytes_float32, wav_bytes_float64,
+    wav_bytes_pcm8, wav_bytes_pcm24, wav_bytes_pcm32, wav_bytes_ulaw, wav_bytes_with_bits,
+    write_temp_wav,
 };
 
 #[test]
@@ -35,6 +36,8 @@ fn generic_decoder_accepts_pcm8_and_pcm16() {
     let pcm32 = decode_wav(Cursor::new(wav_bytes_pcm32(1, &[i32::MIN, i32::MAX]))).unwrap();
     let float32 = decode_wav(Cursor::new(wav_bytes_float32(1, &[-1.25, 0.25]))).unwrap();
     let float64 = decode_wav(Cursor::new(wav_bytes_float64(1, &[-1.5, 0.75]))).unwrap();
+    let ulaw = decode_wav(Cursor::new(wav_bytes_ulaw(1, &[0xff, 0x7f]))).unwrap();
+    let alaw = decode_wav(Cursor::new(wav_bytes_alaw(1, &[0xd5, 0x55]))).unwrap();
 
     assert_eq!(pcm8.channel(0).unwrap(), &[-1.0, 127.0 / 128.0]);
     assert_eq!(
@@ -48,6 +51,8 @@ fn generic_decoder_accepts_pcm8_and_pcm16() {
     assert_eq!(pcm32.channel(0).unwrap(), &[-1.0, 1.0]);
     assert_eq!(float32.channel(0).unwrap(), &[-1.25, 0.25]);
     assert_eq!(float64.channel(0).unwrap(), &[-1.5, 0.75]);
+    assert_eq!(ulaw.channel(0).unwrap(), &[0.0, 0.0]);
+    assert_eq!(alaw.channel(0).unwrap(), &[8.0 / 32768.0, -8.0 / 32768.0]);
 }
 
 #[test]
@@ -130,6 +135,29 @@ fn decodes_mono_float64_to_planar_f32() {
     assert_eq!(audio.spec().channels().as_u16(), 1);
     assert_eq!(audio.frames().as_u64(), 4);
     assert_eq!(audio.channel(0).unwrap(), &[-1.5, 0.0, 0.5, 1.5]);
+}
+
+#[test]
+fn decodes_mono_ulaw_to_planar_f32() {
+    let audio = decode_ulaw(Cursor::new(wav_bytes_ulaw(1, &[0xff, 0xbf, 0x7f]))).unwrap();
+
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 3);
+    assert_eq!(audio.channel(0).unwrap(), &[0.0, 1980.0 / 32768.0, 0.0]);
+}
+
+#[test]
+fn decodes_mono_alaw_to_planar_f32() {
+    let audio = decode_alaw(Cursor::new(wav_bytes_alaw(1, &[0xd5, 0x55, 0xaa]))).unwrap();
+
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 3);
+    assert_eq!(
+        audio.channel(0).unwrap(),
+        &[8.0 / 32768.0, -8.0 / 32768.0, 32256.0 / 32768.0]
+    );
 }
 
 #[test]
@@ -237,6 +265,19 @@ fn pcm16_specific_decoder_rejects_float64_with_typed_error() {
 }
 
 #[test]
+fn pcm16_specific_decoder_rejects_companded_with_typed_error() {
+    let error = decode_pcm16(Cursor::new(wav_bytes_ulaw(1, &[0xff]))).unwrap_err();
+
+    assert_eq!(
+        error,
+        WavError::UnsupportedSampleFormat {
+            bits_per_sample: 8,
+            encoding: WavSampleEncoding::Companded,
+        }
+    );
+}
+
+#[test]
 fn malformed_wav_returns_typed_error() {
     let error = decode_pcm16(Cursor::new(b"not a wav".to_vec())).unwrap_err();
 
@@ -303,6 +344,24 @@ fn path_decoder_accepts_float64() {
     assert_eq!(audio.spec().channels().as_u16(), 2);
     assert_eq!(audio.channel(0).unwrap(), &[-1.5]);
     assert_eq!(audio.channel(1).unwrap(), &[1.5]);
+}
+
+#[test]
+fn path_decoder_accepts_g711() {
+    let ulaw_path = support::temp_path("auralis-wav-path-ulaw", "wav");
+    let alaw_path = support::temp_path("auralis-wav-path-alaw", "wav");
+    fs::write(&ulaw_path, wav_bytes_ulaw(2, &[0xff, 0xbf])).unwrap();
+    fs::write(&alaw_path, wav_bytes_alaw(2, &[0xd5, 0x55])).unwrap();
+
+    let ulaw = auralis_wav::decode_ulaw_path(&ulaw_path).unwrap();
+    let alaw = auralis_wav::decode_alaw_path(&alaw_path).unwrap();
+
+    fs::remove_file(ulaw_path).unwrap();
+    fs::remove_file(alaw_path).unwrap();
+    assert_eq!(ulaw.channel(0).unwrap(), &[0.0]);
+    assert_eq!(ulaw.channel(1).unwrap(), &[1980.0 / 32768.0]);
+    assert_eq!(alaw.channel(0).unwrap(), &[8.0 / 32768.0]);
+    assert_eq!(alaw.channel(1).unwrap(), &[-8.0 / 32768.0]);
 }
 
 #[test]

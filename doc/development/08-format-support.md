@@ -323,6 +323,40 @@ Implementation notes:
 
 ### Feature 8.1.6: WAV u-law and A-law
 
+Status: completed.
+
+Add deterministic WAV u-law and A-law decode and encode support without
+regressing the existing integer and IEEE-float WAV paths.
+
+Acceptance tests:
+
+- `auralis-wav` decodes u-law and A-law WAV bytes and files into the same
+  planar `f32` buffer model used by the other WAV paths;
+- the generic supported-WAV path accepts u-law and A-law while the
+  PCM16-specific path rejects companded WAV with a typed unsupported
+  sample-format diagnostic;
+- `OutputFormat::Wav(WavEncodeOptions::ulaw())` and
+  `OutputFormat::Wav(WavEncodeOptions::alaw())` write G.711 WAV output through
+  the codec boundary while `Pipeline::write_wav` remains the existing PCM16
+  compatibility path;
+- codec-boundary reader/writer tests cover u-law and A-law end to end;
+- README and status/development docs record u-law/A-law as complete and point
+  the next unchecked leaf to WAV RIFX.
+
+Implementation notes:
+
+- `auralis-codec` now extends `WavSampleFormat`/`WavEncodeOptions` with u-law
+  and A-law while keeping PCM16 as the backward-compatible default.
+- `auralis-wav` now supports generic WAV decode for PCM8, PCM16, PCM24,
+  PCM32, float32, float64, u-law, and A-law. u-law and A-law use a small
+  Auralis-owned RIFF/WAVE adapter because the current `hound` backend does not
+  expose WAV format tags 6 or 7.
+- G.711 companding is deterministic scalar format-boundary logic, so SIMD is
+  not applicable for this feature.
+- `auralis::AudioFile::open_wav` and `Pipeline::write(OutputFormat::Wav(...))`
+  now accept u-law and A-law without changing the legacy `write_wav`
+  PCM16-only surface.
+
 ### Feature 8.1.7: WAV RIFX
 
 ## Milestone 8.2: raw formats

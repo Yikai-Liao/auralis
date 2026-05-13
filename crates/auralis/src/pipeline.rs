@@ -459,6 +459,14 @@ impl Pipeline {
                 let encoder = auralis_wav::Float64WavEncoder::new(options, requested_backend);
                 Ok(encoder.encode(&audio, &mut output)?)
             }
+            WavSampleFormat::ULaw => {
+                let encoder = auralis_wav::ULawWavEncoder::new(options, requested_backend);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
+            WavSampleFormat::ALaw => {
+                let encoder = auralis_wav::ALawWavEncoder::new(options, requested_backend);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
             _ => {
                 let encoder = UnsupportedEncoder::new(CodecKind::Wav);
                 Ok(encoder.encode(&audio, &mut output)?)

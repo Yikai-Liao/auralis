@@ -114,7 +114,7 @@ impl fmt::Display for CodecKind {
     }
 }
 
-/// Linear PCM sample format for WAV export.
+/// Sample format for WAV export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WavSampleFormat {
@@ -136,6 +136,12 @@ pub enum WavSampleFormat {
 
     /// 64-bit IEEE floating-point samples.
     Float64,
+
+    /// 8-bit G.711 u-law companded samples.
+    ULaw,
+
+    /// 8-bit G.711 A-law companded samples.
+    ALaw,
 }
 
 /// Auralis-owned options for WAV export.
@@ -185,6 +191,18 @@ impl WavEncodeOptions {
     #[must_use]
     pub const fn float64() -> Self {
         Self::new(WavSampleFormat::Float64)
+    }
+
+    /// Creates WAV encode options for 8-bit G.711 u-law samples.
+    #[must_use]
+    pub const fn ulaw() -> Self {
+        Self::new(WavSampleFormat::ULaw)
+    }
+
+    /// Creates WAV encode options for 8-bit G.711 A-law samples.
+    #[must_use]
+    pub const fn alaw() -> Self {
+        Self::new(WavSampleFormat::ALaw)
     }
 
     /// Returns the configured WAV sample format.

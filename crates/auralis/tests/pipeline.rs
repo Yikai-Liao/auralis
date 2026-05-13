@@ -400,6 +400,35 @@ fn write_output_format_float64_wav_uses_float64_encoder() {
 }
 
 #[test]
+fn write_output_format_g711_wav_uses_g711_encoders() {
+    let source = stereo_audio_buffer(vec![-1.0, 0.0, 0.5, 1.0]);
+    let ulaw_path = support::temp_path("auralis-pipeline-write-wav-ulaw", "wav");
+    let alaw_path = support::temp_path("auralis-pipeline-write-wav-alaw", "wav");
+
+    let ulaw_summary = AudioFile::from_audio_buffer(source.clone())
+        .into_pipeline()
+        .write(&ulaw_path, OutputFormat::Wav(WavEncodeOptions::ulaw()))
+        .unwrap();
+    let alaw_summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&alaw_path, OutputFormat::Wav(WavEncodeOptions::alaw()))
+        .unwrap();
+    let ulaw = auralis_wav::decode_ulaw_path(&ulaw_path).unwrap();
+    let alaw = auralis_wav::decode_alaw_path(&alaw_path).unwrap();
+
+    fs::remove_file(ulaw_path).unwrap();
+    fs::remove_file(alaw_path).unwrap();
+    assert_eq!(ulaw_summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(alaw_summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(ulaw_summary.spec(), ulaw.spec());
+    assert_eq!(alaw_summary.spec(), alaw.spec());
+    assert_eq!(ulaw.channel(0).unwrap(), &[-0.980_346_7, 0.0]);
+    assert_eq!(ulaw.channel(1).unwrap(), &[0.511_596_7, 0.980_346_7]);
+    assert_eq!(alaw.channel(0).unwrap(), &[-0.984_375, 8.0 / 32768.0]);
+    assert_eq!(alaw.channel(1).unwrap(), &[0.515_625, 0.984_375]);
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-raw", "raw");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
@@ -605,6 +634,28 @@ fn open_wav_accepts_float64_input() {
 
     let decoded = auralis_wav::decode_float64_path(output).unwrap();
     assert_samples_close(decoded.as_planar_f32(), source.as_planar_f32());
+    fs::remove_dir_all(tempdir).unwrap();
+}
+
+#[test]
+fn open_wav_accepts_g711_input() {
+    let tempdir = temp_dir();
+    fs::create_dir(&tempdir).unwrap();
+    let input = tempdir.join("input-ulaw.wav");
+    let output = tempdir.join("output-alaw.wav");
+    let source = audio_buffer(vec![-1.0, 0.0, 1.0]);
+
+    auralis_wav::encode_ulaw_path(&input, &source).unwrap();
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .gain_db(0.0)
+        .write(&output, OutputFormat::Wav(WavEncodeOptions::alaw()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_alaw_path(output).unwrap();
+    assert_eq!(decoded.frames().as_u64(), 3);
     fs::remove_dir_all(tempdir).unwrap();
 }
 

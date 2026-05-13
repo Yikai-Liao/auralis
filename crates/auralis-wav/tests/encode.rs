@@ -7,18 +7,20 @@ use auralis_codec::{
 };
 use auralis_simd::BackendKind;
 use auralis_wav::{
-    Float32WavEncoder, Float32WavWriter, Float64WavEncoder, Float64WavWriter, Pcm8WavEncoder,
-    Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter, Pcm24WavEncoder, Pcm24WavWriter,
-    Pcm32WavEncoder, Pcm32WavWriter, WavError, decode_pcm16_path, encode_pcm16_path,
+    ALawWavEncoder, ALawWavWriter, Float32WavEncoder, Float32WavWriter, Float64WavEncoder,
+    Float64WavWriter, Pcm8WavEncoder, Pcm8WavWriter, Pcm16WavEncoder, Pcm16WavWriter,
+    Pcm24WavEncoder, Pcm24WavWriter, Pcm32WavEncoder, Pcm32WavWriter, ULawWavEncoder,
+    ULawWavWriter, WavError, decode_pcm16_path, encode_pcm16_path,
 };
 
 mod support;
 
 use support::{
     assert_audio_bits_eq, audio_buffer, decode_path, decode_path_float32, decode_path_float64,
-    decode_path_pcm8, decode_path_pcm24, decode_path_pcm32, encode_temp_wav,
-    encode_temp_wav_float32, encode_temp_wav_float64, encode_temp_wav_pcm8, encode_temp_wav_pcm24,
-    encode_temp_wav_pcm32, encode_temp_wav_with_backend, temp_path,
+    decode_path_pcm8, decode_path_pcm24, decode_path_pcm32, decode_path_ulaw, encode_temp_wav,
+    encode_temp_wav_alaw, encode_temp_wav_float32, encode_temp_wav_float64, encode_temp_wav_pcm8,
+    encode_temp_wav_pcm24, encode_temp_wav_pcm32, encode_temp_wav_ulaw,
+    encode_temp_wav_with_backend, temp_path,
 };
 
 #[test]
@@ -106,6 +108,38 @@ fn encodes_mono_float64_from_planar_f32_without_clipping() {
     assert_eq!(decoded.spec().channels().as_u16(), 1);
     assert_eq!(decoded.frames().as_u64(), 4);
     assert_eq!(decoded.channel(0).unwrap(), &[-1.5, 0.0, 0.5, 1.5]);
+}
+
+#[test]
+fn encodes_mono_ulaw_from_planar_f32() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 1.0]);
+    let path = encode_temp_wav_ulaw("auralis-wav-encode-mono-ulaw", &audio);
+    let decoded = decode_path_ulaw(&path);
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(decoded.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(decoded.spec().channels().as_u16(), 1);
+    assert_eq!(decoded.frames().as_u64(), 3);
+    assert_eq!(
+        decoded.channel(0).unwrap(),
+        &[-0.980_346_7, 0.0, 0.980_346_7]
+    );
+}
+
+#[test]
+fn encodes_mono_alaw_from_planar_f32() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 1.0]);
+    let path = encode_temp_wav_alaw("auralis-wav-encode-mono-alaw", &audio);
+    let decoded = support::decode_path_alaw(&path);
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(decoded.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(decoded.spec().channels().as_u16(), 1);
+    assert_eq!(decoded.frames().as_u64(), 3);
+    assert_eq!(
+        decoded.channel(0).unwrap(),
+        &[-0.984_375, 8.0 / 32768.0, 0.984_375]
+    );
 }
 
 #[test]
@@ -311,6 +345,30 @@ fn implements_float64_codec_encoder_boundary() {
 }
 
 #[test]
+fn implements_g711_codec_encoder_boundaries() {
+    let audio = audio_buffer(1, 3, &[-1.0, 0.0, 1.0]);
+    let ulaw_encoder = ULawWavEncoder::new(WavEncodeOptions::ulaw(), BackendKind::Scalar);
+    let alaw_encoder = ALawWavEncoder::new(WavEncodeOptions::alaw(), BackendKind::Scalar);
+    let mut ulaw_output = Cursor::new(Vec::new());
+    let mut alaw_output = Cursor::new(Vec::new());
+
+    let ulaw_summary = ulaw_encoder.encode(&audio, &mut ulaw_output).unwrap();
+    let alaw_summary = alaw_encoder.encode(&audio, &mut alaw_output).unwrap();
+    let ulaw = auralis_wav::decode_ulaw(Cursor::new(ulaw_output.into_inner())).unwrap();
+    let alaw = auralis_wav::decode_alaw(Cursor::new(alaw_output.into_inner())).unwrap();
+
+    assert_eq!(ulaw_summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(alaw_summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(ulaw_summary.frames(), audio.frames());
+    assert_eq!(alaw_summary.frames(), audio.frames());
+    assert_eq!(ulaw.channel(0).unwrap(), &[-0.980_346_7, 0.0, 0.980_346_7]);
+    assert_eq!(
+        alaw.channel(0).unwrap(),
+        &[-0.984_375, 8.0 / 32768.0, 0.984_375]
+    );
+}
+
+#[test]
 fn pcm8_writer_boundary_is_one_shot() {
     let audio = audio_buffer(1, 1, &[0.0]);
     let mut writer = Pcm8WavWriter::new(Cursor::new(Vec::new()));
@@ -391,6 +449,33 @@ fn float64_writer_boundary_is_one_shot() {
 }
 
 #[test]
+fn g711_writer_boundaries_are_one_shot() {
+    let audio = audio_buffer(1, 1, &[0.0]);
+    let mut ulaw_writer = ULawWavWriter::new(Cursor::new(Vec::new()));
+    let mut alaw_writer = ALawWavWriter::new(Cursor::new(Vec::new()));
+
+    ulaw_writer.write_audio(&audio).unwrap();
+    alaw_writer.write_audio(&audio).unwrap();
+
+    assert_eq!(ulaw_writer.codec_kind(), CodecKind::Wav);
+    assert_eq!(alaw_writer.codec_kind(), CodecKind::Wav);
+    assert!(matches!(
+        ulaw_writer.write_audio(&audio),
+        Err(CodecError::EncodeFailed {
+            kind: CodecKind::Wav,
+            ..
+        })
+    ));
+    assert!(matches!(
+        alaw_writer.write_audio(&audio),
+        Err(CodecError::EncodeFailed {
+            kind: CodecKind::Wav,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn wav_encode_options_default_to_pcm16() {
     assert_eq!(
         WavEncodeOptions::default().sample_format(),
@@ -427,5 +512,17 @@ fn wav_encode_options_can_target_float64() {
     assert_eq!(
         WavEncodeOptions::float64().sample_format(),
         WavSampleFormat::Float64
+    );
+}
+
+#[test]
+fn wav_encode_options_can_target_g711() {
+    assert_eq!(
+        WavEncodeOptions::ulaw().sample_format(),
+        WavSampleFormat::ULaw
+    );
+    assert_eq!(
+        WavEncodeOptions::alaw().sample_format(),
+        WavSampleFormat::ALaw
     );
 }

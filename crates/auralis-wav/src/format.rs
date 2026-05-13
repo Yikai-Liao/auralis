@@ -12,6 +12,8 @@ pub enum WavSampleEncoding {
     Integer,
     /// IEEE floating-point samples.
     Float,
+    /// G.711 companded samples.
+    Companded,
 }
 
 impl fmt::Display for WavSampleEncoding {
@@ -19,6 +21,7 @@ impl fmt::Display for WavSampleEncoding {
         match self {
             Self::Integer => formatter.write_str("integer PCM"),
             Self::Float => formatter.write_str("IEEE float"),
+            Self::Companded => formatter.write_str("G.711 companded"),
         }
     }
 }
@@ -66,6 +69,7 @@ pub(crate) fn hound_spec(audio: &AudioBuffer, sample_format: WavSampleFormat) ->
         WavSampleFormat::Pcm32 => 32,
         WavSampleFormat::Float32 => 32,
         WavSampleFormat::Float64 => 64,
+        WavSampleFormat::ULaw | WavSampleFormat::ALaw => 8,
         _ => 16,
     };
 
