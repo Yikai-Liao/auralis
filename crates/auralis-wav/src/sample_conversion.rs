@@ -58,6 +58,24 @@ pub(crate) fn pcm32_to_f32(input: &[i32], output: &mut [f32]) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn float32_to_f32(input: &[f32], output: &mut [f32], channels: usize) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::InvalidBufferShape);
+    }
+
+    for (sample_index, (&sample, destination)) in input.iter().zip(output.iter_mut()).enumerate() {
+        if !sample.is_finite() {
+            return Err(WavError::NonFiniteSample {
+                channel_index: sample_index % channels,
+                frame_index: sample_index / channels,
+            });
+        }
+        *destination = sample;
+    }
+
+    Ok(())
+}
+
 pub(crate) fn f32_to_pcm16_with_backend(
     requested_backend: BackendKind,
     input: &[f32],
@@ -153,6 +171,26 @@ pub(crate) fn f32_to_pcm32(input: &[f32], output: &mut [i32], channels: usize) -
         *destination = i32::try_from(quantized).map_err(|_| WavError::WriteFailed {
             message: "PCM32 sample quantization overflowed".to_owned(),
         })?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn f32_to_float32(input: &[f32], output: &mut [f32], channels: usize) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::WriteFailed {
+            message: "sample conversion buffer length mismatch".to_owned(),
+        });
+    }
+
+    for (sample_index, (&sample, destination)) in input.iter().zip(output.iter_mut()).enumerate() {
+        if !sample.is_finite() {
+            return Err(WavError::NonFiniteSample {
+                channel_index: sample_index % channels,
+                frame_index: sample_index / channels,
+            });
+        }
+        *destination = sample;
     }
 
     Ok(())

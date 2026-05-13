@@ -11,20 +11,22 @@ use auralis_simd::BackendKind;
 use crate::{
     Result, WavError,
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
-    sample_conversion::{pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32},
+    sample_conversion::{
+        float32_to_f32, pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32,
+    },
 };
 
 /// Decodes an entire supported linear PCM WAV stream into a planar `f32`
 /// buffer.
 ///
-/// Currently supported sample formats are PCM8, PCM16, PCM24, and PCM32. The returned
+/// Currently supported sample formats are PCM8, PCM16, PCM24, PCM32, and float32. The returned
 /// [`AudioSpec`] always uses [`SampleFormat::Float32`] because that is
 /// Auralis' internal processing format.
 ///
 /// # Errors
 ///
 /// Returns [`WavError::UnsupportedSampleFormat`] for any WAV stream that is not
-/// integer PCM with 8, 16, 24, or 32 bits per sample. Returns [`WavError::Malformed`]
+/// PCM8, PCM16, PCM24, PCM32, or float32. Returns [`WavError::Malformed`]
 /// when the RIFF/WAVE container or sample payload cannot be parsed.
 pub fn decode_wav<R>(reader: R) -> Result<AudioBuffer>
 where
@@ -344,6 +346,69 @@ pub fn decode_pcm32_path_with_backend(
     decode_pcm32_with_backend(BufReader::new(file), requested_backend)
 }
 
+/// Decodes an entire float32 WAV stream into a planar `f32` buffer.
+///
+/// Samples are copied into Auralis' internal processing buffer without
+/// quantization or clipping.
+///
+/// # Errors
+///
+/// Returns [`WavError::UnsupportedSampleFormat`] when the stream is not
+/// 32-bit IEEE float. Returns [`WavError::Malformed`] when the RIFF/WAVE
+/// container or sample payload cannot be parsed.
+pub fn decode_float32<R>(reader: R) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    decode_float32_with_backend(reader, BackendKind::Scalar)
+}
+
+/// Decodes an entire float32 WAV stream with an explicit backend request.
+///
+/// Float32 copying is deterministic scalar logic, so `requested_backend` does
+/// not currently change the produced samples.
+///
+/// # Errors
+///
+/// Returns the same parsing, format, and shape errors as [`decode_float32`].
+pub fn decode_float32_with_backend<R>(
+    reader: R,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer>
+where
+    R: Read,
+{
+    let mut reader = AnyPcmWavReader::new(reader)?;
+    reader.read_expected_format_with_backend(WavSampleFormat::Float32, requested_backend)
+}
+
+/// Decodes a float32 WAV file from disk into a planar `f32` buffer.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_float32`].
+pub fn decode_float32_path(path: impl AsRef<Path>) -> Result<AudioBuffer> {
+    decode_float32_path_with_backend(path, BackendKind::Scalar)
+}
+
+/// Decodes a float32 WAV file from disk with an explicit backend request.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_float32_with_backend`].
+pub fn decode_float32_path_with_backend(
+    path: impl AsRef<Path>,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer> {
+    let file = File::open(path).map_err(|error| WavError::OpenFailed {
+        message: error.to_string(),
+    })?;
+
+    decode_float32_with_backend(BufReader::new(file), requested_backend)
+}
+
 /// Reader for PCM16 WAV streams.
 ///
 /// The reader owns the underlying stream and decodes it at most once. It
@@ -477,6 +542,17 @@ where
                     interleaved_pcm32.push(sample.map_err(|error| malformed(&error))?);
                 }
                 pcm32_to_f32(&interleaved_pcm32, &mut interleaved_f32)?;
+            }
+            WavSampleFormat::Float32 => {
+                let mut interleaved_float32 = Vec::with_capacity(sample_capacity);
+                for sample in self.inner.samples::<f32>() {
+                    interleaved_float32.push(sample.map_err(|error| malformed(&error))?);
+                }
+                float32_to_f32(
+                    &interleaved_float32,
+                    &mut interleaved_f32,
+                    channels.as_usize(),
+                )?;
             }
             _ => unreachable!("unsupported WAV sample format already rejected"),
         }

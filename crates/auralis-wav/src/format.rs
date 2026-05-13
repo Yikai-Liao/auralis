@@ -29,6 +29,7 @@ pub(crate) fn wav_sample_format(spec: hound::WavSpec) -> Result<WavSampleFormat>
         (hound::SampleFormat::Int, 16) => Ok(WavSampleFormat::Pcm16),
         (hound::SampleFormat::Int, 24) => Ok(WavSampleFormat::Pcm24),
         (hound::SampleFormat::Int, 32) => Ok(WavSampleFormat::Pcm32),
+        (hound::SampleFormat::Float, 32) => Ok(WavSampleFormat::Float32),
         _ => Err(WavError::UnsupportedSampleFormat {
             bits_per_sample: spec.bits_per_sample,
             encoding: match spec.sample_format {
@@ -44,7 +45,10 @@ pub(crate) fn ensure_pcm16(spec: hound::WavSpec) -> Result<()> {
         WavSampleFormat::Pcm16 => Ok(()),
         _ => Err(WavError::UnsupportedSampleFormat {
             bits_per_sample: spec.bits_per_sample,
-            encoding: WavSampleEncoding::Integer,
+            encoding: match spec.sample_format {
+                hound::SampleFormat::Int => WavSampleEncoding::Integer,
+                hound::SampleFormat::Float => WavSampleEncoding::Float,
+            },
         }),
     }
 }
@@ -59,14 +63,20 @@ pub(crate) fn hound_spec(audio: &AudioBuffer, sample_format: WavSampleFormat) ->
         WavSampleFormat::Pcm16 => 16,
         WavSampleFormat::Pcm24 => 24,
         WavSampleFormat::Pcm32 => 32,
+        WavSampleFormat::Float32 => 32,
         _ => 16,
+    };
+
+    let hound_sample_format = match sample_format {
+        WavSampleFormat::Float32 => hound::SampleFormat::Float,
+        _ => hound::SampleFormat::Int,
     };
 
     hound::WavSpec {
         channels: audio.channels().as_u16(),
         sample_rate: audio.spec().sample_rate().as_u32(),
         bits_per_sample,
-        sample_format: hound::SampleFormat::Int,
+        sample_format: hound_sample_format,
     }
 }
 

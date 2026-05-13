@@ -451,6 +451,10 @@ impl Pipeline {
                 let encoder = auralis_wav::Pcm32WavEncoder::new(options, requested_backend);
                 Ok(encoder.encode(&audio, &mut output)?)
             }
+            WavSampleFormat::Float32 => {
+                let encoder = auralis_wav::Float32WavEncoder::new(options, requested_backend);
+                Ok(encoder.encode(&audio, &mut output)?)
+            }
             _ => {
                 let encoder = UnsupportedEncoder::new(CodecKind::Wav);
                 Ok(encoder.encode(&audio, &mut output)?)

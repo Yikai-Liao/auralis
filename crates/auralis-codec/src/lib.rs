@@ -130,6 +130,9 @@ pub enum WavSampleFormat {
 
     /// Signed 32-bit PCM samples.
     Pcm32,
+
+    /// 32-bit IEEE floating-point samples.
+    Float32,
 }
 
 /// Auralis-owned options for WAV export.
@@ -167,6 +170,12 @@ impl WavEncodeOptions {
     #[must_use]
     pub const fn pcm32() -> Self {
         Self::new(WavSampleFormat::Pcm32)
+    }
+
+    /// Creates WAV encode options for 32-bit IEEE floating-point samples.
+    #[must_use]
+    pub const fn float32() -> Self {
+        Self::new(WavSampleFormat::Float32)
     }
 
     /// Returns the configured WAV sample format.
