@@ -83,8 +83,10 @@ def test_render_markdown_report_smoke() -> None:
     assert "- Reused completed cases: 1" in markdown
     assert "- Scalar vs SoX-ng: 1 faster, 0 slower, 0 equal" in markdown
     assert "- Scalar geometric mean vs SoX-ng: 0.727 ratio (1.376x), 1 cases" in markdown
+    assert "- Highest scalar ratio vs SoX-ng: gain (1.376x, ratio 0.727)" in markdown
     assert "- Best SIMD speedup vs SoX-ng: gain (2.198x, ratio 0.455)" in markdown
     assert "- SIMD geometric mean vs SoX-ng: 0.455 ratio (2.198x), 1 cases" in markdown
+    assert "- Highest SIMD ratio vs SoX-ng: gain (2.198x, ratio 0.455)" in markdown
     assert "| gain | scalar_and_simd | 11.0 | 8.0 | 5.0 | 0.727 | 0.455 | 0.625 |" in markdown
 
 
@@ -167,6 +169,16 @@ def test_build_report_summary_counts_faster_slower_and_na() -> None:
         "speedup": 1.376,
     }
     assert summary["fastest_simd_vs_sox_ng"] == {
+        "effect_name": "gain",
+        "median_ratio": 0.455,
+        "speedup": 2.198,
+    }
+    assert summary["slowest_scalar_vs_sox_ng"] == {
+        "effect_name": "chorus",
+        "median_ratio": 1.1,
+        "speedup": 0.909,
+    }
+    assert summary["slowest_simd_vs_sox_ng"] == {
         "effect_name": "gain",
         "median_ratio": 0.455,
         "speedup": 2.198,
