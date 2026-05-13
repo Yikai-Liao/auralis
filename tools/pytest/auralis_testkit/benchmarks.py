@@ -717,12 +717,16 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
         "simd_slower_than_sox_ng": 0,
         "simd_equal_to_sox_ng": 0,
         "simd_not_applicable_cases": 0,
+        "scalar_vs_sox_ng_geomean": None,
+        "simd_vs_sox_ng_geomean": None,
         "fastest_scalar_vs_sox_ng": None,
         "fastest_simd_vs_sox_ng": None,
     }
 
     fastest_scalar: tuple[float, str] | None = None
     fastest_simd: tuple[float, str] | None = None
+    scalar_ratios: list[float] = []
+    simd_ratios: list[float] = []
 
     for case in cases:
         status = case.get("status")
@@ -747,13 +751,17 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
         if scalar_key is not None:
             summary[scalar_key] += 1
             fastest_scalar = lower_ratio_case(fastest_scalar, scalar_ratio, case["effect_name"])
+            append_positive_ratio(scalar_ratios, scalar_ratio)
 
         simd_ratio = case.get("comparisons", {}).get("simd_vs_sox_ng")
         simd_key = ratio_summary_key("simd", simd_ratio)
         if simd_key is not None:
             summary[simd_key] += 1
             fastest_simd = lower_ratio_case(fastest_simd, simd_ratio, case["effect_name"])
+            append_positive_ratio(simd_ratios, simd_ratio)
 
+    summary["scalar_vs_sox_ng_geomean"] = ratio_geomean_payload(scalar_ratios)
+    summary["simd_vs_sox_ng_geomean"] = ratio_geomean_payload(simd_ratios)
     summary["fastest_scalar_vs_sox_ng"] = fastest_case_payload(fastest_scalar)
     summary["fastest_simd_vs_sox_ng"] = fastest_case_payload(fastest_simd)
     return summary
@@ -799,6 +807,28 @@ def lower_ratio_case(
     return current
 
 
+def append_positive_ratio(ratios: list[float], comparison: dict[str, Any]) -> None:
+    """Collect a positive median ratio from a successful comparison."""
+
+    ratio = comparison.get("median_ratio")
+    if isinstance(ratio, int | float) and ratio > 0.0:
+        ratios.append(float(ratio))
+
+
+def ratio_geomean_payload(ratios: list[float]) -> dict[str, Any] | None:
+    """Return a geometric-mean ratio payload for completed comparisons."""
+
+    if not ratios:
+        return None
+    ratio = math.prod(ratios) ** (1.0 / len(ratios))
+    rounded_ratio = round(ratio, 3)
+    return {
+        "case_count": len(ratios),
+        "median_ratio": rounded_ratio,
+        "speedup": json_number(round(1.0 / ratio, 3)),
+    }
+
+
 def fastest_case_payload(case: tuple[float, str] | None) -> dict[str, Any] | None:
     """Render a fastest-case tuple into JSON-safe report data."""
 
@@ -833,11 +863,25 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         "",
     ]
     scalar_best = summary.get("fastest_scalar_vs_sox_ng")
+    scalar_geomean = summary.get("scalar_vs_sox_ng_geomean")
+    if scalar_geomean is not None:
+        lines.append(
+            "- Scalar geometric mean vs SoX-ng: "
+            f"{scalar_geomean['median_ratio']} ratio ({scalar_geomean['speedup']}x), "
+            f"{scalar_geomean['case_count']} cases"
+        )
     if scalar_best is not None:
         lines.append(
             f"- Best scalar speedup vs SoX-ng: {scalar_best['effect_name']} ({scalar_best['speedup']}x, ratio {scalar_best['median_ratio']})"
         )
     simd_best = summary.get("fastest_simd_vs_sox_ng")
+    simd_geomean = summary.get("simd_vs_sox_ng_geomean")
+    if simd_geomean is not None:
+        lines.append(
+            "- SIMD geometric mean vs SoX-ng: "
+            f"{simd_geomean['median_ratio']} ratio ({simd_geomean['speedup']}x), "
+            f"{simd_geomean['case_count']} cases"
+        )
     if simd_best is not None:
         lines.append(
             f"- Best SIMD speedup vs SoX-ng: {simd_best['effect_name']} ({simd_best['speedup']}x, ratio {simd_best['median_ratio']})"
