@@ -445,17 +445,21 @@ def benchmark_case(
             "reason": "effect does not route through a distinct SIMD-aware stage in the current implementation",
         }
 
-    return {
+    failed_run_keys = failed_required_run_keys(case, runs)
+    report = {
         "case_id": case.case_id,
         "effect_name": case.effect_name,
         "tokens": list(tokens),
         "backend_mode": case.backend_mode.value,
         "token_source": case.token_source,
-        "status": "ok",
+        "status": "failed" if failed_run_keys else "ok",
         "result_source": "measured",
         "runs": runs,
         "comparisons": build_comparisons(runs),
     }
+    if failed_run_keys:
+        report["failed_runs"] = failed_run_keys
+    return report
 
 
 def prepare_case_assets(
@@ -601,6 +605,21 @@ def build_comparisons(runs: dict[str, Any]) -> dict[str, Any]:
         "simd_vs_scalar": speed_ratio(runs.get("auralis_simd"), runs.get("auralis_scalar")),
     }
     return comparisons
+
+
+def failed_required_run_keys(case: BenchmarkCase, runs: dict[str, Any]) -> list[str]:
+    """Return failed or missing run keys that make a benchmark case incomplete."""
+
+    required_keys = ["sox_ng", "auralis_scalar"]
+    if case.backend_mode is BackendMode.SCALAR_AND_SIMD:
+        required_keys.append("auralis_simd")
+
+    failed_keys = []
+    for key in required_keys:
+        run = runs.get(key)
+        if not isinstance(run, dict) or run.get("status") != "ok":
+            failed_keys.append(key)
+    return failed_keys
 
 
 def speed_ratio(lhs: dict[str, Any] | None, rhs: dict[str, Any] | None) -> dict[str, Any] | None:

@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 
 from auralis_testkit.benchmarks import (
+    BenchmarkCase,
     BackendMode,
     benchmark_case_catalog,
     build_report_summary,
+    failed_required_run_keys,
     load_resume_cases,
     render_markdown_report,
     supported_effect_names,
@@ -144,6 +146,33 @@ def test_build_report_summary_counts_faster_slower_and_na() -> None:
         "median_ratio": 0.455,
         "speedup": 2.198,
     }
+
+
+def test_failed_required_run_keys_match_backend_requirements() -> None:
+    scalar_case = BenchmarkCase(
+        effect_name="chorus",
+        tokens=("chorus", "0.5", "0.7", "55", "0.4", "0.25", "2", "-t"),
+        backend_mode=BackendMode.SCALAR_ONLY,
+        token_source="test",
+    )
+    simd_case = BenchmarkCase(
+        effect_name="gain",
+        tokens=("gain", "-n"),
+        backend_mode=BackendMode.SCALAR_AND_SIMD,
+        token_source="test",
+    )
+    scalar_only_runs = {
+        "sox_ng": {"status": "ok"},
+        "auralis_scalar": {"status": "ok"},
+        "auralis_simd": {"status": "not_applicable"},
+    }
+
+    assert failed_required_run_keys(scalar_case, scalar_only_runs) == []
+    assert failed_required_run_keys(simd_case, scalar_only_runs) == ["auralis_simd"]
+    assert failed_required_run_keys(scalar_case, {"sox_ng": {"status": "failed"}}) == [
+        "sox_ng",
+        "auralis_scalar",
+    ]
 
 
 def test_load_resume_cases_reuses_matching_successes_only(tmp_path: Path) -> None:
