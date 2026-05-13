@@ -50,7 +50,11 @@ pub(crate) fn decode_symphonia_wav_bytes(
         Err(error) => return Err(malformed(&error)),
     };
 
-    let mut builder = PlanarBuilder::new(expected_format, requested_backend);
+    let expected_frames = track
+        .codec_params
+        .n_frames
+        .and_then(|frames| usize::try_from(frames).ok());
+    let mut builder = PlanarBuilder::new(expected_format, requested_backend, expected_frames);
     loop {
         let packet = match format.next_packet() {
             Ok(packet) => packet,
@@ -94,19 +98,27 @@ pub(crate) fn decode_symphonia_wav_bytes(
 struct PlanarBuilder {
     expected_format: Option<WavSampleFormat>,
     requested_backend: BackendKind,
+    expected_frames: Option<usize>,
     sample_rate: Option<SampleRate>,
     channels: Option<ChannelCount>,
+    planar: Option<Vec<f32>>,
     planes: Vec<Vec<f32>>,
     frames: usize,
 }
 
 impl PlanarBuilder {
-    fn new(expected_format: Option<WavSampleFormat>, requested_backend: BackendKind) -> Self {
+    fn new(
+        expected_format: Option<WavSampleFormat>,
+        requested_backend: BackendKind,
+        expected_frames: Option<usize>,
+    ) -> Self {
         Self {
             expected_format,
             requested_backend,
+            expected_frames,
             sample_rate: None,
             channels: None,
+            planar: None,
             planes: Vec::new(),
             frames: 0,
         }
@@ -153,7 +165,14 @@ impl PlanarBuilder {
             (None, None) => {
                 self.sample_rate = Some(sample_rate);
                 self.channels = Some(channels);
-                self.planes = (0..channels.as_usize()).map(|_| Vec::new()).collect();
+                if let Some(expected_frames) = self.expected_frames {
+                    let sample_count = expected_frames
+                        .checked_mul(channels.as_usize())
+                        .ok_or(WavError::InvalidBufferShape)?;
+                    self.planar = Some(vec![0.0; sample_count]);
+                } else {
+                    self.planes = (0..channels.as_usize()).map(|_| Vec::new()).collect();
+                }
                 Ok(())
             }
             (Some(existing_rate), Some(existing_channels))
@@ -171,10 +190,17 @@ impl PlanarBuilder {
         let frame_offset = self.frames;
         for channel_index in 0..self.channel_count()? {
             let plane = buffer.chan(channel_index);
-            let output = &mut self.planes[channel_index];
-            output.reserve(plane.len());
-            for sample in plane {
-                output.push((f32::from(*sample) - 128.0) / 128.0);
+            if self.planar.is_some() {
+                let output = self.output_slice(channel_index, plane.len())?;
+                for (sample, destination) in plane.iter().zip(output) {
+                    *destination = (f32::from(*sample) - 128.0) / 128.0;
+                }
+            } else {
+                let output = &mut self.planes[channel_index];
+                output.reserve(plane.len());
+                for sample in plane {
+                    output.push((f32::from(*sample) - 128.0) / 128.0);
+                }
             }
         }
         self.advance_frames(buffer.frames(), frame_offset)
@@ -184,16 +210,22 @@ impl PlanarBuilder {
         let frame_offset = self.frames;
         for channel_index in 0..self.channel_count()? {
             let plane = buffer.chan(channel_index);
-            let output = &mut self.planes[channel_index];
-            let start = output.len();
-            output.resize(start + plane.len(), 0.0);
-            pcm16_to_f32_with_backend(
-                self.requested_backend,
-                plane,
-                output
-                    .get_mut(start..)
-                    .ok_or(WavError::InvalidBufferShape)?,
-            )?;
+            if self.planar.is_some() {
+                let requested_backend = self.requested_backend;
+                let output = self.output_slice(channel_index, plane.len())?;
+                pcm16_to_f32_with_backend(requested_backend, plane, output)?;
+            } else {
+                let output = &mut self.planes[channel_index];
+                let start = output.len();
+                output.resize(start + plane.len(), 0.0);
+                pcm16_to_f32_with_backend(
+                    self.requested_backend,
+                    plane,
+                    output
+                        .get_mut(start..)
+                        .ok_or(WavError::InvalidBufferShape)?,
+                )?;
+            }
         }
         self.advance_frames(buffer.frames(), frame_offset)
     }
@@ -202,14 +234,21 @@ impl PlanarBuilder {
         let frame_offset = self.frames;
         for channel_index in 0..self.channel_count()? {
             let plane = buffer.chan(channel_index);
-            let output = &mut self.planes[channel_index];
-            output.reserve(plane.len());
             #[allow(
                 clippy::cast_precision_loss,
                 reason = "PCM24 samples fit exactly in f32 before normalization."
             )]
-            for sample in plane {
-                output.push((sample.0 as f32) / 8_388_608.0);
+            if self.planar.is_some() {
+                let output = self.output_slice(channel_index, plane.len())?;
+                for (sample, destination) in plane.iter().zip(output) {
+                    *destination = (sample.0 as f32) / 8_388_608.0;
+                }
+            } else {
+                let output = &mut self.planes[channel_index];
+                output.reserve(plane.len());
+                for sample in plane {
+                    output.push((sample.0 as f32) / 8_388_608.0);
+                }
             }
         }
         self.advance_frames(buffer.frames(), frame_offset)
@@ -219,14 +258,21 @@ impl PlanarBuilder {
         let frame_offset = self.frames;
         for channel_index in 0..self.channel_count()? {
             let plane = buffer.chan(channel_index);
-            let output = &mut self.planes[channel_index];
-            output.reserve(plane.len());
             #[allow(
                 clippy::cast_possible_truncation,
                 reason = "PCM32 decode narrows into Auralis' f32 processing buffer."
             )]
-            for sample in plane {
-                output.push((f64::from(*sample) / 2_147_483_648.0) as f32);
+            if self.planar.is_some() {
+                let output = self.output_slice(channel_index, plane.len())?;
+                for (sample, destination) in plane.iter().zip(output) {
+                    *destination = (f64::from(*sample) / 2_147_483_648.0) as f32;
+                }
+            } else {
+                let output = &mut self.planes[channel_index];
+                output.reserve(plane.len());
+                for sample in plane {
+                    output.push((f64::from(*sample) / 2_147_483_648.0) as f32);
+                }
             }
         }
         self.advance_frames(buffer.frames(), frame_offset)
@@ -236,16 +282,31 @@ impl PlanarBuilder {
         let frame_offset = self.frames;
         for channel_index in 0..self.channel_count()? {
             let plane = buffer.chan(channel_index);
-            let output = &mut self.planes[channel_index];
-            output.reserve(plane.len());
-            for (frame_index, sample) in plane.iter().copied().enumerate() {
-                if !sample.is_finite() {
-                    return Err(WavError::NonFiniteSample {
-                        channel_index,
-                        frame_index: frame_offset + frame_index,
-                    });
+            if self.planar.is_some() {
+                let output = self.output_slice(channel_index, plane.len())?;
+                for (frame_index, (sample, destination)) in
+                    plane.iter().copied().zip(output).enumerate()
+                {
+                    if !sample.is_finite() {
+                        return Err(WavError::NonFiniteSample {
+                            channel_index,
+                            frame_index: frame_offset + frame_index,
+                        });
+                    }
+                    *destination = sample;
                 }
-                output.push(sample);
+            } else {
+                let output = &mut self.planes[channel_index];
+                output.reserve(plane.len());
+                for (frame_index, sample) in plane.iter().copied().enumerate() {
+                    if !sample.is_finite() {
+                        return Err(WavError::NonFiniteSample {
+                            channel_index,
+                            frame_index: frame_offset + frame_index,
+                        });
+                    }
+                    output.push(sample);
+                }
             }
         }
         self.advance_frames(buffer.frames(), frame_offset)
@@ -267,6 +328,28 @@ impl PlanarBuilder {
             .ok_or(WavError::InvalidBufferShape)
     }
 
+    fn output_slice(&mut self, channel_index: usize, frames: usize) -> Result<&mut [f32]> {
+        let expected_frames = self.expected_frames.ok_or(WavError::InvalidBufferShape)?;
+        let start = channel_index
+            .checked_mul(expected_frames)
+            .and_then(|channel_start| channel_start.checked_add(self.frames))
+            .ok_or(WavError::InvalidBufferShape)?;
+        let end = start
+            .checked_add(frames)
+            .ok_or(WavError::InvalidBufferShape)?;
+        if self
+            .frames
+            .checked_add(frames)
+            .is_none_or(|end_frame| end_frame > expected_frames)
+        {
+            return Err(WavError::InvalidBufferShape);
+        }
+        self.planar
+            .as_mut()
+            .and_then(|planar| planar.get_mut(start..end))
+            .ok_or(WavError::InvalidBufferShape)
+    }
+
     fn finish(self) -> Result<AudioBuffer> {
         let sample_rate = self.sample_rate.ok_or_else(|| WavError::Malformed {
             message: "WAV stream did not contain audio packets".to_owned(),
@@ -278,12 +361,33 @@ impl PlanarBuilder {
             .frames
             .checked_mul(channels.as_usize())
             .ok_or(WavError::InvalidBufferShape)?;
-        let mut planar = Vec::with_capacity(sample_count);
-        for plane in self.planes {
-            if plane.len() != self.frames {
-                return Err(WavError::InvalidBufferShape);
+
+        let planar = if let Some(mut planar) = self.planar {
+            if self.expected_frames != Some(self.frames) {
+                for channel_index in 1..channels.as_usize() {
+                    let source_start = channel_index
+                        .checked_mul(self.expected_frames.ok_or(WavError::InvalidBufferShape)?)
+                        .ok_or(WavError::InvalidBufferShape)?;
+                    let destination_start = channel_index
+                        .checked_mul(self.frames)
+                        .ok_or(WavError::InvalidBufferShape)?;
+                    planar.copy_within(source_start..source_start + self.frames, destination_start);
+                }
+                planar.truncate(sample_count);
             }
-            planar.extend(plane);
+            planar
+        } else {
+            let mut planar = Vec::with_capacity(sample_count);
+            for plane in self.planes {
+                if plane.len() != self.frames {
+                    return Err(WavError::InvalidBufferShape);
+                }
+                planar.extend(plane);
+            }
+            planar
+        };
+        if planar.len() != sample_count {
+            return Err(WavError::InvalidBufferShape);
         }
 
         AudioBuffer::from_planar_f32(
