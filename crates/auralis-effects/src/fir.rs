@@ -239,20 +239,23 @@ impl Fir {
 
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
-        let mut planar = Vec::with_capacity(audio.as_planar_f32().len());
+        let mut planar = vec![0.0; audio.as_planar_f32().len()];
+        let input = audio.as_planar_f32();
 
         for channel_index in 0..audio.channels().as_usize() {
-            let channel = audio
-                .channel(channel_index)
+            let start = channel_index
+                .checked_mul(frames)
                 .ok_or(EffectError::FirLengthOverflow)?;
-            let mut state = FirState::new(coefficients.clone());
-            let mut filtered = Vec::with_capacity(frames);
-            state.process_mono_samples(channel, &mut filtered);
-            state.finish(&mut filtered);
-            if filtered.len() != frames {
-                return Err(EffectError::FirLengthOverflow);
-            }
-            planar.extend(filtered);
+            let end = start
+                .checked_add(frames)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            let channel = input
+                .get(start..end)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            let output = planar
+                .get_mut(start..end)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            FirState::new(coefficients.clone()).process_into(channel, output);
         }
 
         AudioBuffer::from_planar_f32(
@@ -300,6 +303,11 @@ impl FirState {
     /// Processes one chunk of mono samples, appending available output samples.
     pub fn process_mono_samples(&mut self, input: &[f32], output: &mut Vec<f32>) {
         self.inner.process_mono_samples(input, output);
+    }
+
+    /// Processes a complete mono stream into an equally sized output slice.
+    pub fn process_into(self, input: &[f32], output: &mut [f32]) {
+        self.inner.process_into(input, output);
     }
 
     /// Flushes delayed end-of-stream samples by appending the remaining output.

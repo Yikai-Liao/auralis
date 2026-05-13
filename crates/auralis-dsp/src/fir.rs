@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use thiserror::Error;
 
 /// Crate-local result type for FIR primitive constructors.
@@ -32,6 +30,7 @@ pub enum FirError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FirCoefficients {
     values: Vec<f64>,
+    fast_values: Vec<f32>,
 }
 
 impl FirCoefficients {
@@ -47,7 +46,11 @@ impl FirCoefficients {
     {
         let values = values.into_iter().collect::<Vec<_>>();
         if values.iter().all(|value| value.is_finite()) {
-            Ok(Self { values })
+            let fast_values = values.iter().map(|value| *value as f32).collect();
+            Ok(Self {
+                values,
+                fast_values,
+            })
         } else {
             Err(FirError::InvalidCoefficients)
         }
@@ -57,6 +60,12 @@ impl FirCoefficients {
     #[must_use]
     pub fn as_slice(&self) -> &[f64] {
         &self.values
+    }
+
+    /// Returns the coefficients as `f32` values for scalar fast paths.
+    #[must_use]
+    pub fn as_f32_slice(&self) -> &[f32] {
+        &self.fast_values
     }
 
     /// Returns the number of coefficients.
@@ -81,7 +90,9 @@ impl FirCoefficients {
 #[derive(Debug, Clone)]
 pub struct FirState {
     coefficients: FirCoefficients,
-    history: VecDeque<f32>,
+    history: Vec<f32>,
+    history_start: usize,
+    history_len: usize,
     samples_seen: usize,
     samples_emitted: usize,
     shift: usize,
@@ -92,9 +103,12 @@ impl FirState {
     #[must_use]
     pub fn new(coefficients: FirCoefficients) -> Self {
         let shift = coefficients.len().saturating_sub(1) / 2;
+        let history_capacity = coefficients.len();
         Self {
             coefficients,
-            history: VecDeque::new(),
+            history: vec![0.0; history_capacity],
+            history_start: 0,
+            history_len: 0,
             samples_seen: 0,
             samples_emitted: 0,
             shift,
@@ -118,6 +132,45 @@ impl FirState {
         }
     }
 
+    /// Processes a complete mono stream into an equally sized output slice.
+    ///
+    /// This length-preserving helper performs the same centered alignment as
+    /// [`Self::process_mono_samples`] followed by [`Self::finish`], but writes
+    /// directly into caller-owned storage.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `output.len() != input.len()`.
+    pub fn process_into(mut self, input: &[f32], output: &mut [f32]) {
+        assert_eq!(input.len(), output.len());
+        if self.coefficients.is_empty() {
+            output.copy_from_slice(input);
+            return;
+        }
+
+        let mut written = 0;
+        for sample in input {
+            self.push_sample(*sample);
+            if self.samples_seen > self.shift {
+                output[written] = self.current_output_sample();
+                written += 1;
+                self.samples_emitted += 1;
+            }
+        }
+
+        let target_samples = self.samples_seen;
+        for _ in 0..self.shift {
+            self.push_sample(0.0);
+            if self.samples_seen > self.shift && self.samples_emitted < target_samples {
+                output[written] = self.current_output_sample();
+                written += 1;
+                self.samples_emitted += 1;
+            }
+        }
+
+        debug_assert_eq!(written, output.len());
+    }
+
     /// Flushes delayed end-of-stream samples by appending the remaining output.
     ///
     /// This method consumes the state so a stream cannot accidentally be
@@ -138,34 +191,41 @@ impl FirState {
     }
 
     fn push_sample(&mut self, sample: f32) {
-        self.history.push_back(sample);
-        if self.history.len() > self.coefficients.len() {
-            self.history.pop_front();
+        if self.history.is_empty() {
+            self.samples_seen += 1;
+            return;
+        }
+
+        if self.history_len < self.history.len() {
+            let write_index = (self.history_start + self.history_len) % self.history.len();
+            self.history[write_index] = sample;
+            self.history_len += 1;
+        } else {
+            self.history[self.history_start] = sample;
+            self.history_start = (self.history_start + 1) % self.history.len();
         }
         self.samples_seen += 1;
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Auralis stores decoded samples as f32 after deterministic f64 FIR accumulation"
-    )]
     fn current_output_sample(&self) -> f32 {
         let newest_index = self.samples_seen - 1;
-        let oldest_index = self.samples_seen - self.history.len();
-        let mut value = 0.0;
+        let oldest_index = self.samples_seen - self.history_len;
+        let history_capacity = self.history.len();
+        let mut value = 0.0_f32;
         for (coefficient_index, coefficient) in
-            self.coefficients.as_slice().iter().copied().enumerate()
+            self.coefficients.as_f32_slice().iter().copied().enumerate()
         {
             if newest_index >= coefficient_index {
                 let input_index = newest_index - coefficient_index;
                 if input_index >= oldest_index {
-                    let history_index = input_index - oldest_index;
-                    value += f64::from(self.history[history_index]) * coefficient;
+                    let history_offset = input_index - oldest_index;
+                    let history_index = (self.history_start + history_offset) % history_capacity;
+                    value += self.history[history_index] * coefficient;
                 }
             }
         }
 
-        value as f32
+        value
     }
 }
 
