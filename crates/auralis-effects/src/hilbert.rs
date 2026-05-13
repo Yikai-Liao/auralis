@@ -129,8 +129,47 @@ impl Hilbert {
     /// fails, or FIR execution errors if the output shape cannot be represented.
     pub fn process_buffer(self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let coefficients = self.coefficients_for_sample_rate(audio.spec().sample_rate())?;
+        if coefficients.len() == 5 {
+            return process_five_tap_hilbert(audio, coefficients.as_slice()[3]);
+        }
+
         Fir::from_coefficients(coefficients).process_buffer(audio)
     }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Hilbert output is rounded to the public f32 sample format after f64 coefficient math"
+)]
+fn process_five_tap_hilbert(audio: &AudioBuffer, coefficient: f64) -> Result<AudioBuffer> {
+    let frames =
+        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+    let mut output = vec![0.0; audio.as_planar_f32().len()];
+
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let start = channel_index
+            .checked_mul(frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let out = output
+            .get_mut(start..start + frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+
+        for frame in 0..frames {
+            let previous = if frame == 0 {
+                0.0
+            } else {
+                f64::from(channel[frame - 1])
+            };
+            let next = channel.get(frame + 1).copied().map_or(0.0, f64::from);
+            out[frame] = ((previous - next) * coefficient) as f32;
+        }
+    }
+
+    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), output)
+        .map_err(|_| EffectError::FirLengthOverflow)
 }
 
 fn validate_taps(taps: u32) -> Result<()> {
