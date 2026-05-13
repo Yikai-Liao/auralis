@@ -14,6 +14,7 @@ path = "src/lib.rs"
 auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
 claxon.workspace = true
+flacenc.workspace = true
 thiserror.workspace = true
 
 [lints]

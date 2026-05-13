@@ -7,8 +7,8 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    AiffEncodeOptions, CodecError, CodecKind, FlacEncodeOptions, RawPcmByteOrder,
-    RawPcmEncodeOptions, WavContainer, WavEncodeOptions, WavSampleFormat,
+    AiffEncodeOptions, CodecKind, FlacEncodeOptions, RawPcmByteOrder, RawPcmEncodeOptions,
+    WavContainer, WavEncodeOptions, WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -545,20 +545,21 @@ fn write_output_format_aifc_uses_aifc_encoder() {
 }
 
 #[test]
-fn write_output_format_rejects_unsupported_formats() {
+fn write_output_format_flac_uses_flac_encoder() {
     let path = support::temp_path("auralis-pipeline-write-flac", "flac");
-    let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
-        .into_pipeline()
-        .write(&path, OutputFormat::Flac(FlacEncodeOptions))
-        .unwrap_err();
+    let summary = AudioFile::from_audio_buffer(audio_buffer(vec![
+        0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25, 0.0, 0.25,
+    ]))
+    .into_pipeline()
+    .write(&path, OutputFormat::Flac(FlacEncodeOptions))
+    .unwrap();
+    let decoded = auralis_flac::decode_flac_path(&path).unwrap();
 
-    let _ = fs::remove_file(path);
-    assert_eq!(
-        error,
-        Error::Codec(CodecError::UnsupportedFormat(
-            auralis_codec::UnsupportedFormat::new(CodecKind::Flac)
-        ))
-    );
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Flac);
+    assert_eq!(summary.frames(), FrameCount::new(16));
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(&decoded.channel(0).unwrap()[..4], &[0.0, 0.25, 0.0, 0.25]);
 }
 
 #[test]

@@ -1235,3 +1235,18 @@ l4 = { status = "not_applicable", reason = "FLAC decode is deterministic parsing
 l5 = { status = "not_applicable", reason = "The current adapter materializes a full buffer and does not expose streaming decoder state.", tests = [] }
 l6 = { status = "not_applicable", reason = "FLAC decode is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "FLAC input fuzzing is not yet wired into the shared fuzz target set; malformed-input smoke coverage exists in unit tests.", tests = [] }
+
+[[subject]]
+id = "primitive.flac_encoder"
+kind = "primitive"
+name = "flac-encoder"
+summary = "FLAC encode boundary through the pure Rust flacenc adapter."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "FLAC encode tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
+l1 = { status = "covered", reason = "FLAC codec tests cover in-memory encode, codec-boundary encode, decode-back verification, and high-level pipeline OutputFormat dispatch.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/pipeline.rs"] }
+l2 = { status = "not_applicable", reason = "The locally installed SoX-ng has no FLAC format handler, so direct FLAC encode comparison cannot be used as a gate for this leaf.", tests = [] }
+l3 = { status = "covered", reason = "Analytical codec-boundary tests cover PCM16 quantization, frame count/spec metadata, short-buffer rejection, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/pipeline.rs"] }
+l4 = { status = "not_applicable", reason = "FLAC encode is deterministic format serialization rather than a sample-processing property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current adapter encodes an already materialized buffer and does not expose streaming encoder state.", tests = [] }
+l6 = { status = "not_applicable", reason = "FLAC encode is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "not_applicable", reason = "FLAC output options are typed Rust values today; no CLI parser or fuzz target consumes serialized FLAC option text.", tests = [] }

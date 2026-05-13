@@ -402,7 +402,7 @@ impl Pipeline {
 
     /// Encodes the processed audio using an explicit output format model.
     ///
-    /// WAV, raw PCM, and AIFF PCM are implemented encoders. Other planned
+    /// WAV, raw PCM, AIFF PCM, and FLAC are implemented encoders. Other planned
     /// formats return typed [`crate::Error::Codec`] unsupported-format
     /// diagnostics until their own roadmap leaves land.
     ///
@@ -416,9 +416,25 @@ impl Pipeline {
             OutputFormat::Wav(options) => self.write_wav_with_options(path, options),
             OutputFormat::RawPcm(options) => self.write_raw_pcm_with_options(path, options),
             OutputFormat::Aiff(options) => self.write_aiff_with_options(path, options),
-            OutputFormat::Flac(_) => self.write_unsupported(path, CodecKind::Flac),
+            OutputFormat::Flac(options) => self.write_flac_with_options(path, options),
             _ => self.write_unsupported(path, kind),
         }
+    }
+
+    fn write_flac_with_options(
+        self,
+        path: impl AsRef<Path>,
+        options: auralis_codec::FlacEncodeOptions,
+    ) -> Result<EncodeSummary> {
+        let path = path.as_ref();
+        let audio = self.finalize_output_audio()?;
+        let mut output =
+            File::create(path).map_err(|error| auralis_codec::CodecError::EncodeFailed {
+                kind: CodecKind::Flac,
+                message: error.to_string(),
+            })?;
+        let encoder = auralis_flac::FlacEncoder::new(options);
+        Ok(encoder.encode(&audio, &mut output)?)
     }
 
     fn write_aiff_with_options(

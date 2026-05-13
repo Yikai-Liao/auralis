@@ -689,7 +689,8 @@ impl CodecCapabilities {
     pub const fn for_kind(kind: CodecKind) -> Self {
         let can_read = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav")
             || matches!(kind, CodecKind::Flac) && cfg!(feature = "auralis-flac");
-        let can_write = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav");
+        let can_write = matches!(kind, CodecKind::Wav) && cfg!(feature = "auralis-wav")
+            || matches!(kind, CodecKind::Flac) && cfg!(feature = "auralis-flac");
 
         Self {
             kind,
@@ -924,7 +925,7 @@ mod tests {
     fn flac_capability_tracks_decode_feature_flag() {
         let capabilities = CodecCapabilities::for_kind(CodecKind::Flac);
         assert_eq!(capabilities.can_read(), cfg!(feature = "auralis-flac"));
-        assert!(!capabilities.can_write());
+        assert_eq!(capabilities.can_write(), cfg!(feature = "auralis-flac"));
     }
 
     #[test]

@@ -9,7 +9,7 @@ Rust APIs, explicit test contracts, and maintainable modules.
 
 Initial scope is deliberately narrow: **WAV first**, with PCM8, PCM16, PCM24,
 PCM32, float32, float64, u-law, A-law, and RIFX currently implemented. Raw PCM,
-AIFF/AIFC, and FLAC are growing behind Auralis-owned pure Rust adapters.
+AIFF/AIFC, and FLAC decode/export are growing behind Auralis-owned pure Rust adapters.
 Additional formats are planned only after effect and pipeline behavior are broad
 and stable, and new codec backends must stay pure Rust unless a later
 development-plan change says otherwise.
@@ -46,8 +46,8 @@ Auralis is pre-alpha. The repository already contains:
   raw byte-order, bit-order, and nibble-order options through an
   Auralis-owned adapter, plain AIFF signed-integer PCM plus AIFC little-endian
   integer, float32/float64, and G.711 u-law/A-law decode/export through the
-  pure Rust `aifc` adapter, FLAC decode through the pure Rust `claxon`
-  adapter, and typed unsupported-format errors for future FLAC export.
+  pure Rust `aifc` adapter, and FLAC decode/export through pure Rust
+  `claxon`/`flacenc` adapters.
 
 Detailed status is kept in [doc/status.md](doc/status.md). Development planning
 lives in [DEVELOPMENT.md](DEVELOPMENT.md) and [doc/development/](doc/development/).

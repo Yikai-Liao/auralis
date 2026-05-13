@@ -201,8 +201,8 @@ because the PRNG and noise-shaping state order is semantically observable.
 The 8.0 format-support policy now records that future codec backends must stay
 pure Rust unless the development plan changes explicitly. WAV remains the
 built-in adapter path, RAW PCM is planned as an Auralis-owned boundary,
-AIFF/AIFC is classified as feature-gated pure Rust adapter work, FLAC decode is
-implemented through the experimental pure Rust `claxon` adapter, and external
+AIFF/AIFC is classified as feature-gated pure Rust adapter work, FLAC decode/export
+is implemented through experimental pure Rust `claxon`/`flacenc` adapters, and external
 `ffmpeg` or native codec wrappers remain not planned under the current roadmap. The codec
 boundary now also owns `OutputFormat`, per-format encode option models,
 `EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
@@ -211,8 +211,8 @@ IEEE float PCM bytes with explicit raw byte-order, bit-order, and nibble-order
 options through `OutputFormat::RawPcm`, while plain AIFF signed-integer PCM and
 AIFC little-endian integer, float32/float64, and G.711 u-law/A-law encodings now
 decode and export through the pure Rust `aifc` adapter. FLAC decode now opens
-integer streams into planar f32 through `auralis-flac`; future FLAC writes
-return typed unsupported-format errors until Feature 8.4.2 lands.
+integer streams into planar f32 through `auralis-flac`, and FLAC writes now
+export deterministic PCM16 FLAC through `OutputFormat::Flac`.
 Feature 8.1.1 through Feature 8.1.7 are now complete: generic WAV
 decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
 u-law, A-law, and RIFX containers, and WAV writes can now target PCM8, PCM16,
@@ -222,8 +222,9 @@ backward compatibility. Feature 8.2.1 through Feature 8.2.3 are now complete
 for signed/unsigned integer and float raw PCM export plus explicit raw
 byte-order, bit-order, and nibble-order options. Feature 8.3.1 is complete for
 plain AIFF signed-integer PCM decode/export, Feature 8.3.2 is complete for
-AIFC little-endian integer, float32/float64, and G.711 encodings, and Feature
-8.4.1 is complete for FLAC decode; the next unchecked 8.x leaf is FLAC encode.
+AIFC little-endian integer, float32/float64, and G.711 encodings, Feature
+8.4.1 is complete for FLAC decode, and Feature 8.4.2 is complete for FLAC
+encode; the next unchecked 8.x leaf is AU/SND.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
