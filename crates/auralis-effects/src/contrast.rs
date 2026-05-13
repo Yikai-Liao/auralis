@@ -71,19 +71,20 @@ impl Contrast {
 
     /// Applies contrast enhancement to a planar sample slice.
     pub fn process_samples(self, samples: &mut [f32]) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "contrast processing works in the public f32 sample format and rounds the validated amount once per call"
+        )]
+        let scaled_amount = self.scaled_amount as f32;
         for sample in samples {
-            *sample = contrast_sample(*sample, self.scaled_amount);
+            *sample = contrast_sample(*sample, scaled_amount);
         }
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the public effect sample format is f32, so the f64 SoX-ng formula is rounded back to f32 samples"
-)]
-fn contrast_sample(sample: f32, amount: f64) -> f32 {
-    let phase = f64::from(sample) * std::f64::consts::FRAC_PI_2;
-    (phase + amount * (phase * 4.0).sin()).sin() as f32
+fn contrast_sample(sample: f32, amount: f32) -> f32 {
+    let phase = sample * std::f32::consts::FRAC_PI_2;
+    (phase + amount * (phase * 4.0).sin()).sin()
 }
 
 #[cfg(test)]
