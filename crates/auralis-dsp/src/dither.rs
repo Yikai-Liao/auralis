@@ -178,8 +178,30 @@ impl DitherState {
 
     /// Applies dither to the next chunk of samples.
     pub fn process_samples(&mut self, samples: &mut [f32]) {
+        if self.dither.noise_shape.is_some() {
+            for sample in samples {
+                *sample = self.process_noise_shaped_sample(*sample);
+            }
+        } else {
+            self.process_unshaped_samples(samples);
+        }
+    }
+
+    fn process_unshaped_samples(&mut self, samples: &mut [f32]) {
+        let params = self.unshaped_params();
         for sample in samples {
-            *sample = self.process_sample(*sample);
+            *sample = self.process_unshaped_sample(*sample, params);
+        }
+    }
+
+    fn unshaped_params(&self) -> UnshapedDitherParams {
+        let precision = self.dither.precision_bits;
+        UnshapedDitherParams {
+            precision,
+            denominator: f64::from(1_u32 << u32::from(32 - precision)),
+            minimum: -(1_i64 << u32::from(precision - 1)),
+            maximum: (1_i64 << u32::from(precision - 1)) - 1,
+            output_shift: u32::from(32 - precision),
         }
     }
 
@@ -188,27 +210,20 @@ impl DitherState {
         clippy::cast_precision_loss,
         reason = "SoX-ng-compatible quantization maps between integer sample units and normalized f32"
     )]
-    fn process_sample(&mut self, sample: f32) -> f32 {
-        if self.dither.noise_shape.is_some() {
-            return self.process_noise_shaped_sample(sample);
-        }
-
-        let precision = self.dither.precision_bits;
-        let random = self.next_random() >> u32::from(precision);
+    fn process_unshaped_sample(&mut self, sample: f32, params: UnshapedDitherParams) -> f32 {
+        let random = self.next_random() >> u32::from(params.precision);
         let second = match self.dither.mode {
-            DitherMode::Tpdf => self.next_random() >> u32::from(precision),
+            DitherMode::Tpdf => self.next_random() >> u32::from(params.precision),
             DitherMode::SlopedTpdf => -self.previous_random,
         };
         self.previous_random = random;
 
-        let denominator = f64::from(1_u32 << u32::from(32 - precision));
         let internal = normalized_to_sox_sample(sample);
-        let scaled = (internal as f64 + f64::from(random) + f64::from(second)) / denominator;
+        let scaled =
+            (internal as f64 + f64::from(random) + f64::from(second)) / params.denominator;
         let quantized = round_half_away_from_zero(scaled);
-        let minimum = -(1_i64 << u32::from(precision - 1));
-        let maximum = (1_i64 << u32::from(precision - 1)) - 1;
-        let clamped = quantized.clamp(minimum, maximum);
-        let output = clamped << u32::from(32 - precision);
+        let clamped = quantized.clamp(params.minimum, params.maximum);
+        let output = clamped << params.output_shift;
 
         (output as f64 / SOX_SAMPLE_SCALE) as f32
     }
@@ -260,6 +275,15 @@ impl DitherState {
             .wrapping_add(1_013_904_223);
         i32::from_ne_bytes(self.random.to_ne_bytes())
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UnshapedDitherParams {
+    precision: u8,
+    denominator: f64,
+    minimum: i64,
+    maximum: i64,
+    output_shift: u32,
 }
 
 const SHIBATA_48KHZ: [f64; 16] = [
