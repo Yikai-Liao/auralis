@@ -190,6 +190,11 @@ fn process_channel(
     taps: &[(usize, f64)],
     output: &mut Vec<f32>,
 ) {
+    if let [(delay, decay)] = taps {
+        process_single_tap_channel(input, output_frames, *delay, gain_in, gain_out, *decay, output);
+        return;
+    }
+
     let mut delay_buffers = taps
         .iter()
         .map(|(delay, _decay)| vec![0.0_f64; *delay])
@@ -215,6 +220,40 @@ fn process_channel(
         for (counter, (delay, _decay)) in counters.iter_mut().zip(taps.iter()) {
             *counter = (*counter + 1) % *delay;
         }
+    }
+}
+
+fn process_single_tap_channel(
+    input: &[f32],
+    output_frames: usize,
+    delay_frames: usize,
+    gain_in: f64,
+    gain_out: f64,
+    decay_gain: f64,
+    output: &mut Vec<f32>,
+) {
+    let input_len = input.len();
+    let lead_end = delay_frames.min(input_len).min(output_frames);
+    for &input_sample in &input[..lead_end] {
+        output.push(f64_to_f32_clamped(f64::from(input_sample) * gain_in * gain_out));
+    }
+
+    let main_end = input_len.min(output_frames);
+    for frame in lead_end..main_end {
+        let input_sample = f64::from(input[frame]);
+        let delayed_sample = f64::from(input[frame - delay_frames]);
+        let output_sample = input_sample.mul_add(gain_in, delayed_sample * decay_gain);
+        output.push(f64_to_f32_clamped(output_sample * gain_out));
+    }
+
+    for frame in input_len..output_frames {
+        let delayed_index = frame - delay_frames;
+        let delayed_sample = if delayed_index < input_len {
+            f64::from(input[delayed_index])
+        } else {
+            0.0
+        };
+        output.push(f64_to_f32_clamped(delayed_sample * decay_gain * gain_out));
     }
 }
 
