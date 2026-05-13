@@ -5,16 +5,16 @@ use std::{fs, io::Cursor};
 use auralis_codec::{AudioReader, CodecKind};
 use auralis_simd::BackendKind;
 use auralis_wav::{
-    AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_float32, decode_pcm8,
-    decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend, decode_pcm24, decode_pcm24_path,
-    decode_pcm32, decode_pcm32_path, decode_wav,
+    AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_float32, decode_float64,
+    decode_pcm8, decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend, decode_pcm24,
+    decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_wav,
 };
 
 mod support;
 
 use support::{
-    assert_audio_bits_eq, wav_bytes, wav_bytes_float32, wav_bytes_pcm8, wav_bytes_pcm24,
-    wav_bytes_pcm32, wav_bytes_with_bits, write_temp_wav,
+    assert_audio_bits_eq, wav_bytes, wav_bytes_float32, wav_bytes_float64, wav_bytes_pcm8,
+    wav_bytes_pcm24, wav_bytes_pcm32, wav_bytes_with_bits, write_temp_wav,
 };
 
 #[test]
@@ -34,6 +34,7 @@ fn generic_decoder_accepts_pcm8_and_pcm16() {
     let pcm24 = decode_wav(Cursor::new(wav_bytes_pcm24(1, &[-8_388_608, 8_388_607]))).unwrap();
     let pcm32 = decode_wav(Cursor::new(wav_bytes_pcm32(1, &[i32::MIN, i32::MAX]))).unwrap();
     let float32 = decode_wav(Cursor::new(wav_bytes_float32(1, &[-1.25, 0.25]))).unwrap();
+    let float64 = decode_wav(Cursor::new(wav_bytes_float64(1, &[-1.5, 0.75]))).unwrap();
 
     assert_eq!(pcm8.channel(0).unwrap(), &[-1.0, 127.0 / 128.0]);
     assert_eq!(
@@ -46,6 +47,7 @@ fn generic_decoder_accepts_pcm8_and_pcm16() {
     );
     assert_eq!(pcm32.channel(0).unwrap(), &[-1.0, 1.0]);
     assert_eq!(float32.channel(0).unwrap(), &[-1.25, 0.25]);
+    assert_eq!(float64.channel(0).unwrap(), &[-1.5, 0.75]);
 }
 
 #[test]
@@ -121,8 +123,32 @@ fn decodes_mono_float32_to_planar_f32() {
 }
 
 #[test]
+fn decodes_mono_float64_to_planar_f32() {
+    let audio = decode_float64(Cursor::new(wav_bytes_float64(1, &[-1.5, 0.0, 0.5, 1.5]))).unwrap();
+
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 1);
+    assert_eq!(audio.frames().as_u64(), 4);
+    assert_eq!(audio.channel(0).unwrap(), &[-1.5, 0.0, 0.5, 1.5]);
+}
+
+#[test]
 fn decode_float32_rejects_non_finite_samples() {
     let error = decode_float32(Cursor::new(wav_bytes_float32(2, &[0.0, f32::NAN]))).unwrap_err();
+
+    assert_eq!(
+        error,
+        WavError::NonFiniteSample {
+            channel_index: 1,
+            frame_index: 0,
+        }
+    );
+}
+
+#[test]
+fn decode_float64_rejects_non_finite_samples() {
+    let error =
+        decode_float64(Cursor::new(wav_bytes_float64(2, &[0.0, f64::INFINITY]))).unwrap_err();
 
     assert_eq!(
         error,
@@ -198,6 +224,19 @@ fn pcm16_specific_decoder_rejects_float32_with_typed_error() {
 }
 
 #[test]
+fn pcm16_specific_decoder_rejects_float64_with_typed_error() {
+    let error = decode_pcm16(Cursor::new(wav_bytes_float64(1, &[0.0]))).unwrap_err();
+
+    assert_eq!(
+        error,
+        WavError::UnsupportedSampleFormat {
+            bits_per_sample: 64,
+            encoding: WavSampleEncoding::Float,
+        }
+    );
+}
+
+#[test]
 fn malformed_wav_returns_typed_error() {
     let error = decode_pcm16(Cursor::new(b"not a wav".to_vec())).unwrap_err();
 
@@ -251,6 +290,19 @@ fn path_decoder_accepts_float32() {
     assert_eq!(audio.spec().channels().as_u16(), 2);
     assert_eq!(audio.channel(0).unwrap(), &[-1.25]);
     assert_eq!(audio.channel(1).unwrap(), &[1.25]);
+}
+
+#[test]
+fn path_decoder_accepts_float64() {
+    let path = support::temp_path("auralis-wav-path-float64", "wav");
+    fs::write(&path, wav_bytes_float64(2, &[-1.5, 1.5])).unwrap();
+    let audio = auralis_wav::decode_float64_path(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(audio.spec().sample_rate().as_u32(), 48_000);
+    assert_eq!(audio.spec().channels().as_u16(), 2);
+    assert_eq!(audio.channel(0).unwrap(), &[-1.5]);
+    assert_eq!(audio.channel(1).unwrap(), &[1.5]);
 }
 
 #[test]

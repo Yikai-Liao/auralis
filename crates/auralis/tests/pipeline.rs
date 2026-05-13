@@ -376,6 +376,30 @@ fn write_output_format_float32_wav_uses_float32_encoder() {
 }
 
 #[test]
+fn write_output_format_float64_wav_uses_float64_encoder() {
+    let source = stereo_audio_buffer(vec![-1.5, 0.0, 0.5, 1.5]);
+    let format_path = support::temp_path("auralis-pipeline-write-wav-float64", "wav");
+
+    let summary = AudioFile::from_audio_buffer(source)
+        .into_pipeline()
+        .write(&format_path, OutputFormat::Wav(WavEncodeOptions::float64()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_float64_path(&format_path).unwrap();
+
+    fs::remove_file(format_path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Wav);
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(summary.frames(), decoded.frames());
+    assert_eq!(decoded.channel(0).unwrap(), &[-1.5, 0.0]);
+    assert_eq!(decoded.channel(1).unwrap(), &[0.5, 1.5]);
+    assert_eq!(
+        WavEncodeOptions::float64().sample_format(),
+        WavSampleFormat::Float64
+    );
+}
+
+#[test]
 fn write_output_format_rejects_unsupported_formats() {
     let path = support::temp_path("auralis-pipeline-write-raw", "raw");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
@@ -558,6 +582,28 @@ fn open_wav_accepts_pcm24_input() {
         .unwrap();
 
     let decoded = auralis_wav::decode_pcm24_path(output).unwrap();
+    assert_samples_close(decoded.as_planar_f32(), source.as_planar_f32());
+    fs::remove_dir_all(tempdir).unwrap();
+}
+
+#[test]
+fn open_wav_accepts_float64_input() {
+    let tempdir = temp_dir();
+    fs::create_dir(&tempdir).unwrap();
+    let input = tempdir.join("input-float64.wav");
+    let output = tempdir.join("output-float64.wav");
+    let source = audio_buffer(vec![-1.5, 0.0, 1.5]);
+
+    auralis_wav::encode_float64_path(&input, &source).unwrap();
+
+    AudioFile::open_wav(&input)
+        .unwrap()
+        .into_pipeline()
+        .gain_db(0.0)
+        .write(&output, OutputFormat::Wav(WavEncodeOptions::float64()))
+        .unwrap();
+
+    let decoded = auralis_wav::decode_float64_path(output).unwrap();
     assert_samples_close(decoded.as_planar_f32(), source.as_planar_f32());
     fs::remove_dir_all(tempdir).unwrap();
 }

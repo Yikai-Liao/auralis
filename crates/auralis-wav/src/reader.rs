@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufReader, Read},
+    io::{BufReader, Cursor, Read},
     path::Path,
 };
 
@@ -11,6 +11,7 @@ use auralis_simd::BackendKind;
 use crate::{
     Result, WavError,
     format::{ensure_pcm16, frame_count, malformed, wav_sample_format},
+    reader_float64::{decode_wav_bytes_or_hound, is_float64_wav_bytes},
     sample_conversion::{
         float32_to_f32, pcm8_to_f32, pcm16_to_f32_with_backend, pcm24_to_f32, pcm32_to_f32,
     },
@@ -19,15 +20,16 @@ use crate::{
 /// Decodes an entire supported linear PCM WAV stream into a planar `f32`
 /// buffer.
 ///
-/// Currently supported sample formats are PCM8, PCM16, PCM24, PCM32, and float32. The returned
-/// [`AudioSpec`] always uses [`SampleFormat::Float32`] because that is
-/// Auralis' internal processing format.
+/// Currently supported sample formats are PCM8, PCM16, PCM24, PCM32, float32,
+/// and float64. The returned [`AudioSpec`] always uses [`SampleFormat::Float32`]
+/// because that is Auralis' internal processing format.
 ///
 /// # Errors
 ///
 /// Returns [`WavError::UnsupportedSampleFormat`] for any WAV stream that is not
-/// PCM8, PCM16, PCM24, PCM32, or float32. Returns [`WavError::Malformed`]
-/// when the RIFF/WAVE container or sample payload cannot be parsed.
+/// PCM8, PCM16, PCM24, PCM32, float32, or float64. Returns
+/// [`WavError::Malformed`] when the RIFF/WAVE container or sample payload
+/// cannot be parsed.
 pub fn decode_wav<R>(reader: R) -> Result<AudioBuffer>
 where
     R: Read,
@@ -49,7 +51,14 @@ pub fn decode_wav_with_backend<R>(reader: R, requested_backend: BackendKind) -> 
 where
     R: Read,
 {
-    AnyPcmWavReader::new(reader)?.read_wav_with_backend(requested_backend)
+    let mut reader = reader;
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| WavError::Malformed {
+            message: error.to_string(),
+        })?;
+    decode_wav_bytes_or_hound(&bytes, requested_backend)
 }
 
 /// Decodes an entire PCM16 WAV stream into a planar `f32` buffer.
@@ -90,7 +99,21 @@ pub fn decode_pcm16_with_backend<R>(
 where
     R: Read,
 {
-    Pcm16WavReader::new(reader)?.read_pcm16_with_backend(requested_backend)
+    let mut reader = reader;
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| WavError::Malformed {
+            message: error.to_string(),
+        })?;
+    if is_float64_wav_bytes(&bytes) {
+        return Err(WavError::UnsupportedSampleFormat {
+            bits_per_sample: 64,
+            encoding: crate::WavSampleEncoding::Float,
+        });
+    }
+
+    Pcm16WavReader::new(Cursor::new(bytes))?.read_pcm16_with_backend(requested_backend)
 }
 
 /// Decodes a PCM16 WAV file from disk into a planar `f32` buffer.

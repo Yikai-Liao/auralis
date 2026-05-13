@@ -9,9 +9,10 @@ use std::{
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_simd::BackendKind;
 use auralis_wav::{
-    decode_float32_path, decode_pcm8_path, decode_pcm16_path, decode_pcm24_path, decode_pcm32_path,
-    encode_float32_path, encode_pcm8_path, encode_pcm16_path, encode_pcm16_path_with_backend,
-    encode_pcm24_path, encode_pcm32_path,
+    decode_float32_path, decode_float64_path, decode_pcm8_path, decode_pcm16_path,
+    decode_pcm24_path, decode_pcm32_path, encode_float32_path, encode_float64_path,
+    encode_pcm8_path, encode_pcm16_path, encode_pcm16_path_with_backend, encode_pcm24_path,
+    encode_pcm32_path,
 };
 
 pub(crate) fn wav_bytes(channels: u16, samples: &[i16]) -> Vec<u8> {
@@ -49,6 +50,14 @@ pub(crate) fn wav_bytes_pcm32(channels: u16, samples: &[i32]) -> Vec<u8> {
 
 pub(crate) fn wav_bytes_float32(channels: u16, samples: &[f32]) -> Vec<u8> {
     let mut bytes = riff_header(channels, 32, 3, u32::try_from(samples.len() * 4).unwrap());
+    for sample in samples {
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    bytes
+}
+
+pub(crate) fn wav_bytes_float64(channels: u16, samples: &[f64]) -> Vec<u8> {
+    let mut bytes = riff_header(channels, 64, 3, u32::try_from(samples.len() * 8).unwrap());
     for sample in samples {
         bytes.extend_from_slice(&sample.to_le_bytes());
     }
@@ -182,6 +191,12 @@ pub(crate) fn encode_temp_wav_float32(prefix: &str, audio: &AudioBuffer) -> Path
     path
 }
 
+pub(crate) fn encode_temp_wav_float64(prefix: &str, audio: &AudioBuffer) -> PathBuf {
+    let path = temp_path(prefix, "wav");
+    encode_float64_path(&path, audio).unwrap();
+    path
+}
+
 pub(crate) fn encode_temp_wav_with_backend(
     prefix: &str,
     audio: &AudioBuffer,
@@ -240,4 +255,8 @@ pub(crate) fn decode_path_pcm32(path: &Path) -> AudioBuffer {
 
 pub(crate) fn decode_path_float32(path: &Path) -> AudioBuffer {
     decode_float32_path(path).unwrap()
+}
+
+pub(crate) fn decode_path_float64(path: &Path) -> AudioBuffer {
+    decode_float64_path(path).unwrap()
 }

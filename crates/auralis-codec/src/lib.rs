@@ -133,6 +133,9 @@ pub enum WavSampleFormat {
 
     /// 32-bit IEEE floating-point samples.
     Float32,
+
+    /// 64-bit IEEE floating-point samples.
+    Float64,
 }
 
 /// Auralis-owned options for WAV export.
@@ -176,6 +179,12 @@ impl WavEncodeOptions {
     #[must_use]
     pub const fn float32() -> Self {
         Self::new(WavSampleFormat::Float32)
+    }
+
+    /// Creates WAV encode options for 64-bit IEEE floating-point samples.
+    #[must_use]
+    pub const fn float64() -> Self {
+        Self::new(WavSampleFormat::Float64)
     }
 
     /// Returns the configured WAV sample format.

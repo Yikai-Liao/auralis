@@ -62,7 +62,7 @@ Implementation notes:
 
 | Format family | Candidate backend | Classification | License and maintenance note | Native dependency note | Streaming and sample-format note | Metadata and fuzz/security note |
 |---|---|---|---|---|---|---|
-| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path. | Pure Rust crate; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, and float32 at the Auralis boundary; later WAV leaves still cover float64 and companded variants. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
+| WAV | `hound` through `auralis-wav` / `auralis-codec` adapters plus an Auralis-owned float64 RIFF/WAVE adapter | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path; float64 uses a narrow in-tree adapter because `hound` only exposes float32 sample I/O. | Pure Rust crate plus Auralis-owned parsing/writing; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, float32, and float64 at the Auralis boundary; later WAV leaves still cover companded variants. | RIFF/WAV metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
 | RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
 | AIFF / AIFC | pure Rust crate candidate such as `aifc`, behind a feature-gated adapter | feature-gated pure Rust | Accept only after a crate-level audit confirms MIT/Apache-compatible licensing, active enough maintenance, and reviewable transitive footprint. | Must remain pure Rust with no libsndfile or other native wrapper path. | Needs a streaming decode/encode story for PCM AIFF first; compressed AIFC encodings are later and may stay narrower if the backend cannot cover them safely. | Chunk metadata behavior must stay behind Auralis-owned option/report types; add parser/fuzz coverage before enabling broad import/export support. |
 | FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
@@ -286,6 +286,40 @@ Implementation notes:
   surface.
 
 ### Feature 8.1.5: WAV float64
+
+Status: completed.
+
+Add deterministic WAV float64 decode and encode support without regressing the
+existing integer and float32 WAV paths.
+
+Acceptance tests:
+
+- `auralis-wav` decodes float64 WAV bytes and files into the same planar `f32`
+  buffer model used by the other WAV paths;
+- the generic supported-WAV path accepts float64 while the PCM16-specific path
+  still rejects float64 with the typed IEEE-float unsupported sample-format
+  diagnostic;
+- `OutputFormat::Wav(WavEncodeOptions::float64())` writes float64 WAV output
+  through the codec boundary while `Pipeline::write_wav` remains the existing
+  PCM16 compatibility path;
+- codec-boundary reader/writer tests cover float64 end to end;
+- README and status/development docs record float64 as complete and point the
+  next unchecked leaf to WAV u-law and A-law.
+
+Implementation notes:
+
+- `auralis-codec` now extends `WavSampleFormat`/`WavEncodeOptions` with
+  float64 while keeping PCM16 as the backward-compatible default.
+- `auralis-wav` now supports generic WAV decode for PCM8, PCM16, PCM24,
+  PCM32, float32, and float64. Float64 uses a small Auralis-owned RIFF/WAVE
+  adapter because the current `hound` sample trait supports `f32` but not
+  `f64` samples.
+- Float64 WAV writes widen finite internal `f32` samples to `f64` without
+  clipping or quantization; SIMD is not applicable because the conversion is a
+  scalar format-boundary widening step.
+- `auralis::AudioFile::open_wav` and `Pipeline::write(OutputFormat::Wav(...))`
+  now accept float64 without changing the legacy `write_wav` PCM16-only
+  surface.
 
 ### Feature 8.1.6: WAV u-law and A-law
 

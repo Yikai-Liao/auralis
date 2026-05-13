@@ -76,6 +76,30 @@ pub(crate) fn float32_to_f32(input: &[f32], output: &mut [f32], channels: usize)
     Ok(())
 }
 
+pub(crate) fn float64_to_f32(input: &[f64], output: &mut [f32], channels: usize) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::InvalidBufferShape);
+    }
+
+    for (sample_index, (&sample, destination)) in input.iter().zip(output.iter_mut()).enumerate() {
+        if !sample.is_finite() {
+            return Err(WavError::NonFiniteSample {
+                channel_index: sample_index % channels,
+                frame_index: sample_index / channels,
+            });
+        }
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Float64 WAV decode narrows into Auralis' public f32 processing buffer."
+        )]
+        {
+            *destination = sample as f32;
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn f32_to_pcm16_with_backend(
     requested_backend: BackendKind,
     input: &[f32],
@@ -191,6 +215,26 @@ pub(crate) fn f32_to_float32(input: &[f32], output: &mut [f32], channels: usize)
             });
         }
         *destination = sample;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn f32_to_float64(input: &[f32], output: &mut [f64], channels: usize) -> Result<()> {
+    if input.len() != output.len() {
+        return Err(WavError::WriteFailed {
+            message: "sample conversion buffer length mismatch".to_owned(),
+        });
+    }
+
+    for (sample_index, (&sample, destination)) in input.iter().zip(output.iter_mut()).enumerate() {
+        if !sample.is_finite() {
+            return Err(WavError::NonFiniteSample {
+                channel_index: sample_index % channels,
+                frame_index: sample_index / channels,
+            });
+        }
+        *destination = f64::from(sample);
     }
 
     Ok(())
