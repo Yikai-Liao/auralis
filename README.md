@@ -40,7 +40,8 @@ Auralis is pre-alpha. The repository already contains:
   codec backends as not planned under the current roadmap;
 - an Auralis-owned output-format boundary with `OutputFormat`,
   per-format encode option types, `AudioEncoder`/`EncodeSummary`, a WAV encoder
-  adapter, raw signed/unsigned integer and float PCM export through an
+  adapter, raw signed/unsigned integer and float PCM export with explicit
+  raw byte-order, bit-order, and nibble-order options through an
   Auralis-owned adapter, and typed unsupported-format errors for future
   AIFF/AIFC and FLAC export leaves.
 

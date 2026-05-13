@@ -3,7 +3,10 @@
 
 use std::io::Cursor;
 
-use auralis_codec::{AudioEncoder, CodecKind, RawPcmEncodeOptions};
+use auralis_codec::{
+    AudioEncoder, CodecKind, RawPcmBitOrder, RawPcmByteOrder, RawPcmEncodeOptions,
+    RawPcmNibbleOrder,
+};
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_raw::{RawPcmEncoder, RawPcmError, encode_raw_pcm};
 
@@ -101,6 +104,64 @@ fn encodes_float_samples_little_endian() {
         ]
         .concat()
     );
+}
+
+#[test]
+fn encodes_multi_byte_samples_big_endian() {
+    let audio = audio_buffer(1, 2, &[-1.0, 1.0]);
+
+    let mut signed16 = Vec::new();
+    encode_raw_pcm(
+        &mut signed16,
+        &audio,
+        RawPcmEncodeOptions::signed16().with_byte_order(RawPcmByteOrder::BigEndian),
+    )
+    .unwrap();
+    assert_eq!(signed16, vec![0x80, 0x00, 0x7f, 0xff]);
+
+    let mut signed24 = Vec::new();
+    encode_raw_pcm(
+        &mut signed24,
+        &audio,
+        RawPcmEncodeOptions::signed24().with_byte_order(RawPcmByteOrder::BigEndian),
+    )
+    .unwrap();
+    assert_eq!(signed24, vec![0x80, 0x00, 0x00, 0x7f, 0xff, 0xff]);
+
+    let mut float32 = Vec::new();
+    encode_raw_pcm(
+        &mut float32,
+        &audio,
+        RawPcmEncodeOptions::float32().with_byte_order(RawPcmByteOrder::BigEndian),
+    )
+    .unwrap();
+    assert_eq!(
+        float32,
+        [(-1.0_f32).to_be_bytes(), 1.0_f32.to_be_bytes(),].concat()
+    );
+}
+
+#[test]
+fn applies_raw_bit_and_nibble_order_per_byte() {
+    let audio = audio_buffer(1, 1, &[0.5]);
+
+    let mut nibble_swapped = Vec::new();
+    encode_raw_pcm(
+        &mut nibble_swapped,
+        &audio,
+        RawPcmEncodeOptions::unsigned8().with_nibble_order(RawPcmNibbleOrder::LowNibbleFirst),
+    )
+    .unwrap();
+    assert_eq!(nibble_swapped, vec![0xfb]);
+
+    let mut bit_reversed = Vec::new();
+    encode_raw_pcm(
+        &mut bit_reversed,
+        &audio,
+        RawPcmEncodeOptions::unsigned8().with_bit_order(RawPcmBitOrder::LeastSignificantBitFirst),
+    )
+    .unwrap();
+    assert_eq!(bit_reversed, vec![0xfd]);
 }
 
 #[test]

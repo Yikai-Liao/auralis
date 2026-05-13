@@ -12,8 +12,8 @@ use std::{
 };
 
 use auralis_codec::{
-    AudioEncoder, AudioOutput, CodecError, CodecKind, EncodeSummary, RawPcmEncodeOptions,
-    RawPcmSampleFormat,
+    AudioEncoder, AudioOutput, CodecError, CodecKind, EncodeSummary, RawPcmBitOrder,
+    RawPcmByteOrder, RawPcmEncodeOptions, RawPcmNibbleOrder, RawPcmSampleFormat,
 };
 use auralis_core::AudioBuffer;
 use thiserror::Error;
@@ -61,8 +61,8 @@ impl From<RawPcmError> for CodecError {
 
 /// Encodes `audio` as interleaved headerless raw PCM bytes.
 ///
-/// Multi-byte integer and floating-point samples are written little-endian
-/// until the raw endian roadmap leaf adds explicit options.
+/// Multi-byte integer and floating-point samples use the configured byte order.
+/// Nibble-order transforms are applied to each byte before bit-order transforms.
 ///
 /// # Errors
 ///
@@ -89,13 +89,7 @@ where
                     message: "audio buffer shape changed during raw PCM write".to_owned(),
                 }
             })?;
-            write_sample(
-                &mut writer,
-                sample,
-                options.sample_format(),
-                channel_index,
-                frame_index,
-            )?;
+            write_sample(&mut writer, sample, options, channel_index, frame_index)?;
         }
     }
 
@@ -160,7 +154,7 @@ impl AudioEncoder for RawPcmEncoder {
 fn write_sample<W>(
     writer: &mut W,
     sample: f32,
-    format: RawPcmSampleFormat,
+    options: RawPcmEncodeOptions,
     channel_index: usize,
     frame_index: usize,
 ) -> Result<()>
@@ -174,43 +168,64 @@ where
         });
     }
 
-    match format {
+    let mut bytes = Vec::with_capacity(8);
+    match options.sample_format() {
         RawPcmSampleFormat::Signed8 => {
             let sample = i8::try_from(quantize_signed(sample, 8)).map_err(quantization_error)?;
-            writer.write_all(&[sample.cast_unsigned()])?;
+            bytes.push(sample.cast_unsigned());
         }
         RawPcmSampleFormat::Unsigned8 => {
             let sample = u8::try_from(quantize_unsigned(sample, 8)).map_err(quantization_error)?;
-            writer.write_all(&[sample])?;
+            bytes.push(sample);
         }
         RawPcmSampleFormat::Signed16 => {
             let sample = i16::try_from(quantize_signed(sample, 16)).map_err(quantization_error)?;
-            writer.write_all(&sample.to_le_bytes())?;
+            bytes.extend_from_slice(&ordered_bytes(sample.to_le_bytes(), options.byte_order()));
         }
         RawPcmSampleFormat::Unsigned16 => {
             let sample =
                 u16::try_from(quantize_unsigned(sample, 16)).map_err(quantization_error)?;
-            writer.write_all(&sample.to_le_bytes())?;
+            bytes.extend_from_slice(&ordered_bytes(sample.to_le_bytes(), options.byte_order()));
         }
-        RawPcmSampleFormat::Signed24 => write_i24_le(writer, quantize_signed(sample, 24))?,
-        RawPcmSampleFormat::Unsigned24 => write_u24_le(writer, quantize_unsigned(sample, 24))?,
+        RawPcmSampleFormat::Signed24 => {
+            bytes.extend_from_slice(&ordered_i24_bytes(
+                quantize_signed(sample, 24),
+                options.byte_order(),
+            )?);
+        }
+        RawPcmSampleFormat::Unsigned24 => {
+            bytes.extend_from_slice(&ordered_u24_bytes(
+                quantize_unsigned(sample, 24),
+                options.byte_order(),
+            )?);
+        }
         RawPcmSampleFormat::Signed32 => {
             let sample = i32::try_from(quantize_signed(sample, 32)).map_err(quantization_error)?;
-            writer.write_all(&sample.to_le_bytes())?;
+            bytes.extend_from_slice(&ordered_bytes(sample.to_le_bytes(), options.byte_order()));
         }
         RawPcmSampleFormat::Unsigned32 => {
             let sample =
                 u32::try_from(quantize_unsigned(sample, 32)).map_err(quantization_error)?;
-            writer.write_all(&sample.to_le_bytes())?;
+            bytes.extend_from_slice(&ordered_bytes(sample.to_le_bytes(), options.byte_order()));
         }
-        RawPcmSampleFormat::Float32 => writer.write_all(&sample.to_le_bytes())?,
-        RawPcmSampleFormat::Float64 => writer.write_all(&f64::from(sample).to_le_bytes())?,
+        RawPcmSampleFormat::Float32 => {
+            bytes.extend_from_slice(&ordered_bytes(sample.to_le_bytes(), options.byte_order()));
+        }
+        RawPcmSampleFormat::Float64 => {
+            bytes.extend_from_slice(&ordered_bytes(
+                f64::from(sample).to_le_bytes(),
+                options.byte_order(),
+            ));
+        }
         _ => {
             return Err(RawPcmError::WriteFailed {
                 message: "raw PCM sample format is not supported".to_owned(),
             });
         }
     }
+
+    transform_bytes(&mut bytes, options.nibble_order(), options.bit_order());
+    writer.write_all(&bytes)?;
 
     Ok(())
 }
@@ -254,24 +269,46 @@ fn quantize_unsigned(sample: f32, bits: u32) -> u64 {
     }
 }
 
-fn write_i24_le<W>(writer: &mut W, sample: i64) -> Result<()>
-where
-    W: Write + ?Sized,
-{
+fn ordered_i24_bytes(sample: i64, byte_order: RawPcmByteOrder) -> Result<[u8; 3]> {
     let sample = i32::try_from(sample).map_err(quantization_error)?;
     let bytes = sample.to_le_bytes();
-    writer.write_all(&bytes[..3])?;
-    Ok(())
+    Ok(match byte_order {
+        RawPcmByteOrder::LittleEndian => [bytes[0], bytes[1], bytes[2]],
+        RawPcmByteOrder::BigEndian => [bytes[2], bytes[1], bytes[0]],
+        _ => unreachable!("unsupported raw PCM byte order"),
+    })
 }
 
-fn write_u24_le<W>(writer: &mut W, sample: u64) -> Result<()>
-where
-    W: Write + ?Sized,
-{
+fn ordered_u24_bytes(sample: u64, byte_order: RawPcmByteOrder) -> Result<[u8; 3]> {
     let sample = u32::try_from(sample).map_err(quantization_error)?;
     let bytes = sample.to_le_bytes();
-    writer.write_all(&bytes[..3])?;
-    Ok(())
+    Ok(match byte_order {
+        RawPcmByteOrder::LittleEndian => [bytes[0], bytes[1], bytes[2]],
+        RawPcmByteOrder::BigEndian => [bytes[2], bytes[1], bytes[0]],
+        _ => unreachable!("unsupported raw PCM byte order"),
+    })
+}
+
+fn ordered_bytes<const N: usize>(mut bytes: [u8; N], byte_order: RawPcmByteOrder) -> [u8; N] {
+    match byte_order {
+        RawPcmByteOrder::LittleEndian => bytes,
+        RawPcmByteOrder::BigEndian => {
+            bytes.reverse();
+            bytes
+        }
+        _ => unreachable!("unsupported raw PCM byte order"),
+    }
+}
+
+fn transform_bytes(bytes: &mut [u8], nibble_order: RawPcmNibbleOrder, bit_order: RawPcmBitOrder) {
+    for byte in bytes {
+        if matches!(nibble_order, RawPcmNibbleOrder::LowNibbleFirst) {
+            *byte = byte.rotate_left(4);
+        }
+        if matches!(bit_order, RawPcmBitOrder::LeastSignificantBitFirst) {
+            *byte = byte.reverse_bits();
+        }
+    }
 }
 
 fn quantization_error(error: impl std::fmt::Display) -> RawPcmError {

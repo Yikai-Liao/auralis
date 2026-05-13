@@ -7,8 +7,8 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    AiffEncodeOptions, CodecError, CodecKind, RawPcmEncodeOptions, WavContainer, WavEncodeOptions,
-    WavSampleFormat,
+    AiffEncodeOptions, CodecError, CodecKind, RawPcmByteOrder, RawPcmEncodeOptions, WavContainer,
+    WavEncodeOptions, WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -485,6 +485,27 @@ fn write_output_format_raw_float_uses_raw_encoder() {
         bytes,
         [(-1.0_f64).to_le_bytes(), 0.5_f64.to_le_bytes()].concat()
     );
+}
+
+#[test]
+fn write_output_format_raw_honors_byte_order_options() {
+    let path = support::temp_path("auralis-pipeline-write-raw-be", "raw");
+    let summary = AudioFile::from_audio_buffer(audio_buffer(vec![-1.0, 1.0]))
+        .into_pipeline()
+        .write(
+            &path,
+            OutputFormat::RawPcm(
+                RawPcmEncodeOptions::signed16().with_byte_order(RawPcmByteOrder::BigEndian),
+            ),
+        )
+        .unwrap();
+
+    let bytes = fs::read(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::RawPcm);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(bytes, vec![0x80, 0x00, 0x7f, 0xff]);
 }
 
 #[test]

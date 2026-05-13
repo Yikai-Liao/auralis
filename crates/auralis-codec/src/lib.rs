@@ -248,9 +248,6 @@ impl Default for WavEncodeOptions {
 }
 
 /// Sample format for headerless raw PCM export.
-///
-/// Multi-byte integer and floating-point samples are little-endian until
-/// explicit raw endian options land in the format roadmap.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RawPcmSampleFormat {
@@ -286,17 +283,82 @@ pub enum RawPcmSampleFormat {
     Float64,
 }
 
+/// Byte order for multi-byte headerless raw PCM samples.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RawPcmByteOrder {
+    /// Least-significant byte first.
+    #[default]
+    LittleEndian,
+
+    /// Most-significant byte first.
+    BigEndian,
+}
+
+/// Bit order transform for each emitted raw PCM byte.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RawPcmBitOrder {
+    /// Preserve normal byte bit order.
+    #[default]
+    MostSignificantBitFirst,
+
+    /// Reverse the bits in each emitted byte.
+    LeastSignificantBitFirst,
+}
+
+/// Nibble order transform for each emitted raw PCM byte.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RawPcmNibbleOrder {
+    /// Preserve high-nibble then low-nibble byte layout.
+    #[default]
+    HighNibbleFirst,
+
+    /// Swap the high and low nibbles in each emitted byte.
+    LowNibbleFirst,
+}
+
 /// Auralis-owned options for raw PCM export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RawPcmEncodeOptions {
     sample_format: RawPcmSampleFormat,
+    byte_order: RawPcmByteOrder,
+    bit_order: RawPcmBitOrder,
+    nibble_order: RawPcmNibbleOrder,
 }
 
 impl RawPcmEncodeOptions {
     /// Creates raw PCM encode options for `sample_format`.
     #[must_use]
     pub const fn new(sample_format: RawPcmSampleFormat) -> Self {
-        Self { sample_format }
+        Self {
+            sample_format,
+            byte_order: RawPcmByteOrder::LittleEndian,
+            bit_order: RawPcmBitOrder::MostSignificantBitFirst,
+            nibble_order: RawPcmNibbleOrder::HighNibbleFirst,
+        }
+    }
+
+    /// Returns a copy with the requested byte order for multi-byte samples.
+    #[must_use]
+    pub const fn with_byte_order(mut self, byte_order: RawPcmByteOrder) -> Self {
+        self.byte_order = byte_order;
+        self
+    }
+
+    /// Returns a copy with the requested per-byte bit order transform.
+    #[must_use]
+    pub const fn with_bit_order(mut self, bit_order: RawPcmBitOrder) -> Self {
+        self.bit_order = bit_order;
+        self
+    }
+
+    /// Returns a copy with the requested per-byte nibble order transform.
+    #[must_use]
+    pub const fn with_nibble_order(mut self, nibble_order: RawPcmNibbleOrder) -> Self {
+        self.nibble_order = nibble_order;
+        self
     }
 
     /// Creates options for signed 8-bit raw PCM.
@@ -363,6 +425,24 @@ impl RawPcmEncodeOptions {
     #[must_use]
     pub const fn sample_format(self) -> RawPcmSampleFormat {
         self.sample_format
+    }
+
+    /// Returns the configured byte order for multi-byte samples.
+    #[must_use]
+    pub const fn byte_order(self) -> RawPcmByteOrder {
+        self.byte_order
+    }
+
+    /// Returns the configured per-byte bit order transform.
+    #[must_use]
+    pub const fn bit_order(self) -> RawPcmBitOrder {
+        self.bit_order
+    }
+
+    /// Returns the configured per-byte nibble order transform.
+    #[must_use]
+    pub const fn nibble_order(self) -> RawPcmNibbleOrder {
+        self.nibble_order
     }
 }
 
@@ -642,9 +722,9 @@ mod tests {
 
     use super::{
         AiffEncodeOptions, AudioEncoder, AudioReader, AudioWriter, CodecCapabilities, CodecError,
-        CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmEncodeOptions,
-        RawPcmSampleFormat, UnsupportedEncoder, UnsupportedFormat, UnsupportedReader,
-        UnsupportedWriter,
+        CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmBitOrder, RawPcmByteOrder,
+        RawPcmEncodeOptions, RawPcmNibbleOrder, RawPcmSampleFormat, UnsupportedEncoder,
+        UnsupportedFormat, UnsupportedReader, UnsupportedWriter,
     };
 
     fn mono_buffer() -> AudioBuffer {
@@ -717,6 +797,19 @@ mod tests {
         assert_eq!(
             RawPcmEncodeOptions::float64().sample_format(),
             RawPcmSampleFormat::Float64
+        );
+        let raw_options = RawPcmEncodeOptions::signed16()
+            .with_byte_order(RawPcmByteOrder::BigEndian)
+            .with_bit_order(RawPcmBitOrder::LeastSignificantBitFirst)
+            .with_nibble_order(RawPcmNibbleOrder::LowNibbleFirst);
+        assert_eq!(raw_options.byte_order(), RawPcmByteOrder::BigEndian);
+        assert_eq!(
+            raw_options.bit_order(),
+            RawPcmBitOrder::LeastSignificantBitFirst
+        );
+        assert_eq!(
+            raw_options.nibble_order(),
+            RawPcmNibbleOrder::LowNibbleFirst
         );
         assert_eq!(
             OutputFormat::Aiff(AiffEncodeOptions).codec_kind(),

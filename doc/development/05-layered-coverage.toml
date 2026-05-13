@@ -1190,3 +1190,18 @@ l4 = { status = "not_applicable", reason = "Automatic dither policy is an explic
 l5 = { status = "not_applicable", reason = "The current policy is applied at output materialization rather than as a streaming processor.", tests = [] }
 l6 = { status = "not_applicable", reason = "The implemented output dither policy uses the deterministic scalar dither primitive.", tests = [] }
 l7 = { status = "covered", reason = "Golden-manifest fuzzing covers the auto-dither metadata field through the shared parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/golden_manifest.rs"] }
+
+[[subject]]
+id = "primitive.raw_pcm_encoder"
+kind = "primitive"
+name = "raw-pcm-encoder"
+summary = "Headerless raw PCM output boundary for signed, unsigned, and IEEE-float samples with explicit byte, bit, and nibble ordering."
+[subject.layers]
+l0 = { status = "not_applicable", reason = "The raw encoder tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
+l1 = { status = "not_applicable", reason = "Headerless raw PCM has no WAV container behavior; WAV I/O coverage remains separate.", tests = [] }
+l2 = { status = "not_applicable", reason = "This leaf is byte serialization for raw PCM output and has no SoX-ng effect command surface.", tests = [] }
+l3 = { status = "covered", reason = "Raw encoder tests cover signed, unsigned, float, interleaving, big-endian byte order, bit-order transforms, nibble-order transforms, non-finite diagnostics, and codec-boundary encoding.", tests = ["crates/auralis-raw/tests/encode.rs", "crates/auralis-codec/src/lib.rs", "crates/auralis/tests/pipeline.rs"] }
+l4 = { status = "not_applicable", reason = "The current raw output feature is deterministic serialization rather than a sample-processing property surface.", tests = [] }
+l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer at the output boundary and does not expose streaming state.", tests = [] }
+l6 = { status = "not_applicable", reason = "Raw PCM output ordering is scalar format-boundary serialization with no backend-dispatched SIMD kernel.", tests = [] }
+l7 = { status = "not_applicable", reason = "Raw output options are typed Rust values today; no CLI parser or fuzz target consumes serialized raw option text.", tests = [] }

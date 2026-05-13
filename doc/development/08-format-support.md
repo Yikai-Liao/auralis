@@ -463,6 +463,35 @@ Implementation notes:
 
 ### Feature 8.2.3: raw endian, bit-order, and nibble-order options
 
+Status: completed.
+
+Add explicit byte-order, bit-order, and nibble-order options for headerless raw
+PCM export while preserving the existing little-endian/default byte stream.
+
+Acceptance tests:
+
+- `auralis-codec` exposes Auralis-owned raw PCM byte-order, bit-order, and
+  nibble-order enums plus builder-style `RawPcmEncodeOptions` accessors;
+- raw signed/unsigned integer and IEEE float output honors little-endian and
+  big-endian byte order for multi-byte samples;
+- raw bit-order and nibble-order transforms apply deterministically per emitted
+  byte after sample quantization and byte-order selection;
+- `Pipeline::write(OutputFormat::RawPcm(...))` dispatches the configured raw
+  options through the raw PCM encoder and returns an `EncodeSummary`;
+- README and status/development docs record raw ordering options as complete and
+  point the next unchecked leaf to AIFF PCM.
+
+Implementation notes:
+
+- Defaults remain `LittleEndian`, `MostSignificantBitFirst`, and
+  `HighNibbleFirst`, so existing raw integer and float export bytes stay
+  unchanged.
+- Nibble-order transforms are applied before bit-order transforms. This keeps
+  both options independently testable and makes the byte-level transform order
+  stable for future parser/fuzz coverage.
+- Raw ordering is scalar format-boundary serialization, so SIMD is not
+  applicable for this leaf beyond earlier sample-processing backends.
+
 ## Milestone 8.3: AIFF formats
 
 ### Feature 8.3.1: AIFF PCM
