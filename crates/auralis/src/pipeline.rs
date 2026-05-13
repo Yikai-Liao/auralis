@@ -1,8 +1,8 @@
 use std::{fs::File, path::Path};
 
 use auralis_codec::{
-    AudioEncoder, CodecKind, EncodeSummary, OutputFormat, RawPcmEncodeOptions, UnsupportedEncoder,
-    WavContainer, WavEncodeOptions, WavSampleFormat,
+    AiffEncodeOptions, AudioEncoder, CodecKind, EncodeSummary, OutputFormat, RawPcmEncodeOptions,
+    UnsupportedEncoder, WavContainer, WavEncodeOptions, WavSampleFormat,
 };
 use auralis_effects::{DcShift, Fade, Gain, Pad, Reverse, Trim};
 
@@ -402,7 +402,7 @@ impl Pipeline {
 
     /// Encodes the processed audio using an explicit output format model.
     ///
-    /// WAV currently remains the only implemented encoder. Other planned
+    /// WAV, raw PCM, and AIFF PCM are implemented encoders. Other planned
     /// formats return typed [`crate::Error::Codec`] unsupported-format
     /// diagnostics until their own roadmap leaves land.
     ///
@@ -415,10 +415,26 @@ impl Pipeline {
         match format {
             OutputFormat::Wav(options) => self.write_wav_with_options(path, options),
             OutputFormat::RawPcm(options) => self.write_raw_pcm_with_options(path, options),
-            OutputFormat::Aiff(_) => self.write_unsupported(path, CodecKind::Aiff),
+            OutputFormat::Aiff(options) => self.write_aiff_with_options(path, options),
             OutputFormat::Flac(_) => self.write_unsupported(path, CodecKind::Flac),
             _ => self.write_unsupported(path, kind),
         }
+    }
+
+    fn write_aiff_with_options(
+        self,
+        path: impl AsRef<Path>,
+        options: AiffEncodeOptions,
+    ) -> Result<EncodeSummary> {
+        let path = path.as_ref();
+        let audio = self.finalize_output_audio()?;
+        let mut output =
+            File::create(path).map_err(|error| auralis_codec::CodecError::EncodeFailed {
+                kind: CodecKind::Aiff,
+                message: error.to_string(),
+            })?;
+        let encoder = auralis_aiff::AiffPcmEncoder::new(options);
+        Ok(encoder.encode(&audio, &mut output)?)
     }
 
     fn write_raw_pcm_with_options(

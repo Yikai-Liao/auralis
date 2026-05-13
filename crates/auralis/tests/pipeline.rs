@@ -7,8 +7,8 @@ use std::fs;
 
 use auralis::{AudioFile, BackendKind, EffectChain, EffectCommand, Error, OutputFormat};
 use auralis_codec::{
-    AiffEncodeOptions, CodecError, CodecKind, RawPcmByteOrder, RawPcmEncodeOptions, WavContainer,
-    WavEncodeOptions, WavSampleFormat,
+    AiffEncodeOptions, CodecError, CodecKind, FlacEncodeOptions, RawPcmByteOrder,
+    RawPcmEncodeOptions, WavContainer, WavEncodeOptions, WavSampleFormat,
 };
 use auralis_core::{Decibels, FrameCount};
 use auralis_effects::{DcShift, Fade, Gain, Reverse, Trim};
@@ -509,18 +509,36 @@ fn write_output_format_raw_honors_byte_order_options() {
 }
 
 #[test]
-fn write_output_format_rejects_unsupported_formats() {
+fn write_output_format_aiff_uses_aiff_pcm_encoder() {
     let path = support::temp_path("auralis-pipeline-write-aiff", "aiff");
+    let summary = AudioFile::from_audio_buffer(stereo_audio_buffer(vec![0.0, 0.5, -0.5, 1.0]))
+        .into_pipeline()
+        .write(&path, OutputFormat::Aiff(AiffEncodeOptions::signed16()))
+        .unwrap();
+
+    let decoded = auralis_aiff::decode_aiff_path(&path).unwrap();
+
+    fs::remove_file(path).unwrap();
+    assert_eq!(summary.codec_kind(), CodecKind::Aiff);
+    assert_eq!(summary.frames(), FrameCount::new(2));
+    assert_eq!(summary.spec(), decoded.spec());
+    assert_eq!(decoded.channel(0).unwrap(), &[0.0, 0.5]);
+    assert_eq!(decoded.channel(1).unwrap(), &[-0.5, 32_767.0 / 32_768.0]);
+}
+
+#[test]
+fn write_output_format_rejects_unsupported_formats() {
+    let path = support::temp_path("auralis-pipeline-write-flac", "flac");
     let error = AudioFile::from_audio_buffer(audio_buffer(vec![0.0, 0.25]))
         .into_pipeline()
-        .write(&path, OutputFormat::Aiff(AiffEncodeOptions))
+        .write(&path, OutputFormat::Flac(FlacEncodeOptions))
         .unwrap_err();
 
     let _ = fs::remove_file(path);
     assert_eq!(
         error,
         Error::Codec(CodecError::UnsupportedFormat(
-            auralis_codec::UnsupportedFormat::new(CodecKind::Aiff)
+            auralis_codec::UnsupportedFormat::new(CodecKind::Flac)
         ))
     );
 }

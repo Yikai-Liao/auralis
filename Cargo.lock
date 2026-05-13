@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "aifc"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00259ade1408f212e06fbf52b31677526eb81d91ff3f71d1ac8c7fa6f4eaf31f"
+dependencies = [
+ "audio-codec-algorithms",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -53,15 +62,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "audio-codec-algorithms"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3befb328a44333ff731148d7f4acb322e57748d48fee4e424ae1fa786d765501"
+
+[[package]]
 name = "auralis"
 version = "0.0.0"
 dependencies = [
+ "auralis-aiff",
  "auralis-codec",
  "auralis-core",
  "auralis-effects",
  "auralis-raw",
  "auralis-simd",
  "auralis-wav",
+ "thiserror",
+]
+
+[[package]]
+name = "auralis-aiff"
+version = "0.0.0"
+dependencies = [
+ "aifc",
+ "auralis-codec",
+ "auralis-core",
  "thiserror",
 ]
 

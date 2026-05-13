@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/auralis",
+    "crates/auralis-aiff",
     "crates/auralis-cli",
     "crates/auralis-codec",
     "crates/auralis-core",
@@ -22,6 +23,7 @@ rust-version = "1.95"
 version = "0.0.0"
 
 [workspace.dependencies]
+aifc = "0.7.0"
 clap = "4.5.53"
 hound = "3.5.1"
 serde = { version = "1.0.228", features = ["derive"] }

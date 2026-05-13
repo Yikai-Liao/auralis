@@ -64,7 +64,7 @@ Implementation notes:
 |---|---|---|---|---|---|---|
 | WAV | `hound` through `auralis-wav` / `auralis-codec` adapters plus Auralis-owned float64, G.711, and RIFX adapters | built-in | Existing dependency with a stable Rust ecosystem footprint and already exercised by the current WAV path; RIFX and non-`hound` formats use narrow in-tree adapters. | Pure Rust crate plus Auralis-owned parsing/writing; no external codec libraries or system tools. | Current stage supports PCM8, PCM16, PCM24, PCM32, float32, float64, u-law, A-law, and RIFF/RIFX container byte orders at the Auralis boundary. | RIFF/RIFX metadata stays intentionally narrow for now; existing parser coverage, fuzz seeds, and unsupported-format diagnostics remain the safety baseline. |
 | RAW PCM | Auralis-owned reader/writer and endian/layout conversion | built-in | No third-party codec crate is required because raw PCM is a container-less boundary owned by Auralis. | No native dependencies. | Streaming-friendly because bytes map directly to frames; future leaves must define endian, signedness, float, and nibble/bit-order handling explicitly. | Metadata is intentionally minimal by design, so the main risk is option parsing and shape validation rather than tag handling; parser/fuzz coverage should focus there. |
-| AIFF / AIFC | pure Rust crate candidate such as `aifc`, behind a feature-gated adapter | feature-gated pure Rust | Accept only after a crate-level audit confirms MIT/Apache-compatible licensing, active enough maintenance, and reviewable transitive footprint. | Must remain pure Rust with no libsndfile or other native wrapper path. | Needs a streaming decode/encode story for PCM AIFF first; compressed AIFC encodings are later and may stay narrower if the backend cannot cover them safely. | Chunk metadata behavior must stay behind Auralis-owned option/report types; add parser/fuzz coverage before enabling broad import/export support. |
+| AIFF / AIFC | `aifc` behind Auralis-owned adapter types | feature-gated pure Rust | `aifc 0.7.0` is MIT OR Apache-2.0, targets Rust 1.87, and has focused AIFF/AIFC tests including the Toisto AIFF suite; keep its concrete types out of public Auralis APIs. | Pure Rust with no libsndfile or native wrapper path; its transitive codec helper is Rust-only and used by the backend for compressed AIFC support. | Plain AIFF signed-integer PCM decode/export is implemented first; compressed AIFC encodings remain the next narrower leaf. | Chunk metadata stays behind the adapter and is not exposed yet; parser risk is covered by focused AIFF round-trip/error tests plus the existing layered coverage gate. |
 | FLAC | pure Rust crate candidate such as `flacenc` plus a pure Rust decoder candidate, both behind adapters | experimental pure Rust | Candidate crates are acceptable only after a feature-level audit records license compatibility, maintenance health, and any 0.x stability caveats. | No `libFLAC`, `ffmpeg`, or other native wrapper path is allowed under the current policy. | The backend must document streaming encode/decode limits, supported bit depths, and channel/sample-rate constraints before the FLAC leaves can land. | FLAC metadata blocks, framing validation, and malformed-stream handling need explicit review and fuzz coverage because they expand the parser attack surface beyond WAV. |
 | MP3 | none selected | not planned | No credible pure Rust encoder is selected today, and adding one is outside the current roadmap. | Native-backed paths such as LAME are outside policy. | Lossy psychoacoustic streaming complexity is intentionally out of scope for the initial format roadmap. | Security and metadata considerations are deferred because no backend is being considered in this phase. |
 | Ogg Vorbis | none selected | not planned | No credible pure Rust encoder/muxer combination is selected today. | libvorbis and other native wrapper paths are outside policy. | Streaming container plus codec complexity is out of scope until a future policy change or strong pure Rust backend appears. | Ogg page parsing and Vorbis comment handling are deferred with the format itself. |
@@ -114,8 +114,8 @@ Implementation notes:
   trait while keeping the existing PCM16 writer and path helpers private to the
   WAV adapter crate.
 - The high-level `auralis::Pipeline` now has `write(path, format)` for the new
-  output-format model, with WAV and raw signed/unsigned integer PCM routed to
-  concrete built-in adapters and AIFF/AIFC plus FLAC still returning typed codec
+  output-format model, with WAV, raw PCM, and plain AIFF PCM routed to concrete
+  adapters while future AIFC encodings and FLAC still return typed codec
   unsupported-format errors until their later roadmap leaves land.
 - `Pipeline::write_wav` remains on the existing PCM16 WAV path so current WAV
   behavior and diagnostics stay unchanged while the new abstraction settles.
@@ -126,7 +126,7 @@ Implementation notes:
 |---|---|---|---|
 | WAV | `hound` behind Auralis adapter | built-in | default output format |
 | RAW PCM | Auralis-owned sample layout and endian conversion | built-in | small boundary; not a complex codec |
-| AIFF / AIFC | pure Rust crate candidate, such as `aifc`, after audit | feature-gated pure Rust | adapter stays optional until the crate audit is accepted |
+| AIFF / AIFC | `aifc` behind Auralis adapter types | feature-gated pure Rust | plain AIFF signed-integer PCM is implemented; AIFC encodings remain next |
 | FLAC | pure Rust encoder candidate, such as `flacenc`, after audit | experimental pure Rust | no libFLAC wrapper under current policy |
 | MP3 | pure Rust encoder only if a credible backend is selected | not planned | no LAME wrapper |
 | Ogg Vorbis | pure Rust encoder only if a credible backend is selected | not planned | no libvorbis wrapper |
@@ -410,8 +410,8 @@ Acceptance tests:
   `f32` buffer, rejects non-finite samples with channel/frame diagnostics, and
   covers codec-boundary encoder behavior;
 - `Pipeline::write(OutputFormat::RawPcm(...))` dispatches through the raw PCM
-  encoder and returns an `EncodeSummary`, while AIFF/AIFC and FLAC remain typed
-  unsupported formats until their later leaves;
+  encoder and returns an `EncodeSummary`, while AIFF PCM is now handled by its
+  own later leaf and AIFC/FLAC remain typed unsupported formats;
 - README and status/development docs record raw signed/unsigned PCM as
   complete and point the next unchecked leaf to raw float32 and float64.
 
@@ -496,8 +496,37 @@ Implementation notes:
 
 ### Feature 8.3.1: AIFF PCM
 
+Status: completed.
+
 Use a pure Rust AIFF backend candidate only after Feature 8.0.1 records the
 dependency audit.
+
+Acceptance tests:
+
+- the selected backend audit records license, maintenance, native-dependency,
+  streaming/sample-format, metadata, and fuzz/security notes;
+- `auralis-aiff` decodes plain AIFF signed 8/16/24/32-bit PCM into the shared
+  planar `f32` buffer model;
+- `AiffEncodeOptions` exposes Auralis-owned signed 8/16/24/32-bit PCM choices,
+  and `OutputFormat::Aiff(...)` writes through the codec boundary with an
+  `EncodeSummary`;
+- AIFC and compressed encodings stay rejected until Feature 8.3.2;
+- README, status, development docs, and layered coverage metadata record AIFF
+  PCM as complete and point the next unchecked leaf to AIFC encodings.
+
+Implementation notes:
+
+- `auralis-aiff` now adapts the pure Rust `aifc 0.7.0` crate behind Auralis
+  error, option, and encoder types; backend types do not leak through
+  `auralis-core` or high-level public APIs.
+- Plain AIFF signed integer PCM decode/export supports signed 8-bit, 16-bit,
+  24-bit, and 32-bit sample widths. Decoding converts interleaved AIFF samples
+  into Auralis' planar `f32` processing buffer; encoding quantizes finite `f32`
+  samples deterministically and reports channel/frame positions for non-finite
+  input.
+- AIFC is intentionally rejected in this leaf because its compressed and
+  little-endian variants need separate compatibility decisions and tests in
+  Feature 8.3.2.
 
 ### Feature 8.3.2: AIFC encodings
 

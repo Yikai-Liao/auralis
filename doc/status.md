@@ -208,9 +208,10 @@ boundary now also owns `OutputFormat`, per-format encode option models,
 `EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
 into that surface while the raw adapter now writes signed/unsigned integer and
 IEEE float PCM bytes with explicit raw byte-order, bit-order, and nibble-order
-options through `OutputFormat::RawPcm`, and future AIFF/AIFC and FLAC writes
-return typed unsupported-format errors until their individual format leaves
-land.
+options through `OutputFormat::RawPcm`, while plain AIFF signed-integer PCM now
+decodes and exports through the pure Rust `aifc` adapter. Future AIFC and FLAC
+writes return typed unsupported-format errors until their individual format
+leaves land.
 Feature 8.1.1 through Feature 8.1.7 are now complete: generic WAV
 decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
 u-law, A-law, and RIFX containers, and WAV writes can now target PCM8, PCM16,
@@ -218,8 +219,9 @@ PCM24, PCM32, float32, float64, u-law, or A-law through RIFF or RIFX
 `WavEncodeOptions` while the legacy `write_wav` path stays PCM16-only for
 backward compatibility. Feature 8.2.1 through Feature 8.2.3 are now complete
 for signed/unsigned integer and float raw PCM export plus explicit raw
-byte-order, bit-order, and nibble-order options; the next unchecked 8.x leaf is
-AIFF PCM.
+byte-order, bit-order, and nibble-order options. Feature 8.3.1 is complete for
+plain AIFF signed-integer PCM decode/export; the next unchecked 8.x leaf is
+AIFC encodings.
 Other effect transform CLI options are still intentionally unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.

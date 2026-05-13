@@ -452,9 +452,73 @@ impl Default for RawPcmEncodeOptions {
     }
 }
 
-/// Auralis-owned options for AIFF/AIFC export.
+/// Sample format for AIFF PCM export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct AiffEncodeOptions;
+#[non_exhaustive]
+pub enum AiffSampleFormat {
+    /// Signed 8-bit PCM samples.
+    Signed8,
+
+    /// Signed 16-bit PCM samples.
+    #[default]
+    Signed16,
+
+    /// Signed 24-bit PCM samples.
+    Signed24,
+
+    /// Signed 32-bit PCM samples.
+    Signed32,
+}
+
+/// Auralis-owned options for AIFF PCM export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AiffEncodeOptions {
+    sample_format: AiffSampleFormat,
+}
+
+impl AiffEncodeOptions {
+    /// Creates AIFF encode options for `sample_format`.
+    #[must_use]
+    pub const fn new(sample_format: AiffSampleFormat) -> Self {
+        Self { sample_format }
+    }
+
+    /// Creates options for signed 8-bit AIFF PCM.
+    #[must_use]
+    pub const fn signed8() -> Self {
+        Self::new(AiffSampleFormat::Signed8)
+    }
+
+    /// Creates options for signed 16-bit AIFF PCM.
+    #[must_use]
+    pub const fn signed16() -> Self {
+        Self::new(AiffSampleFormat::Signed16)
+    }
+
+    /// Creates options for signed 24-bit AIFF PCM.
+    #[must_use]
+    pub const fn signed24() -> Self {
+        Self::new(AiffSampleFormat::Signed24)
+    }
+
+    /// Creates options for signed 32-bit AIFF PCM.
+    #[must_use]
+    pub const fn signed32() -> Self {
+        Self::new(AiffSampleFormat::Signed32)
+    }
+
+    /// Returns the configured AIFF PCM sample format.
+    #[must_use]
+    pub const fn sample_format(self) -> AiffSampleFormat {
+        self.sample_format
+    }
+}
+
+impl Default for AiffEncodeOptions {
+    fn default() -> Self {
+        Self::signed16()
+    }
+}
 
 /// Auralis-owned options for FLAC export.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -721,10 +785,11 @@ mod tests {
     };
 
     use super::{
-        AiffEncodeOptions, AudioEncoder, AudioReader, AudioWriter, CodecCapabilities, CodecError,
-        CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat, RawPcmBitOrder, RawPcmByteOrder,
-        RawPcmEncodeOptions, RawPcmNibbleOrder, RawPcmSampleFormat, UnsupportedEncoder,
-        UnsupportedFormat, UnsupportedReader, UnsupportedWriter,
+        AiffEncodeOptions, AiffSampleFormat, AudioEncoder, AudioReader, AudioWriter,
+        CodecCapabilities, CodecError, CodecKind, EncodeSummary, FlacEncodeOptions, OutputFormat,
+        RawPcmBitOrder, RawPcmByteOrder, RawPcmEncodeOptions, RawPcmNibbleOrder,
+        RawPcmSampleFormat, UnsupportedEncoder, UnsupportedFormat, UnsupportedReader,
+        UnsupportedWriter,
     };
 
     fn mono_buffer() -> AudioBuffer {
@@ -812,7 +877,11 @@ mod tests {
             RawPcmNibbleOrder::LowNibbleFirst
         );
         assert_eq!(
-            OutputFormat::Aiff(AiffEncodeOptions).codec_kind(),
+            AiffEncodeOptions::signed24().sample_format(),
+            AiffSampleFormat::Signed24
+        );
+        assert_eq!(
+            OutputFormat::Aiff(AiffEncodeOptions::default()).codec_kind(),
             CodecKind::Aiff
         );
         assert_eq!(

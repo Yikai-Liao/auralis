@@ -39,7 +39,7 @@ The current order is:
    [`8.x format support`](doc/development/08-format-support.md)
    after the completed pure-Rust codec backend policy record in Feature 8.0.1
    and the completed encoder/output-format boundary in Feature 8.0.2. The next
-   unchecked leaf is Feature 8.3.1: AIFF PCM.
+   unchecked leaf is Feature 8.3.2: AIFC encodings.
 
 The previous Feature 5.5.4 entry is retained only as a historical correction in
 the 5.x plan. It must not be selected as the next gnhf implementation target.

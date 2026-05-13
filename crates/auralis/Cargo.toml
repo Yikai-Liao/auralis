@@ -15,6 +15,7 @@ default = []
 simd = ["auralis-effects/simd", "auralis-simd/simd", "auralis-wav/simd"]
 
 [dependencies]
+auralis-aiff = { path = "../auralis-aiff" }
 auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
 auralis-effects = { path = "../auralis-effects" }
