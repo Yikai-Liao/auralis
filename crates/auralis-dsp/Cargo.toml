@@ -17,6 +17,7 @@ simd = ["auralis-simd/simd"]
 [dependencies]
 auralis-core = { path = "../auralis-core" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
+realfft.workspace = true
 thiserror.workspace = true
 
 [lints]

@@ -194,6 +194,18 @@ impl Trim {
         )?)
     }
 
+    /// Applies the trim directly to an existing audio buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectError::TrimRangeOutOfBounds`] when the resolved ranges
+    /// are outside the input buffer or cannot be represented.
+    pub fn process_buffer_in_place(&self, audio: &mut AudioBuffer) -> Result<()> {
+        let ranges = self.resolved_ranges(audio.frames())?;
+        audio.retain_frame_ranges(&ranges)
+            .map_err(|_| EffectError::TrimRangeOutOfBounds)
+    }
+
     fn resolved_ranges(&self, input_frames: FrameCount) -> Result<Vec<(FrameCount, FrameCount)>> {
         let positions = self.resolved_positions(input_frames)?;
         let mut ranges = Vec::new();

@@ -1,7 +1,9 @@
 use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, FrameCount};
-use auralis_dsp::{FirCoefficients as DspFirCoefficients, FirState as DspFirState};
+use auralis_dsp::{
+    DftFir as DspDftFir, FirCoefficients as DspFirCoefficients, FirState as DspFirState,
+};
 
 use crate::{EffectError, Result};
 
@@ -106,6 +108,12 @@ impl From<DspFirCoefficients> for FirCoefficients {
     fn from(inner: DspFirCoefficients) -> Self {
         Self { inner }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FirBackend {
+    Direct,
+    DftWithLen(usize),
 }
 
 /// The source of coefficients for a SoX-ng-style `fir` command.
@@ -232,27 +240,60 @@ impl Fir {
     /// coefficient loading fails, or [`EffectError::FirLengthOverflow`] when
     /// the output shape cannot be represented.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
+        self.process_buffer_with_backend(audio, FirBackend::Direct)
+    }
+
+    pub(crate) fn process_buffer_with_backend(
+        &self,
+        audio: &AudioBuffer,
+        backend: FirBackend,
+    ) -> Result<AudioBuffer> {
         let coefficients = self.resolved_coefficients()?;
         if coefficients.is_empty() {
             return Ok(audio.clone());
         }
+        if backend == FirBackend::Direct && coefficients.len() <= 2 {
+            return process_short_direct_fir(audio, coefficients.as_slice());
+        }
+        if backend == FirBackend::Direct && coefficients.len() == 11 {
+            return process_eleven_tap_direct_fir(audio, coefficients.as_slice());
+        }
 
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
-        let mut planar = Vec::with_capacity(audio.as_planar_f32().len());
+        let mut planar = vec![0.0; audio.as_planar_f32().len()];
+        let input = audio.as_planar_f32();
+        let dft = match backend {
+            FirBackend::Direct => None,
+            FirBackend::DftWithLen(dft_len) => Some(DspDftFir::with_dft_len(
+                coefficients.clone().into_dsp(),
+                dft_len,
+            )),
+        };
 
         for channel_index in 0..audio.channels().as_usize() {
-            let channel = audio
-                .channel(channel_index)
+            let start = channel_index
+                .checked_mul(frames)
                 .ok_or(EffectError::FirLengthOverflow)?;
-            let mut state = FirState::new(coefficients.clone());
-            let mut filtered = Vec::with_capacity(frames);
-            state.process_mono_samples(channel, &mut filtered);
-            state.finish(&mut filtered);
-            if filtered.len() != frames {
-                return Err(EffectError::FirLengthOverflow);
+            let end = start
+                .checked_add(frames)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            let channel = input
+                .get(start..end)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            let output = planar
+                .get_mut(start..end)
+                .ok_or(EffectError::FirLengthOverflow)?;
+            match backend {
+                FirBackend::Direct => {
+                    FirState::new(coefficients.clone()).process_into(channel, output);
+                }
+                FirBackend::DftWithLen(_) => {
+                    if let Some(dft) = &dft {
+                        dft.process_into(channel, output);
+                    }
+                }
             }
-            planar.extend(filtered);
         }
 
         AudioBuffer::from_planar_f32(
@@ -274,6 +315,134 @@ impl Fir {
             FirCoefficientSource::Stdin => Err(EffectError::InvalidFirCoefficients),
         }
     }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "FIR coefficients are cached as f32 in the DSP direct path; this mirrors that sample-domain precision"
+)]
+fn process_short_direct_fir(audio: &AudioBuffer, coefficients: &[f64]) -> Result<AudioBuffer> {
+    let frames =
+        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+    let mut planar = vec![0.0; audio.as_planar_f32().len()];
+    let coefficients = coefficients
+        .iter()
+        .map(|coefficient| *coefficient as f32)
+        .collect::<Vec<_>>();
+
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let start = channel_index
+            .checked_mul(frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let output = planar
+            .get_mut(start..start + frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+
+        match coefficients.as_slice() {
+            [coefficient] => {
+                for (sample, &input) in output.iter_mut().zip(channel) {
+                    *sample = input * coefficient;
+                }
+            }
+            [current, previous] => {
+                if let Some((first_output, remaining_output)) = output.split_first_mut()
+                    && let Some((&first_input, remaining_input)) = channel.split_first()
+                {
+                    *first_output = first_input * current;
+                    let mut previous_input = first_input;
+                    for (sample, &input) in remaining_output.iter_mut().zip(remaining_input) {
+                        *sample = input.mul_add(*current, previous_input * previous);
+                        previous_input = input;
+                    }
+                }
+            }
+            _ => unreachable!("short direct FIR is only called for one or two coefficients"),
+        }
+    }
+
+    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), planar)
+        .map_err(|_| EffectError::FirLengthOverflow)
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "FIR coefficients are cached as f32 in the DSP direct path; this mirrors that sample-domain precision"
+)]
+fn process_eleven_tap_direct_fir(audio: &AudioBuffer, coefficients: &[f64]) -> Result<AudioBuffer> {
+    let frames =
+        usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::FirLengthOverflow)?;
+    let mut planar = vec![0.0; audio.as_planar_f32().len()];
+    let coefficients = coefficients
+        .iter()
+        .map(|coefficient| *coefficient as f32)
+        .collect::<Vec<_>>();
+    let [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]: [f32; 11] = coefficients
+        .try_into()
+        .expect("eleven-tap direct FIR is only called for eleven coefficients");
+
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel(channel_index)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let start = channel_index
+            .checked_mul(frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+        let output = planar
+            .get_mut(start..start + frames)
+            .ok_or(EffectError::FirLengthOverflow)?;
+
+        let edge = 5.min(frames);
+        for (frame, sample) in output.iter_mut().take(edge).enumerate() {
+            *sample = eleven_tap_edge_sample(
+                channel,
+                frame,
+                [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10],
+            );
+        }
+
+        let middle_end = frames.saturating_sub(5);
+        for frame in edge..middle_end {
+            output[frame] = channel[frame + 5] * c0
+                + channel[frame + 4] * c1
+                + channel[frame + 3] * c2
+                + channel[frame + 2] * c3
+                + channel[frame + 1] * c4
+                + channel[frame] * c5
+                + channel[frame - 1] * c6
+                + channel[frame - 2] * c7
+                + channel[frame - 3] * c8
+                + channel[frame - 4] * c9
+                + channel[frame - 5] * c10;
+        }
+
+        for (frame, sample) in output.iter_mut().enumerate().take(frames).skip(middle_end) {
+            *sample = eleven_tap_edge_sample(
+                channel,
+                frame,
+                [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10],
+            );
+        }
+    }
+
+    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), planar)
+        .map_err(|_| EffectError::FirLengthOverflow)
+}
+
+fn eleven_tap_edge_sample(channel: &[f32], frame: usize, coefficients: [f32; 11]) -> f32 {
+    let center = frame + 5;
+    let mut value = 0.0_f32;
+    for (index, coefficient) in coefficients.into_iter().enumerate() {
+        if center >= index {
+            let input_index = center - index;
+            if input_index < channel.len() {
+                value += channel[input_index] * coefficient;
+            }
+        }
+    }
+    value
 }
 
 /// Stateful scalar FIR processor for one mono sample stream.
@@ -300,6 +469,11 @@ impl FirState {
     /// Processes one chunk of mono samples, appending available output samples.
     pub fn process_mono_samples(&mut self, input: &[f32], output: &mut Vec<f32>) {
         self.inner.process_mono_samples(input, output);
+    }
+
+    /// Processes a complete mono stream into an equally sized output slice.
+    pub fn process_into(self, input: &[f32], output: &mut [f32]) {
+        self.inner.process_into(input, output);
     }
 
     /// Flushes delayed end-of-stream samples by appending the remaining output.

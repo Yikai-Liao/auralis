@@ -205,13 +205,26 @@ impl Flanger {
     /// when the delay line allocation would exceed the platform limit.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let resolved = self.resolve(audio.spec().sample_rate().as_u32())?;
-        let mut output = Vec::with_capacity(audio.as_planar_f32().len());
+        let frames = usize::try_from(audio.frames().as_u64())
+            .map_err(|_| EffectError::FlangerLengthOverflow)?;
+        let mut output = vec![0.0; audio.as_planar_f32().len()];
 
         for channel_index in 0..audio.channels().as_usize() {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(EffectError::FlangerLengthOverflow)?;
-            process_channel(channel, channel_index, resolved, &mut output);
+            let channel_start = channel_index
+                .checked_mul(frames)
+                .ok_or(EffectError::FlangerLengthOverflow)?;
+            let channel_end = channel_start
+                .checked_add(frames)
+                .ok_or(EffectError::FlangerLengthOverflow)?;
+            process_channel(
+                channel,
+                channel_index,
+                resolved,
+                &mut output[channel_start..channel_end],
+            );
         }
 
         Ok(AudioBuffer::from_planar_f32(
@@ -282,11 +295,21 @@ fn process_channel(
     input: &[f32],
     channel_index: usize,
     resolved: ResolvedFlanger,
-    output: &mut Vec<f32>,
+    output: &mut [f32],
 ) {
     let mut state = FlangerChannelState::new(resolved);
-    for (frame, sample) in input.iter().copied().enumerate() {
-        output.push(state.process(f64::from(sample), frame, channel_index));
+    if resolved.interpolation == FlangerInterpolation::None {
+        let delay_offsets = resolved.integer_delay_offsets(channel_index);
+        for (frame, (sample, output)) in input.iter().copied().zip(output).enumerate() {
+            let offset = delay_offsets[frame % delay_offsets.len()];
+            *output = state.process_none_offset(f64::from(sample), offset);
+        }
+    } else {
+        let delay_offsets = resolved.delay_offsets(channel_index);
+        for (frame, (sample, output)) in input.iter().copied().zip(output).enumerate() {
+            let delay = delay_offsets[frame % delay_offsets.len()];
+            *output = state.process(f64::from(sample), delay);
+        }
     }
 }
 
@@ -300,13 +323,12 @@ impl FlangerChannelState {
         }
     }
 
-    fn process(&mut self, input_sample: f64, frame: usize, channel_index: usize) -> f32 {
-        self.delay_line_index = (self.delay_line_index + self.resolved.delay_line_length - 1)
-            % self.resolved.delay_line_length;
+    fn process(&mut self, input_sample: f64, delay: f64) -> f32 {
+        self.delay_line_index =
+            previous_delay_line_index(self.delay_line_index, self.resolved.delay_line_length);
         self.delay_line[self.delay_line_index] =
             input_sample + self.delay_last * self.resolved.regen;
 
-        let delay = self.resolved.delay_offset(frame, channel_index);
         let delayed = match self.resolved.interpolation {
             FlangerInterpolation::None => self.process_none(delay),
             FlangerInterpolation::Linear => self.process_linear(delay),
@@ -320,6 +342,17 @@ impl FlangerChannelState {
     fn process_none(&self, delay: f64) -> f64 {
         let delay_index = self.delay_index(integer_wave_offset(delay));
         self.delay_line[delay_index]
+    }
+
+    fn process_none_offset(&mut self, input_sample: f64, offset: usize) -> f32 {
+        self.delay_line_index =
+            previous_delay_line_index(self.delay_line_index, self.resolved.delay_line_length);
+        self.delay_line[self.delay_line_index] =
+            input_sample + self.delay_last * self.resolved.regen;
+
+        let delayed = self.delay_line[self.delay_index(offset)];
+        self.delay_last = delayed;
+        f64_to_f32_clamped(input_sample * self.resolved.gain_in + delayed * self.resolved.width)
     }
 
     fn process_linear(&self, delay: f64) -> f64 {
@@ -348,13 +381,39 @@ impl FlangerChannelState {
     }
 
     fn delay_index(&self, offset: usize) -> usize {
-        (self.delay_line_index + offset) % self.resolved.delay_line_length
+        wrapped_delay_index(
+            self.delay_line_index,
+            offset,
+            self.resolved.delay_line_length,
+        )
+    }
+}
+
+fn previous_delay_line_index(index: usize, length: usize) -> usize {
+    if index == 0 { length - 1 } else { index - 1 }
+}
+
+fn wrapped_delay_index(index: usize, offset: usize, length: usize) -> usize {
+    let delayed = index + offset;
+    if delayed >= length {
+        delayed - length
+    } else {
+        delayed
     }
 }
 
 impl ResolvedFlanger {
-    fn delay_offset(self, frame: usize, channel_index: usize) -> f64 {
-        self.delay + self.depth * self.wave_value(frame, channel_index)
+    fn delay_offsets(self, channel_index: usize) -> Vec<f64> {
+        (0..self.lfo_length)
+            .map(|frame| self.delay + self.depth * self.wave_value(frame, channel_index))
+            .collect()
+    }
+
+    fn integer_delay_offsets(self, channel_index: usize) -> Vec<usize> {
+        self.delay_offsets(channel_index)
+            .into_iter()
+            .map(integer_wave_offset)
+            .collect()
     }
 
     #[allow(

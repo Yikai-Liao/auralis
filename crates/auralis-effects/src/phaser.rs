@@ -181,6 +181,7 @@ impl Phaser {
     /// exceed the platform limit.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let resolved = self.resolve(audio.spec().sample_rate().as_u32())?;
+        let modulation_offsets = resolved.modulation_offsets();
         let mut output = Vec::with_capacity(audio.as_planar_f32().len());
 
         for channel_index in 0..audio.channels().as_usize() {
@@ -188,8 +189,9 @@ impl Phaser {
                 .channel(channel_index)
                 .ok_or(EffectError::PhaserLengthOverflow)?;
             let mut state = PhaserState::new(resolved);
-            for sample in channel.iter().copied() {
-                output.push(state.process(f64::from(sample)));
+            for (frame, sample) in channel.iter().copied().enumerate() {
+                let offset = modulation_offsets[frame % modulation_offsets.len()];
+                output.push(state.process(f64::from(sample), offset));
             }
         }
 
@@ -255,7 +257,6 @@ struct PhaserState {
     resolved: ResolvedPhaser,
     delay_line: Vec<f64>,
     delay_position: usize,
-    modulation_position: usize,
 }
 
 impl PhaserState {
@@ -264,12 +265,10 @@ impl PhaserState {
             resolved,
             delay_line: vec![0.0; resolved.delay_line_length],
             delay_position: 0,
-            modulation_position: 0,
         }
     }
 
-    fn process(&mut self, input_sample: f64) -> f32 {
-        let offset = self.resolved.modulation_offset(self.modulation_position);
+    fn process(&mut self, input_sample: f64, offset: f64) -> f32 {
         let delayed = match self.resolved.interpolation {
             PhaserInterpolation::None => self.process_none(offset),
             PhaserInterpolation::Linear => self.process_linear(offset),
@@ -277,7 +276,6 @@ impl PhaserState {
         };
         let delayed_mix = input_sample * self.resolved.gain_in + self.resolved.regen * delayed;
 
-        self.modulation_position = (self.modulation_position + 1) % self.resolved.modulation_length;
         self.delay_position = (self.delay_position + 1) % self.resolved.delay_line_length;
         self.delay_line[self.delay_position] = delayed_mix;
 
@@ -320,6 +318,12 @@ impl PhaserState {
 }
 
 impl ResolvedPhaser {
+    fn modulation_offsets(self) -> Vec<f64> {
+        (0..self.modulation_length)
+            .map(|position| self.modulation_offset(position))
+            .collect()
+    }
+
     #[allow(
         clippy::cast_precision_loss,
         reason = "phaser wave-table range is bounded by the allocated delay line length"

@@ -137,13 +137,13 @@ pub struct StatReport {
 
 impl StatReport {
     fn from_audio(stat: Stat, audio: &AudioBuffer) -> Result<Self> {
-        let mut samples = frame_major_scaled_samples(audio, stat.scale)?;
+        let samples = frame_major_scaled_samples(audio, stat.scale)?;
         let samples_read = u64::try_from(samples.len()).map_err(|_| EffectError::InvalidStat)?;
         let length_seconds =
             f64_from_u64(audio.frames().as_u64()) / f64::from(audio.spec().sample_rate().as_u32());
 
         let sample_rate = f64::from(audio.spec().sample_rate().as_u32());
-        let mut report = collect_report_fields(
+        let mut collected = collect_report_fields(
             samples_read,
             length_seconds,
             stat.scale,
@@ -151,24 +151,13 @@ impl StatReport {
             &samples,
         );
         if stat.scale_to_rms {
-            if report.rms_amplitude <= f64::EPSILON {
+            if collected.report.rms_amplitude <= f64::EPSILON {
                 return Err(EffectError::InvalidStat);
             }
-            let rms = report.rms_amplitude;
-            for sample in &mut samples {
-                *sample /= rms;
-            }
-            report = collect_report_fields(
-                samples_read,
-                length_seconds,
-                stat.scale * rms,
-                sample_rate,
-                &samples,
-            );
-            report.scaled_by_rms = Some(rms);
+            collected.report = collected.rms_scaled_report(stat.scale);
         }
 
-        Ok(report)
+        Ok(collected.report)
     }
 
     /// Returns the flattened stream sample count.
@@ -328,31 +317,65 @@ impl StatReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct CollectedStat {
+    report: StatReport,
+    sum: f64,
+}
+
+impl CollectedStat {
+    fn rms_scaled_report(&self, scale: f64) -> StatReport {
+        let rms = self.report.rms_amplitude;
+        let count = f64_from_u64(self.report.samples_read);
+        StatReport {
+            samples_read: self.report.samples_read,
+            length_seconds: self.report.length_seconds,
+            scaled_by: scale * rms,
+            scaled_by_rms: Some(rms),
+            maximum_amplitude: self.report.maximum_amplitude / rms,
+            minimum_amplitude: self.report.minimum_amplitude / rms,
+            midline_amplitude: self.report.midline_amplitude / rms,
+            mean_norm: self.report.mean_norm / rms,
+            mean_amplitude: round_to_31_bit((self.sum / count) / rms),
+            rms_amplitude: 1.0,
+            maximum_delta: self.report.maximum_delta / rms,
+            minimum_delta: self.report.minimum_delta / rms,
+            mean_delta: self.report.mean_delta / rms,
+            rms_delta: self.report.rms_delta / rms,
+            rough_frequency_hz: self.report.rough_frequency_hz,
+            volume_adjustment: self.report.volume_adjustment,
+        }
+    }
+}
+
 fn collect_report_fields(
     samples_read: u64,
     length_seconds: f64,
     scale: f64,
     sample_rate: f64,
     samples: &[f64],
-) -> StatReport {
+) -> CollectedStat {
     if samples.is_empty() {
-        return StatReport {
-            samples_read,
-            length_seconds,
-            scaled_by: scale,
-            scaled_by_rms: None,
-            maximum_amplitude: 0.0,
-            minimum_amplitude: 0.0,
-            midline_amplitude: 0.0,
-            mean_norm: 0.0,
-            mean_amplitude: 0.0,
-            rms_amplitude: 0.0,
-            maximum_delta: 0.0,
-            minimum_delta: 0.0,
-            mean_delta: 0.0,
-            rms_delta: 0.0,
-            rough_frequency_hz: 0,
-            volume_adjustment: None,
+        return CollectedStat {
+            report: StatReport {
+                samples_read,
+                length_seconds,
+                scaled_by: scale,
+                scaled_by_rms: None,
+                maximum_amplitude: 0.0,
+                minimum_amplitude: 0.0,
+                midline_amplitude: 0.0,
+                mean_norm: 0.0,
+                mean_amplitude: 0.0,
+                rms_amplitude: 0.0,
+                maximum_delta: 0.0,
+                minimum_delta: 0.0,
+                mean_delta: 0.0,
+                rms_delta: 0.0,
+                rough_frequency_hz: 0,
+                volume_adjustment: None,
+            },
+            sum: 0.0,
         };
     }
 
@@ -391,31 +414,34 @@ fn collect_report_fields(
         0
     };
 
-    StatReport {
-        samples_read,
-        length_seconds,
-        scaled_by: scale,
-        scaled_by_rms: None,
-        maximum_amplitude: maximum,
-        minimum_amplitude: minimum,
-        midline_amplitude: minimum / 2.0 + maximum / 2.0,
-        mean_norm: absolute_sum / count,
-        mean_amplitude: round_to_31_bit(sum / count),
-        rms_amplitude,
-        maximum_delta,
-        minimum_delta,
-        mean_delta: if delta_count > 0.0 {
-            delta_sum / delta_count
-        } else {
-            0.0
+    CollectedStat {
+        report: StatReport {
+            samples_read,
+            length_seconds,
+            scaled_by: scale,
+            scaled_by_rms: None,
+            maximum_amplitude: maximum,
+            minimum_amplitude: minimum,
+            midline_amplitude: minimum / 2.0 + maximum / 2.0,
+            mean_norm: absolute_sum / count,
+            mean_amplitude: round_to_31_bit(sum / count),
+            rms_amplitude,
+            maximum_delta,
+            minimum_delta,
+            mean_delta: if delta_count > 0.0 {
+                delta_sum / delta_count
+            } else {
+                0.0
+            },
+            rms_delta: if delta_count > 0.0 {
+                (delta_squares / delta_count).sqrt()
+            } else {
+                0.0
+            },
+            rough_frequency_hz,
+            volume_adjustment: (peak > 0.0).then_some(1.0 / (peak * scale)),
         },
-        rms_delta: if delta_count > 0.0 {
-            (delta_squares / delta_count).sqrt()
-        } else {
-            0.0
-        },
-        rough_frequency_hz,
-        volume_adjustment: (peak > 0.0).then_some(1.0 / (peak * scale)),
+        sum,
     }
 }
 

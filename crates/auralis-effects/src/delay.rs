@@ -210,12 +210,7 @@ impl Delay {
             .ok_or(EffectError::DelayLengthOverflow)?;
         let output_frames_usize = usize::try_from(output_frames.as_u64())
             .map_err(|_| EffectError::DelayLengthOverflow)?;
-        let capacity = audio
-            .channels()
-            .as_usize()
-            .checked_mul(output_frames_usize)
-            .ok_or(EffectError::DelayLengthOverflow)?;
-        let mut output = Vec::with_capacity(capacity);
+        let mut output = AudioBuffer::zeroed(audio.spec(), output_frames)?;
 
         for channel_index in 0..audio.channels().as_usize() {
             let delay = delays
@@ -227,16 +222,19 @@ impl Delay {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(EffectError::DelayLengthOverflow)?;
-            output.resize(output.len() + delay_usize, 0.0);
-            output.extend_from_slice(channel);
-            output.resize((channel_index + 1) * output_frames_usize, 0.0);
+            let channel_start = channel_index
+                .checked_mul(output_frames_usize)
+                .ok_or(EffectError::DelayLengthOverflow)?;
+            let copy_start = channel_start
+                .checked_add(delay_usize)
+                .ok_or(EffectError::DelayLengthOverflow)?;
+            let copy_end = copy_start
+                .checked_add(channel.len())
+                .ok_or(EffectError::DelayLengthOverflow)?;
+            output.as_planar_f32_mut()[copy_start..copy_end].copy_from_slice(channel);
         }
 
-        Ok(AudioBuffer::from_planar_f32(
-            audio.spec(),
-            output_frames,
-            output,
-        )?)
+        Ok(output)
     }
 
     fn resolved_delays(&self, audio: &AudioBuffer) -> Result<Vec<FrameCount>> {

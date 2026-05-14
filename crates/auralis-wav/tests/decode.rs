@@ -3,12 +3,13 @@
 use std::{fs, io::Cursor};
 
 use auralis_codec::{AudioReader, CodecKind};
+use auralis_core::FrameCount;
 use auralis_simd::BackendKind;
 use auralis_wav::{
     AnyPcmWavReader, Pcm16WavReader, WavError, WavSampleEncoding, decode_alaw, decode_float32,
-    decode_float64, decode_pcm8, decode_pcm16, decode_pcm16_path, decode_pcm16_with_backend,
-    decode_pcm24, decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_rifx, decode_ulaw,
-    decode_wav,
+    decode_float64, decode_pcm8, decode_pcm16, decode_pcm16_path,
+    decode_pcm16_prefix_path_with_backend, decode_pcm16_with_backend, decode_pcm24,
+    decode_pcm24_path, decode_pcm32, decode_pcm32_path, decode_rifx, decode_ulaw, decode_wav,
 };
 
 mod support;
@@ -113,6 +114,27 @@ fn decodes_stereo_pcm16_to_channel_major_storage() {
         audio.channel(1).unwrap(),
         &[f32::from(32_767_i16) / 32768.0, 0.5, 0.25]
     );
+}
+
+#[test]
+fn decodes_pcm16_prefix_from_path() {
+    let path = write_temp_wav(
+        "decode-prefix",
+        2,
+        &[-32768, 32_767, -16_384, 16_384, 0, 8192],
+    )
+    .unwrap();
+    let full = decode_pcm16_path(&path).unwrap();
+    let prefix =
+        decode_pcm16_prefix_path_with_backend(&path, FrameCount::new(2), BackendKind::Scalar)
+            .unwrap();
+
+    assert_eq!(prefix.spec(), full.spec());
+    assert_eq!(prefix.frames().as_u64(), 2);
+    assert_eq!(prefix.channel(0).unwrap(), &full.channel(0).unwrap()[..2]);
+    assert_eq!(prefix.channel(1).unwrap(), &full.channel(1).unwrap()[..2]);
+
+    fs::remove_file(path).unwrap();
 }
 
 #[test]

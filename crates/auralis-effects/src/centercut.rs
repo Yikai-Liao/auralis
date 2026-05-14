@@ -1,4 +1,4 @@
-use std::f64::consts::TAU;
+use std::f32::consts::TAU;
 
 use auralis_core::{AudioBuffer, AudioSpec, ChannelCount};
 use rustfft::{FftPlanner, num_complex::Complex};
@@ -7,9 +7,9 @@ use crate::{EffectError, Result};
 
 const DEFAULT_WINDOW_SIZE: usize = 8192;
 const OVERLAP_COUNT: usize = 4;
-const OVERLAP_EPSILON: f64 = 1.0e-18;
-const SPECTRAL_EPSILON: f64 = 1.0e-15;
-const POST_WINDOW_SCALE: f64 = 1.6;
+const OVERLAP_EPSILON: f32 = 1.0e-18;
+const SPECTRAL_EPSILON: f32 = 1.0e-15;
+const POST_WINDOW_SCALE: f32 = 1.6;
 const MIN_WINDOW_SIZE: usize = 8;
 const MAX_WINDOW_SIZE: usize = 32_768;
 
@@ -161,7 +161,7 @@ impl Default for Centercut {
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
-    reason = "The spectral core evaluates bounded f64 FFT windows and returns Auralis f32 samples."
+    reason = "The spectral core evaluates bounded f32 FFT windows and returns Auralis f32 samples."
 )]
 fn extract_center(
     left: &[f32],
@@ -191,14 +191,14 @@ fn extract_center(
         .into_iter()
         .map(|sample| sample * POST_WINDOW_SCALE)
         .collect::<Vec<_>>();
-    let mut planner = FftPlanner::<f64>::new();
+    let mut planner = FftPlanner::<f32>::new();
     let forward = planner.plan_fft_forward(window_size);
     let inverse = planner.plan_fft_inverse(window_size);
     let mut left_spectrum = vec![Complex::default(); window_size];
     let mut right_spectrum = vec![Complex::default(); window_size];
     let mut center_spectrum = vec![Complex::default(); window_size];
-    let mut center_accumulator = vec![0.0_f64; left.len()];
-    let mut weight_accumulator = vec![0.0_f64; left.len()];
+    let mut center_accumulator = vec![0.0_f32; left.len()];
+    let mut weight_accumulator = vec![0.0_f32; left.len()];
     let mut block_start = 0_usize;
 
     while block_start < left.len() {
@@ -215,16 +215,13 @@ fn extract_center(
         );
         inverse.process(&mut center_spectrum);
 
-        for (window_index, (center_bin, (&analysis_weight, &post_weight))) in center_spectrum
-            .iter()
-            .zip(analysis.iter().zip(&post))
-            .enumerate()
-        {
+        let active_len = (left.len() - block_start).min(window_size);
+        for window_index in 0..active_len {
+            let center_bin = center_spectrum[window_index];
+            let analysis_weight = analysis[window_index];
+            let post_weight = post[window_index];
             let output_index = block_start + window_index;
-            if output_index >= left.len() {
-                break;
-            }
-            center_accumulator[output_index] += center_bin.re * post_weight / window_size as f64;
+            center_accumulator[output_index] += center_bin.re * post_weight / window_size as f32;
             weight_accumulator[output_index] += analysis_weight * post_weight;
         }
 
@@ -236,7 +233,7 @@ fn extract_center(
         .zip(weight_accumulator)
         .map(|(center, weight)| {
             if weight > OVERLAP_EPSILON {
-                (center / weight) as f32
+                center / weight
             } else {
                 0.0
             }
@@ -245,30 +242,33 @@ fn extract_center(
 }
 
 fn fill_windowed_spectrum(
-    spectrum: &mut [Complex<f64>],
+    spectrum: &mut [Complex<f32>],
     samples: &[f32],
     block_start: usize,
-    window: &[f64],
+    window: &[f32],
 ) {
-    for (index, bin) in spectrum.iter_mut().enumerate() {
-        let sample = samples
-            .get(block_start + index)
-            .copied()
-            .map_or(0.0, f64::from);
-        *bin = Complex::new(sample * window[index], 0.0);
+    let active_len = (samples.len() - block_start).min(spectrum.len());
+    for index in 0..active_len {
+        spectrum[index] = Complex::new(samples[block_start + index] * window[index], 0.0);
+    }
+    for bin in &mut spectrum[active_len..] {
+        *bin = Complex::default();
     }
 }
 
 fn fill_center_spectrum(
-    left: &[Complex<f64>],
-    right: &[Complex<f64>],
-    center: &mut [Complex<f64>],
+    left: &[Complex<f32>],
+    right: &[Complex<f32>],
+    center: &mut [Complex<f32>],
     bass_cutoff_bin: usize,
 ) {
-    center.fill(Complex::default());
+    center[0] = Complex::default();
+    center[left.len() / 2] = Complex::default();
 
     for bin in 1..left.len() / 2 {
         if bin < bass_cutoff_bin {
+            center[bin] = Complex::default();
+            center[left.len() - bin] = Complex::default();
             continue;
         }
 
@@ -289,11 +289,11 @@ fn fill_center_spectrum(
 
 #[allow(
     clippy::cast_precision_loss,
-    reason = "Window sizes are bounded to 8192 samples before conversion to f64."
+    reason = "Window sizes are bounded before conversion to f32."
 )]
-fn raised_cosine_window(size: usize, power: f64) -> Vec<f64> {
+fn raised_cosine_window(size: usize, power: f32) -> Vec<f32> {
     (0..size)
-        .map(|index| (0.5 * (1.0 - (TAU * (index as f64 + 0.5) / size as f64).cos())).powf(power))
+        .map(|index| (0.5 * (1.0 - (TAU * (index as f32 + 0.5) / size as f32).cos())).powf(power))
         .collect()
 }
 

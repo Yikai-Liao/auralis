@@ -373,7 +373,7 @@ struct ChorusStageState {
     delay_line: Vec<f64>,
     delay_line_index: usize,
     wave_index: usize,
-    wave_length: usize,
+    delay_offsets: Vec<f64>,
 }
 
 fn process_channel(
@@ -384,14 +384,32 @@ fn process_channel(
     stages: &[ResolvedChorusStage],
     output: &mut Vec<f32>,
 ) {
+    if let [stage] = stages
+        && stage.interpolation == ChorusInterpolation::Linear
+    {
+        if stage.depth == 0.0 {
+            process_channel_single_fixed_linear(
+                input,
+                output_frames,
+                gain_in,
+                gain_out,
+                *stage,
+                output,
+            );
+            return;
+        }
+        process_channel_single_linear(input, output_frames, gain_in, gain_out, *stage, output);
+        return;
+    }
+
     let mut stage_states = stages
         .iter()
         .copied()
         .map(ChorusStageState::new)
         .collect::<Vec<_>>();
 
-    for frame in 0..output_frames {
-        let input_sample = input.get(frame).copied().map_or(0.0, f64::from);
+    for &input_sample in input {
+        let input_sample = f64::from(input_sample);
         let mut output_sample = input_sample * gain_in;
 
         for stage in &mut stage_states {
@@ -401,24 +419,117 @@ fn process_channel(
         output_sample *= gain_out;
         output.push(f64_to_f32_clamped(output_sample));
     }
+
+    for _ in input.len()..output_frames {
+        let mut output_sample = 0.0;
+
+        for stage in &mut stage_states {
+            output_sample += stage.process(0.0) * stage.resolved.decay;
+        }
+
+        output_sample *= gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+}
+
+fn process_channel_single_fixed_linear(
+    input: &[f32],
+    output_frames: usize,
+    gain_in: f64,
+    gain_out: f64,
+    stage: ResolvedChorusStage,
+    output: &mut Vec<f32>,
+) {
+    let offset_i = stage.base_delay.trunc();
+    let frac = stage.base_delay - offset_i;
+    let offset = float_offset_to_usize(offset_i);
+    let decay = stage.decay;
+    let delay_line_length = stage.delay_line_length;
+    let mut delay_line = vec![0.0; delay_line_length];
+    let mut delay_line_index = 0;
+
+    for &input_sample in input {
+        let input_sample = f64::from(input_sample);
+        let delayed = process_fixed_linear_sample(
+            input_sample,
+            offset,
+            frac,
+            &mut delay_line,
+            delay_line_index,
+        );
+        delay_line_index = advance_delay_line(delay_line_index, delay_line_length);
+        let output_sample = (input_sample * gain_in + delayed * decay) * gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+
+    for _ in input.len()..output_frames {
+        let delayed =
+            process_fixed_linear_sample(0.0, offset, frac, &mut delay_line, delay_line_index);
+        delay_line_index = advance_delay_line(delay_line_index, delay_line_length);
+        let output_sample = delayed * decay * gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+}
+
+fn process_channel_single_linear(
+    input: &[f32],
+    output_frames: usize,
+    gain_in: f64,
+    gain_out: f64,
+    stage: ResolvedChorusStage,
+    output: &mut Vec<f32>,
+) {
+    let decay = stage.decay;
+    let mut stage = ChorusStageState::new(stage);
+
+    for &input_sample in input {
+        let input_sample = f64::from(input_sample);
+        let output_sample = (input_sample * gain_in
+            + stage.process_linear_current(input_sample) * decay)
+            * gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+
+    for _ in input.len()..output_frames {
+        let output_sample = stage.process_linear_current(0.0) * decay * gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+}
+
+fn process_fixed_linear_sample(
+    input_sample: f64,
+    offset: usize,
+    frac: f64,
+    delay_line: &mut [f64],
+    delay_line_index: usize,
+) -> f64 {
+    let delay_line_length = delay_line.len();
+    let delay_index = (delay_line_index + delay_line_length - offset) % delay_line_length;
+    let delayed_0 = delay_line[delay_index];
+    let delayed_1 = delay_line[(delay_index + delay_line_length - 1) % delay_line_length];
+    delay_line[delay_line_index] = input_sample;
+    delayed_0.mul_add(1.0 - frac, delayed_1 * frac)
+}
+
+fn advance_delay_line(index: usize, length: usize) -> usize {
+    let next = index + 1;
+    if next == length { 0 } else { next }
 }
 
 impl ChorusStageState {
     fn new(resolved: ResolvedChorusStage) -> Self {
-        let wave_length = resolved.wave_length();
+        let delay_offsets = resolved.delay_offsets();
         Self {
             resolved,
             delay_line: vec![0.0; resolved.delay_line_length],
             delay_line_index: 0,
             wave_index: 0,
-            wave_length,
+            delay_offsets,
         }
     }
 
     fn process(&mut self, input_sample: f64) -> f64 {
-        let offset = self
-            .resolved
-            .delay_offset(self.wave_index, self.wave_length);
+        let offset = self.delay_offsets[self.wave_index];
         let sample = match self.resolved.interpolation {
             ChorusInterpolation::None => self.process_none(input_sample, offset),
             ChorusInterpolation::Linear => self.process_linear(input_sample, offset),
@@ -426,7 +537,7 @@ impl ChorusStageState {
         };
 
         self.delay_line_index = (self.delay_line_index + 1) % self.resolved.delay_line_length;
-        self.wave_index = (self.wave_index + 1) % self.wave_length;
+        self.wave_index = (self.wave_index + 1) % self.delay_offsets.len();
         sample
     }
 
@@ -447,6 +558,14 @@ impl ChorusStageState {
             [(delay_index + self.resolved.delay_line_length - 1) % self.resolved.delay_line_length];
         self.delay_line[self.delay_line_index] = input_sample;
         delayed_0.mul_add(1.0 - frac, delayed_1 * frac)
+    }
+
+    fn process_linear_current(&mut self, input_sample: f64) -> f64 {
+        let offset = self.delay_offsets[self.wave_index];
+        let sample = self.process_linear(input_sample, offset);
+        self.delay_line_index = (self.delay_line_index + 1) % self.resolved.delay_line_length;
+        self.wave_index = (self.wave_index + 1) % self.delay_offsets.len();
+        sample
     }
 
     fn process_quadratic(&mut self, input_sample: f64, offset: f64) -> f64 {
@@ -473,6 +592,13 @@ impl ChorusStageState {
 }
 
 impl ResolvedChorusStage {
+    fn delay_offsets(self) -> Vec<f64> {
+        let wave_length = self.wave_length();
+        (0..wave_length)
+            .map(|wave_index| self.delay_offset(wave_index, wave_length))
+            .collect()
+    }
+
     fn wave_length(self) -> usize {
         if self.speed_hz == 0.0 {
             return 1;

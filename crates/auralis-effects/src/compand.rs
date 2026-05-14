@@ -173,6 +173,13 @@ impl CompandTransfer {
         (segment.y + offset * ((segment.a * offset) + segment.b)).exp()
     }
 
+    fn is_unity_gain(&self) -> bool {
+        is_exact_one(self.out_min_linear)
+            && self.segments.iter().all(|segment| {
+                is_exact_zero(segment.y) && is_exact_zero(segment.a) && is_exact_zero(segment.b)
+            })
+    }
+
     /// Returns the output level in dBFS for an input level in dBFS.
     #[must_use]
     pub fn output_db_for_input_db(&self, input_db: f64) -> f64 {
@@ -318,6 +325,10 @@ impl Compand {
         &self.transfer
     }
 
+    pub(crate) fn is_passthrough(&self) -> bool {
+        self.delay_seconds == 0.0 && self.transfer.is_unity_gain()
+    }
+
     /// Applies the compander to an audio buffer in place.
     ///
     /// # Errors
@@ -421,18 +432,18 @@ fn process_planar(
     compand: &Compand,
     state: &mut CompandState,
 ) -> Vec<f32> {
-    let mut output_interleaved = Vec::with_capacity(input.len());
+    let mut output = PlanarOutput::new(frames, channels);
 
     for frame in 0..frames {
         update_frame_volumes(input, frame, frames, channels, state);
         for channel in 0..channels {
             let source = input[channel * frames + frame];
-            process_interleaved_sample(source, channel, compand, state, &mut output_interleaved);
+            process_interleaved_sample(source, channel, compand, state, &mut output);
         }
     }
 
-    drain_delay(compand, state, &mut output_interleaved);
-    interleaved_to_planar(&output_interleaved, frames, channels)
+    drain_delay(compand, state, &mut output);
+    output.into_inner()
 }
 
 fn update_frame_volumes(
@@ -473,7 +484,7 @@ fn process_interleaved_sample(
     channel: usize,
     compand: &Compand,
     state: &mut CompandState,
-    output: &mut Vec<f32>,
+    output: &mut PlanarOutput,
 ) {
     let channel_group = if state.volumes.len() > 1 { channel } else { 0 };
     let gain = compand
@@ -497,7 +508,7 @@ fn process_interleaved_sample(
     state.delay_index = (state.delay_index + 1) % state.delay_buffer.len();
 }
 
-fn drain_delay(compand: &Compand, state: &mut CompandState, output: &mut Vec<f32>) {
+fn drain_delay(compand: &Compand, state: &mut CompandState, output: &mut PlanarOutput) {
     if state.delay_buffer.is_empty() {
         return;
     }
@@ -508,7 +519,7 @@ fn drain_delay(compand: &Compand, state: &mut CompandState, output: &mut Vec<f32
 
     while state.delay_count > 0 {
         let channel_group = if state.volumes.len() > 1 {
-            output.len() % state.volumes.len()
+            output.interleaved_len() % state.volumes.len()
         } else {
             0
         };
@@ -533,14 +544,46 @@ fn apply_compand_gain(sample: f32, gain: f64) -> f32 {
     output
 }
 
-fn interleaved_to_planar(input: &[f32], frames: usize, channels: usize) -> Vec<f32> {
-    let mut output = vec![0.0; input.len()];
-    for frame in 0..frames {
-        for channel in 0..channels {
-            output[channel * frames + frame] = input[frame * channels + channel];
+struct PlanarOutput {
+    data: Vec<f32>,
+    frames: usize,
+    channels: usize,
+    frame: usize,
+    channel: usize,
+    interleaved_len: usize,
+}
+
+impl PlanarOutput {
+    fn new(frames: usize, channels: usize) -> Self {
+        Self {
+            data: vec![0.0; frames * channels],
+            frames,
+            channels,
+            frame: 0,
+            channel: 0,
+            interleaved_len: 0,
         }
     }
-    output
+
+    fn push(&mut self, sample: f32) {
+        if self.frame < self.frames {
+            self.data[self.channel * self.frames + self.frame] = sample;
+        }
+        self.interleaved_len += 1;
+        self.channel += 1;
+        if self.channel == self.channels {
+            self.channel = 0;
+            self.frame += 1;
+        }
+    }
+
+    const fn interleaved_len(&self) -> usize {
+        self.interleaved_len
+    }
+
+    fn into_inner(self) -> Vec<f32> {
+        self.data
+    }
 }
 
 fn envelope_coefficient(seconds: f64, sample_rate_hz: u32) -> f64 {
@@ -792,6 +835,14 @@ fn is_non_negative_finite(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
 
+fn is_exact_one(value: f64) -> bool {
+    value.to_bits() == 1.0_f64.to_bits()
+}
+
+fn is_exact_zero(value: f64) -> bool {
+    value.to_bits().trailing_zeros() >= 63
+}
+
 fn linear_to_db(value: f64) -> f64 {
     20.0 * value.log10()
 }
@@ -857,6 +908,17 @@ mod tests {
             -26.0,
             0.001,
         );
+    }
+
+    #[test]
+    fn detects_zero_delay_unity_gain_passthrough() {
+        let compand = Compand::parse_sox_args(&["0,0", "-60,-60,0,0"]).unwrap();
+        let gained = Compand::parse_sox_args(&["0,0", "-60,-60,0,0", "-6"]).unwrap();
+        let delayed = Compand::parse_sox_args(&["0,0", "-60,-60,0,0", "0", "0", "0.1"]).unwrap();
+
+        assert!(compand.is_passthrough());
+        assert!(!gained.is_passthrough());
+        assert!(!delayed.is_passthrough());
     }
 
     #[test]

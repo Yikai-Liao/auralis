@@ -143,18 +143,70 @@ impl SoftVolState {
         let channels = audio.channels().as_usize();
         let samples = audio.as_planar_f32_mut();
 
-        for frame in 0..frames {
-            self.process_planar_frame(samples, channels, frames, frame);
+        match channels {
+            1 => self.process_mono_samples(&mut samples[..frames]),
+            2 => {
+                let (left, right) = samples.split_at_mut(frames);
+                self.process_stereo_samples(left, &mut right[..frames]);
+            }
+            _ => {
+                for frame in 0..frames {
+                    self.process_planar_frame(samples, channels, frames, frame);
+                }
+            }
         }
     }
 
     fn process_mono_samples(&mut self, samples: &mut [f32]) {
-        for sample in samples {
-            let max_sample = sample.abs();
-            self.update_volume_for_peak(max_sample);
-            *sample *= self.volume;
-            self.recover_after_frame();
+        let mut volume = self.volume;
+
+        if let Some(multiplier) = self.multiplier_per_frame {
+            for sample in samples {
+                let max_sample = sample.abs();
+                if max_sample > 0.0 && max_sample * volume > self.max_amplitude {
+                    volume = self.max_amplitude / max_sample;
+                }
+                *sample *= volume;
+                volume *= multiplier;
+            }
+        } else {
+            for sample in samples {
+                let max_sample = sample.abs();
+                if max_sample > 0.0 && max_sample * volume > self.max_amplitude {
+                    volume = self.max_amplitude / max_sample;
+                }
+                *sample *= volume;
+            }
         }
+
+        self.volume = volume;
+    }
+
+    fn process_stereo_samples(&mut self, left: &mut [f32], right: &mut [f32]) {
+        let mut volume = self.volume;
+
+        if let Some(multiplier) = self.multiplier_per_frame {
+            for (left_sample, right_sample) in left.iter_mut().zip(right.iter_mut()) {
+                let max_sample = left_sample.abs().max(right_sample.abs());
+                if max_sample > 0.0 && max_sample * volume > self.max_amplitude {
+                    volume = self.max_amplitude / max_sample;
+                }
+                *left_sample *= volume;
+                *right_sample *= volume;
+                volume *= multiplier;
+            }
+        } else {
+            for (left_sample, right_sample) in left.iter_mut().zip(right.iter_mut()) {
+                let max_sample = left_sample.abs().max(right_sample.abs());
+                if max_sample > 0.0 && max_sample * volume > self.max_amplitude {
+                    volume = self.max_amplitude / max_sample;
+                }
+                *left_sample *= volume;
+                *right_sample *= volume;
+            }
+        }
+
+        self.volume = volume;
     }
 
     fn process_planar_frame(

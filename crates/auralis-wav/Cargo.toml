@@ -19,6 +19,7 @@ auralis-codec = { path = "../auralis-codec" }
 auralis-core = { path = "../auralis-core" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
 hound.workspace = true
+symphonia.workspace = true
 thiserror.workspace = true
 
 [lints]

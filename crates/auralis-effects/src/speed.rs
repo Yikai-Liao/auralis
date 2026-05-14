@@ -94,6 +94,12 @@ impl Speed {
             audio.as_planar_f32().to_vec(),
         )?)
     }
+
+    pub(crate) fn process_buffer_in_place(self, audio: &mut AudioBuffer) -> Result<()> {
+        let output_rate = speed_sample_rate(audio.spec().sample_rate(), self.factor)?;
+        let spec = AudioSpec::new(output_rate, audio.channels(), audio.spec().sample_format());
+        audio.set_spec(spec).map_err(EffectError::Core)
+    }
 }
 
 fn speed_sample_rate(input_rate: SampleRate, factor: f64) -> Result<SampleRate> {

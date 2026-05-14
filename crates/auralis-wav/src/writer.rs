@@ -833,6 +833,10 @@ fn write_pcm16_samples_with_backend<W>(
 where
     W: Write + Seek,
 {
+    if requested_backend == BackendKind::Scalar {
+        return write_pcm16_scalar_samples_direct(writer, audio);
+    }
+
     let channels = audio.channels().as_usize();
     let interleaved_f32 = interleaved_samples(audio)?;
     let mut interleaved_pcm16 = vec![0; interleaved_f32.len()];
@@ -854,6 +858,70 @@ where
     writer.finalize().map_err(|error| WavError::WriteFailed {
         message: error.to_string(),
     })
+}
+
+fn write_pcm16_scalar_samples_direct<W>(
+    mut writer: hound::WavWriter<W>,
+    audio: &AudioBuffer,
+) -> Result<()>
+where
+    W: Write + Seek,
+{
+    let channels = audio.channels().as_usize();
+    let frames = usize::try_from(audio.frames().as_u64()).map_err(|_| WavError::WriteFailed {
+        message: "frame count cannot be represented on this platform".to_owned(),
+    })?;
+    let sample_count = frames
+        .checked_mul(channels)
+        .ok_or_else(|| WavError::WriteFailed {
+            message: "sample count cannot be represented on this platform".to_owned(),
+        })?;
+    let sample_count_u32 = u32::try_from(sample_count).map_err(|_| WavError::WriteFailed {
+        message: "sample count exceeds WAV PCM16 writer capacity".to_owned(),
+    })?;
+    let channel_data = (0..channels)
+        .map(|channel| {
+            audio.channel(channel).ok_or_else(|| WavError::WriteFailed {
+                message: "audio buffer shape changed during encode".to_owned(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut sample_writer = writer.get_i16_writer(sample_count_u32);
+    for frame_index in 0..frames {
+        for (channel_index, channel) in channel_data.iter().enumerate() {
+            let sample = channel[frame_index];
+            if !sample.is_finite() {
+                return Err(WavError::NonFiniteSample {
+                    channel_index,
+                    frame_index,
+                });
+            }
+            sample_writer.write_sample(f32_to_pcm16_scalar_sample(sample));
+        }
+    }
+
+    sample_writer
+        .flush()
+        .map_err(|error| WavError::WriteFailed {
+            message: error.to_string(),
+        })?;
+    writer.finalize().map_err(|error| WavError::WriteFailed {
+        message: error.to_string(),
+    })
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the sample is rounded and clamped to the i16 range before casting"
+)]
+#[inline]
+fn f32_to_pcm16_scalar_sample(sample: f32) -> i16 {
+    let scaled = (sample.clamp(-1.0, 1.0) * 32768.0)
+        .round()
+        .clamp(f32::from(i16::MIN), f32::from(i16::MAX));
+
+    scaled as i16
 }
 
 fn write_pcm8_samples_with_backend<W>(

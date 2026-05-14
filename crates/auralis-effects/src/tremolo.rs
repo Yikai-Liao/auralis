@@ -86,12 +86,30 @@ impl Tremolo {
     /// Panics only if a validated [`AudioBuffer`] cannot return one of its
     /// declared channels.
     pub fn process_buffer(self, audio: &mut AudioBuffer) {
+        if self.speed_hz == 0.0 {
+            return;
+        }
+
         let sample_rate = audio.spec().sample_rate();
+        let sample_rate_f64 = f64::from(sample_rate.as_u32());
+        let frames = usize::try_from(audio.frames().as_u64())
+            .expect("AudioBuffer construction already validated frame count");
+        let modulators = (0..frames)
+            .map(|frame| {
+                self.modulator(
+                    u64::try_from(frame).expect("usize frame fits u64 on supported targets"),
+                    sample_rate_f64,
+                )
+            })
+            .collect::<Vec<_>>();
+
         for channel_index in 0..audio.channels().as_usize() {
             let channel = audio
                 .channel_mut(channel_index)
                 .expect("channel index is within the audio shape");
-            self.process_mono_samples(channel, sample_rate, FrameCount::new(0));
+            for (sample, &modulator) in channel.iter_mut().zip(&modulators) {
+                *sample *= modulator;
+            }
         }
     }
 

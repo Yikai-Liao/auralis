@@ -144,6 +144,7 @@ impl DcShift {
 
 const SOX_SAMPLE_MAX: f64 = i32::MAX as f64;
 const SOX_SAMPLE_SCALE: f64 = SOX_SAMPLE_MAX + 1.0;
+const SOX_SAMPLE_CLIP_MAX: f64 = SOX_SAMPLE_MAX / SOX_SAMPLE_SCALE;
 
 #[expect(
     clippy::cast_possible_truncation,
@@ -157,32 +158,49 @@ fn dc_shift_limited_in_place(samples: &mut [f32], shift: f32, limiter_gain: f32)
     let shift = f64::from(shift);
     let limiter_gain = f64::from(limiter_gain);
     let limiter_threshold = SOX_SAMPLE_MAX * (1.0 - (shift.abs() - limiter_gain));
+    let denominator = SOX_SAMPLE_MAX - limiter_threshold;
+    let limiter_scale = if denominator == 0.0 {
+        0.0
+    } else {
+        limiter_gain / denominator
+    };
+    let shift_sox = shift * SOX_SAMPLE_MAX;
+    let inv_sox_sample_scale = 1.0 / SOX_SAMPLE_SCALE;
 
     for sample in samples {
         let sample_sox = f64::from(*sample) * SOX_SAMPLE_SCALE;
         let shifted = if sample_sox > limiter_threshold && shift > 0.0 {
-            let denominator = SOX_SAMPLE_MAX - limiter_threshold;
             let limited = if denominator == 0.0 {
                 limiter_threshold
             } else {
-                (sample_sox - limiter_threshold) * limiter_gain / denominator
-                    + limiter_threshold
-                    + shift
+                (sample_sox - limiter_threshold) * limiter_scale + limiter_threshold + shift
             };
-            limited / SOX_SAMPLE_SCALE
+            limited * inv_sox_sample_scale
         } else if sample_sox < -limiter_threshold && shift < 0.0 {
-            let denominator = SOX_SAMPLE_MAX - limiter_threshold;
             let limited = if denominator == 0.0 {
                 -limiter_threshold
             } else {
-                (sample_sox + limiter_threshold) * limiter_gain / denominator - limiter_threshold
-                    + shift
+                (sample_sox + limiter_threshold) * limiter_scale - limiter_threshold + shift
             };
-            limited / SOX_SAMPLE_SCALE
+            limited * inv_sox_sample_scale
         } else {
-            (sample_sox + shift * SOX_SAMPLE_MAX) / SOX_SAMPLE_SCALE
+            (sample_sox + shift_sox) * inv_sox_sample_scale
         };
-        *sample = shifted.clamp(-1.0, SOX_SAMPLE_MAX / SOX_SAMPLE_SCALE) as f32;
+        *sample = clip_sox_sample(shifted) as f32;
+    }
+}
+
+#[expect(
+    clippy::manual_clamp,
+    reason = "this helper is used in hot scalar loops where explicit comparisons benchmark faster"
+)]
+fn clip_sox_sample(sample: f64) -> f64 {
+    if sample > SOX_SAMPLE_CLIP_MAX {
+        SOX_SAMPLE_CLIP_MAX
+    } else if sample < -1.0 {
+        -1.0
+    } else {
+        sample
     }
 }
 

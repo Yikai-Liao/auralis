@@ -101,7 +101,22 @@ impl Remix {
             };
             let has_explicit_gain = sources.iter().any(|source| source.gain.is_some());
 
-            for source_index in sources {
+            let first_source = sources[0];
+            let input_channel = audio
+                .channel(first_source.index)
+                .ok_or(EffectError::RemixInputChannelOutOfBounds)?;
+            let multiplier = first_source.gain.map_or_else(
+                || {
+                    self.level_mode
+                        .default_multiplier(automatic_multiplier, has_explicit_gain)
+                },
+                RemixGain::multiplier,
+            );
+            for (output_sample, input_sample) in output_channel.iter_mut().zip(input_channel) {
+                *output_sample = *input_sample * multiplier;
+            }
+
+            for source_index in &sources[1..] {
                 let input_channel = audio
                     .channel(source_index.index)
                     .ok_or(EffectError::RemixInputChannelOutOfBounds)?;

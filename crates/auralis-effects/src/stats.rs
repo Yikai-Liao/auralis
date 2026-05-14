@@ -646,17 +646,18 @@ fn moving_rms_extrema(samples: &[f64], window_samples: usize) -> (f64, f64) {
     }
 
     let window = window_samples.min(samples.len()).max(1);
+    let inv_window = 1.0 / f64_from_usize(window);
     let mut sum_squares = samples[..window]
         .iter()
         .map(|sample| sample * sample)
         .sum::<f64>();
-    let mut min_rms = (sum_squares / f64_from_usize(window)).sqrt();
+    let mut min_rms = (sum_squares * inv_window).sqrt();
     let mut max_rms = min_rms;
 
     for index in window..samples.len() {
         sum_squares += samples[index] * samples[index];
         sum_squares -= samples[index - window] * samples[index - window];
-        let rms = (sum_squares / f64_from_usize(window)).sqrt();
+        let rms = (sum_squares * inv_window).sqrt();
         min_rms = min_rms.min(rms);
         max_rms = max_rms.max(rms);
     }

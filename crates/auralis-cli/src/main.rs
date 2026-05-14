@@ -233,7 +233,7 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     let output_level_policy = options.output_level_policy()?;
     let output_dither_policy = options.output_dither_policy()?;
     let effect_chain = options.effect_chain()?;
-    let pipeline = open_pipeline(input, options)?
+    let pipeline = open_pipeline(input, options, effect_chain.as_ref())?
         .with_backend(backend)
         .with_sample_rate_conversion_policy(sample_rate_conversion_policy)
         .with_channel_conversion_policy(channel_conversion_policy)
@@ -433,8 +433,26 @@ impl RunOptions {
     }
 }
 
-fn open_pipeline(input: &Path, options: &RunOptions) -> Result<auralis::Pipeline, CliError> {
+fn open_pipeline(
+    input: &Path,
+    options: &RunOptions,
+    effect_chain: Option<&auralis::EffectChain>,
+) -> Result<auralis::Pipeline, CliError> {
     if options.additional_inputs.is_empty() {
+        if let Some(frames) = effect_chain.and_then(synth_prefix_frame_limit) {
+            match auralis_wav::decode_pcm16_prefix_path_with_backend(input, frames, options.backend)
+            {
+                Ok(audio) => {
+                    return Ok(auralis::Pipeline::from_audio_buffer_with_backend(
+                        audio,
+                        options.backend,
+                    ));
+                }
+                Err(WavError::UnsupportedSampleFormat { .. }) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+
         let audio = auralis::AudioFile::open_wav_with_backend(input, options.backend)?;
         return Ok(audio.into_pipeline());
     }
@@ -486,6 +504,13 @@ fn open_pipeline(input: &Path, options: &RunOptions) -> Result<auralis::Pipeline
     };
 
     Ok(audio.into_pipeline())
+}
+
+fn synth_prefix_frame_limit(effect_chain: &auralis::EffectChain) -> Option<auralis::FrameCount> {
+    match effect_chain.commands().first()? {
+        auralis::EffectCommand::Synth(synth) => synth.input_prefix_frames(),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

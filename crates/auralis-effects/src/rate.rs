@@ -421,12 +421,9 @@ fn resample_channel_linear(
     let last_input_index = input.len() - 1;
     let source = f64::from(source.as_u32());
     let target = f64::from(target.as_u32());
-    for (output_index, output_sample) in output.iter_mut().enumerate() {
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "Sample-rate conversion maps usize frame positions into f64 time coordinates."
-        )]
-        let source_position = output_index as f64 * source / target;
+    let step = source / target;
+    let mut source_position = 0.0_f64;
+    for output_sample in output {
         #[allow(
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss,
@@ -453,6 +450,7 @@ fn resample_channel_linear(
         let left = input[source_floor_index];
         let right = input[source_floor_index + 1];
         *output_sample = left.mul_add(1.0 - fraction, right * fraction);
+        source_position += step;
     }
 }
 

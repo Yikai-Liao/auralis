@@ -116,6 +116,9 @@ fn apply_buffer_command(
         }
         EffectCommand::Centercut(centercut) => apply_centercut_command(*centercut, audio)?,
         EffectCommand::Channels(channels) => {
+            if channels.target_channels == audio.channels() {
+                return Ok(true);
+            }
             *audio = channels
                 .process_buffer_with_backend(audio, requested_backend)
                 .map_err(|source| ("channels", source))?;
@@ -266,8 +269,7 @@ fn apply_buffer_command(
                 .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Trim(trim) => {
-            *audio = trim
-                .process_buffer(audio)
+            trim.process_buffer_in_place(audio)
                 .map_err(|source| ("frame-range", source))?;
         }
         EffectCommand::Vad(vad) => {
@@ -297,8 +299,8 @@ fn apply_sample_rate_command(
                 .map_err(|source| ("frequency", source))?;
         }
         EffectCommand::Speed(speed) => {
-            *audio = speed
-                .process_buffer(audio)
+            speed
+                .process_buffer_in_place(audio)
                 .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Upsample(upsample) => {

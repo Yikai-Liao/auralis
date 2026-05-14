@@ -111,16 +111,18 @@ impl Norm {
 }
 
 fn finite_peak_amplitude(samples: &[f32]) -> Result<f32> {
-    for (sample_index, sample) in samples.iter().enumerate() {
+    let mut peak = 0.0_f32;
+    for (sample_index, &sample) in samples.iter().enumerate() {
         if !sample.is_finite() {
             return Err(EffectError::NonFiniteNormSample { sample_index });
         }
+        let amplitude = sample.abs();
+        if amplitude > peak {
+            peak = amplitude;
+        }
     }
 
-    Ok(samples
-        .iter()
-        .map(|sample| sample.abs())
-        .fold(0.0, f32::max))
+    Ok(peak)
 }
 
 #[cfg(test)]

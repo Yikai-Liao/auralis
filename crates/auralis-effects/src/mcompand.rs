@@ -163,35 +163,36 @@ impl MCompand {
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidMCompand)?;
         let channels = audio.channels().as_usize();
         let sample_rate_hz = f64::from(audio.spec().sample_rate().as_u32());
-        let mut remaining = planar_to_interleaved(audio.as_planar_f32(), frames, channels);
+        let mut remaining = audio.as_planar_f32().to_vec();
         let mut summed = vec![0.0; remaining.len()];
 
         for band in &self.bands {
             let band_input = if let Some(frequency) = band.top_frequency_hz {
-                let (low, high) = split_crossover(&remaining, channels, sample_rate_hz, frequency)?;
+                let (low, high) =
+                    split_crossover(&remaining, frames, channels, sample_rate_hz, frequency)?;
                 remaining = high;
                 low
             } else {
                 remaining.clone()
             };
 
-            let mut band_audio = AudioBuffer::from_planar_f32(
-                audio.spec(),
-                audio.frames(),
-                interleaved_to_planar(&band_input, frames, channels),
-            )
-            .map_err(|_| EffectError::InvalidMCompand)?;
-            band.compand
-                .process_buffer(&mut band_audio)
-                .map_err(|_| EffectError::InvalidMCompand)?;
-            let band_output = planar_to_interleaved(band_audio.as_planar_f32(), frames, channels);
-            add_clipped(&mut summed, &band_output);
+            if band.compand.is_passthrough() {
+                add_clipped(&mut summed, &band_input);
+            } else {
+                let mut band_audio =
+                    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), band_input)
+                        .map_err(|_| EffectError::InvalidMCompand)?;
+                band.compand
+                    .process_buffer(&mut band_audio)
+                    .map_err(|_| EffectError::InvalidMCompand)?;
+                add_clipped(&mut summed, band_audio.as_planar_f32());
+            }
         }
 
         *audio = AudioBuffer::from_planar_f32(
             audio.spec(),
             FrameCount::new(audio.frames().as_u64()),
-            interleaved_to_planar(&summed, frames, channels),
+            summed,
         )
         .map_err(|_| EffectError::InvalidMCompand)?;
         Ok(())
@@ -220,6 +221,7 @@ fn parse_frequency(value: &str) -> Result<f64> {
 
 fn split_crossover(
     input: &[f32],
+    frames: usize,
     channels: usize,
     sample_rate_hz: f64,
     frequency_hz: f64,
@@ -253,15 +255,20 @@ fn split_crossover(
     let mut low = vec![0.0; input.len()];
     let mut high = vec![0.0; input.len()];
 
-    for (index, &sample) in input.iter().enumerate() {
-        let channel = index % channels;
+    for channel in 0..channels {
         let low_state = &mut low_states[channel];
-        let low_first = low_state[0].process_sample(sample);
-        low[index] = low_state[1].process_sample(low_first);
-
         let high_state = &mut high_states[channel];
-        let high_first = high_state[0].process_sample(sample);
-        high[index] = high_state[1].process_sample(high_first);
+        let channel_start = channel * frames;
+
+        for frame in 0..frames {
+            let index = channel_start + frame;
+            let sample = input[index];
+            let low_first = low_state[0].process_sample(sample);
+            low[index] = low_state[1].process_sample(low_first);
+
+            let high_first = high_state[0].process_sample(sample);
+            high[index] = high_state[1].process_sample(high_first);
+        }
     }
 
     Ok((low, high))
@@ -271,26 +278,6 @@ fn add_clipped(output: &mut [f32], input: &[f32]) {
     for (output, input) in output.iter_mut().zip(input) {
         *output = (*output + *input).clamp(-1.0, 1.0);
     }
-}
-
-fn planar_to_interleaved(input: &[f32], frames: usize, channels: usize) -> Vec<f32> {
-    let mut output = vec![0.0; input.len()];
-    for frame in 0..frames {
-        for channel in 0..channels {
-            output[frame * channels + channel] = input[channel * frames + frame];
-        }
-    }
-    output
-}
-
-fn interleaved_to_planar(input: &[f32], frames: usize, channels: usize) -> Vec<f32> {
-    let mut output = vec![0.0; input.len()];
-    for frame in 0..frames {
-        for channel in 0..channels {
-            output[channel * frames + frame] = input[frame * channels + channel];
-        }
-    }
-    output
 }
 
 #[cfg(test)]
@@ -367,12 +354,10 @@ mod tests {
         mcompand.process_buffer(&mut audio).unwrap();
 
         assert_eq!(audio.frames(), FrameCount::new(6));
-        assert!(
-            audio
-                .as_planar_f32()
-                .iter()
-                .all(|sample| sample.is_finite())
-        );
+        assert!(audio
+            .as_planar_f32()
+            .iter()
+            .all(|sample| sample.is_finite()));
     }
 
     #[test]

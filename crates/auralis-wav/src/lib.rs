@@ -39,6 +39,7 @@ mod g711;
 mod reader;
 mod reader_float64;
 mod reader_g711;
+mod reader_symphonia;
 mod rifx;
 mod sample_conversion;
 mod writer;
@@ -52,10 +53,11 @@ pub use reader::{
     AnyPcmWavReader, Pcm16WavReader, decode_float32, decode_float32_path,
     decode_float32_path_with_backend, decode_float32_with_backend, decode_pcm8, decode_pcm8_path,
     decode_pcm8_path_with_backend, decode_pcm8_with_backend, decode_pcm16, decode_pcm16_path,
-    decode_pcm16_path_with_backend, decode_pcm16_with_backend, decode_pcm24, decode_pcm24_path,
-    decode_pcm24_path_with_backend, decode_pcm24_with_backend, decode_pcm32, decode_pcm32_path,
-    decode_pcm32_path_with_backend, decode_pcm32_with_backend, decode_wav, decode_wav_path,
-    decode_wav_path_with_backend, decode_wav_with_backend,
+    decode_pcm16_path_with_backend, decode_pcm16_prefix_path_with_backend,
+    decode_pcm16_with_backend, decode_pcm24, decode_pcm24_path, decode_pcm24_path_with_backend,
+    decode_pcm24_with_backend, decode_pcm32, decode_pcm32_path, decode_pcm32_path_with_backend,
+    decode_pcm32_with_backend, decode_wav, decode_wav_path, decode_wav_path_with_backend,
+    decode_wav_with_backend,
 };
 pub use reader_float64::{
     decode_float64, decode_float64_path, decode_float64_path_with_backend,

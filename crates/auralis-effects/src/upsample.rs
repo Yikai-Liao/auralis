@@ -106,21 +106,21 @@ impl Upsample {
             .as_usize()
             .checked_mul(output_frames_usize)
             .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        let zero_count = usize::try_from(self.factor - 1)
+        let factor = usize::try_from(self.factor)
             .map_err(|_| auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        let mut output = Vec::with_capacity(capacity);
+        let mut output = vec![0.0; capacity];
 
         for channel_index in 0..audio.channels().as_usize() {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-            for &sample in channel {
-                output.push(sample);
-                output.resize(output.len() + zero_count, 0.0);
+            let channel_start = channel_index
+                .checked_mul(output_frames_usize)
+                .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
+            for (frame, &sample) in channel.iter().enumerate() {
+                output[channel_start + frame * factor] = sample;
             }
         }
-
-        debug_assert_eq!(output.len(), capacity);
 
         let spec = AudioSpec::new(
             SampleRate::new(output_rate)?,

@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, SampleRate};
 
-use crate::{EffectError, Fir, FirCoefficients, Result};
+use crate::{EffectError, Fir, FirCoefficients, Result, fir::FirBackend};
 
 const FIRFIT_TAP_COUNT: usize = 2047;
 const FIRFIT_CENTER_TAP: usize = FIRFIT_TAP_COUNT / 2;
@@ -222,7 +222,12 @@ impl FirFit {
     /// represented.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let coefficients = self.coefficients_for_sample_rate(audio.spec().sample_rate())?;
-        Fir::from_coefficients(coefficients).process_buffer(audio)
+        let backend = if is_centered_impulse(coefficients.as_slice()) {
+            FirBackend::Direct
+        } else {
+            FirBackend::DftWithLen(FIRFIT_TAP_COUNT * 8)
+        };
+        Fir::from_coefficients(coefficients).process_buffer_with_backend(audio, backend)
     }
 
     fn resolved_knots(&self) -> Result<Vec<FirFitKnot>> {
@@ -269,22 +274,31 @@ fn design_coefficients(knots: &[FirFitKnot], sample_rate: SampleRate) -> Result<
         response.push(db_to_linear(interpolated_gain_db(knots, frequency)));
     }
 
-    let mut coefficients = Vec::with_capacity(FIRFIT_TAP_COUNT);
-    for tap in 0..FIRFIT_TAP_COUNT {
-        let offset = isize::try_from(tap).expect("tap count fits isize")
-            - isize::try_from(FIRFIT_CENTER_TAP).expect("tap count fits isize");
+    let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
+    for distance in 0..=FIRFIT_CENTER_TAP {
         let mut sum = 0.0;
+        let phase_step =
+            std::f64::consts::PI * distance as f64 / FIRFIT_RESPONSE_STEPS as f64;
+        let (sin_step, cos_step) = phase_step.sin_cos();
+        let mut sin_phase = 0.0;
+        let mut cos_phase = 1.0;
         for (index, amplitude) in response.iter().copied().enumerate() {
             let weight = if index == 0 || index == FIRFIT_RESPONSE_STEPS {
                 0.5
             } else {
                 1.0
             };
-            let phase =
-                std::f64::consts::PI * index as f64 * offset as f64 / FIRFIT_RESPONSE_STEPS as f64;
-            sum += weight * amplitude * phase.cos();
+            sum += weight * amplitude * cos_phase;
+            if index != FIRFIT_RESPONSE_STEPS {
+                let next_cos = cos_phase * cos_step - sin_phase * sin_step;
+                sin_phase = sin_phase * cos_step + cos_phase * sin_step;
+                cos_phase = next_cos;
+            }
         }
-        coefficients.push(sum / FIRFIT_RESPONSE_STEPS as f64 * blackman_nuttall(tap));
+        let tap = FIRFIT_CENTER_TAP + distance;
+        let coefficient = sum / FIRFIT_RESPONSE_STEPS as f64 * blackman_nuttall(tap);
+        coefficients[tap] = coefficient;
+        coefficients[FIRFIT_CENTER_TAP - distance] = coefficient;
     }
 
     FirCoefficients::new(coefficients)
@@ -306,6 +320,14 @@ fn centered_impulse(multiplier: f64) -> Vec<f64> {
     let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
     coefficients[FIRFIT_CENTER_TAP] = multiplier;
     coefficients
+}
+
+fn is_centered_impulse(coefficients: &[f64]) -> bool {
+    coefficients.len() == FIRFIT_TAP_COUNT
+        && coefficients
+            .iter()
+            .enumerate()
+            .all(|(index, coefficient)| index == FIRFIT_CENTER_TAP || *coefficient == 0.0)
 }
 
 fn interpolated_gain_db(knots: &[FirFitKnot], frequency_hz: f64) -> f64 {

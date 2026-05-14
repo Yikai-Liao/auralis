@@ -116,7 +116,11 @@ impl Downsample {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-            output.extend(channel.iter().step_by(step).copied());
+            let mut frame = 0;
+            while frame < channel.len() {
+                output.push(channel[frame]);
+                frame += step;
+            }
         }
 
         debug_assert_eq!(output.len(), capacity);
