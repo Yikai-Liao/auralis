@@ -143,7 +143,7 @@ fn reduce_channel(samples: &[f32], noisegate: &[f64], amount: f64) -> Result<Vec
 
     let mut state = ChannelState::new(noisegate, amount);
     let mut consumed = 0;
-    let mut output = Vec::new();
+    let mut output = Vec::with_capacity(samples.len());
 
     while consumed < samples.len() {
         let old_bufdata = state.bufdata;
