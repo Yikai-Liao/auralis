@@ -151,8 +151,14 @@ impl Loudness {
 
         let sample_rate = f64::from(audio.spec().sample_rate().as_u32());
         let taps = self.filter_taps(sample_rate)?;
-        let dft =
-            DftFir::new(DspFirCoefficients::new(taps).map_err(|_| EffectError::InvalidLoudness)?);
+        let tap_count = taps.len();
+        let coefficients =
+            DspFirCoefficients::new(taps).map_err(|_| EffectError::InvalidLoudness)?;
+        let dft = if tap_count <= 511 {
+            DftFir::with_dft_len(coefficients, 2048)
+        } else {
+            DftFir::new(coefficients)
+        };
         let frames =
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::InvalidLoudness)?;
         let channels = audio.channels().as_usize();
