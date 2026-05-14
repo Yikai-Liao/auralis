@@ -185,13 +185,17 @@ impl Echo {
         )?)
     }
 
-    fn resolved_taps(&self, sample_rate_hz: u32) -> Result<Vec<(usize, f64)>> {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echo delay processing stores decay coefficients as f32 to match f32 audio buffers"
+    )]
+    fn resolved_taps(&self, sample_rate_hz: u32) -> Result<Vec<(usize, f32)>> {
         self.taps
             .iter()
             .map(|tap| {
                 let frames = tap.resolved_frames(sample_rate_hz)?;
                 usize::try_from(frames.as_u64())
-                    .map(|frames| (frames, tap.decay()))
+                    .map(|frames| (frames, tap.decay() as f32))
                     .map_err(|_| EffectError::EchoLengthOverflow)
             })
             .collect()
@@ -204,14 +208,24 @@ fn process_channel(
     max_delay: usize,
     gain_in: f64,
     gain_out: f64,
-    taps: &[(usize, f64)],
+    taps: &[(usize, f32)],
     output: &mut Vec<f32>,
 ) {
-    let mut delay_buffer = vec![0.0_f64; max_delay];
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echo delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_in = gain_in as f32;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echo delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_out = gain_out as f32;
+    let mut delay_buffer = vec![0.0_f32; max_delay];
     let mut counter = 0;
 
     for frame in 0..output_frames {
-        let input_sample = input.get(frame).copied().map_or(0.0, f64::from);
+        let input_sample = input.get(frame).copied().unwrap_or(0.0);
         let mut output_sample = input_sample * gain_in;
 
         if max_delay == 0 {
@@ -227,17 +241,7 @@ fn process_channel(
             counter = (counter + 1) % max_delay;
         }
 
-        output.push(f64_to_f32_clamped(output_sample * gain_out));
-    }
-}
-
-fn f64_to_f32_clamped(sample: f64) -> f32 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "echo output is explicitly clipped to normalized f32 full scale"
-    )]
-    {
-        sample.clamp(-1.0, 1.0) as f32
+        output.push((output_sample * gain_out).clamp(-1.0, 1.0));
     }
 }
 
