@@ -166,9 +166,19 @@ impl Vad {
             usize::try_from(audio.frames().as_u64()).map_err(|_| EffectError::VadLengthOverflow)?;
         let channels = audio.channels().as_usize();
         let start = resolved.detect_start(audio, frames)?;
+        if start == 0 {
+            return Ok(audio.clone());
+        }
         let output_frames = frames
             .checked_sub(start)
             .ok_or(EffectError::VadLengthOverflow)?;
+        if output_frames == 0 {
+            return Ok(AudioBuffer::from_planar_f32(
+                audio.spec(),
+                FrameCount::new(0),
+                Vec::new(),
+            )?);
+        }
         let capacity = output_frames
             .checked_mul(channels)
             .ok_or(EffectError::VadLengthOverflow)?;
