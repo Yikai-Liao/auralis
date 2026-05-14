@@ -74,14 +74,13 @@ impl Oops {
         let sample_count = frame_count
             .checked_mul(2)
             .ok_or(auralis_core::AuralisError::InvalidAudioBufferShape)?;
-        let mut samples = Vec::with_capacity(sample_count);
+        let mut samples = vec![0.0; sample_count];
+        let (left_output, right_output) = samples.split_at_mut(frame_count);
 
-        samples.extend(
-            left.iter()
-                .zip(right)
-                .map(|(&left, &right)| (left - right).clamp(-1.0, 1.0)),
-        );
-        samples.extend_from_within(..frame_count);
+        for ((output, &left), &right) in left_output.iter_mut().zip(left).zip(right) {
+            *output = (left - right).clamp(-1.0, 1.0);
+        }
+        right_output.copy_from_slice(left_output);
 
         AudioBuffer::from_planar_f32(output_spec, frames, samples).map_err(EffectError::from)
     }
