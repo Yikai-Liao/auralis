@@ -153,7 +153,11 @@ impl Stretch {
         }
 
         let state = StretchState::new(self, audio.spec().sample_rate().as_u32())?;
-        let mut output = Vec::new();
+        let mut output = Vec::with_capacity(estimated_output_samples(
+            audio.frames(),
+            audio.channels().as_usize(),
+            self.factor,
+        )?);
         let mut output_frames = None;
 
         for channel_index in 0..audio.channels().as_usize() {
@@ -179,6 +183,23 @@ impl Stretch {
         );
         Ok(AudioBuffer::from_planar_f32(spec, output_frames, output)?)
     }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "stretch output capacity is only a best-effort allocation hint derived from validated effect parameters"
+)]
+fn estimated_output_samples(
+    input_frames: FrameCount,
+    channels: usize,
+    factor: f64,
+) -> Result<usize> {
+    let frames = ((input_frames.as_u64() as f64) * factor).ceil() as usize;
+    frames
+        .checked_mul(channels)
+        .ok_or(EffectError::StretchLengthOverflow)
 }
 
 impl Default for Stretch {
