@@ -116,7 +116,10 @@ fn finite_peak_amplitude(samples: &[f32]) -> Result<f32> {
         if !sample.is_finite() {
             return Err(EffectError::NonFiniteNormSample { sample_index });
         }
-        peak = peak.max(sample.abs());
+        let amplitude = sample.abs();
+        if amplitude > peak {
+            peak = amplitude;
+        }
     }
 
     Ok(peak)
