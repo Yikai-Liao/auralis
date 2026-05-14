@@ -300,8 +300,8 @@ fn apply_sample_rate_command(
                 .map_err(|source| ("frequency", source))?;
         }
         EffectCommand::Speed(speed) => {
-            *audio = speed
-                .process_buffer(audio)
+            speed
+                .process_buffer_in_place(audio)
                 .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Upsample(upsample) => {

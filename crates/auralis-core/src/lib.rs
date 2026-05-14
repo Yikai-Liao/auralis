@@ -460,6 +460,23 @@ impl AudioBuffer {
         }
     }
 
+    /// Updates the buffer audio specification without copying sample data.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuralisError::InvalidAudioBufferShape`] when the new
+    /// specification's channel count is incompatible with the existing planar
+    /// sample data and frame count.
+    pub fn set_spec(&mut self, spec: AudioSpec) -> Result<()> {
+        let expected_len = planar_sample_count(spec.channels(), self.frames)?;
+        if self.data.len() == expected_len {
+            self.spec = spec;
+            Ok(())
+        } else {
+            Err(AuralisError::InvalidAudioBufferShape)
+        }
+    }
+
     /// Returns the buffer audio specification.
     #[must_use]
     pub const fn spec(&self) -> AudioSpec {
@@ -756,6 +773,26 @@ mod tests {
         assert_eq!(updated.spec(), spec);
         assert_eq!(updated.frames(), FrameCount::new(2));
         assert_eq!(updated.as_planar_f32(), &[0.0, 0.25, 0.5, -0.5]);
+    }
+
+    #[test]
+    fn set_spec_updates_metadata_in_place() {
+        let mut buffer = AudioBuffer::from_planar_f32(
+            test_spec(1),
+            FrameCount::new(2),
+            vec![0.0, 0.25],
+        )
+        .unwrap();
+        let spec = AudioSpec::new(
+            SampleRate::new(24_000).unwrap(),
+            ChannelCount::new(1).unwrap(),
+            SampleFormat::Float32,
+        );
+
+        buffer.set_spec(spec).unwrap();
+
+        assert_eq!(buffer.spec(), spec);
+        assert_eq!(buffer.as_planar_f32(), &[0.0, 0.25]);
     }
 
     #[test]
