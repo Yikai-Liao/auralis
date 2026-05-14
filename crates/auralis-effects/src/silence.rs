@@ -160,8 +160,15 @@ impl Silence {
         let frames = usize::try_from(audio.frames().as_u64())
             .map_err(|_| EffectError::SilenceLengthOverflow)?;
         let channels = audio.channels().as_usize();
+        let channel_data = (0..channels)
+            .map(|channel| {
+                audio
+                    .channel(channel)
+                    .ok_or(EffectError::SilenceLengthOverflow)
+            })
+            .collect::<Result<Vec<_>>>()?;
         let mut ranges = Vec::new();
-        let mut cursor = self.resolve_start(audio, 0, frames)?;
+        let mut cursor = self.resolve_start(audio, &channel_data, 0, frames)?;
 
         loop {
             let Some(below) = self.below else {
@@ -172,7 +179,7 @@ impl Silence {
             };
 
             let Some((silent_start, silent_end)) =
-                Self::find_silence_run(audio, cursor, frames, below)?
+                Self::find_silence_run(audio, &channel_data, cursor, frames, below)?
             else {
                 if cursor < frames {
                     ranges.push(cursor..frames);
@@ -191,7 +198,7 @@ impl Silence {
             if !self.restart {
                 break;
             }
-            cursor = self.resolve_start(audio, silent_end, frames)?;
+            cursor = self.resolve_start(audio, &channel_data, silent_end, frames)?;
         }
 
         let output_frames = ranges.iter().try_fold(0_usize, |total, range| {
@@ -204,10 +211,7 @@ impl Silence {
             .ok_or(EffectError::SilenceLengthOverflow)?;
         let mut output = Vec::with_capacity(capacity);
 
-        for channel_index in 0..channels {
-            let channel = audio
-                .channel(channel_index)
-                .ok_or(EffectError::SilenceLengthOverflow)?;
+        for &channel in &channel_data {
             for range in &ranges {
                 output.extend_from_slice(&channel[range.clone()]);
             }
@@ -223,16 +227,23 @@ impl Silence {
         .map_err(|_| EffectError::SilenceLengthOverflow)
     }
 
-    fn resolve_start(&self, audio: &AudioBuffer, start: usize, frames: usize) -> Result<usize> {
+    fn resolve_start(
+        &self,
+        audio: &AudioBuffer,
+        channels: &[&[f32]],
+        start: usize,
+        frames: usize,
+    ) -> Result<usize> {
         let Some(above) = self.above else {
             return Ok(start);
         };
         let required = above
             .duration
             .resolved_frames(audio.spec().sample_rate().as_u32())?;
+        let threshold = above.threshold.linear_amplitude_threshold();
         if required == 0 {
             return (start..frames)
-                .find(|&frame| Self::above_threshold_frame(audio, frame, above.threshold))
+                .find(|&frame| Self::above_threshold_frame(channels, frame, threshold))
                 .ok_or(EffectError::SilenceLengthOverflow)
                 .or(Ok(frames));
         }
@@ -242,7 +253,7 @@ impl Silence {
         let mut run_len = 0_usize;
 
         for frame in start..frames {
-            if Self::above_threshold_frame(audio, frame, above.threshold) {
+            if Self::above_threshold_frame(channels, frame, threshold) {
                 if run_len == 0 {
                     run_start = frame;
                 }
@@ -264,6 +275,7 @@ impl Silence {
 
     fn find_silence_run(
         audio: &AudioBuffer,
+        channels: &[&[f32]],
         start: usize,
         frames: usize,
         below: SilencePeriod,
@@ -271,12 +283,13 @@ impl Silence {
         let required = below
             .duration
             .resolved_frames(audio.spec().sample_rate().as_u32())?;
+        let threshold = below.threshold.linear_amplitude_threshold();
         let mut found_periods = 0_u32;
         let mut run_start = start;
         let mut run_len = 0_usize;
 
         for frame in start..frames {
-            if Self::below_threshold_frame(audio, frame, below.threshold) {
+            if Self::below_threshold_frame(channels, frame, threshold) {
                 if run_len == 0 {
                     run_start = frame;
                 }
@@ -296,28 +309,16 @@ impl Silence {
         Ok(None)
     }
 
-    fn above_threshold_frame(
-        audio: &AudioBuffer,
-        frame: usize,
-        threshold: SilenceThreshold,
-    ) -> bool {
-        (0..audio.channels().as_usize()).any(|channel| {
-            audio
-                .sample(channel, frame)
-                .is_some_and(|sample| threshold.is_above(sample))
-        })
+    fn above_threshold_frame(channels: &[&[f32]], frame: usize, threshold: f32) -> bool {
+        channels
+            .iter()
+            .any(|channel| channel.get(frame).is_some_and(|sample| sample.abs() > threshold))
     }
 
-    fn below_threshold_frame(
-        audio: &AudioBuffer,
-        frame: usize,
-        threshold: SilenceThreshold,
-    ) -> bool {
-        !(0..audio.channels().as_usize()).all(|channel| {
-            audio
-                .sample(channel, frame)
-                .is_some_and(|sample| threshold.is_above(sample))
-        })
+    fn below_threshold_frame(channels: &[&[f32]], frame: usize, threshold: f32) -> bool {
+        !channels
+            .iter()
+            .all(|channel| channel.get(frame).is_some_and(|sample| sample.abs() > threshold))
     }
 }
 
@@ -406,10 +407,6 @@ impl SilenceThreshold {
             Self::Decibels(db) if db.is_finite() && db < 0.0 => Ok(()),
             _ => Err(EffectError::InvalidSilence),
         }
-    }
-
-    fn is_above(self, sample: f32) -> bool {
-        sample.abs() > self.linear_amplitude_threshold()
     }
 
     #[allow(
