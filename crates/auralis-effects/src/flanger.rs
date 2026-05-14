@@ -311,8 +311,8 @@ impl FlangerChannelState {
     }
 
     fn process(&mut self, input_sample: f64, delay: f64) -> f32 {
-        self.delay_line_index = (self.delay_line_index + self.resolved.delay_line_length - 1)
-            % self.resolved.delay_line_length;
+        self.delay_line_index =
+            previous_delay_line_index(self.delay_line_index, self.resolved.delay_line_length);
         self.delay_line[self.delay_line_index] =
             input_sample + self.delay_last * self.resolved.regen;
 
@@ -332,8 +332,8 @@ impl FlangerChannelState {
     }
 
     fn process_none_offset(&mut self, input_sample: f64, offset: usize) -> f32 {
-        self.delay_line_index = (self.delay_line_index + self.resolved.delay_line_length - 1)
-            % self.resolved.delay_line_length;
+        self.delay_line_index =
+            previous_delay_line_index(self.delay_line_index, self.resolved.delay_line_length);
         self.delay_line[self.delay_line_index] =
             input_sample + self.delay_last * self.resolved.regen;
 
@@ -368,7 +368,24 @@ impl FlangerChannelState {
     }
 
     fn delay_index(&self, offset: usize) -> usize {
-        (self.delay_line_index + offset) % self.resolved.delay_line_length
+        wrapped_delay_index(
+            self.delay_line_index,
+            offset,
+            self.resolved.delay_line_length,
+        )
+    }
+}
+
+fn previous_delay_line_index(index: usize, length: usize) -> usize {
+    if index == 0 { length - 1 } else { index - 1 }
+}
+
+fn wrapped_delay_index(index: usize, offset: usize, length: usize) -> usize {
+    let delayed = index + offset;
+    if delayed >= length {
+        delayed - length
+    } else {
+        delayed
     }
 }
 
