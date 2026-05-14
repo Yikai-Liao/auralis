@@ -205,13 +205,26 @@ impl Flanger {
     /// when the delay line allocation would exceed the platform limit.
     pub fn process_buffer(&self, audio: &AudioBuffer) -> Result<AudioBuffer> {
         let resolved = self.resolve(audio.spec().sample_rate().as_u32())?;
-        let mut output = Vec::with_capacity(audio.as_planar_f32().len());
+        let frames = usize::try_from(audio.frames().as_u64())
+            .map_err(|_| EffectError::FlangerLengthOverflow)?;
+        let mut output = vec![0.0; audio.as_planar_f32().len()];
 
         for channel_index in 0..audio.channels().as_usize() {
             let channel = audio
                 .channel(channel_index)
                 .ok_or(EffectError::FlangerLengthOverflow)?;
-            process_channel(channel, channel_index, resolved, &mut output);
+            let channel_start = channel_index
+                .checked_mul(frames)
+                .ok_or(EffectError::FlangerLengthOverflow)?;
+            let channel_end = channel_start
+                .checked_add(frames)
+                .ok_or(EffectError::FlangerLengthOverflow)?;
+            process_channel(
+                channel,
+                channel_index,
+                resolved,
+                &mut output[channel_start..channel_end],
+            );
         }
 
         Ok(AudioBuffer::from_planar_f32(
@@ -282,20 +295,20 @@ fn process_channel(
     input: &[f32],
     channel_index: usize,
     resolved: ResolvedFlanger,
-    output: &mut Vec<f32>,
+    output: &mut [f32],
 ) {
     let mut state = FlangerChannelState::new(resolved);
     if resolved.interpolation == FlangerInterpolation::None {
         let delay_offsets = resolved.integer_delay_offsets(channel_index);
-        for (frame, sample) in input.iter().copied().enumerate() {
+        for (frame, (sample, output)) in input.iter().copied().zip(output).enumerate() {
             let offset = delay_offsets[frame % delay_offsets.len()];
-            output.push(state.process_none_offset(f64::from(sample), offset));
+            *output = state.process_none_offset(f64::from(sample), offset);
         }
     } else {
         let delay_offsets = resolved.delay_offsets(channel_index);
-        for (frame, sample) in input.iter().copied().enumerate() {
+        for (frame, (sample, output)) in input.iter().copied().zip(output).enumerate() {
             let delay = delay_offsets[frame % delay_offsets.len()];
-            output.push(state.process(f64::from(sample), delay));
+            *output = state.process(f64::from(sample), delay);
         }
     }
 }
