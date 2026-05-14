@@ -214,7 +214,7 @@ struct StretchState {
     ishift: usize,
     oshift: usize,
     overlap: usize,
-    fade_coefs: Vec<f64>,
+    fade_coefs: Vec<f32>,
 }
 
 impl StretchState {
@@ -265,7 +265,7 @@ struct StretchMachine<'state, 'output> {
     index: usize,
     oindex: usize,
     ibuf: Vec<f32>,
-    obuf: Vec<f64>,
+    obuf: Vec<f32>,
     output: &'output mut Vec<f32>,
 }
 
@@ -323,14 +323,13 @@ impl<'state, 'output> StretchMachine<'state, 'output> {
     fn combine(&mut self) {
         let overlap = self.state.overlap;
         for i in 0..overlap {
-            self.obuf[i] += self.state.fade_coefs[overlap - 1 - i] * f64::from(self.ibuf[i]);
+            self.obuf[i] += self.state.fade_coefs[overlap - 1 - i] * self.ibuf[i];
         }
         for i in overlap..self.state.segment - overlap {
-            self.obuf[i] += f64::from(self.ibuf[i]);
+            self.obuf[i] += self.ibuf[i];
         }
         for i in self.state.segment - overlap..self.state.segment {
-            self.obuf[i] +=
-                self.state.fade_coefs[i + overlap - self.state.segment] * f64::from(self.ibuf[i]);
+            self.obuf[i] += self.state.fade_coefs[i + overlap - self.state.segment] * self.ibuf[i];
         }
     }
 
@@ -356,20 +355,17 @@ impl<'state, 'output> StretchMachine<'state, 'output> {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Auralis effect buffers store normalized f32 samples after SoX-ng-style f64 accumulation and clipping"
-    )]
-    fn push_output_sample(&mut self, sample: f64) {
-        self.output.push(sample.clamp(-1.0, 1.0) as f32);
+    fn push_output_sample(&mut self, sample: f32) {
+        self.output.push(sample.clamp(-1.0, 1.0));
     }
 }
 
 #[allow(
+    clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
-    reason = "fade tables mirror SoX-ng's index-to-double coefficient formulas"
+    reason = "fade tables mirror SoX-ng's index-to-double coefficient formulas before storing f32 coefficients for f32 audio buffers"
 )]
-fn fade_coefficients(fade: StretchFade, overlap: usize) -> Vec<f64> {
+fn fade_coefficients(fade: StretchFade, overlap: usize) -> Vec<f32> {
     let mut coefs = vec![0.0; overlap];
     if overlap == 0 {
         return coefs;
@@ -391,7 +387,7 @@ fn fade_coefficients(fade: StretchFade, overlap: usize) -> Vec<f64> {
             StretchFade::QuarterCosine => {
                 (((i as f64) / (overlap - 1) as f64) * std::f64::consts::FRAC_PI_2).cos()
             }
-        };
+        } as f32;
     }
 
     coefs
