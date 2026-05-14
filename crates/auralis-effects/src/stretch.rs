@@ -315,8 +315,7 @@ impl<'state, 'output> StretchMachine<'state, 'output> {
         }
 
         while self.oindex < self.index {
-            self.push_output_sample(self.obuf[self.oindex]);
-            self.oindex += 1;
+            self.push_output_slice(self.index);
         }
     }
 
@@ -342,8 +341,7 @@ impl<'state, 'output> StretchMachine<'state, 'output> {
 
     fn flush_output_shift(&mut self) {
         while self.oindex < self.state.oshift {
-            self.push_output_sample(self.obuf[self.oindex]);
-            self.oindex += 1;
+            self.push_output_slice(self.state.oshift);
         }
 
         if self.oindex >= self.state.oshift {
@@ -355,8 +353,14 @@ impl<'state, 'output> StretchMachine<'state, 'output> {
         }
     }
 
-    fn push_output_sample(&mut self, sample: f32) {
-        self.output.push(sample.clamp(-1.0, 1.0));
+    fn push_output_slice(&mut self, end: usize) {
+        self.output.extend(
+            self.obuf[self.oindex..end]
+                .iter()
+                .copied()
+                .map(|sample| sample.clamp(-1.0, 1.0)),
+        );
+        self.oindex = end;
     }
 }
 
