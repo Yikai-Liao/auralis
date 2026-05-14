@@ -384,6 +384,13 @@ fn process_channel(
     stages: &[ResolvedChorusStage],
     output: &mut Vec<f32>,
 ) {
+    if let [stage] = stages
+        && stage.interpolation == ChorusInterpolation::Linear
+    {
+        process_channel_single_linear(input, output_frames, gain_in, gain_out, *stage, output);
+        return;
+    }
+
     let mut stage_states = stages
         .iter()
         .copied()
@@ -410,6 +417,31 @@ fn process_channel(
         }
 
         output_sample *= gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+}
+
+fn process_channel_single_linear(
+    input: &[f32],
+    output_frames: usize,
+    gain_in: f64,
+    gain_out: f64,
+    stage: ResolvedChorusStage,
+    output: &mut Vec<f32>,
+) {
+    let decay = stage.decay;
+    let mut stage = ChorusStageState::new(stage);
+
+    for &input_sample in input {
+        let input_sample = f64::from(input_sample);
+        let output_sample = (input_sample * gain_in
+            + stage.process_linear_current(input_sample) * decay)
+            * gain_out;
+        output.push(f64_to_f32_clamped(output_sample));
+    }
+
+    for _ in input.len()..output_frames {
+        let output_sample = stage.process_linear_current(0.0) * decay * gain_out;
         output.push(f64_to_f32_clamped(output_sample));
     }
 }
@@ -456,6 +488,14 @@ impl ChorusStageState {
             [(delay_index + self.resolved.delay_line_length - 1) % self.resolved.delay_line_length];
         self.delay_line[self.delay_line_index] = input_sample;
         delayed_0.mul_add(1.0 - frac, delayed_1 * frac)
+    }
+
+    fn process_linear_current(&mut self, input_sample: f64) -> f64 {
+        let offset = self.delay_offsets[self.wave_index];
+        let sample = self.process_linear(input_sample, offset);
+        self.delay_line_index = (self.delay_line_index + 1) % self.resolved.delay_line_length;
+        self.wave_index = (self.wave_index + 1) % self.delay_offsets.len();
+        sample
     }
 
     fn process_quadratic(&mut self, input_sample: f64, offset: f64) -> f64 {
