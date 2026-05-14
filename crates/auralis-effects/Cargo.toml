@@ -18,6 +18,7 @@ simd = ["auralis-dsp/simd", "auralis-simd/simd"]
 auralis-core = { path = "../auralis-core" }
 auralis-dsp = { path = "../auralis-dsp" }
 auralis-simd = { path = "../auralis-simd", default-features = false }
+realfft.workspace = true
 rustfft.workspace = true
 thiserror.workspace = true
 

@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use auralis_core::{AudioBuffer, FrameCount};
-use rustfft::{FftPlanner, num_complex::Complex};
+use realfft::{ComplexToReal, RealFftPlanner, RealToComplex, num_complex::Complex32};
 
 use crate::{
     EffectError, NOISE_PROFILE_FREQ_COUNT, NOISE_PROFILE_WINDOW_SIZE, NoiseProfile, Result,
@@ -169,64 +169,101 @@ fn reduce_channel(samples: &[f32], noisegate: &[f64], amount: f64) -> Result<Vec
 
 struct ChannelState<'profile> {
     window: Vec<f32>,
-    last_window: Option<Vec<f32>>,
+    last_window: Vec<f32>,
+    next_window: Vec<f32>,
+    has_last_window: bool,
     smoothing: Vec<f32>,
     noisegate: &'profile [f64],
     amount: f64,
     bufdata: usize,
-    fft: std::sync::Arc<dyn rustfft::Fft<f32>>,
-    ifft: std::sync::Arc<dyn rustfft::Fft<f32>>,
-    spectrum: Vec<Complex<f32>>,
+    fft: std::sync::Arc<dyn RealToComplex<f32>>,
+    ifft: std::sync::Arc<dyn ComplexToReal<f32>>,
+    fft_input: Vec<f32>,
+    power_input: Vec<f32>,
+    inverse_output: Vec<f32>,
+    spectrum: Vec<Complex32>,
+    power_spectrum: Vec<Complex32>,
+    hann: Vec<f32>,
 }
 
 impl<'profile> ChannelState<'profile> {
     fn new(noisegate: &'profile [f64], amount: f64) -> Self {
-        let mut planner = FftPlanner::<f32>::new();
+        let mut planner = RealFftPlanner::<f32>::new();
         let fft = planner.plan_fft_forward(NOISE_PROFILE_WINDOW_SIZE);
         let ifft = planner.plan_fft_inverse(NOISE_PROFILE_WINDOW_SIZE);
+        let fft_input = fft.make_input_vec();
+        let power_input = fft.make_input_vec();
+        let spectrum = fft.make_output_vec();
+        let power_spectrum = fft.make_output_vec();
+        let inverse_output = ifft.make_output_vec();
         Self {
             window: vec![0.0; NOISE_PROFILE_WINDOW_SIZE],
-            last_window: None,
+            last_window: vec![0.0; NOISE_PROFILE_WINDOW_SIZE],
+            next_window: vec![0.0; NOISE_PROFILE_WINDOW_SIZE],
+            has_last_window: false,
             smoothing: vec![0.0; NOISE_PROFILE_FREQ_COUNT],
             noisegate,
             amount,
             bufdata: 0,
             fft,
             ifft,
-            spectrum: vec![Complex::new(0.0, 0.0); NOISE_PROFILE_WINDOW_SIZE],
+            fft_input,
+            power_input,
+            inverse_output,
+            spectrum,
+            power_spectrum,
+            hann: hann_coefficients(),
         }
     }
 
     fn process_window(&mut self, len: usize, output: &mut Vec<f32>) {
         let use_len = len.min(NOISE_PROFILE_WINDOW_SIZE) - len.min(HALF_WINDOW_SIZE);
-        let mut next_window = vec![0.0; NOISE_PROFILE_WINDOW_SIZE];
-        next_window[..HALF_WINDOW_SIZE]
+        self.next_window.fill(0.0);
+        self.next_window[..HALF_WINDOW_SIZE]
             .copy_from_slice(&self.window[HALF_WINDOW_SIZE..NOISE_PROFILE_WINDOW_SIZE]);
 
         self.reduce_noise();
 
-        if let Some(last_window) = &self.last_window {
+        if self.has_last_window {
             output.extend(
                 self.window[..use_len]
                     .iter()
-                    .zip(&last_window[HALF_WINDOW_SIZE..HALF_WINDOW_SIZE + use_len])
+                    .zip(&self.last_window[HALF_WINDOW_SIZE..HALF_WINDOW_SIZE + use_len])
                     .map(|(current, previous)| current + previous),
             );
         } else {
             output.extend_from_slice(&self.window[..use_len]);
         }
 
-        self.last_window = Some(std::mem::replace(&mut self.window, next_window));
+        std::mem::swap(&mut self.last_window, &mut self.window);
+        std::mem::swap(&mut self.window, &mut self.next_window);
+        self.has_last_window = true;
     }
 
     fn reduce_noise(&mut self) {
-        for (bin, sample) in self.spectrum.iter_mut().zip(&self.window) {
-            *bin = Complex::new(*sample, 0.0);
-        }
-        self.fft.process(&mut self.spectrum);
+        self.fft_input.copy_from_slice(&self.window);
+        self.fft
+            .process(&mut self.fft_input, &mut self.spectrum)
+            .expect("noise reduction FFT input length matches plan");
 
-        let power = hann_power_spectrum(&self.window);
-        for (index, power) in power.into_iter().enumerate() {
+        for ((input, sample), hann) in self
+            .power_input
+            .iter_mut()
+            .zip(&self.window)
+            .zip(&self.hann)
+        {
+            *input = *sample * *hann;
+        }
+        self.fft
+            .process(&mut self.power_input, &mut self.power_spectrum)
+            .expect("noise reduction power FFT input length matches plan");
+        for (index, power) in self
+            .power_spectrum
+            .iter()
+            .take(NOISE_PROFILE_FREQ_COUNT)
+            .map(Complex32::norm_sqr)
+            .enumerate()
+        {
             let target = if power > 0.0
                 && f64::from(power.ln()) < self.noisegate[index] + self.amount * 8.0
             {
@@ -238,41 +275,32 @@ impl<'profile> ChannelState<'profile> {
         }
         suppress_isolated_bins(&mut self.smoothing);
 
-        self.spectrum[0] *= self.smoothing[0];
-        self.spectrum[HALF_WINDOW_SIZE] *= self.smoothing[HALF_WINDOW_SIZE];
-        for index in 1..HALF_WINDOW_SIZE {
-            let smooth = self.smoothing[index];
-            self.spectrum[index] *= smooth;
-            self.spectrum[NOISE_PROFILE_WINDOW_SIZE - index] *= smooth;
+        for (bin, smooth) in self.spectrum.iter_mut().zip(&self.smoothing) {
+            *bin *= *smooth;
         }
 
-        self.ifft.process(&mut self.spectrum);
-        for (index, sample) in self.window.iter_mut().enumerate() {
-            *sample = self.spectrum[index].re / WINDOW_SIZE_F32 * hann_coefficient(index);
+        self.ifft
+            .process(&mut self.spectrum, &mut self.inverse_output)
+            .expect("noise reduction inverse FFT length matches plan");
+        for ((sample, value), hann) in self
+            .window
+            .iter_mut()
+            .zip(&self.inverse_output)
+            .zip(&self.hann)
+        {
+            *sample = *value / WINDOW_SIZE_F32 * *hann;
         }
     }
 }
 
-fn hann_power_spectrum(window: &[f32]) -> Vec<f32> {
-    let mut planner = FftPlanner::<f32>::new();
-    let fft = planner.plan_fft_forward(NOISE_PROFILE_WINDOW_SIZE);
-    let mut spectrum = vec![Complex::new(0.0, 0.0); NOISE_PROFILE_WINDOW_SIZE];
-
-    for (index, bin) in spectrum.iter_mut().enumerate() {
-        *bin = Complex::new(window[index] * hann_coefficient(index), 0.0);
-    }
-    fft.process(&mut spectrum);
-
-    spectrum
-        .iter()
-        .take(NOISE_PROFILE_FREQ_COUNT)
-        .map(Complex::norm_sqr)
+fn hann_coefficients() -> Vec<f32> {
+    (0..NOISE_PROFILE_WINDOW_SIZE)
+        .map(|index| {
+            let index =
+                f32::from(u16::try_from(index).expect("noise reduction window index fits in u16"));
+            0.5 - 0.5 * (std::f32::consts::TAU * index / WINDOW_SIZE_F32).cos()
+        })
         .collect()
-}
-
-fn hann_coefficient(index: usize) -> f32 {
-    let index = f32::from(u16::try_from(index).expect("noise reduction window index fits in u16"));
-    0.5 - 0.5 * (std::f32::consts::TAU * index / WINDOW_SIZE_F32).cos()
 }
 
 fn suppress_isolated_bins(smoothing: &mut [f32]) {
