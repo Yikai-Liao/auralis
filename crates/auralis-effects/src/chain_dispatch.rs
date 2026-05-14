@@ -269,8 +269,7 @@ fn apply_buffer_command(
                 .map_err(|source| ("factor", source))?;
         }
         EffectCommand::Trim(trim) => {
-            *audio = trim
-                .process_buffer(audio)
+            trim.process_buffer_in_place(audio)
                 .map_err(|source| ("frame-range", source))?;
         }
         EffectCommand::Vad(vad) => {

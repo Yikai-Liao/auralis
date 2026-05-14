@@ -507,6 +507,71 @@ impl AudioBuffer {
         &mut self.data
     }
 
+    /// Retains ordered half-open frame ranges in place across every channel.
+    ///
+    /// Ranges must be monotonically ordered and within the current frame
+    /// count. The audio specification is preserved and the buffer's frame
+    /// count becomes the sum of retained range lengths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuralisError::InvalidAudioBufferShape`] when any range is
+    /// out of bounds, unordered, or the retained shape cannot be represented.
+    pub fn retain_frame_ranges(&mut self, ranges: &[(FrameCount, FrameCount)]) -> Result<()> {
+        let input_frames = usize::try_from(self.frames.as_u64())
+            .map_err(|_| AuralisError::InvalidAudioBufferShape)?;
+        let mut previous_end = 0_usize;
+        let mut output_frames = 0_usize;
+        let mut resolved = Vec::with_capacity(ranges.len());
+
+        for &(start, end) in ranges {
+            let start = usize::try_from(start.as_u64())
+                .map_err(|_| AuralisError::InvalidAudioBufferShape)?;
+            let end = usize::try_from(end.as_u64())
+                .map_err(|_| AuralisError::InvalidAudioBufferShape)?;
+            if start < previous_end || start > end || end > input_frames {
+                return Err(AuralisError::InvalidAudioBufferShape);
+            }
+            output_frames = output_frames
+                .checked_add(end - start)
+                .ok_or(AuralisError::InvalidAudioBufferShape)?;
+            previous_end = end;
+            resolved.push((start, end));
+        }
+
+        let output_len = planar_sample_count(
+            self.channels(),
+            FrameCount::new(
+                u64::try_from(output_frames).map_err(|_| AuralisError::InvalidAudioBufferShape)?,
+            ),
+        )?;
+
+        for channel_index in 0..self.channels().as_usize() {
+            let read_base = channel_index
+                .checked_mul(input_frames)
+                .ok_or(AuralisError::InvalidAudioBufferShape)?;
+            let write_base = channel_index
+                .checked_mul(output_frames)
+                .ok_or(AuralisError::InvalidAudioBufferShape)?;
+            let mut write_offset = 0_usize;
+
+            for &(start, end) in &resolved {
+                let len = end - start;
+                let source_start = read_base + start;
+                let source_end = read_base + end;
+                let dest_start = write_base + write_offset;
+                self.data.copy_within(source_start..source_end, dest_start);
+                write_offset += len;
+            }
+        }
+
+        self.frames = FrameCount::new(
+            u64::try_from(output_frames).map_err(|_| AuralisError::InvalidAudioBufferShape)?,
+        );
+        self.data.truncate(output_len);
+        Ok(())
+    }
+
     /// Returns a read-only view of one channel.
     #[must_use]
     pub fn channel(&self, channel_index: usize) -> Option<&[f32]> {
@@ -793,6 +858,41 @@ mod tests {
 
         assert_eq!(buffer.spec(), spec);
         assert_eq!(buffer.as_planar_f32(), &[0.0, 0.25]);
+    }
+
+    #[test]
+    fn retain_frame_ranges_compacts_each_channel_in_place() {
+        let mut buffer = AudioBuffer::from_planar_f32(
+            test_spec(2),
+            FrameCount::new(5),
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 10.0, 11.0, 12.0, 13.0, 14.0],
+        )
+        .unwrap();
+
+        buffer
+            .retain_frame_ranges(&[
+                (FrameCount::new(1), FrameCount::new(3)),
+                (FrameCount::new(4), FrameCount::new(5)),
+            ])
+            .unwrap();
+
+        assert_eq!(buffer.frames(), FrameCount::new(3));
+        assert_eq!(buffer.channel(0), Some([1.0, 2.0, 4.0].as_slice()));
+        assert_eq!(buffer.channel(1), Some([11.0, 12.0, 14.0].as_slice()));
+        assert_eq!(buffer.as_planar_f32(), &[1.0, 2.0, 4.0, 11.0, 12.0, 14.0]);
+    }
+
+    #[test]
+    fn retain_frame_ranges_rejects_unordered_ranges() {
+        let mut buffer = AudioBuffer::zeroed(test_spec(1), FrameCount::new(4)).unwrap();
+
+        assert_eq!(
+            buffer.retain_frame_ranges(&[
+                (FrameCount::new(2), FrameCount::new(3)),
+                (FrameCount::new(1), FrameCount::new(4)),
+            ]),
+            Err(AuralisError::InvalidAudioBufferShape)
+        );
     }
 
     #[test]
