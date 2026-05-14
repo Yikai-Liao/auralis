@@ -111,6 +111,10 @@ impl LowPass {
     /// Returns [`EffectError::InvalidBiquadDesign`] if this buffer's sample
     /// rate makes the configured filter invalid.
     pub fn process_buffer(self, audio: &mut AudioBuffer) -> Result<()> {
+        if matches!(self.mode, LowPassMode::OnePole) {
+            return self.process_one_pole_buffer(audio);
+        }
+
         let coefficients = self.coefficients(audio.spec().sample_rate())?;
         Biquad::new(coefficients).process_buffer(audio);
         Ok(())
@@ -133,6 +137,34 @@ impl LowPass {
         let pole = (-w0).exp();
         BiquadCoefficients::normalized(1.0 - pole, 0.0, 0.0, -pole, 0.0)
             .map_err(|_| EffectError::InvalidBiquadDesign)
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Auralis effect samples are f32 while one-pole filter state is accumulated in f64 for deterministic scalar precision"
+    )]
+    fn process_one_pole_buffer(self, audio: &mut AudioBuffer) -> Result<()> {
+        let w0 = checked_w0(
+            f64::from(audio.spec().sample_rate().as_u32()),
+            self.frequency_hz,
+        )?;
+        let pole = (-w0).exp();
+        let feed_forward = 1.0 - pole;
+
+        for channel_index in 0..audio.channels().as_usize() {
+            let channel = audio
+                .channel_mut(channel_index)
+                .expect("channel index is within the audio shape");
+            let mut delay = 0.0;
+            for sample in channel {
+                let input = f64::from(*sample);
+                let output = feed_forward.mul_add(input, delay);
+                delay = pole * output;
+                *sample = output as f32;
+            }
+        }
+
+        Ok(())
     }
 }
 
