@@ -113,7 +113,7 @@ impl From<DspFirCoefficients> for FirCoefficients {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FirBackend {
     Direct,
-    Dft,
+    DftWithLen(usize),
 }
 
 /// The source of coefficients for a SoX-ng-style `fir` command.
@@ -265,7 +265,10 @@ impl Fir {
         let input = audio.as_planar_f32();
         let dft = match backend {
             FirBackend::Direct => None,
-            FirBackend::Dft => Some(DspDftFir::new(coefficients.clone().into_dsp())),
+            FirBackend::DftWithLen(dft_len) => Some(DspDftFir::with_dft_len(
+                coefficients.clone().into_dsp(),
+                dft_len,
+            )),
         };
 
         for channel_index in 0..audio.channels().as_usize() {
@@ -285,7 +288,7 @@ impl Fir {
                 FirBackend::Direct => {
                     FirState::new(coefficients.clone()).process_into(channel, output);
                 }
-                FirBackend::Dft => {
+                FirBackend::DftWithLen(_) => {
                     if let Some(dft) = &dft {
                         dft.process_into(channel, output);
                     }

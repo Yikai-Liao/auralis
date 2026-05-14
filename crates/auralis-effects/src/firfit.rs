@@ -225,7 +225,7 @@ impl FirFit {
         let backend = if is_centered_impulse(coefficients.as_slice()) {
             FirBackend::Direct
         } else {
-            FirBackend::Dft
+            FirBackend::DftWithLen(FIRFIT_TAP_COUNT * 8)
         };
         Fir::from_coefficients(coefficients).process_buffer_with_backend(audio, backend)
     }
