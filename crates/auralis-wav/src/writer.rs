@@ -871,6 +871,14 @@ where
     let frames = usize::try_from(audio.frames().as_u64()).map_err(|_| WavError::WriteFailed {
         message: "frame count cannot be represented on this platform".to_owned(),
     })?;
+    let sample_count = frames
+        .checked_mul(channels)
+        .ok_or_else(|| WavError::WriteFailed {
+            message: "sample count cannot be represented on this platform".to_owned(),
+        })?;
+    let sample_count_u32 = u32::try_from(sample_count).map_err(|_| WavError::WriteFailed {
+        message: "sample count exceeds WAV PCM16 writer capacity".to_owned(),
+    })?;
     let channel_data = (0..channels)
         .map(|channel| {
             audio.channel(channel).ok_or_else(|| WavError::WriteFailed {
@@ -879,6 +887,7 @@ where
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let mut sample_writer = writer.get_i16_writer(sample_count_u32);
     for frame_index in 0..frames {
         for (channel_index, channel) in channel_data.iter().enumerate() {
             let sample = channel[frame_index];
@@ -888,14 +897,15 @@ where
                     frame_index,
                 });
             }
-            writer
-                .write_sample(f32_to_pcm16_scalar_sample(sample))
-                .map_err(|error| WavError::WriteFailed {
-                    message: error.to_string(),
-                })?;
+            sample_writer.write_sample(f32_to_pcm16_scalar_sample(sample));
         }
     }
 
+    sample_writer
+        .flush()
+        .map_err(|error| WavError::WriteFailed {
+            message: error.to_string(),
+        })?;
     writer.finalize().map_err(|error| WavError::WriteFailed {
         message: error.to_string(),
     })
