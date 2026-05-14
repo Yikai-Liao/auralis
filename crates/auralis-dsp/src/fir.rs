@@ -377,7 +377,7 @@ impl FirState {
 
 fn dft_len_for_taps(taps: usize) -> usize {
     let mut len = 256_usize;
-    let target = taps.saturating_mul(2).max(2);
+    let target = taps.saturating_mul(4).max(2);
     while len < target {
         len <<= 1;
     }
