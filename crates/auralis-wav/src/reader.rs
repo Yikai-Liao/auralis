@@ -5,7 +5,7 @@ use std::{
 };
 
 use auralis_codec::{AudioReader, CodecError, CodecKind, WavSampleFormat};
-use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, SampleFormat, SampleRate};
+use auralis_core::{AudioBuffer, AudioSpec, ChannelCount, FrameCount, SampleFormat, SampleRate};
 use auralis_simd::BackendKind;
 
 use crate::{
@@ -180,6 +180,64 @@ pub fn decode_pcm16_path_with_backend(
     })?;
 
     decode_pcm16_with_backend(BufReader::new(file), requested_backend)
+}
+
+/// Decodes at most the first `max_frames` frames from a PCM16 WAV file.
+///
+/// This is intended for effects that only inspect a bounded prefix of the
+/// input. The returned buffer has the actual decoded prefix length, which may
+/// be shorter than `max_frames` when the input file is shorter.
+///
+/// # Errors
+///
+/// Returns [`WavError::OpenFailed`] if `path` cannot be opened. Propagates the
+/// same parsing and format errors as [`decode_pcm16_with_backend`].
+pub fn decode_pcm16_prefix_path_with_backend(
+    path: impl AsRef<Path>,
+    max_frames: FrameCount,
+    requested_backend: BackendKind,
+) -> Result<AudioBuffer> {
+    let file = File::open(path).map_err(|error| WavError::OpenFailed {
+        message: error.to_string(),
+    })?;
+    let mut reader =
+        hound::WavReader::new(BufReader::new(file)).map_err(|error| malformed(&error))?;
+    let hound_spec = reader.spec();
+    ensure_pcm16(hound_spec)?;
+
+    let sample_rate =
+        SampleRate::new(hound_spec.sample_rate).map_err(|_| WavError::InvalidSampleRate)?;
+    let channels =
+        ChannelCount::new(hound_spec.channels).map_err(|_| WavError::InvalidChannelCount)?;
+    let source_frames = u64::from(reader.duration());
+    let frames = FrameCount::new(source_frames.min(max_frames.as_u64()));
+    let frame_count = usize::try_from(frames.as_u64()).map_err(|_| WavError::InvalidBufferShape)?;
+    let channel_count = channels.as_usize();
+    let sample_count = frame_count
+        .checked_mul(channel_count)
+        .ok_or(WavError::InvalidBufferShape)?;
+    let mut interleaved_pcm16 = Vec::with_capacity(sample_count);
+    for sample in reader.samples::<i16>().take(sample_count) {
+        interleaved_pcm16.push(sample.map_err(|error| malformed(&error))?);
+    }
+    if interleaved_pcm16.len() % channel_count != 0 {
+        return Err(WavError::InvalidBufferShape);
+    }
+
+    let decoded_frames = interleaved_pcm16.len() / channel_count;
+    let mut interleaved_f32 = vec![0.0; interleaved_pcm16.len()];
+    pcm16_to_f32_with_backend(requested_backend, &interleaved_pcm16, &mut interleaved_f32)?;
+
+    let mut planar = vec![0.0; interleaved_f32.len()];
+    for (sample_index, sample) in interleaved_f32.into_iter().enumerate() {
+        let frame_index = sample_index / channel_count;
+        let channel_index = sample_index % channel_count;
+        planar[channel_index * decoded_frames + frame_index] = sample;
+    }
+
+    let spec = AudioSpec::new(sample_rate, channels, SampleFormat::Float32);
+    AudioBuffer::from_planar_f32(spec, FrameCount::new(decoded_frames as u64), planar)
+        .map_err(|_| WavError::InvalidBufferShape)
 }
 
 /// Decodes a supported linear PCM WAV file from disk into a planar `f32`

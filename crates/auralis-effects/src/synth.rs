@@ -513,6 +513,15 @@ impl Synth {
         self.no_headroom
     }
 
+    /// Returns the bounded input prefix needed by an explicit frame-length synth.
+    #[must_use]
+    pub const fn input_prefix_frames(&self) -> Option<FrameCount> {
+        match self.length {
+            Some(SynthLength::Frames(frames)) => Some(frames),
+            Some(SynthLength::Seconds(_)) | None => None,
+        }
+    }
+
     /// Generates synth output over an audio buffer's shape.
     ///
     /// # Errors
