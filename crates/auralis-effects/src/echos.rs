@@ -144,6 +144,40 @@ impl Echos {
             .as_usize()
             .checked_mul(output_frames)
             .ok_or(EffectError::EchosLengthOverflow)?;
+
+        if let [(delay_frames, decay_gain)] = resolved_taps.as_slice() {
+            let mut output = vec![0.0; capacity];
+            for channel_index in 0..audio.channels().as_usize() {
+                let channel = audio
+                    .channel(channel_index)
+                    .ok_or(EffectError::EchosLengthOverflow)?;
+                let start = channel_index
+                    .checked_mul(output_frames)
+                    .ok_or(EffectError::EchosLengthOverflow)?;
+                let end = start
+                    .checked_add(output_frames)
+                    .ok_or(EffectError::EchosLengthOverflow)?;
+                process_single_tap_channel_into(
+                    channel,
+                    *delay_frames,
+                    self.gain_in,
+                    self.gain_out,
+                    *decay_gain,
+                    output
+                        .get_mut(start..end)
+                        .ok_or(EffectError::EchosLengthOverflow)?,
+                );
+            }
+
+            return Ok(AudioBuffer::from_planar_f32(
+                audio.spec(),
+                FrameCount::new(
+                    u64::try_from(output_frames).map_err(|_| EffectError::EchosLengthOverflow)?,
+                ),
+                output,
+            )?);
+        }
+
         let mut output = Vec::with_capacity(capacity);
 
         for channel_index in 0..audio.channels().as_usize() {
@@ -246,6 +280,26 @@ fn process_single_tap_channel(
     decay_gain: f32,
     output: &mut Vec<f32>,
 ) {
+    let start = output.len();
+    output.resize(start + output_frames, 0.0);
+    process_single_tap_channel_into(
+        input,
+        delay_frames,
+        gain_in,
+        gain_out,
+        decay_gain,
+        &mut output[start..],
+    );
+}
+
+fn process_single_tap_channel_into(
+    input: &[f32],
+    delay_frames: usize,
+    gain_in: f64,
+    gain_out: f64,
+    decay_gain: f32,
+    output: &mut [f32],
+) {
     #[allow(
         clippy::cast_possible_truncation,
         reason = "echos delay processing stores gains as f32 to match f32 audio buffers"
@@ -257,27 +311,27 @@ fn process_single_tap_channel(
     )]
     let gain_out = gain_out as f32;
     let input_len = input.len();
-    let lead_end = delay_frames.min(input_len).min(output_frames);
-    for &input_sample in &input[..lead_end] {
-        output.push((input_sample * gain_in * gain_out).clamp(-1.0, 1.0));
+    let lead_end = delay_frames.min(input_len).min(output.len());
+    for (output_sample, &input_sample) in output[..lead_end].iter_mut().zip(&input[..lead_end]) {
+        *output_sample = (input_sample * gain_in * gain_out).clamp(-1.0, 1.0);
     }
 
-    let main_end = input_len.min(output_frames);
+    let main_end = input_len.min(output.len());
     for frame in lead_end..main_end {
         let input_sample = input[frame];
         let delayed_sample = input[frame - delay_frames];
         let output_sample = input_sample.mul_add(gain_in, delayed_sample * decay_gain);
-        output.push((output_sample * gain_out).clamp(-1.0, 1.0));
+        output[frame] = (output_sample * gain_out).clamp(-1.0, 1.0);
     }
 
-    for frame in input_len..output_frames {
+    for (frame, output_sample) in output.iter_mut().enumerate().skip(input_len) {
         let delayed_index = frame - delay_frames;
         let delayed_sample = if delayed_index < input_len {
             input[delayed_index]
         } else {
             0.0
         };
-        output.push((delayed_sample * decay_gain * gain_out).clamp(-1.0, 1.0));
+        *output_sample = (delayed_sample * decay_gain * gain_out).clamp(-1.0, 1.0);
     }
 }
 
