@@ -113,6 +113,10 @@ impl BiquadCoefficients {
             && self.a1.is_finite()
             && self.a2.is_finite()
     }
+
+    fn is_one_pole_feed_forward(self) -> bool {
+        self.b1 == 0.0 && self.b2 == 0.0 && self.a2 == 0.0
+    }
 }
 
 /// Scalar direct-form biquad processor.
@@ -214,9 +218,33 @@ impl BiquadState {
 
     /// Applies the biquad to a mono sample segment while preserving state.
     pub fn process_mono_samples(&mut self, samples: &mut [f32]) {
+        if self.coefficients.is_one_pole_feed_forward() {
+            self.process_one_pole_feed_forward_samples(samples);
+            return;
+        }
+
         for sample in samples {
             *sample = self.process_sample(*sample);
         }
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Auralis effect samples are f32 while filter state is accumulated in f64 for deterministic scalar precision"
+    )]
+    fn process_one_pole_feed_forward_samples(&mut self, samples: &mut [f32]) {
+        let b0 = self.coefficients.b0;
+        let a1 = self.coefficients.a1;
+        let mut delay_1 = self.delay_1;
+
+        for sample in samples {
+            let output = b0.mul_add(f64::from(*sample), delay_1);
+            delay_1 = -(a1 * output);
+            *sample = output as f32;
+        }
+
+        self.delay_1 = delay_1;
+        self.delay_2 = 0.0;
     }
 }
 
