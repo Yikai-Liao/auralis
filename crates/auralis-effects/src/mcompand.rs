@@ -176,16 +176,17 @@ impl MCompand {
                 remaining.clone()
             };
 
-            let mut band_audio = AudioBuffer::from_planar_f32(
-                audio.spec(),
-                audio.frames(),
-                band_input,
-            )
-            .map_err(|_| EffectError::InvalidMCompand)?;
-            band.compand
-                .process_buffer(&mut band_audio)
-                .map_err(|_| EffectError::InvalidMCompand)?;
-            add_clipped(&mut summed, band_audio.as_planar_f32());
+            if band.compand.is_passthrough() {
+                add_clipped(&mut summed, &band_input);
+            } else {
+                let mut band_audio =
+                    AudioBuffer::from_planar_f32(audio.spec(), audio.frames(), band_input)
+                        .map_err(|_| EffectError::InvalidMCompand)?;
+                band.compand
+                    .process_buffer(&mut band_audio)
+                    .map_err(|_| EffectError::InvalidMCompand)?;
+                add_clipped(&mut summed, band_audio.as_planar_f32());
+            }
         }
 
         *audio = AudioBuffer::from_planar_f32(
@@ -353,12 +354,10 @@ mod tests {
         mcompand.process_buffer(&mut audio).unwrap();
 
         assert_eq!(audio.frames(), FrameCount::new(6));
-        assert!(
-            audio
-                .as_planar_f32()
-                .iter()
-                .all(|sample| sample.is_finite())
-        );
+        assert!(audio
+            .as_planar_f32()
+            .iter()
+            .all(|sample| sample.is_finite()));
     }
 
     #[test]

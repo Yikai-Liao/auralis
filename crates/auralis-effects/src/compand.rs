@@ -173,6 +173,13 @@ impl CompandTransfer {
         (segment.y + offset * ((segment.a * offset) + segment.b)).exp()
     }
 
+    fn is_unity_gain(&self) -> bool {
+        is_exact_one(self.out_min_linear)
+            && self.segments.iter().all(|segment| {
+                is_exact_zero(segment.y) && is_exact_zero(segment.a) && is_exact_zero(segment.b)
+            })
+    }
+
     /// Returns the output level in dBFS for an input level in dBFS.
     #[must_use]
     pub fn output_db_for_input_db(&self, input_db: f64) -> f64 {
@@ -316,6 +323,10 @@ impl Compand {
     #[must_use]
     pub const fn transfer(&self) -> &CompandTransfer {
         &self.transfer
+    }
+
+    pub(crate) fn is_passthrough(&self) -> bool {
+        self.delay_seconds == 0.0 && self.transfer.is_unity_gain()
     }
 
     /// Applies the compander to an audio buffer in place.
@@ -824,6 +835,14 @@ fn is_non_negative_finite(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
 
+fn is_exact_one(value: f64) -> bool {
+    value.to_bits() == 1.0_f64.to_bits()
+}
+
+fn is_exact_zero(value: f64) -> bool {
+    value.to_bits().trailing_zeros() >= 63
+}
+
 fn linear_to_db(value: f64) -> f64 {
     20.0 * value.log10()
 }
@@ -889,6 +908,17 @@ mod tests {
             -26.0,
             0.001,
         );
+    }
+
+    #[test]
+    fn detects_zero_delay_unity_gain_passthrough() {
+        let compand = Compand::parse_sox_args(&["0,0", "-60,-60,0,0"]).unwrap();
+        let gained = Compand::parse_sox_args(&["0,0", "-60,-60,0,0", "-6"]).unwrap();
+        let delayed = Compand::parse_sox_args(&["0,0", "-60,-60,0,0", "0", "0", "0.1"]).unwrap();
+
+        assert!(compand.is_passthrough());
+        assert!(!gained.is_passthrough());
+        assert!(!delayed.is_passthrough());
     }
 
     #[test]
