@@ -224,6 +224,20 @@ fn process_channel(
     let mut delay_buffer = vec![0.0_f32; max_delay];
     let mut counter = 0;
 
+    if let [(delay, decay)] = taps
+        && max_delay != 0
+    {
+        for frame in 0..output_frames {
+            let input_sample = input.get(frame).copied().unwrap_or(0.0);
+            let delayed_index = (counter + max_delay - delay) % max_delay;
+            let output_sample = input_sample.mul_add(gain_in, delay_buffer[delayed_index] * decay);
+            delay_buffer[counter] = input_sample;
+            counter = (counter + 1) % max_delay;
+            output.push((output_sample * gain_out).clamp(-1.0, 1.0));
+        }
+        return;
+    }
+
     for frame in 0..output_frames {
         let input_sample = input.get(frame).copied().unwrap_or(0.0);
         let mut output_sample = input_sample * gain_in;
