@@ -140,11 +140,7 @@ impl Pitch {
             shifted.spec().sample_format(),
         );
 
-        Ok(AudioBuffer::from_planar_f32(
-            spec,
-            shifted.frames(),
-            shifted.as_planar_f32().to_vec(),
-        )?)
+        Ok(shifted.with_spec(spec)?)
     }
 }
 
