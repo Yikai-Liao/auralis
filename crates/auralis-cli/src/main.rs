@@ -2,11 +2,12 @@
 
 use std::{
     ffi::OsStr,
+    fs,
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
-use auralis_wav::{WavError, decode_pcm16_path};
+use auralis_wav::{WavError, decode_pcm16_path, decode_pcm16_prefix_path_with_backend};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -233,6 +234,18 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     let output_level_policy = options.output_level_policy()?;
     let output_dither_policy = options.output_dither_policy()?;
     let effect_chain = options.effect_chain()?;
+    if try_copy_passthrough_noop_channels_effect(
+        input,
+        output,
+        options,
+        effect_chain.as_ref(),
+        channel_conversion_policy,
+        sample_rate_conversion_policy,
+        output_level_policy,
+        output_dither_policy,
+    )? {
+        return Ok(());
+    }
     let pipeline = open_pipeline(input, options, effect_chain.as_ref())?
         .with_backend(backend)
         .with_sample_rate_conversion_policy(sample_rate_conversion_policy)
@@ -284,6 +297,59 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     pipeline.write_wav(output)?;
 
     Ok(())
+}
+
+fn try_copy_passthrough_noop_channels_effect(
+    input: &Path,
+    output: &Path,
+    options: &RunOptions,
+    effect_chain: Option<&auralis::EffectChain>,
+    channel_conversion_policy: auralis::ChannelConversionPolicy,
+    sample_rate_conversion_policy: auralis::SampleRateConversionPolicy,
+    output_level_policy: auralis::OutputLevelPolicy,
+    output_dither_policy: auralis::OutputDitherPolicy,
+) -> Result<bool, CliError> {
+    if input == output
+        || options.combine != auralis::CombineMethod::Concatenate
+        || !options.additional_inputs.is_empty()
+        || options.has_legacy_effect_options()
+        || !matches!(
+            channel_conversion_policy,
+            auralis::ChannelConversionPolicy::Preserve
+        )
+        || !matches!(
+            sample_rate_conversion_policy,
+            auralis::SampleRateConversionPolicy::Preserve
+        )
+        || !matches!(output_level_policy, auralis::OutputLevelPolicy::Preserve)
+        || !matches!(output_dither_policy, auralis::OutputDitherPolicy::Disabled)
+    {
+        return Ok(false);
+    }
+
+    let Some(effect_chain) = effect_chain else {
+        return Ok(false);
+    };
+    let [auralis::EffectCommand::Channels(channels)] = effect_chain.commands() else {
+        return Ok(false);
+    };
+
+    let input_prefix = match decode_pcm16_prefix_path_with_backend(
+        input,
+        auralis::FrameCount::new(0),
+        options.backend,
+    ) {
+        Ok(audio) => audio,
+        Err(_) => return Ok(false),
+    };
+    if channels.target_channels != input_prefix.channels() {
+        return Ok(false);
+    }
+
+    fs::copy(input, output).map_err(|error| WavError::CreateFailed {
+        message: error.to_string(),
+    })?;
+    Ok(true)
 }
 
 #[derive(Debug)]
