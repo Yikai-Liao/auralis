@@ -169,13 +169,17 @@ impl Echos {
         )?)
     }
 
-    fn resolved_taps(&self, sample_rate_hz: u32) -> Result<Vec<(usize, f64)>> {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echos delay processing stores decay coefficients as f32 to match f32 audio buffers"
+    )]
+    fn resolved_taps(&self, sample_rate_hz: u32) -> Result<Vec<(usize, f32)>> {
         self.taps
             .iter()
             .map(|tap| {
                 let frames = tap.resolved_frames(sample_rate_hz)?;
                 usize::try_from(frames.as_u64())
-                    .map(|frames| (frames, tap.decay()))
+                    .map(|frames| (frames, tap.decay() as f32))
                     .map_err(|_| EffectError::EchosLengthOverflow)
             })
             .collect()
@@ -187,7 +191,7 @@ fn process_channel(
     output_frames: usize,
     gain_in: f64,
     gain_out: f64,
-    taps: &[(usize, f64)],
+    taps: &[(usize, f32)],
     output: &mut Vec<f32>,
 ) {
     if let [(delay, decay)] = taps {
@@ -195,21 +199,31 @@ fn process_channel(
         return;
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echos delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_in = gain_in as f32;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echos delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_out = gain_out as f32;
     let mut delay_buffers = taps
         .iter()
-        .map(|(delay, _decay)| vec![0.0_f64; *delay])
+        .map(|(delay, _decay)| vec![0.0_f32; *delay])
         .collect::<Vec<_>>();
     let mut counters = vec![0_usize; taps.len()];
 
     for frame in 0..output_frames {
-        let input_sample = input.get(frame).copied().map_or(0.0, f64::from);
+        let input_sample = input.get(frame).copied().unwrap_or(0.0);
         let mut output_sample = input_sample * gain_in;
 
         for (index, (_delay, decay)) in taps.iter().enumerate() {
             output_sample += delay_buffers[index][counters[index]] * decay;
         }
 
-        output.push(f64_to_f32_clamped(output_sample * gain_out));
+        output.push((output_sample * gain_out).clamp(-1.0, 1.0));
 
         for index in (1..taps.len()).rev() {
             delay_buffers[index][counters[index]] =
@@ -229,41 +243,41 @@ fn process_single_tap_channel(
     delay_frames: usize,
     gain_in: f64,
     gain_out: f64,
-    decay_gain: f64,
+    decay_gain: f32,
     output: &mut Vec<f32>,
 ) {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echos delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_in = gain_in as f32;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "echos delay processing stores gains as f32 to match f32 audio buffers"
+    )]
+    let gain_out = gain_out as f32;
     let input_len = input.len();
     let lead_end = delay_frames.min(input_len).min(output_frames);
     for &input_sample in &input[..lead_end] {
-        output.push(f64_to_f32_clamped(f64::from(input_sample) * gain_in * gain_out));
+        output.push((input_sample * gain_in * gain_out).clamp(-1.0, 1.0));
     }
 
     let main_end = input_len.min(output_frames);
     for frame in lead_end..main_end {
-        let input_sample = f64::from(input[frame]);
-        let delayed_sample = f64::from(input[frame - delay_frames]);
+        let input_sample = input[frame];
+        let delayed_sample = input[frame - delay_frames];
         let output_sample = input_sample.mul_add(gain_in, delayed_sample * decay_gain);
-        output.push(f64_to_f32_clamped(output_sample * gain_out));
+        output.push((output_sample * gain_out).clamp(-1.0, 1.0));
     }
 
     for frame in input_len..output_frames {
         let delayed_index = frame - delay_frames;
         let delayed_sample = if delayed_index < input_len {
-            f64::from(input[delayed_index])
+            input[delayed_index]
         } else {
             0.0
         };
-        output.push(f64_to_f32_clamped(delayed_sample * decay_gain * gain_out));
-    }
-}
-
-fn f64_to_f32_clamped(sample: f64) -> f32 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "echos output is explicitly clipped to normalized f32 full scale"
-    )]
-    {
-        sample.clamp(-1.0, 1.0) as f32
+        output.push((delayed_sample * decay_gain * gain_out).clamp(-1.0, 1.0));
     }
 }
 
