@@ -247,6 +247,7 @@ struct TempoState {
     search: usize,
     segment: usize,
     overlap: usize,
+    overlap_samples: usize,
     process_size: usize,
 }
 
@@ -280,6 +281,9 @@ impl TempoState {
             .map(|with_overlap| with_overlap.max(segment))
             .and_then(|size| size.checked_add(search))
             .ok_or(EffectError::TempoLengthOverflow)?;
+        let overlap_samples = overlap
+            .checked_mul(channels)
+            .ok_or(EffectError::TempoLengthOverflow)?;
 
         if channels == 0 || segment == 0 || overlap == 0 || process_size == 0 {
             return Err(EffectError::TempoLengthOverflow);
@@ -292,6 +296,7 @@ impl TempoState {
             search,
             segment,
             overlap,
+            overlap_samples,
             process_size,
         })
     }
@@ -389,9 +394,9 @@ impl<'state> TempoMachine<'state> {
         }
 
         let mut best_pos = 0;
-        let mut least_diff = self.difference_at(0)?;
+        let mut least_diff = self.difference_at(0);
         for offset in 1..self.state.search {
-            let diff = self.difference_at(offset)?;
+            let diff = self.difference_at(offset);
             if diff < least_diff {
                 least_diff = diff;
                 best_pos = offset;
@@ -403,7 +408,7 @@ impl<'state> TempoMachine<'state> {
     fn quick_best_overlap_position(&self) -> Result<usize> {
         let mut prev_best_pos = (self.state.search + 1) >> 1;
         let mut best_pos = prev_best_pos;
-        let mut least_diff = self.difference_at(best_pos)?;
+        let mut least_diff = self.difference_at(best_pos);
         let mut step = 64_usize;
 
         loop {
@@ -423,7 +428,7 @@ impl<'state> TempoMachine<'state> {
                     if offset >= self.state.search {
                         break;
                     }
-                    let diff = self.difference_at(offset)?;
+                    let diff = self.difference_at(offset);
                     if diff < least_diff {
                         least_diff = diff;
                         best_pos = offset;
@@ -441,22 +446,19 @@ impl<'state> TempoMachine<'state> {
         Ok(best_pos)
     }
 
-    fn difference_at(&self, offset: usize) -> Result<f32> {
-        let start = self.state.wide_to_flat(offset)?;
-        let length = self
-            .state
-            .wide_to_flat(self.state.overlap)
-            .map_err(|_| EffectError::TempoLengthOverflow)?;
-        let input_range = self.input_bounds(start, length)?;
-        let input = &self.input_fifo[input_range];
-        Ok(input
+    fn difference_at(&self, offset: usize) -> f32 {
+        let start = self.input_start + offset * self.state.channels;
+        let end = start + self.state.overlap_samples;
+        debug_assert!(end <= self.input_fifo.len());
+        let input = &self.input_fifo[start..end];
+        input
             .iter()
             .zip(&self.overlap_buf)
             .map(|(left, right)| {
                 let delta = left - right;
                 delta * delta
             })
-            .sum())
+            .sum()
     }
 
     fn copy_overlap_to_output(&mut self, offset: usize) -> Result<()> {
