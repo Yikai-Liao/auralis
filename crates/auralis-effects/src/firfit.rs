@@ -277,16 +277,23 @@ fn design_coefficients(knots: &[FirFitKnot], sample_rate: SampleRate) -> Result<
     let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
     for distance in 0..=FIRFIT_CENTER_TAP {
         let mut sum = 0.0;
+        let phase_step =
+            std::f64::consts::PI * distance as f64 / FIRFIT_RESPONSE_STEPS as f64;
+        let (sin_step, cos_step) = phase_step.sin_cos();
+        let mut sin_phase = 0.0;
+        let mut cos_phase = 1.0;
         for (index, amplitude) in response.iter().copied().enumerate() {
             let weight = if index == 0 || index == FIRFIT_RESPONSE_STEPS {
                 0.5
             } else {
                 1.0
             };
-            let phase =
-                std::f64::consts::PI * index as f64 * distance as f64
-                    / FIRFIT_RESPONSE_STEPS as f64;
-            sum += weight * amplitude * phase.cos();
+            sum += weight * amplitude * cos_phase;
+            if index != FIRFIT_RESPONSE_STEPS {
+                let next_cos = cos_phase * cos_step - sin_phase * sin_step;
+                sin_phase = sin_phase * cos_step + cos_phase * sin_step;
+                cos_phase = next_cos;
+            }
         }
         let tap = FIRFIT_CENTER_TAP + distance;
         let coefficient = sum / FIRFIT_RESPONSE_STEPS as f64 * blackman_nuttall(tap);
