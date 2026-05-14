@@ -285,10 +285,18 @@ fn process_channel(
     output: &mut Vec<f32>,
 ) {
     let mut state = FlangerChannelState::new(resolved);
-    let delay_offsets = resolved.delay_offsets(channel_index);
-    for (frame, sample) in input.iter().copied().enumerate() {
-        let delay = delay_offsets[frame % delay_offsets.len()];
-        output.push(state.process(f64::from(sample), delay));
+    if resolved.interpolation == FlangerInterpolation::None {
+        let delay_offsets = resolved.integer_delay_offsets(channel_index);
+        for (frame, sample) in input.iter().copied().enumerate() {
+            let offset = delay_offsets[frame % delay_offsets.len()];
+            output.push(state.process_none_offset(f64::from(sample), offset));
+        }
+    } else {
+        let delay_offsets = resolved.delay_offsets(channel_index);
+        for (frame, sample) in input.iter().copied().enumerate() {
+            let delay = delay_offsets[frame % delay_offsets.len()];
+            output.push(state.process(f64::from(sample), delay));
+        }
     }
 }
 
@@ -321,6 +329,17 @@ impl FlangerChannelState {
     fn process_none(&self, delay: f64) -> f64 {
         let delay_index = self.delay_index(integer_wave_offset(delay));
         self.delay_line[delay_index]
+    }
+
+    fn process_none_offset(&mut self, input_sample: f64, offset: usize) -> f32 {
+        self.delay_line_index = (self.delay_line_index + self.resolved.delay_line_length - 1)
+            % self.resolved.delay_line_length;
+        self.delay_line[self.delay_line_index] =
+            input_sample + self.delay_last * self.resolved.regen;
+
+        let delayed = self.delay_line[self.delay_index(offset)];
+        self.delay_last = delayed;
+        f64_to_f32_clamped(input_sample * self.resolved.gain_in + delayed * self.resolved.width)
     }
 
     fn process_linear(&self, delay: f64) -> f64 {
@@ -357,6 +376,13 @@ impl ResolvedFlanger {
     fn delay_offsets(self, channel_index: usize) -> Vec<f64> {
         (0..self.lfo_length)
             .map(|frame| self.delay + self.depth * self.wave_value(frame, channel_index))
+            .collect()
+    }
+
+    fn integer_delay_offsets(self, channel_index: usize) -> Vec<usize> {
+        self.delay_offsets(channel_index)
+            .into_iter()
+            .map(integer_wave_offset)
             .collect()
     }
 
