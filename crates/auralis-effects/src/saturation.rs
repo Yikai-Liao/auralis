@@ -159,10 +159,46 @@ impl Saturation {
 
     /// Applies saturation to a planar sample slice.
     pub fn process_samples(self, samples: &mut [f32]) {
+        match self.saturation_type {
+            SaturationType::Tanh => self.process_tanh_samples(samples),
+            SaturationType::Sqrt => self.process_sqrt_samples(samples),
+            SaturationType::Diode => self.process_diode_samples(samples),
+        }
+    }
+
+    fn process_tanh_samples(self, samples: &mut [f32]) {
+        let dry_blend = 1.0 - self.blend;
         for sample in samples {
             let dry = *sample;
-            let wet = self.wet_sample_without_gain(dry) * self.gain_out;
-            *sample = ((wet * self.blend) + (dry * (1.0 - self.blend))).clamp(-1.0, 1.0);
+            let shifted = dry + self.offset;
+            let wet = ((self.parameter * shifted).tanh() - self.offset_out) * self.gain_out;
+            *sample = wet.mul_add(self.blend, dry * dry_blend).clamp(-1.0, 1.0);
+        }
+    }
+
+    fn process_sqrt_samples(self, samples: &mut [f32]) {
+        let dry_blend = 1.0 - self.blend;
+        let root_blend = 1.0 - self.parameter;
+        for sample in samples {
+            let dry = *sample;
+            let shifted = dry + self.offset;
+            let root = shifted.abs().sqrt();
+            let signed_root = if shifted < 0.0 { -root } else { root };
+            let sample_root = shifted * root;
+            let shaped = signed_root.mul_add(self.parameter, sample_root * root_blend);
+            let wet = (shaped - self.offset_out) * self.gain_out;
+            *sample = wet.mul_add(self.blend, dry * dry_blend).clamp(-1.0, 1.0);
+        }
+    }
+
+    fn process_diode_samples(self, samples: &mut [f32]) {
+        let dry_blend = 1.0 - self.blend;
+        for sample in samples {
+            let dry = *sample;
+            let shifted = dry + self.offset;
+            let shaped = shifted.clamp(-self.parameter, self.parameter);
+            let wet = (shaped - self.offset_out) * self.gain_out;
+            *sample = wet.mul_add(self.blend, dry * dry_blend).clamp(-1.0, 1.0);
         }
     }
 
