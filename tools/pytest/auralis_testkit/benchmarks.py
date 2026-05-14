@@ -31,6 +31,8 @@ DEFAULT_DURATION_SECONDS = 90
 MIN_DURATION_SECONDS = 30
 DEFAULT_SAMPLE_RATE = 48_000
 BENCHMARK_INPUT_CHANNELS = 2
+EARWAX_REQUIRED_SAMPLE_RATE = 44_100
+EARWAX_REQUIRED_CHANNELS = 2
 DEFAULT_OUTPUT_DIR = Path("target/benchmarks/sox_ng")
 REPORT_FILENAME = "report.json"
 PROFILE_PLACEHOLDER = "profile.prof"
@@ -279,6 +281,8 @@ def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 sox_executable=sox_executable,
                 input_path=input_path,
                 output_dir=output_dir,
+                sample_rate=args.sample_rate,
+                input_channels=BENCHMARK_INPUT_CHANNELS,
                 iterations=args.iterations,
                 warmups=args.warmups,
             )
@@ -379,10 +383,26 @@ def benchmark_case(
     sox_executable: str,
     input_path: Path,
     output_dir: Path,
+    sample_rate: int,
+    input_channels: int,
     iterations: int,
     warmups: int,
 ) -> dict[str, Any]:
     """Run one benchmark case across all applicable tool/backend variants."""
+
+    skip_reason = should_skip_case(case, sample_rate=sample_rate, input_channels=input_channels)
+    if skip_reason is not None:
+        return {
+            "case_id": case.case_id,
+            "effect_name": case.effect_name,
+            "tokens": list(case.resolve_tokens()),
+            "backend_mode": case.backend_mode.value,
+            "token_source": case.token_source,
+            "status": "skipped",
+            "skip_reason": skip_reason,
+            "runs": {},
+            "comparisons": {},
+        }
 
     case_dir = output_dir / case.case_id
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -464,6 +484,23 @@ def benchmark_case(
     if failed_run_keys:
         report["failed_runs"] = failed_run_keys
     return report
+
+
+def should_skip_case(
+    case: BenchmarkCase, *, sample_rate: int, input_channels: int
+) -> str | None:
+    """Return a skip reason when a case is incompatible with benchmark shape constraints."""
+
+    if case.effect_name != "earwax":
+        return None
+    reasons: list[str] = []
+    if sample_rate != EARWAX_REQUIRED_SAMPLE_RATE:
+        reasons.append(f"requires sample rate {EARWAX_REQUIRED_SAMPLE_RATE} Hz")
+    if input_channels != EARWAX_REQUIRED_CHANNELS:
+        reasons.append(f"requires {EARWAX_REQUIRED_CHANNELS} channels")
+    if reasons:
+        return f"auto-skipped because {case.effect_name} {', '.join(reasons)}; got {sample_rate} Hz, {input_channels} channel(s)"
+    return None
 
 
 def prepare_case_assets(
@@ -708,6 +745,7 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
         "total_cases": len(cases),
         "ok_cases": 0,
         "failed_cases": 0,
+        "skipped_cases": 0,
         "preparation_failed_cases": 0,
         "reused_cases": 0,
         "scalar_faster_than_sox_ng": 0,
@@ -738,6 +776,9 @@ def build_report_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
             summary["ok_cases"] += 1
             if case.get("result_source") == "reused":
                 summary["reused_cases"] += 1
+        elif status == "skipped":
+            summary["skipped_cases"] += 1
+            continue
         elif status == "preparation_failed":
             summary["failed_cases"] += 1
             summary["preparation_failed_cases"] += 1
@@ -880,7 +921,7 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"{report['config'].get('input_channels', BENCHMARK_INPUT_CHANNELS)} channels, "
         f"{report['config'].get('input_frames', report['config']['sample_rate'] * report['config']['duration_seconds'])} frames",
         f"- Iterations: {report['config']['iterations']} measured, {report['config']['warmups']} warmup",
-        f"- Cases: {summary['ok_cases']}/{summary['total_cases']} completed successfully",
+        f"- Cases: {summary['ok_cases']}/{summary['total_cases']} completed successfully ({summary['skipped_cases']} skipped, {summary['failed_cases']} failed)",
         f"- Reused completed cases: {summary['reused_cases']}",
         f"- Scalar vs SoX-ng: {summary['scalar_faster_than_sox_ng']} faster, {summary['scalar_slower_than_sox_ng']} slower, {summary['scalar_equal_to_sox_ng']} equal",
         f"- SIMD vs SoX-ng: {summary['simd_faster_than_sox_ng']} faster, {summary['simd_slower_than_sox_ng']} slower, {summary['simd_equal_to_sox_ng']} equal, {summary['simd_not_applicable_cases']} not applicable",
@@ -929,7 +970,13 @@ def render_markdown_report(report: dict[str, Any]) -> str:
     )
 
     for case in report["cases"]:
-        if case.get("status") != "ok":
+        status = case.get("status")
+        if status == "skipped":
+            lines.append(
+                f"| {case['effect_name']} | {case['backend_mode']} | skipped | skipped | skipped | n/a | n/a | n/a |"
+            )
+            continue
+        if status != "ok":
             lines.append(
                 f"| {case['effect_name']} | {case['backend_mode']} | failed | failed | failed | n/a | n/a | n/a |"
             )
