@@ -107,6 +107,11 @@ impl BandPass {
     /// rate makes the configured filter invalid.
     pub fn process_buffer(self, audio: &mut AudioBuffer) -> Result<()> {
         let coefficients = self.coefficients(audio.spec().sample_rate())?;
+        if coefficients.b1.to_bits() == 0.0_f64.to_bits() {
+            process_zero_b1_biquad(audio, coefficients);
+            return Ok(());
+        }
+
         Biquad::new(coefficients).process_buffer(audio);
         Ok(())
     }
@@ -143,6 +148,27 @@ fn reject_invalid_width(width: BiquadWidth) -> Result<()> {
         Ok(())
     } else {
         Err(EffectError::InvalidBiquadDesign)
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Auralis effect samples are f32 while biquad filter state is accumulated in f64 for deterministic scalar precision"
+)]
+fn process_zero_b1_biquad(audio: &mut AudioBuffer, coefficients: BiquadCoefficients) {
+    for channel_index in 0..audio.channels().as_usize() {
+        let channel = audio
+            .channel_mut(channel_index)
+            .expect("channel index is within the audio shape");
+        let mut delay_1 = 0.0;
+        let mut delay_2 = 0.0;
+        for sample in channel {
+            let input = f64::from(*sample);
+            let output = coefficients.b0.mul_add(input, delay_1);
+            delay_1 = delay_2 - (coefficients.a1 * output);
+            delay_2 = coefficients.b2.mul_add(input, -(coefficients.a2 * output));
+            *sample = output as f32;
+        }
     }
 }
 
