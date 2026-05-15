@@ -27,6 +27,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("oops"), "{stdout}");
     assert!(stdout.contains("riaa"), "{stdout}");
     assert!(stdout.contains("swap"), "{stdout}");
+    assert!(stdout.contains("contrast"), "{stdout}");
+    assert!(stdout.contains("overdrive"), "{stdout}");
+    assert!(stdout.contains("saturation"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -140,6 +143,42 @@ fn gain_man_page_describes_recipe_lowering() {
     );
     assert!(stdout.contains("render --fx 'gain ...'"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn distortion_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "contrast",
+            "contrast - enhance sample contrast",
+            "render --fx 'contrast ...'",
+            "--amount AMOUNT",
+        ),
+        (
+            "overdrive",
+            "overdrive - apply overdrive distortion",
+            "render --fx 'overdrive ...'",
+            "--color COLOR",
+        ),
+        (
+            "saturation",
+            "saturation - apply saturation distortion",
+            "render --fx 'saturation ...'",
+            "--parameter VALUE",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
 }
 
 #[test]

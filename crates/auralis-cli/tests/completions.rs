@@ -23,6 +23,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("oops"), "{stdout}");
     assert!(stdout.contains("riaa"), "{stdout}");
     assert!(stdout.contains("swap"), "{stdout}");
+    assert!(stdout.contains("contrast"), "{stdout}");
+    assert!(stdout.contains("overdrive"), "{stdout}");
+    assert!(stdout.contains("saturation"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -54,6 +57,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'oops:oops'"), "{stdout}");
     assert!(stdout.contains("'riaa:riaa'"), "{stdout}");
     assert!(stdout.contains("'swap:swap'"), "{stdout}");
+    assert!(stdout.contains("'contrast:contrast'"), "{stdout}");
+    assert!(stdout.contains("'overdrive:overdrive'"), "{stdout}");
+    assert!(stdout.contains("'saturation:saturation'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
@@ -113,6 +119,18 @@ fn fish_completions_include_modern_commands_and_flags() {
         "{stdout}"
     );
     assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'contrast'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'overdrive'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'saturation'"),
+        "{stdout}"
+    );
+    assert!(
         stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'fade'"),
         "{stdout}"
     );
@@ -138,6 +156,12 @@ fn fish_completions_include_modern_commands_and_flags() {
     );
     assert!(
         stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from fade' -l out"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "complete -c auralis -n '__fish_seen_subcommand_from saturation' -l parameter"
+        ),
         "{stdout}"
     );
     assert!(

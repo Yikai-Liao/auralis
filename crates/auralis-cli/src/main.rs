@@ -213,6 +213,96 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Enhance sample contrast.
+    Contrast {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Contrast amount from 0 to 100.
+        #[arg(long, value_name = "AMOUNT", default_value = "75")]
+        amount: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply overdrive distortion.
+    Overdrive {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Overdrive gain.
+        #[arg(
+            long,
+            value_name = "GAIN",
+            default_value = "20",
+            allow_hyphen_values = true
+        )]
+        gain: String,
+
+        /// Overdrive color.
+        #[arg(
+            long,
+            value_name = "COLOR",
+            default_value = "20",
+            allow_hyphen_values = true
+        )]
+        color: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply saturation distortion.
+    Saturation {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Saturation curve type: tanh, sqrt, or diode.
+        #[arg(long = "type", value_name = "TYPE", default_value = "tanh")]
+        saturation_type: String,
+
+        /// Wet/dry blend amount.
+        #[arg(
+            long,
+            value_name = "BLEND",
+            default_value = "1",
+            allow_hyphen_values = true
+        )]
+        blend: String,
+
+        /// Input offset before saturation.
+        #[arg(
+            long,
+            value_name = "OFFSET",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        offset: String,
+
+        /// Curve-specific parameter: drive, color, or threshold.
+        #[arg(long, value_name = "VALUE", allow_hyphen_values = true)]
+        parameter: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Fade one audio file in or out.
     Fade {
         /// PCM16 WAV input file to read.
@@ -585,6 +675,41 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["swap"]),
+        Command::Contrast {
+            input,
+            amount,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["contrast", amount.as_str()]),
+        Command::Overdrive {
+            input,
+            gain,
+            color,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            ["overdrive", gain.as_str(), color.as_str()],
+        ),
+        Command::Saturation {
+            input,
+            saturation_type,
+            blend,
+            offset,
+            parameter,
+            output,
+            backend,
+        } => run_saturation_recipe(
+            &input,
+            &saturation_type,
+            &blend,
+            &offset,
+            parameter.as_deref(),
+            &output,
+            backend,
+        ),
         Command::Fade {
             input,
             fade_in,
@@ -772,6 +897,33 @@ fn run_fade_recipe(
     ];
     if let Some(fade_out) = fade_out {
         effect_chain.push(format!("out={fade_out}"));
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_saturation_recipe(
+    input: &Path,
+    saturation_type: &str,
+    blend: &str,
+    offset: &str,
+    parameter: Option<&str>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec![
+        "saturation".to_owned(),
+        saturation_type.to_owned(),
+        blend.to_owned(),
+        offset.to_owned(),
+    ];
+    if let Some(parameter) = parameter {
+        effect_chain.push(parameter.to_owned());
     }
 
     run_effect_recipe(
@@ -1384,6 +1536,26 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "contrast",
+        options: &["-o", "--output", "--amount", "--backend"],
+    },
+    CompletionSpec {
+        name: "overdrive",
+        options: &["-o", "--output", "--gain", "--color", "--backend"],
+    },
+    CompletionSpec {
+        name: "saturation",
+        options: &[
+            "-o",
+            "--output",
+            "--type",
+            "--blend",
+            "--offset",
+            "--parameter",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "fade",
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
@@ -1490,6 +1662,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("oops", "Extract out-of-phase stereo content."),
             ("riaa", "Apply RIAA vinyl playback equalization."),
             ("swap", "Swap adjacent channel pairs."),
+            ("contrast", "Enhance sample contrast."),
+            ("overdrive", "Apply overdrive distortion."),
+            ("saturation", "Apply saturation distortion."),
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
@@ -1618,6 +1793,49 @@ const MAN_PAGES: &[ManPage] = &[
         synopsis: "auralis swap INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
         description: "Swap is a recipe alias for exchanging adjacent channel pairs. It lowers to the same typed effect pipeline as `render --fx swap`.",
         options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "contrast",
+        summary: "enhance sample contrast",
+        synopsis: "auralis contrast INPUT.wav [--amount AMOUNT] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Contrast is a recipe alias for phase contrast enhancement. It lowers to the same typed effect pipeline as `render --fx 'contrast ...'`.",
+        options: &[
+            ("--amount AMOUNT", "Contrast amount from 0 to 100."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "overdrive",
+        summary: "apply overdrive distortion",
+        synopsis: "auralis overdrive INPUT.wav [--gain GAIN] [--color COLOR] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Overdrive is a recipe alias for applying one overdrive distortion stage. It lowers to the same typed effect pipeline as `render --fx 'overdrive ...'`.",
+        options: &[
+            ("--gain GAIN", "Overdrive gain."),
+            ("--color COLOR", "Overdrive color."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "saturation",
+        summary: "apply saturation distortion",
+        synopsis: "auralis saturation INPUT.wav [--type TYPE] [--blend BLEND] [--offset OFFSET] [--parameter VALUE] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Saturation is a recipe alias for applying one saturation curve. It lowers to the same typed effect pipeline as `render --fx 'saturation ...'`.",
+        options: &[
+            (
+                "--type TYPE",
+                "Saturation curve type: tanh, sqrt, or diode.",
+            ),
+            ("--blend BLEND", "Wet/dry blend amount."),
+            ("--offset OFFSET", "Input offset before saturation."),
+            (
+                "--parameter VALUE",
+                "Curve-specific parameter: drive, color, or threshold.",
+            ),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
