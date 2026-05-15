@@ -169,6 +169,21 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Mix two or more audio files into one output.
+    Mix {
+        /// PCM16 WAV input files to mix.
+        #[arg(value_name = "INPUT", num_args = 2..)]
+        inputs: Vec<PathBuf>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Render one ordered stream with typed effect syntax.
     Render {
         /// PCM16 WAV input file to read.
@@ -430,6 +445,11 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
+        Command::Mix {
+            inputs,
+            output,
+            backend,
+        } => run_mix_recipe(&inputs, &output, backend),
         Command::Render {
             input,
             output,
@@ -602,6 +622,33 @@ fn run_effect_recipe<'a>(
         dither_seed: None,
         effects_file: None,
         effect_chain: effect_chain.into_iter().map(ToOwned::to_owned).collect(),
+    };
+
+    run_pipeline(input, output, &options)
+}
+
+fn run_mix_recipe(
+    inputs: &[PathBuf],
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let (input, additional_inputs) = inputs
+        .split_first()
+        .expect("clap requires at least two mix inputs");
+    let options = RenderOptions {
+        backend,
+        combine: auralis::CombineMethod::Mix,
+        additional_inputs: additional_inputs.to_vec(),
+        output_channels: None,
+        no_auto_channels: false,
+        output_sample_rate: None,
+        no_auto_rate: false,
+        guard: OutputGuard::Disabled,
+        norm: None,
+        dither: OutputDither::Disabled,
+        dither_seed: None,
+        effects_file: None,
+        effect_chain: Vec::new(),
     };
 
     run_pipeline(input, output, &options)
@@ -1132,6 +1179,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
     CompletionSpec {
+        name: "mix",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "render",
         options: &[
             "-o",
@@ -1210,6 +1261,7 @@ const MAN_PAGES: &[ManPage] = &[
             ("gain", "Adjust one audio file by a gain amount."),
             ("reverse", "Reverse one audio file."),
             ("fade", "Fade one audio file in or out."),
+            ("mix", "Mix two or more audio files into one output."),
             (
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
@@ -1298,6 +1350,17 @@ const MAN_PAGES: &[ManPage] = &[
                 "--curve CURVE",
                 "Fade curve family: linear, quarter-sine, half-sine, log, or parabola.",
             ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "mix",
+        summary: "mix audio files",
+        synopsis: "auralis mix INPUT.wav INPUT.wav... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Mix is a recipe alias for combining two or more inputs. It lowers to the same typed render pipeline as `render --combine mix --input ...`.",
+        options: &[
+            ("INPUT", "Two or more WAV input files to mix."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

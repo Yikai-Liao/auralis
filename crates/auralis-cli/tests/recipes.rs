@@ -246,3 +246,56 @@ fn fade_recipe_lowers_to_typed_render_fade() {
     fs::remove_file(recipe_output).unwrap();
     fs::remove_file(render_output).unwrap();
 }
+
+#[test]
+fn mix_recipe_lowers_to_typed_render_mix() {
+    let first = temp_path("auralis-cli-mix-recipe-first", "wav");
+    let second = temp_path("auralis-cli-mix-recipe-second", "wav");
+    let third = temp_path("auralis-cli-mix-recipe-third", "wav");
+    let recipe_output = temp_path("auralis-cli-mix-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-mix-render-output", "wav");
+    write_pcm16_wav(&first, 1, &[1200, -1200, 600]);
+    write_pcm16_wav(&second, 1, &[600, 0, -600]);
+    write_pcm16_wav(&third, 1, &[0, 900, -300]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "mix",
+            first.to_str().unwrap(),
+            second.to_str().unwrap(),
+            third.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--combine",
+            "mix",
+            "--input",
+            second.to_str().unwrap(),
+            "--input",
+            third.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(read_pcm16_wav(&recipe_output), (1, vec![600, -100, -100]));
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(third).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
