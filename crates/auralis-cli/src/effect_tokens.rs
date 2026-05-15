@@ -37,6 +37,7 @@ fn lower_graph_effect_tokens_a_to_l(
         "biquad" => {
             lower_ordered_tokens("biquad", params, &["b0", "b1", "b2", "a0", "a1", "a2"]).map(Some)
         }
+        "centercut" => lower_centercut_tokens(params).map(Some),
         "channels" => lower_ordered_tokens("channels", params, &["count"]).map(Some),
         "chorus" => lower_chorus_tokens(params).map(Some),
         "compand" => lower_ordered_tokens(
@@ -108,6 +109,7 @@ fn lower_graph_effect_tokens_m_to_z(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
     match op {
+        "mcompand" => lower_mcompand_tokens(params),
         "norm.peak" => {
             let Some(target) = params.get("target") else {
                 return Ok(vec!["norm".to_owned()]);
@@ -317,6 +319,24 @@ fn lower_bandpass_tokens(
     Ok(tokens)
 }
 
+fn lower_centercut_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["centercut".to_owned()];
+    if let Some(gain) = params.get("gain") {
+        tokens.push("-a".to_owned());
+        tokens.push(param_as_string(gain, "gain")?);
+    }
+    if param_as_bool(params.get("bass_to_sides"), "bass_to_sides")? {
+        tokens.push("-b".to_owned());
+    }
+    if let Some(window_size) = params.get("window_size") {
+        tokens.push("-w".to_owned());
+        tokens.push(param_as_string(window_size, "window_size")?);
+    }
+    Ok(tokens)
+}
+
 fn lower_splice_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -453,6 +473,17 @@ fn lower_echo_tokens(
     Ok(tokens)
 }
 
+fn lower_mcompand_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["mcompand".to_owned()];
+    let Some(bands) = params.get("bands") else {
+        return Ok(tokens);
+    };
+    append_mcompand_bands(&mut tokens, bands)?;
+    Ok(tokens)
+}
+
 fn lower_flanger_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -522,6 +553,28 @@ fn append_chorus_stages(
         }
         if let Some(wave) = stage.get("wave") {
             tokens.push(stage_wave_flag(param_as_string(wave, "stages")?));
+        }
+    }
+    Ok(())
+}
+
+fn append_mcompand_bands(
+    tokens: &mut Vec<String>,
+    value: &toml::Value,
+) -> Result<(), EffectTokenError> {
+    let toml::Value::Array(bands) = value else {
+        return Err(invalid_param("bands"));
+    };
+    for band in bands {
+        let toml::Value::Table(band) = band else {
+            return Err(invalid_param("bands"));
+        };
+        let Some(compand) = band.get("compand") else {
+            return Err(invalid_param("bands"));
+        };
+        tokens.push(param_as_string(compand, "bands")?);
+        if let Some(crossover) = band.get("crossover") {
+            tokens.push(param_as_string(crossover, "bands")?);
         }
     }
     Ok(())

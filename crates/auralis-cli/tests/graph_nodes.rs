@@ -2,10 +2,38 @@
 
 mod support;
 
-use support::{Command, fs, read_pcm16_wav_with_sample_rate, stderr, temp_path, write_pcm16_wav};
+use support::{
+    Command, fs, read_pcm16_wav_with_sample_rate, stderr, temp_path,
+    write_pcm16_wav_with_sample_rate,
+};
 
 fn assert_graph_node_matches_render(
     name: &str,
+    samples: &[i16],
+    op: &str,
+    params: &str,
+    render_fx: &str,
+) {
+    assert_graph_node_matches_render_with_channels(name, 1, samples, op, params, render_fx);
+}
+
+fn assert_graph_node_matches_render_with_channels(
+    name: &str,
+    channels: u16,
+    samples: &[i16],
+    op: &str,
+    params: &str,
+    render_fx: &str,
+) {
+    assert_graph_node_matches_render_with_format(
+        name, 48_000, channels, samples, op, params, render_fx,
+    );
+}
+
+fn assert_graph_node_matches_render_with_format(
+    name: &str,
+    sample_rate: u32,
+    channels: u16,
     samples: &[i16],
     op: &str,
     params: &str,
@@ -15,7 +43,7 @@ fn assert_graph_node_matches_render(
     let input = temp_path(&format!("auralis-cli-graph-node-{name}-input"), "wav");
     let graph_output = temp_path(&format!("auralis-cli-graph-node-{name}-output"), "wav");
     let render_output = temp_path(&format!("auralis-cli-graph-node-{name}-render"), "wav");
-    write_pcm16_wav(&input, 1, samples);
+    write_pcm16_wav_with_sample_rate(&input, sample_rate, channels, samples);
     fs::write(
         &spec,
         format!(
@@ -103,6 +131,40 @@ gain = "3""#,
 q = 0.707"#,
         "lowpass 12000 0.707q",
     );
+    assert_graph_node_matches_render(
+        "highpass",
+        samples,
+        "filter.highpass",
+        r#"poles = "2"
+frequency = "80Hz"
+width = "0.707q""#,
+        "highpass -2 80 0.707q",
+    );
+    assert_graph_node_matches_render(
+        "allpass",
+        samples,
+        "allpass",
+        r#"frequency = "1200"
+q = "0.707""#,
+        "allpass 1200 0.707q",
+    );
+    assert_graph_node_matches_render(
+        "bandreject",
+        samples,
+        "bandreject",
+        r#"frequency = "1000"
+width = "0.707q""#,
+        "bandreject 1000 0.707q",
+    );
+    assert_graph_node_matches_render(
+        "treble",
+        samples,
+        "treble",
+        r#"gain = "3"
+frequency = "4000"
+width = "0.707q""#,
+        "treble 3 4000 0.707q",
+    );
 }
 
 #[test]
@@ -184,6 +246,60 @@ parameter = "0.25""#,
 depth = "50""#,
         "tremolo 5 50",
     );
+}
+
+#[test]
+fn graph_nodes_lower_named_basic_edit_parameters() {
+    let samples = &[2000, -3000, 4000, -5000, 6000, -7000, 8000, -9000];
+
+    assert_graph_node_matches_render("gain", samples, "gain", r#"by = "-3""#, "gain -3");
+    assert_graph_node_matches_render(
+        "norm_peak",
+        samples,
+        "norm.peak",
+        r#"target = "-1dBFS""#,
+        "norm -1",
+    );
+    assert_graph_node_matches_render(
+        "fade",
+        samples,
+        "fade",
+        r#"curve = "linear"
+fade_in = "2"
+fade_out = "2""#,
+        "fade t 2 0 2",
+    );
+    assert_graph_node_matches_render(
+        "trim",
+        samples,
+        "trim",
+        r#"range = "1s..6s""#,
+        "trim 1s =6s",
+    );
+}
+
+#[test]
+fn graph_nodes_execute_registry_backed_no_parameter_effects() {
+    let mono_samples = &[1000, -2000, 3000, -4000, 5000, -6000, 7000, -8000];
+    let stereo_samples = &[
+        1000, -1000, 2000, -2000, 3000, -3000, 4000, -4000, 5000, -5000, 6000, -6000, 7000, -7000,
+        8000, -8000,
+    ];
+
+    assert_graph_node_matches_render("deemph", mono_samples, "deemph", "", "deemph");
+    assert_graph_node_matches_render("reverse", mono_samples, "reverse", "", "reverse");
+    assert_graph_node_matches_render("riaa", mono_samples, "riaa", "", "riaa");
+    assert_graph_node_matches_render_with_format(
+        "earwax",
+        44_100,
+        2,
+        stereo_samples,
+        "earwax",
+        "",
+        "earwax",
+    );
+    assert_graph_node_matches_render_with_channels("oops", 2, stereo_samples, "oops", "", "oops");
+    assert_graph_node_matches_render_with_channels("swap", 2, stereo_samples, "swap", "", "swap");
 }
 
 #[test]
@@ -368,6 +484,35 @@ a2 = "0""#,
         "firfit",
         r#"knots = ["20", "0", "10000", "0"]"#,
         "firfit 20 0 10000 0",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_multiband_parameters() {
+    let samples = &[
+        1000, -1000, 2000, -2000, 3000, -3000, 4000, -4000, 5000, -5000, 6000, -6000, 7000, -7000,
+        8000, -8000,
+    ];
+
+    assert_graph_node_matches_render_with_channels(
+        "centercut",
+        2,
+        samples,
+        "centercut",
+        r#"gain = "0.5"
+bass_to_sides = true
+window_size = "16""#,
+        "centercut -a 0.5 -b -w 16",
+    );
+    assert_graph_node_matches_render(
+        "mcompand",
+        samples,
+        "mcompand",
+        r#"bands = [
+  { compand = "0,0 -60,-60,0,0", crossover = "1k" },
+  { compand = "0.01,0.1 3:-70,-60,0,-3 -1 -20" },
+]"#,
+        "mcompand '0,0 -60,-60,0,0' 1k '0.01,0.1 3:-70,-60,0,-3 -1 -20'",
     );
 }
 
