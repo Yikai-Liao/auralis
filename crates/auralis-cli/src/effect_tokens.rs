@@ -118,6 +118,7 @@ fn lower_graph_effect_tokens_m_to_z(
         }
         "overdrive" => lower_ordered_tokens("overdrive", params, &["gain", "color"]),
         "pad" => lower_pad_tokens(params),
+        "phaser" => lower_phaser_tokens(params),
         "pitch" => lower_pitch_tokens(params),
         "rate" => lower_rate_tokens(params),
         "repeat" => lower_ordered_tokens("repeat", params, &["count"]),
@@ -204,16 +205,6 @@ fn lower_ordered_tokens(
         }
         tokens.push(param_as_string(value, param)?);
     }
-    Ok(tokens)
-}
-
-fn lower_optional_ordered_tokens(
-    op: &str,
-    params: &BTreeMap<String, toml::Value>,
-    ordered_params: &[&'static str],
-) -> Result<Vec<String>, EffectTokenError> {
-    let mut tokens = vec![op.to_owned()];
-    append_optional_ordered(&mut tokens, params, ordered_params)?;
     Ok(tokens)
 }
 
@@ -516,6 +507,35 @@ fn lower_flanger_tokens(
     Ok(tokens)
 }
 
+fn lower_phaser_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["phaser".to_owned()];
+    if let Some(interpolation) = params.get("interpolation") {
+        push_interpolation_flag(
+            &mut tokens,
+            param_as_string(interpolation, "interpolation")?,
+            true,
+        );
+    }
+    if matches!(
+        params
+            .get("wave")
+            .map(|value| param_as_string(value, "wave"))
+            .transpose()?
+            .as_deref(),
+        Some("triangle" | "t")
+    ) {
+        tokens.push("-t".to_owned());
+    }
+    append_optional_ordered(
+        &mut tokens,
+        params,
+        &["gain_in", "gain_out", "delay", "regen", "speed"],
+    )?;
+    Ok(tokens)
+}
+
 fn append_echo_taps(tokens: &mut Vec<String>, value: &toml::Value) -> Result<(), EffectTokenError> {
     let toml::Value::Array(taps) = value else {
         return Err(invalid_param("taps"));
@@ -732,7 +752,8 @@ fn lower_stats_tokens(
 fn lower_stretch_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
-    let mut tokens = lower_optional_ordered_tokens("stretch", params, &["factor", "window"])?;
+    let mut tokens = vec!["stretch".to_owned()];
+    append_optional_ordered(&mut tokens, params, &["factor", "window"])?;
     if let Some(fade) = params.get("fade") {
         if tokens.len() < 3 {
             return Err(invalid_param("fade"));

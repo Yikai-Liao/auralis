@@ -354,6 +354,19 @@ interpolation = "quadratic""#,
         "flanger -q -t 1 2 0 71 0.5 triangle 25",
     );
     assert_graph_node_matches_render(
+        "phaser",
+        samples,
+        "phaser",
+        r#"interpolation = "linear"
+wave = "triangle"
+gain_in = "0.4"
+gain_out = "0.74"
+delay = "3"
+regen = "0.4"
+speed = "0.5""#,
+        "phaser -l -t 0.4 0.74 3 0.4 0.5",
+    );
+    assert_graph_node_matches_render(
         "chorus",
         samples,
         "chorus",
