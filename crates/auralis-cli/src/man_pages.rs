@@ -874,9 +874,10 @@ const MAN_PAGES: &[ManPage] = &[
     ManPage {
         name: "plan",
         summary: "preview graph execution",
-        synopsis: "auralis plan SPEC [--json] [--locked]",
+        synopsis: "auralis plan SPEC [--target TARGET] [--json] [--locked]",
         description: "Plan validates an Auralis graph spec, exposes streaming segments, whole-buffer barriers, fanout points, and output targets, and can emit a machine-readable JSON form for tooling.",
         options: &[
+            ("--target TARGET", "Plan only the named target."),
             ("--json", "Emit machine-readable JSON output."),
             (
                 "--locked",
@@ -887,12 +888,15 @@ const MAN_PAGES: &[ManPage] = &[
     ManPage {
         name: "run",
         summary: "execute an Auralis graph spec",
-        synopsis: "auralis run SPEC [--locked]",
+        synopsis: "auralis run [SPEC] [--target TARGET] [--locked]",
         description: "Run executes the currently supported source-to-chain-to-sink subset of graph specs. Unsupported graph nodes should be inspected with `plan` first.",
-        options: &[(
-            "--locked",
-            "Require a matching Auralis.lock before running.",
-        )],
+        options: &[
+            ("--target TARGET", "Run only the named target."),
+            (
+                "--locked",
+                "Require a matching Auralis.lock before running.",
+            ),
+        ],
     },
     ManPage {
         name: "init",

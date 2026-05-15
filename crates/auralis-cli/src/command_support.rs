@@ -87,13 +87,23 @@ pub(super) fn check_command(
     check_effects(effects_file, fx, chain)
 }
 
-pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(), CliError> {
-    let spec_ref = parse_graph_spec_ref(spec);
+pub(super) fn plan_graph_spec(
+    spec: &Path,
+    target: Option<&str>,
+    json: bool,
+    locked: bool,
+) -> Result<(), CliError> {
+    let spec_ref = parse_graph_spec_ref(spec, target);
     graph_plan::plan_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), json, locked)
 }
 
-pub(super) fn run_graph_spec(spec: &Path, locked: bool, cache: CacheMode) -> Result<(), CliError> {
-    let spec_ref = parse_graph_spec_ref(spec);
+pub(super) fn run_graph_spec(
+    spec: &Path,
+    target: Option<&str>,
+    locked: bool,
+    cache: CacheMode,
+) -> Result<(), CliError> {
+    let spec_ref = parse_graph_spec_ref(spec, target);
     graph_runtime::run_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), locked, cache)
 }
 
@@ -181,21 +191,23 @@ struct GraphSpecRef {
     target: Option<String>,
 }
 
-fn parse_graph_spec_ref(spec: &Path) -> GraphSpecRef {
+fn parse_graph_spec_ref(spec: &Path, explicit_target: Option<&str>) -> GraphSpecRef {
     let spec = spec.to_string_lossy();
     if let Some((path, target)) = spec.rsplit_once('#') {
         let target = target.trim();
         if !target.is_empty() {
             return GraphSpecRef {
                 path: PathBuf::from(path),
-                target: Some(target.to_owned()),
+                target: explicit_target
+                    .map(str::to_owned)
+                    .or_else(|| Some(target.to_owned())),
             };
         }
     }
 
     GraphSpecRef {
         path: PathBuf::from(spec.as_ref()),
-        target: None,
+        target: explicit_target.map(str::to_owned),
     }
 }
 

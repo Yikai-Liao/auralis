@@ -748,6 +748,10 @@ pub(crate) struct PlanArgs {
     /// Auralis graph spec to plan.
     pub(crate) spec: PathBuf,
 
+    /// Plan only the named target.
+    #[arg(long, value_name = "TARGET")]
+    pub(crate) target: Option<String>,
+
     /// Emit machine-readable JSON output.
     #[arg(long)]
     pub(crate) json: bool,
@@ -849,7 +853,12 @@ pub(crate) struct ExplainArgs {
 #[derive(Debug, Args)]
 pub(crate) struct RunArgs {
     /// Auralis graph spec to execute.
+    #[arg(default_value = "Auralis.toml")]
     pub(crate) spec: PathBuf,
+
+    /// Run only the named target.
+    #[arg(long, value_name = "TARGET")]
+    pub(crate) target: Option<String>,
 
     /// Require an up-to-date Auralis.lock before running.
     #[arg(long)]

@@ -967,7 +967,12 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &fx,
             chain.as_deref(),
         ),
-        Command::Plan(PlanArgs { spec, json, locked }) => plan_graph_spec(&spec, json, locked),
+        Command::Plan(PlanArgs {
+            spec,
+            target,
+            json,
+            locked,
+        }) => plan_graph_spec(&spec, target.as_deref(), json, locked),
         Command::Graph(GraphArgs {
             spec,
             output,
@@ -984,9 +989,10 @@ fn run(cli: Cli) -> Result<(), CliError> {
         Command::Explain(ExplainArgs { spec, target }) => explain_graph_target(&spec, &target),
         Command::Run(RunArgs {
             spec,
+            target,
             locked,
             cache,
-        }) => run_graph_spec(&spec, locked, cache),
+        }) => run_graph_spec(&spec, target.as_deref(), locked, cache),
         Command::Ops(OpsArgs { effect, schema }) => print_ops(effect.as_deref(), schema),
     }
 }

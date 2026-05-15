@@ -74,6 +74,7 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("--locked"), "{stdout}");
     assert!(stdout.contains("--cache"), "{stdout}");
+    assert!(stdout.contains("--target"), "{stdout}");
     assert!(stdout.contains("--root"), "{stdout}");
     assert!(stdout.contains("--yes"), "{stdout}");
     assert!(stdout.contains("--schema"), "{stdout}");
@@ -147,6 +148,7 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'--peak[normalize option]'"), "{stdout}");
     assert!(stdout.contains("'--curve[fade option]'"), "{stdout}");
     assert!(stdout.contains("'--locked[plan option]'"), "{stdout}");
+    assert!(stdout.contains("'--target[plan option]'"), "{stdout}");
     assert!(stdout.contains("'--cache[run option]'"), "{stdout}");
     assert!(stdout.contains("'--output[graph option]'"), "{stdout}");
 }

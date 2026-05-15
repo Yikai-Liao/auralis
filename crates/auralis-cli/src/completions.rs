@@ -432,7 +432,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "plan",
-        options: &["--json", "--locked"],
+        options: &["--target", "--json", "--locked"],
     },
     CompletionSpec {
         name: "graph",
@@ -464,7 +464,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "run",
-        options: &["--locked", "--cache"],
+        options: &["--target", "--locked", "--cache"],
     },
     CompletionSpec {
         name: "ops",
