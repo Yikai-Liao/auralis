@@ -540,11 +540,7 @@ pub(super) fn run_hilbert_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["hilbert".to_owned()];
-    if let Some(taps) = taps {
-        effect_chain.push("-n".to_owned());
-        effect_chain.push(taps.to_owned());
-    }
+    let effect_chain = hilbert_effect_tokens(taps);
 
     run_effect_recipe(
         input,
@@ -562,14 +558,7 @@ pub(super) fn run_dither_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["dither".to_owned()];
-    if let Some("shibata") = noise_shape {
-        effect_chain.push("-s".to_owned());
-    } else if sloped {
-        effect_chain.push("-S".to_owned());
-    }
-    effect_chain.push("-p".to_owned());
-    effect_chain.push(precision.to_owned());
+    let effect_chain = dither_effect_tokens(sloped, noise_shape, precision);
 
     run_effect_recipe(
         input,
@@ -592,18 +581,15 @@ pub(super) fn run_reverb_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["reverb".to_owned()];
-    if wet_only {
-        effect_chain.push("-w".to_owned());
-    }
-    effect_chain.extend([
-        reverberance.to_owned(),
-        hf_damping.to_owned(),
-        room_scale.to_owned(),
-        stereo_depth.to_owned(),
-        pre_delay.to_owned(),
-        wet_gain.to_owned(),
-    ]);
+    let effect_chain = reverb_effect_tokens(
+        wet_only,
+        reverberance,
+        hf_damping,
+        room_scale,
+        stereo_depth,
+        pre_delay,
+        wet_gain,
+    );
 
     run_effect_recipe(
         input,
@@ -628,6 +614,67 @@ pub(super) fn run_stretch_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
+    let effect_chain = stretch_effect_tokens(options);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+pub(super) fn hilbert_effect_tokens(taps: Option<&str>) -> Vec<String> {
+    let mut effect_chain = vec!["hilbert".to_owned()];
+    if let Some(taps) = taps {
+        effect_chain.push("-n".to_owned());
+        effect_chain.push(taps.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn dither_effect_tokens(
+    sloped: bool,
+    noise_shape: Option<&str>,
+    precision: &str,
+) -> Vec<String> {
+    let mut effect_chain = vec!["dither".to_owned()];
+    if let Some("shibata") = noise_shape {
+        effect_chain.push("-s".to_owned());
+    } else if sloped {
+        effect_chain.push("-S".to_owned());
+    }
+    effect_chain.push("-p".to_owned());
+    effect_chain.push(precision.to_owned());
+    effect_chain
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn reverb_effect_tokens(
+    wet_only: bool,
+    reverberance: &str,
+    hf_damping: &str,
+    room_scale: &str,
+    stereo_depth: &str,
+    pre_delay: &str,
+    wet_gain: &str,
+) -> Vec<String> {
+    let mut effect_chain = vec!["reverb".to_owned()];
+    if wet_only {
+        effect_chain.push("-w".to_owned());
+    }
+    effect_chain.extend([
+        reverberance.to_owned(),
+        hf_damping.to_owned(),
+        room_scale.to_owned(),
+        stereo_depth.to_owned(),
+        pre_delay.to_owned(),
+        wet_gain.to_owned(),
+    ]);
+    effect_chain
+}
+
+pub(super) fn stretch_effect_tokens(options: StretchRecipeOptions<'_>) -> Vec<String> {
     let mut effect_chain = vec![
         "stretch".to_owned(),
         options.factor.to_owned(),
@@ -640,13 +687,7 @@ pub(super) fn run_stretch_recipe(
     if let Some(fading) = options.fading {
         effect_chain.push(fading.to_owned());
     }
-
-    run_effect_recipe(
-        input,
-        output,
-        backend,
-        effect_chain.iter().map(String::as_str),
-    )
+    effect_chain
 }
 
 fn stretch_fade_token(fade: &str) -> &str {

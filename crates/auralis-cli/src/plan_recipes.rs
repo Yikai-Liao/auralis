@@ -11,15 +11,16 @@ use crate::{
     plan_args::PlanCommand,
     plan_commands::step_slug,
     recipe_args::{
-        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DownsampleArgs, EqualizerArgs,
-        FadeArgs, PadArgs, PitchArgs, PoleFilterArgs, RepeatArgs, TempoArgs, TrebleArgs,
-        UpsampleArgs,
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DitherArgs, DownsampleArgs,
+        EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, PadArgs, PitchArgs, PoleFilterArgs,
+        RepeatArgs, ReverbArgs, StretchArgs, TempoArgs, TrebleArgs, UpsampleArgs,
     },
     recipes::{
-        TimingArgs, band_effect_tokens, bandpass_effect_tokens, chorus_effect_tokens,
-        delay_effect_tokens, echo_effect_tokens, fade_effect_tokens, optional_tail_effect_tokens,
-        pad_effect_tokens, phaser_effect_tokens, pitch_effect_tokens, pole_filter_effect_tokens,
-        saturation_effect_tokens, tempo_effect_tokens, vol_effect_tokens,
+        StretchRecipeOptions, TimingArgs, band_effect_tokens, bandpass_effect_tokens,
+        chorus_effect_tokens, delay_effect_tokens, dither_effect_tokens, echo_effect_tokens,
+        fade_effect_tokens, hilbert_effect_tokens, optional_tail_effect_tokens, pad_effect_tokens,
+        phaser_effect_tokens, pitch_effect_tokens, pole_filter_effect_tokens, reverb_effect_tokens,
+        saturation_effect_tokens, stretch_effect_tokens, tempo_effect_tokens, vol_effect_tokens,
     },
     spec,
 };
@@ -70,6 +71,11 @@ pub(super) fn plan_recipe_surface_command(
         PlanCommand::Repeat(repeat) => plan_repeat_command(repeat, json),
         PlanCommand::Downsample(downsample) => plan_downsample_command(downsample, json),
         PlanCommand::Upsample(upsample) => plan_upsample_command(upsample, json),
+        PlanCommand::Hilbert(hilbert) => plan_hilbert_command(hilbert, json),
+        PlanCommand::Loudness(loudness) => plan_loudness_command(loudness, json),
+        PlanCommand::Dither(dither) => plan_dither_command(dither, json),
+        PlanCommand::Reverb(reverb) => plan_reverb_command(reverb, json),
+        PlanCommand::Stretch(stretch) => plan_stretch_command(stretch, json),
         PlanCommand::Render(_) | PlanCommand::Pipe(_) => {
             unreachable!("render and pipe are handled before recipe planning")
         }
@@ -681,6 +687,123 @@ fn plan_upsample_command(upsample: UpsampleArgs, json: bool) -> Result<(), CliEr
         input,
         output,
         ["upsample", factor.as_str()],
+        json,
+    )
+}
+
+fn plan_hilbert_command(hilbert: HilbertArgs, json: bool) -> Result<(), CliError> {
+    let HilbertArgs {
+        input,
+        taps,
+        output,
+        backend: _,
+    } = hilbert;
+    let tokens = hilbert_effect_tokens(taps.as_deref());
+    plan_recipe_command(
+        "hilbert",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_loudness_command(loudness: LoudnessArgs, json: bool) -> Result<(), CliError> {
+    let LoudnessArgs {
+        input,
+        gain,
+        reference,
+        half_points,
+        output,
+        backend: _,
+    } = loudness;
+    plan_recipe_command(
+        "loudness",
+        input,
+        output,
+        [
+            "loudness",
+            gain.as_str(),
+            reference.as_str(),
+            half_points.as_str(),
+        ],
+        json,
+    )
+}
+
+fn plan_dither_command(dither: DitherArgs, json: bool) -> Result<(), CliError> {
+    let DitherArgs {
+        input,
+        sloped,
+        noise_shape,
+        precision,
+        output,
+        backend: _,
+    } = dither;
+    let tokens = dither_effect_tokens(sloped, noise_shape.as_deref(), &precision);
+    plan_recipe_command(
+        "dither",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_reverb_command(reverb: ReverbArgs, json: bool) -> Result<(), CliError> {
+    let ReverbArgs {
+        input,
+        wet_only,
+        reverberance,
+        hf_damping,
+        room_scale,
+        stereo_depth,
+        pre_delay,
+        wet_gain,
+        output,
+        backend: _,
+    } = reverb;
+    let tokens = reverb_effect_tokens(
+        wet_only,
+        &reverberance,
+        &hf_damping,
+        &room_scale,
+        &stereo_depth,
+        &pre_delay,
+        &wet_gain,
+    );
+    plan_recipe_command(
+        "reverb",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_stretch_command(stretch: StretchArgs, json: bool) -> Result<(), CliError> {
+    let StretchArgs {
+        input,
+        factor,
+        window,
+        fade,
+        shift,
+        fading,
+        output,
+        backend: _,
+    } = stretch;
+    let tokens = stretch_effect_tokens(StretchRecipeOptions {
+        factor: &factor,
+        window: &window,
+        fade: &fade,
+        shift: shift.as_deref(),
+        fading: fading.as_deref(),
+    });
+    plan_recipe_command(
+        "stretch",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
         json,
     )
 }

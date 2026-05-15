@@ -9,9 +9,9 @@ use crate::{
         SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     recipe_args::{
-        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DownsampleArgs, EqualizerArgs,
-        FadeArgs, PadArgs, PitchArgs, PoleFilterArgs, RepeatArgs, TempoArgs, TrebleArgs,
-        UpsampleArgs,
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DitherArgs, DownsampleArgs,
+        EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, PadArgs, PitchArgs, PoleFilterArgs,
+        RepeatArgs, ReverbArgs, StretchArgs, TempoArgs, TrebleArgs, UpsampleArgs,
     },
 };
 
@@ -132,4 +132,14 @@ pub(crate) enum PlanCommand {
     Downsample(DownsampleArgs),
     /// Plan an upsample recipe command without executing it.
     Upsample(UpsampleArgs),
+    /// Plan a hilbert recipe command without executing it.
+    Hilbert(HilbertArgs),
+    /// Plan a loudness recipe command without executing it.
+    Loudness(LoudnessArgs),
+    /// Plan a dither recipe command without executing it.
+    Dither(DitherArgs),
+    /// Plan a reverb recipe command without executing it.
+    Reverb(ReverbArgs),
+    /// Plan a stretch recipe command without executing it.
+    Stretch(StretchArgs),
 }
