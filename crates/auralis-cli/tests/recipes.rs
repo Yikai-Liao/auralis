@@ -610,6 +610,32 @@ fn structural_recipes_lower_to_typed_render_effects() {
     }
 }
 
+#[test]
+fn fir_and_quantization_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        ("hilbert", vec!["--taps", "5"], "hilbert -n 5"),
+        (
+            "loudness",
+            vec!["--gain", "-6", "--reference", "70", "--half-points", "127"],
+            "loudness -6 70 127",
+        ),
+        (
+            "dither",
+            vec!["--sloped", "--precision", "12"],
+            "dither -S -p 12",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[1000, -2000, 3000, -4000, 5000, -6000],
+        );
+    }
+}
+
 fn assert_recipe_with_args_matches_render_effect(
     effect: &str,
     recipe_args: &[&str],

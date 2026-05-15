@@ -53,6 +53,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("repeat"), "{stdout}");
     assert!(stdout.contains("downsample"), "{stdout}");
     assert!(stdout.contains("upsample"), "{stdout}");
+    assert!(stdout.contains("hilbert"), "{stdout}");
+    assert!(stdout.contains("loudness"), "{stdout}");
+    assert!(stdout.contains("dither"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -113,6 +116,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'repeat:repeat'"), "{stdout}");
     assert!(stdout.contains("'downsample:downsample'"), "{stdout}");
     assert!(stdout.contains("'upsample:upsample'"), "{stdout}");
+    assert!(stdout.contains("'hilbert:hilbert'"), "{stdout}");
+    assert!(stdout.contains("'loudness:loudness'"), "{stdout}");
+    assert!(stdout.contains("'dither:dither'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
     assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
@@ -134,15 +140,9 @@ fn fish_completions_include_modern_commands_and_flags() {
 
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let stdout = stdout(&output);
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'ops'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'trim'"),
-        "{stdout}"
-    );
     for command in [
+        "ops",
+        "trim",
         "gain",
         "reverse",
         "deemph",
@@ -180,6 +180,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         "repeat",
         "downsample",
         "upsample",
+        "hilbert",
+        "loudness",
+        "dither",
         "mix",
         "concat",
         "mix-power",
@@ -216,6 +219,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("check", "locked"),
         ("delay", "position"),
         ("pad", "at"),
+        ("hilbert", "taps"),
+        ("loudness", "half-points"),
+        ("dither", "noise-shape"),
         ("render", "chain"),
     ] {
         assert!(

@@ -489,6 +489,24 @@ fn structural_man_pages_describe_recipe_lowering() {
             "render --fx 'upsample ...'",
             "FACTOR",
         ),
+        (
+            "hilbert",
+            "hilbert - apply Hilbert transform",
+            "render --fx 'hilbert ...'",
+            "--taps TAPS",
+        ),
+        (
+            "loudness",
+            "loudness - apply loudness compensation",
+            "render --fx 'loudness ...'",
+            "--half-points N",
+        ),
+        (
+            "dither",
+            "dither - apply deterministic dithering",
+            "render --fx 'dither ...'",
+            "--precision BITS",
+        ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
             .args(["man", topic])

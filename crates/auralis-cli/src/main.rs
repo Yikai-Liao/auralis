@@ -1159,6 +1159,86 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Apply Hilbert transform phase shifting.
+    Hilbert {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Optional odd FIR tap count.
+        #[arg(long, value_name = "TAPS")]
+        taps: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply loudness compensation filtering.
+    Loudness {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Gain in dB.
+        #[arg(
+            long,
+            value_name = "DB",
+            default_value = "-10",
+            allow_hyphen_values = true
+        )]
+        gain: String,
+
+        /// Reference level in dB.
+        #[arg(
+            long,
+            value_name = "DB",
+            default_value = "65",
+            allow_hyphen_values = true
+        )]
+        reference: String,
+
+        /// Number of FIR half-points.
+        #[arg(long, value_name = "N", default_value = "1023")]
+        half_points: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply deterministic dithering.
+    Dither {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Use sloped TPDF dither.
+        #[arg(long)]
+        sloped: bool,
+
+        /// Noise-shaping filter to apply.
+        #[arg(long = "noise-shape", value_name = "SHAPE", value_parser = ["shibata"])]
+        noise_shape: Option<String>,
+
+        /// Target precision in bits.
+        #[arg(long, value_name = "BITS", default_value = "16")]
+        precision: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Mix two or more audio files into one output.
     Mix {
         /// PCM16 WAV input files to mix.
@@ -1904,6 +1984,45 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["upsample", factor.as_str()]),
+        Command::Hilbert {
+            input,
+            taps,
+            output,
+            backend,
+        } => run_hilbert_recipe(&input, taps.as_deref(), &output, backend),
+        Command::Loudness {
+            input,
+            gain,
+            reference,
+            half_points,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            [
+                "loudness",
+                gain.as_str(),
+                reference.as_str(),
+                half_points.as_str(),
+            ],
+        ),
+        Command::Dither {
+            input,
+            sloped,
+            noise_shape,
+            precision,
+            output,
+            backend,
+        } => run_dither_recipe(
+            &input,
+            sloped,
+            noise_shape.as_deref(),
+            &precision,
+            &output,
+            backend,
+        ),
         Command::Mix {
             inputs,
             output,
@@ -2445,6 +2564,51 @@ fn run_bandpass_recipe(
     }
     effect_chain.push(frequency.to_owned());
     effect_chain.push(width.to_owned());
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_hilbert_recipe(
+    input: &Path,
+    taps: Option<&str>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["hilbert".to_owned()];
+    if let Some(taps) = taps {
+        effect_chain.push("-n".to_owned());
+        effect_chain.push(taps.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_dither_recipe(
+    input: &Path,
+    sloped: bool,
+    noise_shape: Option<&str>,
+    precision: &str,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["dither".to_owned()];
+    if let Some("shibata") = noise_shape {
+        effect_chain.push("-s".to_owned());
+    } else if sloped {
+        effect_chain.push("-S".to_owned());
+    }
+    effect_chain.push("-p".to_owned());
+    effect_chain.push(precision.to_owned());
 
     run_effect_recipe(
         input,
@@ -3296,6 +3460,32 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "hilbert",
+        options: &["-o", "--output", "--taps", "--backend"],
+    },
+    CompletionSpec {
+        name: "loudness",
+        options: &[
+            "-o",
+            "--output",
+            "--gain",
+            "--reference",
+            "--half-points",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "dither",
+        options: &[
+            "-o",
+            "--output",
+            "--sloped",
+            "--noise-shape",
+            "--precision",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "mix",
         options: &["-o", "--output", "--backend"],
     },
@@ -3428,6 +3618,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("repeat", "Append finite copies."),
             ("downsample", "Keep every Nth sample."),
             ("upsample", "Insert zero samples between input samples."),
+            ("hilbert", "Apply Hilbert transform phase shifting."),
+            ("loudness", "Apply loudness compensation filtering."),
+            ("dither", "Apply deterministic dithering."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
             (
@@ -4018,6 +4211,43 @@ const MAN_PAGES: &[ManPage] = &[
         description: "Upsample is a recipe alias for inserting zero samples between input samples. It lowers to the same typed effect pipeline as `render --fx 'upsample ...'`.",
         options: &[
             ("FACTOR", "Integer upsample factor."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "hilbert",
+        summary: "apply Hilbert transform",
+        synopsis: "auralis hilbert INPUT.wav [--taps TAPS] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Hilbert is a recipe alias for phase shifting with a Hilbert transform FIR. It lowers to the same typed effect pipeline as `render --fx 'hilbert ...'`.",
+        options: &[
+            ("--taps TAPS", "Optional odd FIR tap count."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "loudness",
+        summary: "apply loudness compensation",
+        synopsis: "auralis loudness INPUT.wav [--gain DB] [--reference DB] [--half-points N] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Loudness is a recipe alias for loudness compensation filtering. It lowers to the same typed effect pipeline as `render --fx 'loudness ...'`.",
+        options: &[
+            ("--gain DB", "Gain in dB."),
+            ("--reference DB", "Reference level in dB."),
+            ("--half-points N", "Number of FIR half-points."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "dither",
+        summary: "apply deterministic dithering",
+        synopsis: "auralis dither INPUT.wav [--sloped] [--noise-shape shibata] [--precision BITS] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Dither is a recipe alias for deterministic dither processing. It lowers to the same typed effect pipeline as `render --fx 'dither ...'`.",
+        options: &[
+            ("--sloped", "Use sloped TPDF dither."),
+            ("--noise-shape SHAPE", "Noise-shaping filter: shibata."),
+            ("--precision BITS", "Target precision in bits."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
