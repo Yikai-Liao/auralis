@@ -21,6 +21,8 @@ pub fn lower_graph_effect_tokens(
         "bandpass" => lower_bandpass_tokens(params),
         "bandreject" => lower_ordered_tokens("bandreject", params, &["frequency", "width"]),
         "bass" => lower_ordered_tokens("bass", params, &["gain", "frequency", "width"]),
+        "biquad" => lower_ordered_tokens("biquad", params, &["b0", "b1", "b2", "a0", "a1", "a2"]),
+        "channels" => lower_ordered_tokens("channels", params, &["count"]),
         "chorus" => lower_chorus_tokens(params),
         "contrast" => lower_ordered_tokens("contrast", params, &["amount"]),
         "dcshift" => lower_ordered_tokens("dcshift", params, &["shift", "limiter_gain"]),
@@ -60,6 +62,8 @@ pub fn lower_graph_effect_tokens(
         }
         "filter.lowpass" | "lowpass" => lower_pole_filter_tokens("lowpass", params),
         "filter.highpass" | "highpass" => lower_pole_filter_tokens("highpass", params),
+        "fir" => lower_source_or_repeated_tokens("fir", params, "source", "coefficients"),
+        "firfit" => lower_source_or_repeated_tokens("firfit", params, "source", "knots"),
         "flanger" => lower_flanger_tokens(params),
         "hilbert" => lower_flagged_value_tokens("hilbert", params, "taps", "-n"),
         "loudness" => {
@@ -74,6 +78,7 @@ pub fn lower_graph_effect_tokens(
         "overdrive" => lower_ordered_tokens("overdrive", params, &["gain", "color"]),
         "pad" => lower_pad_tokens(params),
         "pitch" => lower_pitch_tokens(params),
+        "rate" => lower_rate_tokens(params),
         "repeat" => lower_ordered_tokens("repeat", params, &["count"]),
         "reverb" => lower_reverb_tokens(params),
         "remix" => lower_remix_tokens(params),
@@ -103,6 +108,21 @@ pub fn lower_graph_effect_tokens(
         "vol" => lower_ordered_tokens("vol", params, &["gain", "type", "limiter_gain"]),
         _ => Ok(vec![op.to_owned()]),
     }
+}
+
+fn lower_source_or_repeated_tokens(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+    source_param: &'static str,
+    repeated_param: &'static str,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec![op.to_owned()];
+    if let Some(source) = params.get(source_param) {
+        tokens.push(param_as_string(source, source_param)?);
+    } else if let Some(values) = params.get(repeated_param) {
+        tokens.extend(param_as_string_array(values, repeated_param)?);
+    }
+    Ok(tokens)
 }
 
 fn lower_ordered_tokens(
@@ -500,6 +520,23 @@ fn lower_remix_tokens(
     Ok(tokens)
 }
 
+fn lower_rate_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let Some(frequency) = params
+        .get("frequency")
+        .or_else(|| params.get("sample_rate"))
+    else {
+        return Ok(vec!["rate".to_owned()]);
+    };
+    let mut tokens = vec!["rate".to_owned()];
+    if let Some(quality) = params.get("quality") {
+        tokens.push(rate_quality_flag(param_as_string(quality, "quality")?));
+    }
+    tokens.push(param_as_string(frequency, "frequency")?);
+    Ok(tokens)
+}
+
 fn lower_stat_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -686,6 +723,20 @@ fn profile_token(value: String) -> String {
         "music" => "-m".to_owned(),
         "speech" => "-s".to_owned(),
         "linear" => "-l".to_owned(),
+        _ => value,
+    }
+}
+
+fn rate_quality_flag(value: String) -> String {
+    match value.as_str() {
+        "quick" | "q" => "-q".to_owned(),
+        "low" | "l" => "-l".to_owned(),
+        "medium" | "m" => "-m".to_owned(),
+        "generic" | "g" => "-g".to_owned(),
+        "high" | "h" => "-h".to_owned(),
+        "extreme" | "e" => "-e".to_owned(),
+        "very_high" | "very-high" | "v" => "-v".to_owned(),
+        "ultra" | "u" => "-u".to_owned(),
         _ => value,
     }
 }

@@ -257,6 +257,21 @@ stages = [
 fn graph_nodes_lower_named_resampling_and_repeat_parameters() {
     let samples = &[1000, 2000, 3000, 4000, 5000, 6000];
 
+    assert_graph_node_matches_render(
+        "channels",
+        samples,
+        "channels",
+        r#"count = "2""#,
+        "channels 2",
+    );
+    assert_graph_node_matches_render(
+        "rate",
+        samples,
+        "rate",
+        r#"quality = "quick"
+frequency = "24000""#,
+        "rate -q 24000",
+    );
     assert_graph_node_matches_render("repeat", samples, "repeat", r#"count = "1""#, "repeat 1");
     assert_graph_node_matches_render(
         "downsample",
@@ -321,6 +336,38 @@ taps = "11"
 round_taps = true
 range = "1000-4000""#,
         "sinc -b 8 -n 11 -r 1000-4000",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_direct_filter_parameters() {
+    let samples = &[1000, -2000, 3000, -4000, 5000, -6000, 7000, -8000];
+
+    assert_graph_node_matches_render(
+        "biquad",
+        samples,
+        "biquad",
+        r#"b0 = "0.5"
+b1 = "0"
+b2 = "0"
+a0 = "1"
+a1 = "-0.5"
+a2 = "0""#,
+        "biquad 0.5 0 0 1 -0.5 0",
+    );
+    assert_graph_node_matches_render(
+        "fir",
+        samples,
+        "fir",
+        r#"coefficients = ["0.25", "0.5", "0.25"]"#,
+        "fir 0.25 0.5 0.25",
+    );
+    assert_graph_node_matches_render(
+        "firfit",
+        samples,
+        "firfit",
+        r#"knots = ["20", "0", "10000", "0"]"#,
+        "firfit 20 0 10000 0",
     );
 }
 
