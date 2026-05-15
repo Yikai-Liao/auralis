@@ -6,10 +6,10 @@ use auralis::AudioFile;
 use support::*;
 
 #[test]
-fn run_gain_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-gain-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-gain-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-gain-library-output", "wav");
+fn render_gain_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-gain-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-gain-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-gain-library-output", "wav");
     write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
 
     AudioFile::open_wav(&input)
@@ -21,11 +21,12 @@ fn run_gain_output_matches_library_pipeline() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--gain-db",
-            "-6",
+            "--fx",
+            "gain -6",
         ])
         .output()
         .unwrap();
@@ -43,10 +44,10 @@ fn run_gain_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_gain_output_matches_under_forced_scalar_and_requested_simd() {
-    let input = temp_path("auralis-cli-run-gain-backend-input", "wav");
-    let scalar_output = temp_path("auralis-cli-run-gain-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-gain-simd-output", "wav");
+fn render_gain_output_matches_under_forced_scalar_and_requested_simd() {
+    let input = temp_path("auralis-cli-render-gain-backend-input", "wav");
+    let scalar_output = temp_path("auralis-cli-render-gain-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-gain-simd-output", "wav");
     write_pcm16_wav(
         &input,
         1,
@@ -65,25 +66,27 @@ fn run_gain_output_matches_under_forced_scalar_and_requested_simd() {
 
     let scalar_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
-            "--gain-db",
-            "-3",
+            "--fx",
+            "gain -3",
         ])
         .output()
         .unwrap();
     let simd_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
-            "--gain-db",
-            "-3",
+            "--fx",
+            "gain -3",
         ])
         .output()
         .unwrap();
@@ -106,10 +109,10 @@ fn run_gain_output_matches_under_forced_scalar_and_requested_simd() {
 }
 
 #[test]
-fn run_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
-    let input = temp_path("auralis-cli-run-dc-shift-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-dc-shift-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-dc-shift-library-output", "wav");
+fn render_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
+    let input = temp_path("auralis-cli-render-dc-shift-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-dc-shift-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-dc-shift-library-output", "wav");
     write_pcm16_wav(&input, 2, &[-32768, 0, 8192, 30_000]);
 
     AudioFile::open_wav(&input)
@@ -121,11 +124,12 @@ fn run_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--dc-shift",
-            "0.25",
+            "--fx",
+            "dcshift 0.25",
         ])
         .output()
         .unwrap();
@@ -147,10 +151,10 @@ fn run_dc_shift_output_matches_library_pipeline_and_clips_at_wav_boundary() {
 }
 
 #[test]
-fn run_dc_shift_output_matches_under_forced_scalar_and_requested_simd() {
-    let input = temp_path("auralis-cli-run-dc-shift-backend-input", "wav");
-    let scalar_output = temp_path("auralis-cli-run-dc-shift-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-dc-shift-simd-output", "wav");
+fn render_dc_shift_output_matches_under_forced_scalar_and_requested_simd() {
+    let input = temp_path("auralis-cli-render-dc-shift-backend-input", "wav");
+    let scalar_output = temp_path("auralis-cli-render-dc-shift-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-dc-shift-simd-output", "wav");
     write_pcm16_wav(
         &input,
         1,
@@ -169,25 +173,27 @@ fn run_dc_shift_output_matches_under_forced_scalar_and_requested_simd() {
 
     let scalar_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
-            "--dc-shift",
-            "0.125",
+            "--fx",
+            "dcshift 0.125",
         ])
         .output()
         .unwrap();
     let simd_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
-            "--dc-shift",
-            "0.125",
+            "--fx",
+            "dcshift 0.125",
         ])
         .output()
         .unwrap();
@@ -210,10 +216,10 @@ fn run_dc_shift_output_matches_under_forced_scalar_and_requested_simd() {
 }
 
 #[test]
-fn run_trim_frames_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-trim-frame-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-trim-frame-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-trim-frame-library-output", "wav");
+fn render_trim_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-trim-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-trim-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-trim-frame-library-output", "wav");
     write_pcm16_wav(
         &input,
         2,
@@ -229,13 +235,12 @@ fn run_trim_frames_output_matches_library_pipeline() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--trim-start-frame",
-            "1",
-            "--trim-end-frame",
-            "3",
+            "--fx",
+            "trim 1 =3",
         ])
         .output()
         .unwrap();
@@ -257,10 +262,10 @@ fn run_trim_frames_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_trim_seconds_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-trim-seconds-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-trim-seconds-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-trim-seconds-library-output", "wav");
+fn render_trim_seconds_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-trim-seconds-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-trim-seconds-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-trim-seconds-library-output", "wav");
     write_pcm16_wav(&input, 1, &[-1000, -500, 0, 500, 1000]);
 
     AudioFile::open_wav(&input)
@@ -272,13 +277,12 @@ fn run_trim_seconds_output_matches_library_pipeline() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--trim-start-seconds",
-            "0.000020833333333333333",
-            "--trim-end-seconds",
-            "0.000083333333333333333",
+            "--fx",
+            "trim 1 =4",
         ])
         .output()
         .unwrap();
@@ -297,10 +301,10 @@ fn run_trim_seconds_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_pad_frames_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-pad-frame-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-pad-frame-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-pad-frame-library-output", "wav");
+fn render_pad_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-pad-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-pad-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-pad-frame-library-output", "wav");
     write_pcm16_wav(&input, 2, &[-1000, 1000, -2000, 2000]);
 
     AudioFile::open_wav(&input)
@@ -312,13 +316,12 @@ fn run_pad_frames_output_matches_library_pipeline() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--pad-start-frame",
-            "1",
-            "--pad-end-frame",
-            "2",
+            "--fx",
+            "pad 1 2",
         ])
         .output()
         .unwrap();
@@ -340,18 +343,19 @@ fn run_pad_frames_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_single_sided_pad_defaults_other_side_to_zero() {
-    let input = temp_path("auralis-cli-run-pad-single-input", "wav");
-    let output = temp_path("auralis-cli-run-pad-single-output", "wav");
+fn render_single_sided_pad_defaults_other_side_to_zero() {
+    let input = temp_path("auralis-cli-render-pad-single-input", "wav");
+    let output = temp_path("auralis-cli-render-pad-single-output", "wav");
     write_pcm16_wav(&input, 1, &[1000, -1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
-            "--pad-end-frame",
-            "2",
+            "--fx",
+            "pad 0 2",
         ])
         .output()
         .unwrap();
@@ -368,19 +372,20 @@ fn run_single_sided_pad_defaults_other_side_to_zero() {
 }
 
 #[test]
-fn run_guard_attenuates_output_that_would_clip() {
-    let input = temp_path("auralis-cli-run-guard-input", "wav");
-    let output = temp_path("auralis-cli-run-guard-output", "wav");
+fn render_guard_attenuates_output_that_would_clip() {
+    let input = temp_path("auralis-cli-render-guard-input", "wav");
+    let output = temp_path("auralis-cli-render-guard-output", "wav");
     write_pcm16_wav(&input, 1, &[24_576, 8_192]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--guard",
-            "--gain-db",
-            "6",
+            "--fx",
+            "gain 6",
         ])
         .output()
         .unwrap();
@@ -397,15 +402,16 @@ fn run_guard_attenuates_output_that_would_clip() {
 }
 
 #[test]
-fn run_norm_without_value_normalizes_output_to_full_scale() {
-    let input = temp_path("auralis-cli-run-norm-input", "wav");
-    let output = temp_path("auralis-cli-run-norm-output", "wav");
+fn render_norm_without_value_normalizes_output_to_full_scale() {
+    let input = temp_path("auralis-cli-render-norm-input", "wav");
+    let output = temp_path("auralis-cli-render-norm-output", "wav");
     write_pcm16_wav(&input, 1, &[8_192, -16_384]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--norm",
         ])
@@ -424,15 +430,16 @@ fn run_norm_without_value_normalizes_output_to_full_scale() {
 }
 
 #[test]
-fn run_rejects_mixed_guard_and_norm() {
-    let input = temp_path("auralis-cli-run-mixed-guard-norm-input", "wav");
-    let output = temp_path("auralis-cli-run-mixed-guard-norm-output", "wav");
+fn render_rejects_mixed_guard_and_norm() {
+    let input = temp_path("auralis-cli-render-mixed-guard-norm-input", "wav");
+    let output = temp_path("auralis-cli-render-mixed-guard-norm-output", "wav");
     write_pcm16_wav(&input, 1, &[0]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--guard",
             "--norm",
@@ -451,10 +458,10 @@ fn run_rejects_mixed_guard_and_norm() {
 }
 
 #[test]
-fn run_reverse_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-reverse-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-reverse-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-reverse-library-output", "wav");
+fn render_reverse_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-reverse-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-reverse-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-reverse-library-output", "wav");
     write_pcm16_wav(&input, 2, &[-1000, 1000, -2000, 2000, -3000, 3000]);
 
     AudioFile::open_wav(&input)
@@ -466,10 +473,12 @@ fn run_reverse_output_matches_library_pipeline() {
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--reverse",
+            "--fx",
+            "reverse",
         ])
         .output()
         .unwrap();
@@ -491,32 +500,33 @@ fn run_reverse_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_fade_frames_output_matches_library_pipeline() {
-    let input = temp_path("auralis-cli-run-fade-frame-input", "wav");
-    let cli_output = temp_path("auralis-cli-run-fade-frame-cli-output", "wav");
-    let library_output = temp_path("auralis-cli-run-fade-frame-library-output", "wav");
+fn render_fade_frames_output_matches_library_pipeline() {
+    let input = temp_path("auralis-cli-render-fade-frame-input", "wav");
+    let cli_output = temp_path("auralis-cli-render-fade-frame-cli-output", "wav");
+    let library_output = temp_path("auralis-cli-render-fade-frame-library-output", "wav");
     write_pcm16_wav(
         &input,
         2,
         &[-10000, 10000, -20000, 20000, -30000, 30000, -4000, 4000],
     );
 
+    let chain_tokens = ["fade", "t", "2", "4", "2"];
+    let chain = auralis::parse_effect_chain(&chain_tokens).unwrap();
     AudioFile::open_wav(&input)
         .unwrap()
         .into_pipeline()
-        .fade_frames(2, 2)
+        .apply_effect_chain(&chain)
         .write_wav(&library_output)
         .unwrap();
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             cli_output.to_str().unwrap(),
-            "--fade-in-frame",
-            "2",
-            "--fade-out-frame",
-            "2",
+            "--fx",
+            "fade t 2 4 2",
         ])
         .output()
         .unwrap();
@@ -529,7 +539,7 @@ fn run_fade_frames_output_matches_library_pipeline() {
     assert_eq!(read_pcm16_wav(&cli_output), read_pcm16_wav(&library_output));
     assert_eq!(
         read_pcm16_wav(&cli_output),
-        (2, vec![0, 0, -10000, 10000, -15000, 15000, 0, 0])
+        (2, vec![0, 0, -10000, 10000, -30000, 30000, -2000, 2000])
     );
 
     fs::remove_file(input).unwrap();
@@ -538,10 +548,10 @@ fn run_fade_frames_output_matches_library_pipeline() {
 }
 
 #[test]
-fn run_fade_frames_output_matches_under_forced_scalar_and_requested_simd() {
-    let input = temp_path("auralis-cli-run-fade-frame-backend-input", "wav");
-    let scalar_output = temp_path("auralis-cli-run-fade-frame-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-fade-frame-simd-output", "wav");
+fn render_fade_frames_output_matches_under_forced_scalar_and_requested_simd() {
+    let input = temp_path("auralis-cli-render-fade-frame-backend-input", "wav");
+    let scalar_output = temp_path("auralis-cli-render-fade-frame-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-fade-frame-simd-output", "wav");
     write_pcm16_wav(
         &input,
         2,
@@ -553,29 +563,27 @@ fn run_fade_frames_output_matches_under_forced_scalar_and_requested_simd() {
 
     let scalar_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
-            "--fade-in-frame",
-            "5",
-            "--fade-out-frame",
-            "7",
+            "--fx",
+            "fade t 2 8 2",
         ])
         .output()
         .unwrap();
     let simd_command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
-            "--fade-in-frame",
-            "5",
-            "--fade-out-frame",
-            "7",
+            "--fx",
+            "fade t 2 8 2",
         ])
         .output()
         .unwrap();
