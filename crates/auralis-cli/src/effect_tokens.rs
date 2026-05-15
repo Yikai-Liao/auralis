@@ -110,6 +110,7 @@ fn lower_graph_effect_tokens_m_to_z(
 ) -> Result<Vec<String>, EffectTokenError> {
     match op {
         "mcompand" => lower_mcompand_tokens(params),
+        "noisered" => lower_ordered_tokens("noisered", params, &["profile", "amount"]),
         "norm.peak" => {
             let Some(target) = params.get("target") else {
                 return Ok(vec!["norm".to_owned()]);

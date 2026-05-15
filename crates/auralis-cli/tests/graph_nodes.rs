@@ -101,6 +101,17 @@ path = "{}"
     let _ = fs::remove_file(&render_output);
 }
 
+fn noise_profile_text(channels: u16) -> String {
+    use std::fmt::Write as _;
+
+    let bins = vec!["0.000000"; 1025].join(", ");
+    let mut text = String::new();
+    for channel in 0..channels {
+        writeln!(&mut text, "Channel {channel}: {bins}").unwrap();
+    }
+    text
+}
+
 #[test]
 fn graph_nodes_lower_named_tone_filter_parameters() {
     let samples = &[1000, -2000, 3000, -4000, 5000, -6000, 7000, -8000];
@@ -246,6 +257,27 @@ parameter = "0.25""#,
 depth = "50""#,
         "tremolo 5 50",
     );
+}
+
+#[test]
+fn graph_nodes_lower_named_noise_reduction_parameters() {
+    let samples = &[1000; 4096];
+    let profile = temp_path("auralis-cli-graph-node-noisered-profile", "prof");
+    fs::write(&profile, noise_profile_text(1)).unwrap();
+
+    assert_graph_node_matches_render(
+        "noisered",
+        samples,
+        "noisered",
+        &format!(
+            r#"profile = "{}"
+amount = "0.25""#,
+            profile.display()
+        ),
+        &format!("noisered {} 0.25", profile.display()),
+    );
+
+    let _ = fs::remove_file(&profile);
 }
 
 #[test]
