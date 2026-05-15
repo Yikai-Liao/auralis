@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::effect_tokens;
 use serde::{Deserialize, Serialize};
 
 const LOCK_VERSION: &str = "auralis.lock/v1";
@@ -460,186 +461,14 @@ fn chain_step_effect_tokens(
     index: usize,
     step: &ChainStepSpec,
 ) -> Result<Vec<String>, GraphSpecError> {
-    match step.op.as_str() {
-        "dcshift" => {
-            let shift = param_as_string(step.params.get("shift").ok_or_else(|| {
-                GraphSpecError::InvalidStepParam {
-                    chain_id: chain.id.clone(),
-                    index,
-                    op: step.op.clone(),
-                    param: "shift",
-                }
-            })?)
-            .ok_or_else(|| GraphSpecError::InvalidStepParam {
-                chain_id: chain.id.clone(),
-                index,
-                op: step.op.clone(),
-                param: "shift",
-            })?;
-            Ok(vec![step.op.clone(), shift])
-        }
-        "gain" => {
-            let Some(by) = step.params.get("by") else {
-                return Ok(vec![step.op.clone()]);
-            };
-            let by = param_as_string(by).ok_or_else(|| GraphSpecError::InvalidStepParam {
-                chain_id: chain.id.clone(),
-                index,
-                op: step.op.clone(),
-                param: "by",
-            })?;
-            Ok(vec![step.op.clone(), by])
-        }
-        "fade" => {
-            let Some(fade_in) = step.params.get("fade_in") else {
-                return Ok(vec![step.op.clone()]);
-            };
-            let fade_in =
-                param_as_string(fade_in).ok_or_else(|| GraphSpecError::InvalidStepParam {
-                    chain_id: chain.id.clone(),
-                    index,
-                    op: step.op.clone(),
-                    param: "fade_in",
-                })?;
-            let curve = step
-                .params
-                .get("curve")
-                .map(|value| {
-                    param_as_string(value).ok_or_else(|| GraphSpecError::InvalidStepParam {
-                        chain_id: chain.id.clone(),
-                        index,
-                        op: step.op.clone(),
-                        param: "curve",
-                    })
-                })
-                .transpose()?
-                .map_or_else(|| "l".to_owned(), fade_curve_token);
-            let Some(fade_out) = step.params.get("fade_out") else {
-                return Ok(vec![step.op.clone(), curve, fade_in]);
-            };
-            let fade_out =
-                param_as_string(fade_out).ok_or_else(|| GraphSpecError::InvalidStepParam {
-                    chain_id: chain.id.clone(),
-                    index,
-                    op: step.op.clone(),
-                    param: "fade_out",
-                })?;
-            Ok(vec![
-                step.op.clone(),
-                curve,
-                fade_in,
-                "0".to_owned(),
-                fade_out,
-            ])
-        }
-        "filter.highpass" => highpass_effect_tokens(chain, index, step),
-        "norm.peak" => norm_peak_effect_tokens(chain, index, step),
-        "trim" => {
-            let Some(range) = step.params.get("range") else {
-                return Ok(vec![step.op.clone()]);
-            };
-            let range = param_as_string(range).ok_or_else(|| GraphSpecError::InvalidStepParam {
-                chain_id: chain.id.clone(),
-                index,
-                op: step.op.clone(),
-                param: "range",
-            })?;
-            let Some((start, end)) = range.split_once("..") else {
-                return Err(GraphSpecError::InvalidStepParam {
-                    chain_id: chain.id.clone(),
-                    index,
-                    op: step.op.clone(),
-                    param: "range",
-                });
-            };
-            Ok(vec![step.op.clone(), start.to_owned(), format!("={end}")])
-        }
-        _ => Ok(vec![step.op.clone()]),
-    }
-}
-
-fn highpass_effect_tokens(
-    chain: &ChainSpec,
-    index: usize,
-    step: &ChainStepSpec,
-) -> Result<Vec<String>, GraphSpecError> {
-    let Some(cutoff) = step.params.get("cutoff") else {
-        return Ok(vec![step.op.clone()]);
-    };
-    let cutoff = param_as_frequency_hz(cutoff).ok_or_else(|| GraphSpecError::InvalidStepParam {
-        chain_id: chain.id.clone(),
-        index,
-        op: step.op.clone(),
-        param: "cutoff",
-    })?;
-    let mut tokens = vec!["highpass".to_owned(), cutoff];
-    if let Some(q) = step.params.get("q") {
-        let q = param_as_string(q).ok_or_else(|| GraphSpecError::InvalidStepParam {
+    effect_tokens::lower_graph_effect_tokens(&step.op, &step.params).map_err(|error| {
+        GraphSpecError::InvalidStepParam {
             chain_id: chain.id.clone(),
             index,
             op: step.op.clone(),
-            param: "q",
-        })?;
-        tokens.push(format!("{q}q"));
-    }
-    Ok(tokens)
-}
-
-fn norm_peak_effect_tokens(
-    chain: &ChainSpec,
-    index: usize,
-    step: &ChainStepSpec,
-) -> Result<Vec<String>, GraphSpecError> {
-    let Some(target) = step.params.get("target") else {
-        return Ok(vec!["norm".to_owned()]);
-    };
-    let target = param_as_dbfs(target).ok_or_else(|| GraphSpecError::InvalidStepParam {
-        chain_id: chain.id.clone(),
-        index,
-        op: step.op.clone(),
-        param: "target",
-    })?;
-    Ok(vec!["norm".to_owned(), target])
-}
-
-fn param_as_frequency_hz(value: &toml::Value) -> Option<String> {
-    let value = param_as_string(value)?;
-    let value = value
-        .strip_suffix("Hz")
-        .or_else(|| value.strip_suffix("hz"))
-        .unwrap_or(&value);
-    Some(value.to_owned())
-}
-
-fn param_as_dbfs(value: &toml::Value) -> Option<String> {
-    let value = param_as_string(value)?;
-    let value = value
-        .strip_suffix("dBFS")
-        .or_else(|| value.strip_suffix("dbfs"))
-        .or_else(|| value.strip_suffix("dB"))
-        .or_else(|| value.strip_suffix("db"))
-        .unwrap_or(&value);
-    Some(value.to_owned())
-}
-
-fn fade_curve_token(value: String) -> String {
-    match value.as_str() {
-        "linear" => "t".to_owned(),
-        "logarithmic" => "l".to_owned(),
-        "quarter-sine" => "q".to_owned(),
-        "half-sine" => "h".to_owned(),
-        "inverted-parabola" => "p".to_owned(),
-        _ => value,
-    }
-}
-
-fn param_as_string(value: &toml::Value) -> Option<String> {
-    match value {
-        toml::Value::String(value) => Some(value.clone()),
-        toml::Value::Integer(value) => Some(value.to_string()),
-        toml::Value::Float(value) => Some(value.to_string()),
-        _ => None,
-    }
+            param: error.param(),
+        }
+    })
 }
 
 fn ensure_non_empty_id(id: &str, kind: &'static str) -> Result<(), GraphSpecError> {

@@ -601,13 +601,13 @@ path = "build/out.wav"
     assert!(graph_json.status.success(), "{}", stderr(&graph_json));
     let mermaid_stdout = stdout(&mermaid);
     assert!(
-        mermaid_stdout.contains("quiet[\"gain -6\"]"),
+        mermaid_stdout.contains("quiet[\"gain -6dB\"]"),
         "{mermaid_stdout}"
     );
     let graph: serde_json::Value = serde_json::from_str(&stdout(&graph_json)).unwrap();
     assert_eq!(
         graph["nodes"][1],
-        serde_json::json!({"id": "quiet", "kind": "node", "label": "gain -6"})
+        serde_json::json!({"id": "quiet", "kind": "node", "label": "gain -6dB"})
     );
 }
 
@@ -1019,7 +1019,7 @@ path = "build/out.wav"
     let stdout = stdout(&command_output);
     assert!(stdout.contains("Kind: node"), "{stdout}");
     assert!(stdout.contains("Op:"), "{stdout}");
-    assert!(stdout.contains("gain -6"), "{stdout}");
+    assert!(stdout.contains("gain -6dB"), "{stdout}");
     assert!(stdout.contains("Execution mode:"), "{stdout}");
     assert!(stdout.contains("streaming"), "{stdout}");
 }
@@ -1669,6 +1669,53 @@ path = "{}"
         stderr(&command_output)
     );
     assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -2000, 3000]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_registry_no_parameter_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-reverse", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-reverse-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-reverse-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "reversed"
+op = "reverse"
+input = "voice.audio"
+
+[[sinks]]
+id = "wav"
+input = "reversed.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![3000, -2000, 1000]));
     fs::remove_file(output).unwrap();
 }
 

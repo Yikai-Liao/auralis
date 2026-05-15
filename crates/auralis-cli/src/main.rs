@@ -1,5 +1,6 @@
 //! Auralis command-line entrypoint.
 
+mod effect_tokens;
 mod spec;
 
 use std::{
@@ -5365,47 +5366,6 @@ fn classify_node_plan_mode(node: &spec::CheckedNode) -> (PlanStepMode, &'static 
     }
 }
 
-fn param_as_string(value: &toml::Value) -> Option<String> {
-    match value {
-        toml::Value::String(value) => Some(value.clone()),
-        toml::Value::Integer(value) => Some(value.to_string()),
-        toml::Value::Float(value) => Some(value.to_string()),
-        _ => None,
-    }
-}
-
-fn strip_db_suffix(value: &str) -> String {
-    value
-        .strip_suffix("dBFS")
-        .or_else(|| value.strip_suffix("dbfs"))
-        .or_else(|| value.strip_suffix("dB"))
-        .or_else(|| value.strip_suffix("db"))
-        .unwrap_or(value)
-        .to_owned()
-}
-
-fn param_as_frequency_hz(value: &toml::Value) -> Option<String> {
-    let value = param_as_string(value)?;
-    Some(
-        value
-            .strip_suffix("Hz")
-            .or_else(|| value.strip_suffix("hz"))
-            .unwrap_or(&value)
-            .to_owned(),
-    )
-}
-
-fn fade_curve_token(value: String) -> String {
-    match value.as_str() {
-        "linear" => "t".to_owned(),
-        "logarithmic" => "l".to_owned(),
-        "quarter-sine" => "q".to_owned(),
-        "half-sine" => "h".to_owned(),
-        "inverted-parabola" => "p".to_owned(),
-        _ => value,
-    }
-}
-
 fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
     if locked {
         spec::verify_graph_lock(spec)?;
@@ -5568,116 +5528,29 @@ fn node_effect_tokens(
     op: &str,
     params: &std::collections::BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, CliError> {
-    match op {
-        "gain" => {
-            let Some(by) = params.get("by") else {
-                return Ok(vec!["gain".to_owned()]);
-            };
-            let Some(by) = param_as_string(by) else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `by` must be a string or number".to_owned(),
-                });
-            };
-            Ok(vec!["gain".to_owned(), strip_db_suffix(&by)])
+    let tokens = effect_tokens::lower_graph_effect_tokens(op, params).map_err(|error| {
+        CliError::UnsupportedGraphNodeOp {
+            op: op.to_owned(),
+            reason: format!("parameter `{}` must be a string or number", error.param()),
         }
-        "dcshift" => {
-            let Some(shift) = params.get("shift") else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `shift` is required".to_owned(),
-                });
-            };
-            let Some(shift) = param_as_string(shift) else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `shift` must be a string or number".to_owned(),
-                });
-            };
-            Ok(vec!["dcshift".to_owned(), shift])
+    })?;
+
+    if tokens == [op] {
+        let descriptor =
+            EffectRegistry::resolve(op).map_err(|_| CliError::UnsupportedGraphNodeOp {
+                op: op.to_owned(),
+                reason: "node op is not implemented by the current graph runner".to_owned(),
+            })?;
+        if !params.is_empty() {
+            return Err(CliError::UnsupportedGraphNodeOp {
+                op: op.to_owned(),
+                reason: "named parameters are not implemented for this graph node op".to_owned(),
+            });
         }
-        "trim" => {
-            let Some(range) = params.get("range") else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `range` is required".to_owned(),
-                });
-            };
-            let Some(range) = param_as_string(range) else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `range` must be a string or number".to_owned(),
-                });
-            };
-            let Some((start, end)) = range.split_once("..") else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `range` must use start..end syntax".to_owned(),
-                });
-            };
-            Ok(vec!["trim".to_owned(), start.to_owned(), format!("={end}")])
-        }
-        "fade" => {
-            let Some(fade_in) = params.get("fade_in") else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `fade_in` is required".to_owned(),
-                });
-            };
-            let Some(fade_in) = param_as_string(fade_in) else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `fade_in` must be a string or number".to_owned(),
-                });
-            };
-            let curve = params
-                .get("curve")
-                .and_then(param_as_string)
-                .map_or_else(|| "l".to_owned(), fade_curve_token);
-            let fade_out = params.get("fade_out").and_then(param_as_string);
-            Ok(match fade_out {
-                Some(fade_out) => vec!["fade".to_owned(), curve, fade_in, "0".to_owned(), fade_out],
-                None => vec!["fade".to_owned(), curve, fade_in],
-            })
-        }
-        "filter.highpass" => {
-            let Some(cutoff) = params.get("cutoff") else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `cutoff` is required".to_owned(),
-                });
-            };
-            let Some(cutoff) = param_as_frequency_hz(cutoff) else {
-                return Err(CliError::UnsupportedGraphNodeOp {
-                    op: op.to_owned(),
-                    reason: "parameter `cutoff` must be a string or number".to_owned(),
-                });
-            };
-            let mut tokens = vec!["highpass".to_owned(), cutoff];
-            if let Some(q) = params.get("q") {
-                let Some(q) = param_as_string(q) else {
-                    return Err(CliError::UnsupportedGraphNodeOp {
-                        op: op.to_owned(),
-                        reason: "parameter `q` must be a string or number".to_owned(),
-                    });
-                };
-                tokens.push(format!("{q}q"));
-            }
-            Ok(tokens)
-        }
-        "norm.peak" => {
-            let target = params
-                .get("target")
-                .and_then(param_as_string)
-                .map(|value| strip_db_suffix(&value))
-                .unwrap_or_else(|| "0".to_owned());
-            Ok(vec!["norm".to_owned(), target])
-        }
-        unsupported => Err(CliError::UnsupportedGraphNodeOp {
-            op: unsupported.to_owned(),
-            reason: "node op is not implemented by the current graph runner".to_owned(),
-        }),
+        return Ok(vec![descriptor.canonical_name().to_owned()]);
     }
+
+    Ok(tokens)
 }
 
 fn resolve_spec_path(spec_dir: &Path, path: &Path) -> PathBuf {
