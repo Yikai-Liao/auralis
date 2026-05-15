@@ -348,6 +348,7 @@ fn chain_step_effect_tokens(
                 fade_out,
             ])
         }
+        "filter.highpass" => highpass_effect_tokens(chain, index, step),
         "trim" => {
             let Some(range) = step.params.get("range") else {
                 return Ok(vec![step.op.clone()]);
@@ -370,6 +371,42 @@ fn chain_step_effect_tokens(
         }
         _ => Ok(vec![step.op.clone()]),
     }
+}
+
+fn highpass_effect_tokens(
+    chain: &ChainSpec,
+    index: usize,
+    step: &ChainStepSpec,
+) -> Result<Vec<String>, GraphSpecError> {
+    let Some(cutoff) = step.params.get("cutoff") else {
+        return Ok(vec![step.op.clone()]);
+    };
+    let cutoff = param_as_frequency_hz(cutoff).ok_or_else(|| GraphSpecError::InvalidStepParam {
+        chain_id: chain.id.clone(),
+        index,
+        op: step.op.clone(),
+        param: "cutoff",
+    })?;
+    let mut tokens = vec!["highpass".to_owned(), cutoff];
+    if let Some(q) = step.params.get("q") {
+        let q = param_as_string(q).ok_or_else(|| GraphSpecError::InvalidStepParam {
+            chain_id: chain.id.clone(),
+            index,
+            op: step.op.clone(),
+            param: "q",
+        })?;
+        tokens.push(format!("{q}q"));
+    }
+    Ok(tokens)
+}
+
+fn param_as_frequency_hz(value: &toml::Value) -> Option<String> {
+    let value = param_as_string(value)?;
+    let value = value
+        .strip_suffix("Hz")
+        .or_else(|| value.strip_suffix("hz"))
+        .unwrap_or(&value);
+    Some(value.to_owned())
 }
 
 fn fade_curve_token(value: String) -> String {

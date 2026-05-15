@@ -675,6 +675,68 @@ path = "{}"
 }
 
 #[test]
+fn run_graph_spec_applies_highpass_chain_step_params() {
+    let spec = temp_path("auralis-cli-run-spec-highpass-param", "toml");
+    let input = temp_path("auralis-cli-run-spec-highpass-param-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-highpass-param-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-highpass-param-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[0, 8000, -8000, 12000, -12000, 6000, -6000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "voice_filtered"
+input = "voice.audio"
+steps = [
+  {{ op = "filter.highpass", cutoff = "1000Hz", q = 0.707 }},
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_filtered.audio"
+path = "{}"
+"#,
+            input.display(),
+            graph_output.display()
+        ),
+    )
+    .unwrap();
+
+    let graph = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "highpass 1000 0.707q",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(graph.status.success(), "{}", stderr(&graph));
+    assert!(render.status.success(), "{}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&graph_output),
+        read_pcm16_wav(&render_output)
+    );
+    fs::remove_file(graph_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn run_graph_spec_reports_unsupported_node_execution() {
     let spec = temp_path("auralis-cli-run-spec-node", "toml");
     fs::write(
