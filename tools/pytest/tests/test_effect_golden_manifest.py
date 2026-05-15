@@ -56,11 +56,13 @@ def test_cli_standalone_effect_matches_sox_ng_golden_manifest(
         "--package",
         "auralis-cli",
         "--",
-        "run",
+        "render",
         str(input_path),
+        "-o",
         str(auralis_output),
         *(["--rate", str(output_sample_rate)] if output_sample_rate is not None else []),
-        *effect_tokens["auralis"],
+        "--fx",
+        " ".join(effect_tokens["auralis"]),
     ]
     auralis_result = subprocess.run(
         auralis_command,
