@@ -25,6 +25,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
+    assert!(stdout.contains("mix-power"), "{stdout}");
+    assert!(stdout.contains("merge"), "{stdout}");
+    assert!(stdout.contains("multiply"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -147,6 +150,54 @@ fn concat_man_page_describes_recipe_lowering() {
         "{stdout}"
     );
     assert!(stdout.contains("render --combine concatenate"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn mix_power_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "mix-power"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("mix-power - equal-power mix audio files"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --combine mix-power"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn merge_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "merge"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(stdout.contains("merge - merge audio channels"), "{stdout}");
+    assert!(stdout.contains("render --combine merge"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn multiply_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "multiply"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("multiply - multiply audio files"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --combine multiply"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
 }
 

@@ -355,3 +355,147 @@ fn concat_recipe_lowers_to_typed_render_concatenate() {
     fs::remove_file(recipe_output).unwrap();
     fs::remove_file(render_output).unwrap();
 }
+
+#[test]
+fn mix_power_recipe_lowers_to_typed_render_mix_power() {
+    let first = temp_path("auralis-cli-mix-power-recipe-first", "wav");
+    let second = temp_path("auralis-cli-mix-power-recipe-second", "wav");
+    let recipe_output = temp_path("auralis-cli-mix-power-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-mix-power-render-output", "wav");
+    write_pcm16_wav(&first, 1, &[1000, -1000]);
+    write_pcm16_wav(&second, 1, &[3000, 1000]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "mix-power",
+            first.to_str().unwrap(),
+            second.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--combine",
+            "mix-power",
+            "--input",
+            second.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(read_pcm16_wav(&recipe_output), (1, vec![2828, 0]));
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
+fn merge_recipe_lowers_to_typed_render_merge() {
+    let first = temp_path("auralis-cli-merge-recipe-first", "wav");
+    let second = temp_path("auralis-cli-merge-recipe-second", "wav");
+    let recipe_output = temp_path("auralis-cli-merge-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-merge-render-output", "wav");
+    write_pcm16_wav(&first, 1, &[1000, -1000]);
+    write_pcm16_wav(&second, 1, &[3000, 1000]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "merge",
+            first.to_str().unwrap(),
+            second.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--combine",
+            "merge",
+            "--input",
+            second.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        (2, vec![1000, 3000, -1000, 1000])
+    );
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
+fn multiply_recipe_lowers_to_typed_render_multiply() {
+    let first = temp_path("auralis-cli-multiply-recipe-first", "wav");
+    let second = temp_path("auralis-cli-multiply-recipe-second", "wav");
+    let recipe_output = temp_path("auralis-cli-multiply-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-multiply-render-output", "wav");
+    write_pcm16_wav(&first, 1, &[16_384, -16_384]);
+    write_pcm16_wav(&second, 1, &[8192, 16_384]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "multiply",
+            first.to_str().unwrap(),
+            second.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--combine",
+            "multiply",
+            "--input",
+            second.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(read_pcm16_wav(&recipe_output), (1, vec![4096, -8192]));
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}

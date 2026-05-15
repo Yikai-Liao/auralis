@@ -199,6 +199,51 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Mix two or more audio files using equal-power scaling.
+    MixPower {
+        /// PCM16 WAV input files to equal-power mix.
+        #[arg(value_name = "INPUT", num_args = 2..)]
+        inputs: Vec<PathBuf>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Merge all channels from two or more audio files.
+    Merge {
+        /// PCM16 WAV input files to merge into one multichannel output.
+        #[arg(value_name = "INPUT", num_args = 2..)]
+        inputs: Vec<PathBuf>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Multiply corresponding samples from two or more audio files.
+    Multiply {
+        /// PCM16 WAV input files to multiply.
+        #[arg(value_name = "INPUT", num_args = 2..)]
+        inputs: Vec<PathBuf>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Render one ordered stream with typed effect syntax.
     Render {
         /// PCM16 WAV input file to read.
@@ -475,6 +520,21 @@ fn run(cli: Cli) -> Result<(), CliError> {
             backend,
             auralis::CombineMethod::Concatenate,
         ),
+        Command::MixPower {
+            inputs,
+            output,
+            backend,
+        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::MixPower),
+        Command::Merge {
+            inputs,
+            output,
+            backend,
+        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Merge),
+        Command::Multiply {
+            inputs,
+            output,
+            backend,
+        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Multiply),
         Command::Render {
             input,
             output,
@@ -1221,6 +1281,18 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "mix-power",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "merge",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "multiply",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "render",
         options: &[
             "-o",
@@ -1301,6 +1373,15 @@ const MAN_PAGES: &[ManPage] = &[
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
+            (
+                "mix-power",
+                "Mix two or more audio files with equal-power scaling.",
+            ),
+            ("merge", "Merge channels from two or more audio files."),
+            (
+                "multiply",
+                "Multiply corresponding samples from two or more audio files.",
+            ),
             (
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
@@ -1411,6 +1492,42 @@ const MAN_PAGES: &[ManPage] = &[
         description: "Concat is a recipe alias for joining two or more inputs end-to-end. It lowers to the same typed render pipeline as `render --combine concatenate --input ...`.",
         options: &[
             ("INPUT", "Two or more WAV input files to concatenate."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "mix-power",
+        summary: "equal-power mix audio files",
+        synopsis: "auralis mix-power INPUT.wav INPUT.wav... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Mix-power is a recipe alias for combining two or more inputs with equal-power scaling. It lowers to the same typed render pipeline as `render --combine mix-power --input ...`.",
+        options: &[
+            ("INPUT", "Two or more WAV input files to equal-power mix."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "merge",
+        summary: "merge audio channels",
+        synopsis: "auralis merge INPUT.wav INPUT.wav... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Merge is a recipe alias for placing every input channel into one multichannel output. It lowers to the same typed render pipeline as `render --combine merge --input ...`.",
+        options: &[
+            (
+                "INPUT",
+                "Two or more WAV input files whose channels should be merged.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "multiply",
+        summary: "multiply audio files",
+        synopsis: "auralis multiply INPUT.wav INPUT.wav... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Multiply is a recipe alias for multiplying corresponding samples from two or more inputs. It lowers to the same typed render pipeline as `render --combine multiply --input ...`.",
+        options: &[
+            ("INPUT", "Two or more WAV input files to multiply."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

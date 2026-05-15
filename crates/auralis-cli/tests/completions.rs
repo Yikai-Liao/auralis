@@ -21,6 +21,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
+    assert!(stdout.contains("mix-power"), "{stdout}");
+    assert!(stdout.contains("merge"), "{stdout}");
+    assert!(stdout.contains("multiply"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -44,6 +47,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
+    assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
+    assert!(stdout.contains("'merge:merge'"), "{stdout}");
+    assert!(stdout.contains("'multiply:multiply'"), "{stdout}");
     assert!(stdout.contains("'fmt:fmt'"), "{stdout}");
     assert!(stdout.contains("'--check[fmt option]'"), "{stdout}");
     assert!(stdout.contains("'--peak[normalize option]'"), "{stdout}");
@@ -86,6 +92,18 @@ fn fish_completions_include_modern_commands_and_flags() {
     );
     assert!(
         stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'concat'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'mix-power'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'merge'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'multiply'"),
         "{stdout}"
     );
     assert!(
