@@ -123,7 +123,7 @@ def test_golden_failure_report_helpers_use_stable_schema() -> None:
         },
         backend="scalar",
         repo_root=REPO_ROOT,
-        auralis_command=["auralis", "run"],
+        auralis_command=["auralis", "render", "input.wav", "-o", "output.wav"],
         sox_ng_command=["/does/not/exist/sox_ng"],
         outputs=outputs,
         metrics=metrics,

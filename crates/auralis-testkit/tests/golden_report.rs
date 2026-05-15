@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use auralis_testkit::golden_report::{
-    GOLDEN_FAILURE_REPORT_SCHEMA, GoldenFailureReport, GoldenJsonNumber, GoldenMetricComparison,
-    GoldenMetricFailure, GoldenOutputMetadata, GoldenThresholds,
+    GoldenFailureReport, GoldenJsonNumber, GoldenMetricComparison, GoldenMetricFailure,
+    GoldenOutputMetadata, GoldenThresholds, GOLDEN_FAILURE_REPORT_SCHEMA,
 };
 use serde_json::json;
 
@@ -15,7 +15,13 @@ fn golden_failure_report_serializes_stable_schema() {
     report.sox_ng_version = "sox_ng 14.4.3".to_owned();
     report.inputs = vec!["sine_48k_mono.wav".to_owned()];
     report.corpus_ids = vec!["l0/sine_mono_32".to_owned()];
-    report.auralis_command = vec!["auralis".to_owned(), "run".to_owned()];
+    report.auralis_command = vec![
+        "auralis".to_owned(),
+        "render".to_owned(),
+        "input.wav".to_owned(),
+        "-o".to_owned(),
+        "output.wav".to_owned(),
+    ];
     report.sox_ng_command = vec!["sox_ng".to_owned(), "-R".to_owned()];
     report.thresholds = GoldenThresholds {
         max_abs: 0.0001,
