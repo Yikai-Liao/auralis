@@ -613,6 +613,68 @@ path = "{}"
 }
 
 #[test]
+fn run_graph_spec_applies_fade_chain_step_params() {
+    let spec = temp_path("auralis-cli-run-spec-fade-param", "toml");
+    let input = temp_path("auralis-cli-run-spec-fade-param-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-fade-param-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-fade-param-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[10000, 12000, 14000, 16000, 18000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "voice_faded"
+input = "voice.audio"
+steps = [
+  {{ op = "fade", curve = "linear", fade_in = "2", fade_out = "2" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_faded.audio"
+path = "{}"
+"#,
+            input.display(),
+            graph_output.display()
+        ),
+    )
+    .unwrap();
+
+    let graph = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "fade t 2 0 2",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(graph.status.success(), "{}", stderr(&graph));
+    assert!(render.status.success(), "{}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&graph_output),
+        read_pcm16_wav(&render_output)
+    );
+    fs::remove_file(graph_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn run_graph_spec_reports_unsupported_node_execution() {
     let spec = temp_path("auralis-cli-run-spec-node", "toml");
     fs::write(

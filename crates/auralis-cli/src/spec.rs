@@ -306,6 +306,48 @@ fn chain_step_effect_tokens(
             })?;
             Ok(vec![step.op.clone(), by])
         }
+        "fade" => {
+            let Some(fade_in) = step.params.get("fade_in") else {
+                return Ok(vec![step.op.clone()]);
+            };
+            let fade_in =
+                param_as_string(fade_in).ok_or_else(|| GraphSpecError::InvalidStepParam {
+                    chain_id: chain.id.clone(),
+                    index,
+                    op: step.op.clone(),
+                    param: "fade_in",
+                })?;
+            let curve = step
+                .params
+                .get("curve")
+                .map(|value| {
+                    param_as_string(value).ok_or_else(|| GraphSpecError::InvalidStepParam {
+                        chain_id: chain.id.clone(),
+                        index,
+                        op: step.op.clone(),
+                        param: "curve",
+                    })
+                })
+                .transpose()?
+                .map_or_else(|| "l".to_owned(), fade_curve_token);
+            let Some(fade_out) = step.params.get("fade_out") else {
+                return Ok(vec![step.op.clone(), curve, fade_in]);
+            };
+            let fade_out =
+                param_as_string(fade_out).ok_or_else(|| GraphSpecError::InvalidStepParam {
+                    chain_id: chain.id.clone(),
+                    index,
+                    op: step.op.clone(),
+                    param: "fade_out",
+                })?;
+            Ok(vec![
+                step.op.clone(),
+                curve,
+                fade_in,
+                "0".to_owned(),
+                fade_out,
+            ])
+        }
         "trim" => {
             let Some(range) = step.params.get("range") else {
                 return Ok(vec![step.op.clone()]);
@@ -327,6 +369,17 @@ fn chain_step_effect_tokens(
             Ok(vec![step.op.clone(), start.to_owned(), format!("={end}")])
         }
         _ => Ok(vec![step.op.clone()]),
+    }
+}
+
+fn fade_curve_token(value: String) -> String {
+    match value.as_str() {
+        "linear" => "t".to_owned(),
+        "logarithmic" => "l".to_owned(),
+        "quarter-sine" => "q".to_owned(),
+        "half-sine" => "h".to_owned(),
+        "inverted-parabola" => "p".to_owned(),
+        _ => value,
     }
 }
 
