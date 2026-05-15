@@ -69,6 +69,7 @@ pub(super) fn inspect(input: &Path, json: bool) -> Result<(), CliError> {
 
 pub(super) fn check_command(
     spec: Option<&Path>,
+    json: bool,
     locked: bool,
     effects_file: Option<&Path>,
     fx: &[String],
@@ -78,13 +79,13 @@ pub(super) fn check_command(
         if effects_file.is_some() || !fx.is_empty() || chain.is_some() {
             return Err(CliError::MixedCheckInputs);
         }
-        return check_graph_spec(spec, locked);
+        return check_graph_spec(spec, json, locked);
     }
 
     if locked {
         return Err(CliError::LockedRequiresSpec);
     }
-    check_effects(effects_file, fx, chain)
+    check_effects(effects_file, fx, chain, json)
 }
 
 pub(super) fn plan_graph_spec(
@@ -211,13 +212,38 @@ fn parse_graph_spec_ref(spec: &Path, explicit_target: Option<&str>) -> GraphSpec
     }
 }
 
-fn check_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
+#[derive(Debug, Serialize)]
+struct JsonCheckGraphOutput {
+    status: &'static str,
+    kind: &'static str,
+    sources: usize,
+    chains: usize,
+    nodes: usize,
+    sinks: usize,
+    expanded_steps: usize,
+}
+
+fn check_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(), CliError> {
     if locked {
         spec::verify_graph_lock(spec)?;
     } else {
         spec::sync_graph_lock(spec)?;
     }
     let checked = spec::check_graph_spec(spec)?;
+
+    if json {
+        let output = JsonCheckGraphOutput {
+            status: "ok",
+            kind: "graph",
+            sources: checked.source_count,
+            chains: checked.chain_count,
+            nodes: checked.node_count,
+            sinks: checked.sink_count,
+            expanded_steps: checked.expanded_step_ids.len(),
+        };
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
+    }
 
     println!("status: ok");
     println!("sources: {}", checked.source_count);
@@ -229,12 +255,32 @@ fn check_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
     Ok(())
 }
 
+#[derive(Debug, Serialize)]
+struct JsonCheckEffectsOutput {
+    status: &'static str,
+    kind: &'static str,
+    commands: usize,
+    boundaries: usize,
+}
+
 fn check_effects(
     effects_file: Option<&Path>,
     fx: &[String],
     chain: Option<&str>,
+    json: bool,
 ) -> Result<(), CliError> {
     let effect_chain = parse_effect_spec(effects_file, fx, chain)?;
+
+    if json {
+        let output = JsonCheckEffectsOutput {
+            status: "ok",
+            kind: "effects",
+            commands: effect_chain.len(),
+            boundaries: effect_chain.boundaries().len(),
+        };
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
+    }
 
     println!("status: ok");
     println!("commands: {}", effect_chain.len());

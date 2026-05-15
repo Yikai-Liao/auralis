@@ -431,7 +431,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "check",
-        options: &["--locked", "--effects-file", "--fx", "--chain"],
+        options: &["--json", "--locked", "--effects-file", "--fx", "--chain"],
     },
     CompletionSpec {
         name: "plan",

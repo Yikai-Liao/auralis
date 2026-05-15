@@ -944,12 +944,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
         }
         Command::Check(CheckArgs {
             spec,
+            json,
             locked,
             effects_file,
             fx,
             chain,
         }) => check_command(
             spec.as_deref(),
+            json,
             locked,
             effects_file.as_deref(),
             &fx,

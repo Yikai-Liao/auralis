@@ -739,6 +739,10 @@ pub(crate) struct CheckArgs {
     /// Auralis graph spec to validate.
     pub(crate) spec: Option<PathBuf>,
 
+    /// Emit machine-readable JSON output.
+    #[arg(long)]
+    pub(crate) json: bool,
+
     /// Require an up-to-date Auralis.lock instead of refreshing it.
     #[arg(long)]
     pub(crate) locked: bool,

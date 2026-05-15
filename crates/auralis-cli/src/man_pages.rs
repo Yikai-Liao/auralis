@@ -929,9 +929,10 @@ const MAN_PAGES: &[ManPage] = &[
     ManPage {
         name: "check",
         summary: "validate effect syntax or graph specs",
-        synopsis: "auralis check [SPEC] [--locked] [--fx EFFECT]... [--chain CHAIN] [--effects-file FILE]",
+        synopsis: "auralis check [SPEC] [--json] [--locked] [--fx EFFECT]... [--chain CHAIN] [--effects-file FILE]",
         description: "Check validates either one graph spec or one effect-input mode. For graph specs, the default mode refreshes Auralis.lock while `--locked` requires an up-to-date lock.",
         options: &[
+            ("--json", "Emit machine-readable JSON output."),
             (
                 "--locked",
                 "Require a matching Auralis.lock instead of refreshing it.",
