@@ -5,17 +5,18 @@ mod support;
 use support::*;
 
 #[test]
-fn run_mix_averages_equal_length_mono_inputs() {
-    let first = temp_path("auralis-cli-run-mix-mono-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-mono-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-mono-output", "wav");
+fn render_mix_averages_equal_length_mono_inputs() {
+    let first = temp_path("auralis-cli-render-mix-mono-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-mono-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-mono-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[3000, 1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix",
@@ -38,17 +39,18 @@ fn run_mix_averages_equal_length_mono_inputs() {
 }
 
 #[test]
-fn run_mix_treats_mismatched_lengths_as_trailing_silence() {
-    let first = temp_path("auralis-cli-run-mix-length-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-length-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-length-output", "wav");
+fn render_mix_treats_mismatched_lengths_as_trailing_silence() {
+    let first = temp_path("auralis-cli-render-mix-length-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-length-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-length-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[500, 0, -500]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix",
@@ -71,23 +73,25 @@ fn run_mix_treats_mismatched_lengths_as_trailing_silence() {
 }
 
 #[test]
-fn run_mix_combines_stereo_inputs_before_effects() {
-    let first = temp_path("auralis-cli-run-mix-stereo-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-stereo-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-stereo-output", "wav");
+fn render_mix_combines_stereo_inputs_before_effects() {
+    let first = temp_path("auralis-cli-render-mix-stereo-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-stereo-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-stereo-output", "wav");
     write_pcm16_wav(&first, 2, &[-1000, 1000, -2000, 2000]);
     write_pcm16_wav(&second, 2, &[3000, -1000, 1000, -3000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix",
             "--input",
             second.to_str().unwrap(),
-            "--reverse",
+            "--chain",
+            "reverse",
         ])
         .output()
         .unwrap();
@@ -105,17 +109,18 @@ fn run_mix_combines_stereo_inputs_before_effects() {
 }
 
 #[test]
-fn run_mix_accepts_mismatched_channel_counts() {
-    let first = temp_path("auralis-cli-run-mix-channel-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-channel-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-channel-output", "wav");
+fn render_mix_accepts_mismatched_channel_counts() {
+    let first = temp_path("auralis-cli-render-mix-channel-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-channel-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-channel-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 2, &[3000, 1000, -1000, 500]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix",
@@ -138,18 +143,19 @@ fn run_mix_accepts_mismatched_channel_counts() {
 }
 
 #[test]
-fn run_mix_backend_scalar_and_requested_simd_match() {
-    let first = temp_path("auralis-cli-run-mix-backend-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-backend-second", "wav");
-    let scalar_output = temp_path("auralis-cli-run-mix-backend-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-mix-backend-simd-output", "wav");
+fn render_mix_backend_scalar_and_requested_simd_match() {
+    let first = temp_path("auralis-cli-render-mix-backend-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-backend-second", "wav");
+    let scalar_output = temp_path("auralis-cli-render-mix-backend-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-mix-backend-simd-output", "wav");
     write_pcm16_wav(&first, 1, &[-32768, -12345, 0, 12345, 32767]);
     write_pcm16_wav(&second, 1, &[32767, 12345, 0, -12345, -32768]);
 
     let scalar = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
@@ -162,8 +168,9 @@ fn run_mix_backend_scalar_and_requested_simd_match() {
         .unwrap();
     let simd = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
@@ -186,17 +193,18 @@ fn run_mix_backend_scalar_and_requested_simd_match() {
 }
 
 #[test]
-fn run_mix_power_scales_equal_length_mono_inputs() {
-    let first = temp_path("auralis-cli-run-mix-power-mono-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-power-mono-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-power-mono-output", "wav");
+fn render_mix_power_scales_equal_length_mono_inputs() {
+    let first = temp_path("auralis-cli-render-mix-power-mono-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-power-mono-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-power-mono-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[3000, 1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix-power",
@@ -219,17 +227,18 @@ fn run_mix_power_scales_equal_length_mono_inputs() {
 }
 
 #[test]
-fn run_mix_power_treats_mismatched_lengths_as_trailing_silence() {
-    let first = temp_path("auralis-cli-run-mix-power-length-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-power-length-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-power-length-output", "wav");
+fn render_mix_power_treats_mismatched_lengths_as_trailing_silence() {
+    let first = temp_path("auralis-cli-render-mix-power-length-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-power-length-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-power-length-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[500, 0, -500]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix-power",
@@ -252,23 +261,25 @@ fn run_mix_power_treats_mismatched_lengths_as_trailing_silence() {
 }
 
 #[test]
-fn run_mix_power_combines_stereo_inputs_before_effects() {
-    let first = temp_path("auralis-cli-run-mix-power-stereo-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-power-stereo-second", "wav");
-    let output = temp_path("auralis-cli-run-mix-power-stereo-output", "wav");
+fn render_mix_power_combines_stereo_inputs_before_effects() {
+    let first = temp_path("auralis-cli-render-mix-power-stereo-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-power-stereo-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-power-stereo-output", "wav");
     write_pcm16_wav(&first, 2, &[-1000, 1000, -2000, 2000]);
     write_pcm16_wav(&second, 2, &[3000, -1000, 1000, -3000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "mix-power",
             "--input",
             second.to_str().unwrap(),
-            "--reverse",
+            "--chain",
+            "reverse",
         ])
         .output()
         .unwrap();
@@ -286,18 +297,19 @@ fn run_mix_power_combines_stereo_inputs_before_effects() {
 }
 
 #[test]
-fn run_mix_power_backend_scalar_and_requested_simd_match() {
-    let first = temp_path("auralis-cli-run-mix-power-backend-first", "wav");
-    let second = temp_path("auralis-cli-run-mix-power-backend-second", "wav");
-    let scalar_output = temp_path("auralis-cli-run-mix-power-backend-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-mix-power-backend-simd-output", "wav");
+fn render_mix_power_backend_scalar_and_requested_simd_match() {
+    let first = temp_path("auralis-cli-render-mix-power-backend-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-power-backend-second", "wav");
+    let scalar_output = temp_path("auralis-cli-render-mix-power-backend-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-mix-power-backend-simd-output", "wav");
     write_pcm16_wav(&first, 1, &[-32768, -12345, 0, 12345, 32767]);
     write_pcm16_wav(&second, 1, &[32767, 12345, 0, -12345, -32768]);
 
     let scalar = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
@@ -310,8 +322,9 @@ fn run_mix_power_backend_scalar_and_requested_simd_match() {
         .unwrap();
     let simd = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
