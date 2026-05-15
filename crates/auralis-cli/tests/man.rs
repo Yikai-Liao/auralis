@@ -34,6 +34,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("vol"), "{stdout}");
     assert!(stdout.contains("softvol"), "{stdout}");
     assert!(stdout.contains("tremolo"), "{stdout}");
+    assert!(stdout.contains("bass"), "{stdout}");
+    assert!(stdout.contains("treble"), "{stdout}");
+    assert!(stdout.contains("equalizer"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -211,6 +214,42 @@ fn level_and_modulation_man_pages_describe_recipe_lowering() {
             "tremolo - apply tremolo modulation",
             "render --fx 'tremolo ...'",
             "--depth PERCENT",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
+}
+
+#[test]
+fn eq_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "bass",
+            "bass - boost or cut bass frequencies",
+            "render --fx 'bass ...'",
+            "--frequency HZ",
+        ),
+        (
+            "treble",
+            "treble - boost or cut treble frequencies",
+            "render --fx 'treble ...'",
+            "--width WIDTH",
+        ),
+        (
+            "equalizer",
+            "equalizer - apply one peaking equalizer band",
+            "render --fx 'equalizer ...'",
+            "--gain DB",
         ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))

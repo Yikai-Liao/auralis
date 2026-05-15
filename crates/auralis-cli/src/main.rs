@@ -421,6 +421,84 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Boost or cut bass frequencies in one audio file.
+    Bass {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Shelf gain in dB.
+        #[arg(value_name = "DB", allow_hyphen_values = true)]
+        gain: String,
+
+        /// Shelf frequency in Hz.
+        #[arg(long, value_name = "HZ", default_value = "100")]
+        frequency: String,
+
+        /// Shelf width, for example `0.5s`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH", default_value = "0.5s")]
+        width: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Boost or cut treble frequencies in one audio file.
+    Treble {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Shelf gain in dB.
+        #[arg(value_name = "DB", allow_hyphen_values = true)]
+        gain: String,
+
+        /// Shelf frequency in Hz.
+        #[arg(long, value_name = "HZ", default_value = "3000")]
+        frequency: String,
+
+        /// Shelf width, for example `0.5s`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH", default_value = "0.5s")]
+        width: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply one peaking equalizer band to one audio file.
+    Equalizer {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Center frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Band width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: String,
+
+        /// Band gain in dB.
+        #[arg(long, value_name = "DB", allow_hyphen_values = true)]
+        gain: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Fade one audio file in or out.
     Fade {
         /// PCM16 WAV input file to read.
@@ -879,6 +957,50 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
             ["tremolo", speed.as_str(), depth.as_str()],
+        ),
+        Command::Bass {
+            input,
+            gain,
+            frequency,
+            width,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            ["bass", gain.as_str(), frequency.as_str(), width.as_str()],
+        ),
+        Command::Treble {
+            input,
+            gain,
+            frequency,
+            width,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            ["treble", gain.as_str(), frequency.as_str(), width.as_str()],
+        ),
+        Command::Equalizer {
+            input,
+            frequency,
+            width,
+            gain,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            [
+                "equalizer",
+                frequency.as_str(),
+                width.as_str(),
+                gain.as_str(),
+            ],
         ),
         Command::Fade {
             input,
@@ -1793,6 +1915,25 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--depth", "--backend"],
     },
     CompletionSpec {
+        name: "bass",
+        options: &["-o", "--output", "--frequency", "--width", "--backend"],
+    },
+    CompletionSpec {
+        name: "treble",
+        options: &["-o", "--output", "--frequency", "--width", "--backend"],
+    },
+    CompletionSpec {
+        name: "equalizer",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--gain",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "fade",
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
@@ -1906,6 +2047,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("vol", "Apply SoX-ng volume scaling."),
             ("softvol", "Apply soft volume changes."),
             ("tremolo", "Apply tremolo modulation."),
+            ("bass", "Boost or cut bass frequencies."),
+            ("treble", "Boost or cut treble frequencies."),
+            ("equalizer", "Apply one peaking equalizer band."),
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
@@ -2133,6 +2277,54 @@ const MAN_PAGES: &[ManPage] = &[
         options: &[
             ("SPEED_HZ", "Modulation speed in Hz."),
             ("--depth PERCENT", "Modulation depth percentage."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "bass",
+        summary: "boost or cut bass frequencies",
+        synopsis: "auralis bass INPUT.wav DB [--frequency HZ] [--width WIDTH] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Bass is a recipe alias for one low-shelf EQ stage. It lowers to the same typed effect pipeline as `render --fx 'bass ...'`.",
+        options: &[
+            ("DB", "Shelf gain in dB."),
+            ("--frequency HZ", "Shelf frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Shelf width, accepting values like `0.5s`, `0.707q`, or `1o`.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "treble",
+        summary: "boost or cut treble frequencies",
+        synopsis: "auralis treble INPUT.wav DB [--frequency HZ] [--width WIDTH] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Treble is a recipe alias for one high-shelf EQ stage. It lowers to the same typed effect pipeline as `render --fx 'treble ...'`.",
+        options: &[
+            ("DB", "Shelf gain in dB."),
+            ("--frequency HZ", "Shelf frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Shelf width, accepting values like `0.5s`, `0.707q`, or `1o`.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "equalizer",
+        summary: "apply one peaking equalizer band",
+        synopsis: "auralis equalizer INPUT.wav --frequency HZ --width WIDTH --gain DB -o OUTPUT.wav [--backend BACKEND]",
+        description: "Equalizer is a recipe alias for one peaking EQ band. It lowers to the same typed effect pipeline as `render --fx 'equalizer ...'`.",
+        options: &[
+            ("--frequency HZ", "Center frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Band width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--gain DB", "Band gain in dB."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

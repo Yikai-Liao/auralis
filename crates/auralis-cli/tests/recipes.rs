@@ -294,6 +294,36 @@ fn level_and_modulation_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn eq_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "bass",
+            vec!["6", "--frequency", "120", "--width", "0.707q"],
+            "bass 6 120 0.707q",
+        ),
+        (
+            "treble",
+            vec!["-3", "--frequency", "4k", "--width", "1o"],
+            "treble -3 4k 1o",
+        ),
+        (
+            "equalizer",
+            vec!["--frequency", "1k", "--width", "500", "--gain", "-2"],
+            "equalizer 1k 500 -2",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[-12000, -6000, 0, 6000, 12000, 6000, 0, -6000],
+        );
+    }
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");

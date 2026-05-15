@@ -30,6 +30,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("vol"), "{stdout}");
     assert!(stdout.contains("softvol"), "{stdout}");
     assert!(stdout.contains("tremolo"), "{stdout}");
+    assert!(stdout.contains("bass"), "{stdout}");
+    assert!(stdout.contains("treble"), "{stdout}");
+    assert!(stdout.contains("equalizer"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -68,6 +71,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'vol:vol'"), "{stdout}");
     assert!(stdout.contains("'softvol:softvol'"), "{stdout}");
     assert!(stdout.contains("'tremolo:tremolo'"), "{stdout}");
+    assert!(stdout.contains("'bass:bass'"), "{stdout}");
+    assert!(stdout.contains("'treble:treble'"), "{stdout}");
+    assert!(stdout.contains("'equalizer:equalizer'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
@@ -113,6 +119,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         "vol",
         "softvol",
         "tremolo",
+        "bass",
+        "treble",
+        "equalizer",
         "fade",
         "mix",
         "concat",
@@ -143,6 +152,18 @@ fn fish_completions_include_modern_commands_and_flags() {
     );
     assert!(
         stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from tremolo' -l depth"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from bass' -l frequency"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from treble' -l width"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from equalizer' -l gain"),
         "{stdout}"
     );
     assert!(
