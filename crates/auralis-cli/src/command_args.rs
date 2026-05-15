@@ -6,7 +6,7 @@ use crate::{
     command_support::OpsSchemaFormat,
     completions::CompletionShell,
     parsers::{
-        parse_backend, parse_channel_count, parse_combine_method, parse_sample_rate,
+        parse_backend, parse_channel_count, parse_combine_method, parse_dbfs, parse_sample_rate,
         parse_wav_sample_format,
     },
 };
@@ -61,6 +61,168 @@ pub(crate) struct ConvertArgs {
     /// Select WAV sample encoding when the output container is WAV.
     #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]
     pub(crate) sample: Option<auralis::WavSampleFormat>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct TrimArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Frame range to keep, for example `10..30` or `10..`.
+    pub(crate) range: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct NormalizeArgs {
+    /// Input audio file to read.
+    pub(crate) input: PathBuf,
+
+    /// Output audio file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Peak target in dBFS, defaulting to 0 dBFS.
+    #[arg(long, value_name = "DBFS", default_value = "0", allow_hyphen_values = true, value_parser = parse_dbfs)]
+    pub(crate) peak: f64,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct NormArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Peak target in dBFS.
+    #[arg(value_name = "DBFS", default_value = "0", allow_hyphen_values = true)]
+    pub(crate) level: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct RateArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Target sample rate in Hz.
+    #[arg(value_name = "RATE")]
+    pub(crate) sample_rate: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct ChannelsArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Target channel count.
+    #[arg(value_name = "CHANNELS")]
+    pub(crate) count: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct GainArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Gain adjustment in dB, for example `-3` or `-3dB`.
+    #[arg(value_name = "DB", allow_hyphen_values = true)]
+    pub(crate) db: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct SimpleRecipeArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct EchoArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Clean input gain.
+    #[arg(
+        long = "gain-in",
+        value_name = "GAIN",
+        default_value = "0.8",
+        allow_hyphen_values = true
+    )]
+    pub(crate) gain_in: String,
+
+    /// Output gain.
+    #[arg(
+        long = "gain-out",
+        value_name = "GAIN",
+        default_value = "0.9",
+        allow_hyphen_values = true
+    )]
+    pub(crate) gain_out: String,
+
+    /// Echo tap as `delay_ms,decay`; repeat for multiple taps.
+    #[arg(
+        long = "tap",
+        value_name = "DELAY_MS,DECAY",
+        required = true,
+        allow_hyphen_values = true
+    )]
+    pub(crate) taps: Vec<String>,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
 }
 
 #[derive(Debug, Args)]

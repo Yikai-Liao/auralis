@@ -20,8 +20,9 @@ use clap::{Parser, Subcommand};
 
 pub(crate) use command_args::GraphFormat;
 use command_args::{
-    CheckArgs, CompletionsArgs, ConvertArgs, ExplainArgs, FmtArgs, GraphArgs, InspectArgs, ManArgs,
-    OpsArgs, PlanArgs, RenderArgs, RunArgs,
+    ChannelsArgs, CheckArgs, CompletionsArgs, ConvertArgs, EchoArgs, ExplainArgs, FmtArgs,
+    GainArgs, GraphArgs, InspectArgs, ManArgs, NormArgs, NormalizeArgs, OpsArgs, PlanArgs,
+    RateArgs, RenderArgs, RunArgs, SimpleRecipeArgs, TrimArgs,
 };
 use command_support::{
     PathRole, check_command, effect_input_to_chain_tokens, inspect, plan_graph_spec, print_ops,
@@ -34,7 +35,7 @@ use executor::{
 };
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
-use parsers::{parse_backend, parse_dbfs, parse_filter_poles};
+use parsers::{parse_backend, parse_filter_poles};
 use recipes::{
     StretchRecipeOptions, TimingArgs, normalize_audio, run_band_recipe, run_bandpass_recipe,
     run_chorus_recipe, run_combine_recipe, run_dc_shift_recipe, run_delay_recipe,
@@ -61,235 +62,37 @@ enum Command {
     Convert(ConvertArgs),
 
     /// Keep one range from an audio file.
-    Trim {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Frame range to keep, for example `10..30` or `10..`.
-        range: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Trim(TrimArgs),
 
     /// Normalize one audio file to a peak level.
-    Normalize {
-        /// Input audio file to read.
-        input: PathBuf,
-
-        /// Output audio file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Peak target in dBFS, defaulting to 0 dBFS.
-        #[arg(long, value_name = "DBFS", default_value = "0", allow_hyphen_values = true, value_parser = parse_dbfs)]
-        peak: f64,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Normalize(NormalizeArgs),
 
     /// Normalize one audio file with the typed norm effect.
-    Norm {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Peak target in dBFS.
-        #[arg(value_name = "DBFS", default_value = "0", allow_hyphen_values = true)]
-        level: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Norm(NormArgs),
 
     /// Resample one audio file with the typed rate effect.
-    Rate {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Target sample rate in Hz.
-        #[arg(value_name = "RATE")]
-        sample_rate: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Rate(RateArgs),
 
     /// Convert one audio file to a target channel count.
-    Channels {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Target channel count.
-        #[arg(value_name = "CHANNELS")]
-        count: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Channels(ChannelsArgs),
 
     /// Adjust one audio file by a gain amount.
-    Gain {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Gain adjustment in dB, for example `-3` or `-3dB`.
-        #[arg(value_name = "DB", allow_hyphen_values = true)]
-        db: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Gain(GainArgs),
 
     /// Reverse one audio file.
-    Reverse {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Reverse(SimpleRecipeArgs),
 
     /// Apply CD/DAT de-emphasis to one audio file.
-    Deemph {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Deemph(SimpleRecipeArgs),
 
     /// Apply the stereo headphone-cue filter to one audio file.
-    Earwax {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Earwax(SimpleRecipeArgs),
 
     /// Add one or more parallel delayed echoes.
-    Echo {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Clean input gain.
-        #[arg(
-            long = "gain-in",
-            value_name = "GAIN",
-            default_value = "0.8",
-            allow_hyphen_values = true
-        )]
-        gain_in: String,
-
-        /// Output gain.
-        #[arg(
-            long = "gain-out",
-            value_name = "GAIN",
-            default_value = "0.9",
-            allow_hyphen_values = true
-        )]
-        gain_out: String,
-
-        /// Echo tap as `delay_ms,decay`; repeat for multiple taps.
-        #[arg(
-            long = "tap",
-            value_name = "DELAY_MS,DECAY",
-            required = true,
-            allow_hyphen_values = true
-        )]
-        taps: Vec<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Echo(EchoArgs),
 
     /// Add one or more cascaded delayed echoes.
-    Echos {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Clean input gain.
-        #[arg(
-            long = "gain-in",
-            value_name = "GAIN",
-            default_value = "0.8",
-            allow_hyphen_values = true
-        )]
-        gain_in: String,
-
-        /// Output gain.
-        #[arg(
-            long = "gain-out",
-            value_name = "GAIN",
-            default_value = "0.9",
-            allow_hyphen_values = true
-        )]
-        gain_out: String,
-
-        /// Echo tap as `delay_ms,decay`; repeat for multiple taps.
-        #[arg(
-            long = "tap",
-            value_name = "DELAY_MS,DECAY",
-            required = true,
-            allow_hyphen_values = true
-        )]
-        taps: Vec<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Echos(EchoArgs),
 
     /// Add chorus modulation to one audio file.
     Chorus {
@@ -1513,73 +1316,73 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 sample,
             },
         ),
-        Command::Trim {
+        Command::Trim(TrimArgs {
             input,
             range,
             output,
             backend,
-        } => run_trim_recipe(&input, &range, &output, backend),
-        Command::Normalize {
+        }) => run_trim_recipe(&input, &range, &output, backend),
+        Command::Normalize(NormalizeArgs {
             input,
             output,
             peak,
             backend,
-        } => normalize_audio(&input, &output, peak, backend),
-        Command::Norm {
+        }) => normalize_audio(&input, &output, peak, backend),
+        Command::Norm(NormArgs {
             input,
             level,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["norm", level.as_str()]),
-        Command::Rate {
+        }) => run_effect_recipe(&input, &output, backend, ["norm", level.as_str()]),
+        Command::Rate(RateArgs {
             input,
             sample_rate,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["rate", sample_rate.as_str()]),
-        Command::Channels {
+        }) => run_effect_recipe(&input, &output, backend, ["rate", sample_rate.as_str()]),
+        Command::Channels(ChannelsArgs {
             input,
             count,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["channels", count.as_str()]),
-        Command::Gain {
+        }) => run_effect_recipe(&input, &output, backend, ["channels", count.as_str()]),
+        Command::Gain(GainArgs {
             input,
             db,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["gain", db.as_str()]),
-        Command::Reverse {
+        }) => run_effect_recipe(&input, &output, backend, ["gain", db.as_str()]),
+        Command::Reverse(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["reverse"]),
-        Command::Deemph {
+        }) => run_effect_recipe(&input, &output, backend, ["reverse"]),
+        Command::Deemph(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["deemph"]),
-        Command::Earwax {
+        }) => run_effect_recipe(&input, &output, backend, ["deemph"]),
+        Command::Earwax(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["earwax"]),
-        Command::Echo {
-            input,
-            gain_in,
-            gain_out,
-            taps,
-            output,
-            backend,
-        } => run_echo_recipe("echo", &input, &gain_in, &gain_out, &taps, &output, backend),
-        Command::Echos {
+        }) => run_effect_recipe(&input, &output, backend, ["earwax"]),
+        Command::Echo(EchoArgs {
             input,
             gain_in,
             gain_out,
             taps,
             output,
             backend,
-        } => run_echo_recipe(
+        }) => run_echo_recipe("echo", &input, &gain_in, &gain_out, &taps, &output, backend),
+        Command::Echos(EchoArgs {
+            input,
+            gain_in,
+            gain_out,
+            taps,
+            output,
+            backend,
+        }) => run_echo_recipe(
             "echos", &input, &gain_in, &gain_out, &taps, &output, backend,
         ),
         Command::Chorus {
