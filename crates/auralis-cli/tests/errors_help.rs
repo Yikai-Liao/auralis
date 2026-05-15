@@ -354,6 +354,71 @@ path = "build/out.wav"
 }
 
 #[test]
+fn graph_spec_reports_dot_for_valid_linear_spec() {
+    let spec = temp_path("auralis-cli-graph-spec-dot", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "dot"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("digraph Auralis {"), "{stdout}");
+    assert!(stdout.contains("rankdir=LR;"), "{stdout}");
+    assert!(
+        stdout.contains("\"voice\" [label=\"source: input/voice.wav\"]"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("\"cut\" [label=\"trim\"]"), "{stdout}");
+    assert!(stdout.contains("\"voice\" -> \"cut\""), "{stdout}");
+    assert!(
+        stdout.contains("\"voice_clean/02-gain\" [label=\"gain -3dB\"]"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("\"cut\" -> \"voice_clean/02-gain\""),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("\"wav\" [label=\"sink: build/out.wav\"]"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("\"voice_clean/02-gain\" -> \"wav\""),
+        "{stdout}"
+    );
+}
+
+#[test]
 fn plan_graph_spec_reuses_validation_errors() {
     let spec = temp_path("auralis-cli-plan-spec-unknown-input", "toml");
     fs::write(

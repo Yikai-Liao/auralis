@@ -186,6 +186,7 @@ enum Command {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum GraphFormat {
     Mermaid,
+    Dot,
 }
 
 fn main() -> ExitCode {
@@ -426,6 +427,7 @@ fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
     let checked = spec::check_graph_spec(spec)?;
     match format {
         GraphFormat::Mermaid => print_mermaid_graph(&checked),
+        GraphFormat::Dot => print_dot_graph(&checked),
     }
 
     Ok(())
@@ -459,14 +461,46 @@ fn print_mermaid_graph(checked: &spec::CheckedGraphSpec) {
             sink.path.display()
         );
         let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
-        let upstream = checked
-            .chains
-            .iter()
-            .find(|chain| chain.id == input)
-            .and_then(|chain| chain.step_ids.last())
-            .map_or(input, String::as_str);
+        let upstream = sink_upstream(checked, input);
         println!("  {} --> {}", mermaid_id(upstream), mermaid_id(&sink.id));
     }
+}
+
+fn print_dot_graph(checked: &spec::CheckedGraphSpec) {
+    println!("digraph Auralis {{");
+    println!("  rankdir=LR;");
+    for source in &checked.sources {
+        println!(
+            "  {} [label={}];",
+            dot_id(&source.id),
+            dot_label(&format!("source: {}", source.path.display()))
+        );
+    }
+    for chain in &checked.chains {
+        let mut previous = chain.input.strip_suffix(".audio").unwrap_or(&chain.input);
+        for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
+            println!("  {} [label={}];", dot_id(step_id), dot_label(label));
+            println!("  {} -> {};", dot_id(previous), dot_id(step_id));
+            previous = step_id;
+        }
+    }
+    for node in &checked.nodes {
+        println!("  {} [label={}];", dot_id(node), dot_label(node));
+    }
+    for sink in &checked.sinks {
+        println!(
+            "  {} [label={}];",
+            dot_id(&sink.id),
+            dot_label(&format!("sink: {}", sink.path.display()))
+        );
+        let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
+        println!(
+            "  {} -> {};",
+            dot_id(sink_upstream(checked, input)),
+            dot_id(&sink.id)
+        );
+    }
+    println!("}}");
 }
 
 fn mermaid_id(id: &str) -> String {
@@ -476,6 +510,23 @@ fn mermaid_id(id: &str) -> String {
             _ => '_',
         })
         .collect()
+}
+
+fn sink_upstream<'a>(checked: &'a spec::CheckedGraphSpec, input: &'a str) -> &'a str {
+    checked
+        .chains
+        .iter()
+        .find(|chain| chain.id == input)
+        .and_then(|chain| chain.step_ids.last())
+        .map_or(input, String::as_str)
+}
+
+fn dot_id(id: &str) -> String {
+    dot_label(id)
+}
+
+fn dot_label(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn run_graph_spec(spec: &Path) -> Result<(), CliError> {
