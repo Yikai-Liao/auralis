@@ -15,32 +15,61 @@ pub fn lower_graph_effect_tokens(
     op: &str,
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
+    if let Some(tokens) = lower_graph_effect_tokens_a_to_l(op, params)? {
+        return Ok(tokens);
+    }
+    lower_graph_effect_tokens_m_to_z(op, params)
+}
+
+fn lower_graph_effect_tokens_a_to_l(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Option<Vec<String>>, EffectTokenError> {
     match op {
-        "allpass" => lower_pole_filter_tokens("allpass", params),
-        "band" => lower_band_tokens(params),
-        "bandpass" => lower_bandpass_tokens(params),
-        "bandreject" => lower_ordered_tokens("bandreject", params, &["frequency", "width"]),
-        "bass" => lower_ordered_tokens("bass", params, &["gain", "frequency", "width"]),
-        "biquad" => lower_ordered_tokens("biquad", params, &["b0", "b1", "b2", "a0", "a1", "a2"]),
-        "channels" => lower_ordered_tokens("channels", params, &["count"]),
-        "chorus" => lower_chorus_tokens(params),
-        "contrast" => lower_ordered_tokens("contrast", params, &["amount"]),
-        "dcshift" => lower_ordered_tokens("dcshift", params, &["shift", "limiter_gain"]),
-        "delay" => lower_repeated_tokens("delay", params, "positions"),
-        "dither" => lower_dither_tokens(params),
-        "downsample" => lower_ordered_tokens("downsample", params, &["factor"]),
-        "echo" => lower_echo_tokens("echo", params),
-        "echos" => lower_echo_tokens("echos", params),
-        "equalizer" => lower_ordered_tokens("equalizer", params, &["frequency", "width", "gain"]),
+        "allpass" => lower_pole_filter_tokens("allpass", params).map(Some),
+        "band" => lower_band_tokens(params).map(Some),
+        "bandpass" => lower_bandpass_tokens(params).map(Some),
+        "bandreject" => {
+            lower_ordered_tokens("bandreject", params, &["frequency", "width"]).map(Some)
+        }
+        "bass" => lower_ordered_tokens("bass", params, &["gain", "frequency", "width"]).map(Some),
+        "bend" => lower_bend_tokens(params).map(Some),
+        "biquad" => {
+            lower_ordered_tokens("biquad", params, &["b0", "b1", "b2", "a0", "a1", "a2"]).map(Some)
+        }
+        "channels" => lower_ordered_tokens("channels", params, &["count"]).map(Some),
+        "chorus" => lower_chorus_tokens(params).map(Some),
+        "compand" => lower_ordered_tokens(
+            "compand",
+            params,
+            &[
+                "attack_decay",
+                "transfer",
+                "gain",
+                "initial_volume",
+                "delay",
+            ],
+        )
+        .map(Some),
+        "contrast" => lower_ordered_tokens("contrast", params, &["amount"]).map(Some),
+        "dcshift" => lower_ordered_tokens("dcshift", params, &["shift", "limiter_gain"]).map(Some),
+        "delay" => lower_repeated_tokens("delay", params, "positions").map(Some),
+        "dither" => lower_dither_tokens(params).map(Some),
+        "downsample" => lower_ordered_tokens("downsample", params, &["factor"]).map(Some),
+        "echo" => lower_echo_tokens("echo", params).map(Some),
+        "echos" => lower_echo_tokens("echos", params).map(Some),
+        "equalizer" => {
+            lower_ordered_tokens("equalizer", params, &["frequency", "width", "gain"]).map(Some)
+        }
         "gain" => {
             let Some(by) = params.get("by") else {
-                return Ok(vec![op.to_owned()]);
+                return Ok(Some(vec![op.to_owned()]));
             };
-            Ok(vec![op.to_owned(), param_as_string(by, "by")?])
+            Ok(Some(vec![op.to_owned(), param_as_string(by, "by")?]))
         }
         "fade" => {
             let Some(fade_in) = params.get("fade_in") else {
-                return Ok(vec![op.to_owned()]);
+                return Ok(Some(vec![op.to_owned()]));
             };
             let fade_in = param_as_string(fade_in, "fade_in")?;
             let curve = params
@@ -49,26 +78,36 @@ pub fn lower_graph_effect_tokens(
                 .transpose()?
                 .map_or_else(|| "l".to_owned(), fade_curve_token);
             let Some(fade_out) = params.get("fade_out") else {
-                return Ok(vec![op.to_owned(), curve, fade_in]);
+                return Ok(Some(vec![op.to_owned(), curve, fade_in]));
             };
             let fade_out = param_as_string(fade_out, "fade_out")?;
-            Ok(vec![
+            Ok(Some(vec![
                 op.to_owned(),
                 curve,
                 fade_in,
                 "0".to_owned(),
                 fade_out,
-            ])
+            ]))
         }
-        "filter.lowpass" | "lowpass" => lower_pole_filter_tokens("lowpass", params),
-        "filter.highpass" | "highpass" => lower_pole_filter_tokens("highpass", params),
-        "fir" => lower_source_or_repeated_tokens("fir", params, "source", "coefficients"),
-        "firfit" => lower_source_or_repeated_tokens("firfit", params, "source", "knots"),
-        "flanger" => lower_flanger_tokens(params),
-        "hilbert" => lower_flagged_value_tokens("hilbert", params, "taps", "-n"),
+        "filter.lowpass" | "lowpass" => lower_pole_filter_tokens("lowpass", params).map(Some),
+        "filter.highpass" | "highpass" => lower_pole_filter_tokens("highpass", params).map(Some),
+        "fir" => lower_source_or_repeated_tokens("fir", params, "source", "coefficients").map(Some),
+        "firfit" => lower_source_or_repeated_tokens("firfit", params, "source", "knots").map(Some),
+        "flanger" => lower_flanger_tokens(params).map(Some),
+        "hilbert" => lower_flagged_value_tokens("hilbert", params, "taps", "-n").map(Some),
         "loudness" => {
             lower_ordered_tokens("loudness", params, &["gain", "reference", "half_points"])
+                .map(Some)
         }
+        _ => Ok(None),
+    }
+}
+
+fn lower_graph_effect_tokens_m_to_z(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    match op {
         "norm.peak" => {
             let Some(target) = params.get("target") else {
                 return Ok(vec!["norm".to_owned()]);
@@ -83,11 +122,13 @@ pub fn lower_graph_effect_tokens(
         "reverb" => lower_reverb_tokens(params),
         "remix" => lower_remix_tokens(params),
         "saturation" => lower_saturation_tokens(params),
+        "silence" => lower_silence_tokens(params),
         "sinc" => lower_sinc_tokens(params),
         "softvol" => {
             lower_ordered_tokens("softvol", params, &["volume", "double_time", "headroom"])
         }
         "speed" => lower_ordered_tokens("speed", params, &["factor"]),
+        "splice" => lower_splice_tokens(params),
         "stat" => lower_stat_tokens(params),
         "stats" => lower_stats_tokens(params),
         "stretch" => lower_stretch_tokens(params),
@@ -105,6 +146,7 @@ pub fn lower_graph_effect_tokens(
             Ok(vec![op.to_owned(), start.to_owned(), format!("={end}")])
         }
         "upsample" => lower_ordered_tokens("upsample", params, &["factor"]),
+        "vad" => lower_vad_tokens(params),
         "vol" => lower_ordered_tokens("vol", params, &["gain", "type", "limiter_gain"]),
         _ => Ok(vec![op.to_owned()]),
     }
@@ -121,6 +163,24 @@ fn lower_source_or_repeated_tokens(
         tokens.push(param_as_string(source, source_param)?);
     } else if let Some(values) = params.get(repeated_param) {
         tokens.extend(param_as_string_array(values, repeated_param)?);
+    }
+    Ok(tokens)
+}
+
+fn lower_bend_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["bend".to_owned()];
+    if let Some(frame_rate) = params.get("frame_rate") {
+        tokens.push("-f".to_owned());
+        tokens.push(param_as_string(frame_rate, "frame_rate")?);
+    }
+    if let Some(oversample) = params.get("oversample") {
+        tokens.push("-o".to_owned());
+        tokens.push(param_as_string(oversample, "oversample")?);
+    }
+    if let Some(segments) = params.get("segments") {
+        tokens.extend(param_as_string_array(segments, "segments")?);
     }
     Ok(tokens)
 }
@@ -254,6 +314,41 @@ fn lower_bandpass_tokens(
     if let Some(width) = params.get("width") {
         tokens.push(param_as_string(width, "width")?);
     }
+    Ok(tokens)
+}
+
+fn lower_splice_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["splice".to_owned()];
+    if let Some(fade) = params.get("fade") {
+        tokens.push(splice_fade_token(param_as_string(fade, "fade")?));
+    }
+    if let Some(points) = params.get("points") {
+        tokens.extend(param_as_string_array(points, "points")?);
+    }
+    Ok(tokens)
+}
+
+fn lower_silence_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["silence".to_owned()];
+    if param_as_bool(params.get("leave_periods"), "leave_periods")? {
+        tokens.push("-l".to_owned());
+    }
+    append_optional_ordered(
+        &mut tokens,
+        params,
+        &[
+            "above_periods",
+            "above_duration",
+            "above_threshold",
+            "below_periods",
+            "below_duration",
+            "below_threshold",
+        ],
+    )?;
     Ok(tokens)
 }
 
@@ -641,6 +736,42 @@ fn lower_pitch_tokens(
     Ok(tokens)
 }
 
+fn lower_vad_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["vad".to_owned()];
+    append_flagged_param(&mut tokens, params, "boot_time", "-b")?;
+    append_flagged_param(&mut tokens, params, "noise_tc_up", "-N")?;
+    append_flagged_param(&mut tokens, params, "noise_tc_down", "-n")?;
+    append_flagged_param(&mut tokens, params, "noise_reduction_amount", "-r")?;
+    append_flagged_param(&mut tokens, params, "measure_frequency", "-f")?;
+    append_flagged_param(&mut tokens, params, "measure_duration", "-m")?;
+    append_flagged_param(&mut tokens, params, "measure_tc", "-M")?;
+    append_flagged_param(&mut tokens, params, "high_pass_frequency", "-h")?;
+    append_flagged_param(&mut tokens, params, "low_pass_frequency", "-l")?;
+    append_flagged_param(&mut tokens, params, "high_pass_lifter_frequency", "-H")?;
+    append_flagged_param(&mut tokens, params, "low_pass_lifter_frequency", "-L")?;
+    append_flagged_param(&mut tokens, params, "trigger_time", "-T")?;
+    append_flagged_param(&mut tokens, params, "trigger_level", "-t")?;
+    append_flagged_param(&mut tokens, params, "search_time", "-s")?;
+    append_flagged_param(&mut tokens, params, "gap_time", "-g")?;
+    append_flagged_param(&mut tokens, params, "pre_trigger_time", "-p")?;
+    Ok(tokens)
+}
+
+fn append_flagged_param(
+    tokens: &mut Vec<String>,
+    params: &BTreeMap<String, toml::Value>,
+    param: &'static str,
+    flag: &str,
+) -> Result<(), EffectTokenError> {
+    if let Some(value) = params.get(param) {
+        tokens.push(flag.to_owned());
+        tokens.push(param_as_string(value, param)?);
+    }
+    Ok(())
+}
+
 fn param_as_string(value: &toml::Value, param: &'static str) -> Result<String, EffectTokenError> {
     match value {
         toml::Value::String(value) => Ok(value.clone()),
@@ -714,6 +845,15 @@ fn stretch_fade_token(value: String) -> String {
         "sqrt" => "s".to_owned(),
         "half" => "h".to_owned(),
         "quarter" => "q".to_owned(),
+        _ => value,
+    }
+}
+
+fn splice_fade_token(value: String) -> String {
+    match value.as_str() {
+        "half_sine" | "half-sine" | "h" => "-h".to_owned(),
+        "triangular" | "triangle" | "t" => "-t".to_owned(),
+        "quarter_sine" | "quarter-sine" | "q" => "-q".to_owned(),
         _ => value,
     }
 }

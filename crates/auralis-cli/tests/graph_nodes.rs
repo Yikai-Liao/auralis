@@ -469,3 +469,73 @@ fading = "0.25""#,
         "stretch 1.5 10 q 0.75 0.25",
     );
 }
+
+#[test]
+fn graph_nodes_lower_named_segment_edit_parameters() {
+    let samples = (0..128)
+        .map(|index| {
+            let value = (index % 32) * 500;
+            if index % 2 == 0 { value } else { -value }
+        })
+        .collect::<Vec<_>>();
+
+    assert_graph_node_matches_render(
+        "bend",
+        &samples,
+        "bend",
+        r#"frame_rate = "40"
+oversample = "8"
+segments = ["0s,100,+32s"]"#,
+        "bend -f 40 -o 8 0s,100,+32s",
+    );
+    assert_graph_node_matches_render(
+        "splice",
+        &samples,
+        "splice",
+        r#"fade = "triangular"
+points = ["48s,4s,0s", "96s,2s"]"#,
+        "splice -t 48s,4s,0s 96s,2s",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_dynamics_and_detection_parameters() {
+    let samples = &[
+        0, 0, 800, 1600, -800, -1600, 0, 0, 1200, -1200, 0, 0, 600, -600, 0, 0,
+    ];
+
+    assert_graph_node_matches_render(
+        "compand",
+        samples,
+        "compand",
+        r#"attack_decay = "0,0"
+transfer = "-60,-60,0,-6"
+gain = "0"
+initial_volume = "-90"
+delay = "0.01""#,
+        "compand 0,0 -60,-60,0,-6 0 -90 0.01",
+    );
+    assert_graph_node_matches_render(
+        "silence",
+        samples,
+        "silence",
+        r#"above_periods = "1"
+above_duration = "1s"
+above_threshold = "0%"
+below_periods = "1"
+below_duration = "2s"
+below_threshold = "0%""#,
+        "silence 1 1s 0% 1 2s 0%",
+    );
+    assert_graph_node_matches_render(
+        "vad",
+        samples,
+        "vad",
+        r#"high_pass_frequency = "1000"
+trigger_time = "0.01"
+trigger_level = "1"
+gap_time = "0.1"
+pre_trigger_time = "0.001""#,
+        "vad -h 1000 -T 0.01 -t 1 -g 0.1 -p 0.001",
+    );
+}
