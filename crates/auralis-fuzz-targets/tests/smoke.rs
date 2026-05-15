@@ -100,7 +100,7 @@ fn seeds() -> Vec<&'static [u8]> {
         br#"[id.case]
 input = "in.wav"
 corpus_id = "sine_1k_mono_480"
-auralis = ["run"]
+auralis = ["gain", "-3"]
 sox_ng = ["gain", "-3"]
 max_abs = 0.0
 rms = 0.0

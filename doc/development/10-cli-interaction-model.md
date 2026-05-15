@@ -64,9 +64,10 @@ auralis render input.wav -o output.wav --sox 'gain -3 reverse'
 auralis import sox --input input.wav --output output.wav --effects 'gain -3 reverse' --export Auralis.toml
 ```
 
-The current `auralis run input.wav output.wav gain -3 ...` path can remain
-during migration, but new documentation and new functionality should move
-toward `convert`, `render`, `plan`, `run`, `graph`, and `explain`.
+The legacy `auralis run input.wav output.wav gain -3 ...` path has been
+removed. New documentation and new functionality should use `convert`,
+`render`, `plan`, `run`, `graph`, and `explain`, with legacy SoX-compatible
+entry points living behind explicit import or compatibility commands.
 
 ## Target command surface
 
@@ -1104,7 +1105,7 @@ Allowed internal implementation:
 
 - Lower to existing `EffectChain` and `Pipeline`.
 - Reuse existing typed effect command parser where practical.
-- Keep current `auralis run input.wav output.wav ...` as compatibility.
+- Do not reintroduce `auralis run input.wav output.wav ...` compatibility.
 
 Acceptance:
 

@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use crate::{
-    AudioBuffer, BackendKind, Pipeline, Result, concatenate_audio_buffers, merge_audio_buffers,
-    mix_audio_buffers_with_backend, mix_power_audio_buffers_with_backend,
-    multiply_audio_buffers_with_backend, sequence_audio_buffers,
+    concatenate_audio_buffers, merge_audio_buffers, mix_audio_buffers_with_backend,
+    mix_power_audio_buffers_with_backend, multiply_audio_buffers_with_backend,
+    sequence_audio_buffers, AudioBuffer, BackendKind, Pipeline, Result,
 };
 
 /// Decoded audio file ready to enter an effect pipeline.
@@ -82,11 +82,11 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and concatenates them in
     /// caller order.
     ///
-    /// This is the library counterpart to `auralis run --combine concatenate`.
-    /// Each input is decoded into planar `f32`, then the buffers are
-    /// concatenated before any later pipeline effects are applied. All inputs
-    /// must have the same sample rate and channel count; frame lengths may
-    /// differ.
+    /// This is the library counterpart to
+    /// `auralis render ... --combine concatenate`. Each input is decoded into
+    /// planar `f32`, then the buffers are concatenated before any later
+    /// pipeline effects are applied. All inputs must have the same sample rate
+    /// and channel count; frame lengths may differ.
     ///
     /// # Errors
     ///
@@ -136,11 +136,12 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and sequences them in
     /// caller order.
     ///
-    /// This is the library counterpart to `auralis run --combine sequence`.
-    /// Auralis writes one output buffer/file, so sequence boundaries must keep
-    /// the same sample rate and channel count. Representable boundaries append
-    /// decoded input samples in serial playback order before any later effects
-    /// are applied. Frame lengths may differ.
+    /// This is the library counterpart to
+    /// `auralis render ... --combine sequence`. Auralis writes one output
+    /// buffer/file, so sequence boundaries must keep the same sample rate and
+    /// channel count. Representable boundaries append decoded input samples in
+    /// serial playback order before any later effects are applied. Frame
+    /// lengths may differ.
     ///
     /// # Errors
     ///
@@ -190,11 +191,11 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and mixes them into one
     /// buffer.
     ///
-    /// This is the library counterpart to `auralis run --combine mix`. Each
-    /// input is decoded into planar `f32`, scaled by `1 / input_count`, and
-    /// summed with corresponding channels before any later effects are applied.
-    /// The output length is the longest input; missing tail frames and missing
-    /// channels are silence.
+    /// This is the library counterpart to `auralis render ... --combine mix`.
+    /// Each input is decoded into planar `f32`, scaled by `1 / input_count`,
+    /// and summed with corresponding channels before any later effects are
+    /// applied. The output length is the longest input; missing tail frames
+    /// and missing channels are silence.
     ///
     /// # Errors
     ///
@@ -246,11 +247,12 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and mixes them with
     /// equal-power balancing.
     ///
-    /// This is the library counterpart to `auralis run --combine mix-power`.
-    /// Each input is decoded into planar `f32`, scaled by
-    /// `1 / sqrt(input_count)`, and summed with corresponding channels before
-    /// any later effects are applied. The output length is the longest input;
-    /// missing tail frames and missing channels are silence.
+    /// This is the library counterpart to
+    /// `auralis render ... --combine mix-power`. Each input is decoded into
+    /// planar `f32`, scaled by `1 / sqrt(input_count)`, and summed with
+    /// corresponding channels before any later effects are applied. The output
+    /// length is the longest input; missing tail frames and missing channels
+    /// are silence.
     ///
     /// # Errors
     ///
@@ -302,10 +304,11 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and merges all input
     /// channels.
     ///
-    /// This is the library counterpart to `auralis run --combine merge`. Each
-    /// input is decoded into planar `f32`; output channels contain all channels
-    /// from the first input, then all channels from each later input. The output
-    /// length is the longest input; missing tail frames are silence.
+    /// This is the library counterpart to `auralis render ... --combine merge`.
+    /// Each input is decoded into planar `f32`; output channels contain all
+    /// channels from the first input, then all channels from each later input.
+    /// The output length is the longest input; missing tail frames are
+    /// silence.
     ///
     /// # Errors
     ///
@@ -356,11 +359,12 @@ impl AudioFile {
     /// Opens multiple supported linear PCM WAV files and multiplies
     /// corresponding samples.
     ///
-    /// This is the library counterpart to `auralis run --combine multiply`.
-    /// Each input is decoded into planar `f32`; output samples are the product
-    /// of corresponding input channels and frames. The output length is the
-    /// longest input and the output channel count is the largest input channel
-    /// count. Missing tail frames and missing channels are silence.
+    /// This is the library counterpart to
+    /// `auralis render ... --combine multiply`. Each input is decoded into
+    /// planar `f32`; output samples are the product of corresponding input
+    /// channels and frames. The output length is the longest input and the
+    /// output channel count is the largest input channel count. Missing tail
+    /// frames and missing channels are silence.
     ///
     /// # Errors
     ///

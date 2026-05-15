@@ -1,5 +1,5 @@
 use crate::AudioBuffer;
-use auralis_effects::{DEFAULT_DITHER_SEED, Dither};
+use auralis_effects::{Dither, DEFAULT_DITHER_SEED};
 use thiserror::Error;
 
 /// Output-boundary dither configuration for PCM16 writing.
@@ -128,7 +128,7 @@ pub enum OutputDitherError {
 ///
 /// This helper clones the input, validates that every sample is finite, applies
 /// the configured dither, and returns the adjusted buffer. It is the library
-/// counterpart to `auralis run --dither`.
+/// counterpart to `auralis render ... --dither`.
 ///
 /// # Errors
 ///

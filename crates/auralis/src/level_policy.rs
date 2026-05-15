@@ -77,10 +77,10 @@ pub enum OutputLevelError {
 
 /// Attenuates a decoded planar buffer only when its absolute peak exceeds full scale.
 ///
-/// This is the library counterpart to `auralis run --guard`. It scans finite
-/// samples, clones the input when the peak is already within `[-1.0, 1.0]`, and
-/// otherwise applies a deterministic `1 / peak` linear scale to every channel
-/// using the scalar backend.
+/// This is the library counterpart to `auralis render ... --guard`. It scans
+/// finite samples, clones the input when the peak is already within
+/// `[-1.0, 1.0]`, and otherwise applies a deterministic `1 / peak` linear
+/// scale to every channel using the scalar backend.
 ///
 /// # Errors
 ///
@@ -117,10 +117,10 @@ pub fn guard_audio_level_with_backend(
 
 /// Normalizes a decoded planar buffer to a target full-scale peak.
 ///
-/// This is the library counterpart to `auralis run --norm[=DB]`. Silent input
-/// is returned unchanged because there is no finite multiplier that can create
-/// a peak from silence. Non-silent input is scaled so its absolute peak reaches
-/// `target`.
+/// This is the library counterpart to `auralis render ... --norm[=DB]`.
+/// Silent input is returned unchanged because there is no finite multiplier
+/// that can create a peak from silence. Non-silent input is scaled so its
+/// absolute peak reaches `target`.
 ///
 /// # Errors
 ///
