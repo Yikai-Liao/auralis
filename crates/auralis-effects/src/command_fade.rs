@@ -21,11 +21,11 @@ pub(super) fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<E
     };
 
     let fade_in = crate::command::required_arg(effect, args, "fade-in-frame")?;
-    let fade_in = parse_frame_count(effect, "fade-in-frame", fade_in)?;
+    let fade_in = parse_fade_frame_count(effect, "fade-in-frame", fade_in)?;
     let fade = if let Some(stop_position) = args.get(1).copied() {
         let stop_position = parse_fade_stop_position(effect, stop_position)?;
         let fade_out = match args.get(2).copied() {
-            Some(fade_out) => parse_frame_count(effect, "fade-out-frame", fade_out)?,
+            Some(fade_out) => parse_fade_frame_count(effect, "fade-out-frame", fade_out)?,
             None => fade_in,
         };
         reject_extra_arguments(effect, args.get(3..).unwrap_or_default())?;
@@ -65,7 +65,15 @@ fn parse_fade_stop_position(effect: &'static str, value: &str) -> CommandResult<
         return Ok(FrameCount::new(0));
     }
 
-    parse_frame_count(effect, "stop-position", value)
+    parse_fade_frame_count(effect, "stop-position", value)
+}
+
+fn parse_fade_frame_count(
+    effect: &'static str,
+    argument: &'static str,
+    value: &str,
+) -> CommandResult<FrameCount> {
+    parse_frame_count(effect, argument, value.strip_suffix('f').unwrap_or(value))
 }
 
 fn named_fade_args(effect: &'static str, args: &[&str]) -> CommandResult<Vec<String>> {
@@ -93,10 +101,13 @@ fn named_fade_args(effect: &'static str, args: &[&str]) -> CommandResult<Vec<Str
         }
     }
 
-    let fade_in = fade_in.ok_or(EffectCommandParseError::MissingArgument {
-        effect,
-        argument: "in",
-    })?;
+    if fade_in.is_none() && fade_out.is_none() {
+        return Err(EffectCommandParseError::MissingArgument {
+            effect,
+            argument: "in",
+        });
+    }
+    let fade_in = fade_in.unwrap_or_else(|| "0".to_owned());
     let mut parsed = Vec::new();
     if let Some(curve) = curve {
         parsed.push(curve);

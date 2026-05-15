@@ -334,7 +334,7 @@ path = "build/out.wav"
 #[test]
 fn check_accepts_documented_named_fade_effect_syntax() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["check", "--fx", "fade in=2 out=3 curve=linear"])
+        .args(["check", "--fx", "fade out=3f curve=linear"])
         .output()
         .unwrap();
 

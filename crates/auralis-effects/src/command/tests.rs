@@ -121,6 +121,18 @@ fn parses_documented_named_fade_form_with_frame_values() {
             .render_tokens(),
         ["fade", "h", "2", "0", "3"]
     );
+    assert_eq!(
+        parse_effect_command(&["fade", "out=3f", "curve=linear"])
+            .unwrap()
+            .render_tokens(),
+        ["fade", "t", "0", "0", "3"]
+    );
+    assert_eq!(
+        parse_effect_command(&["fade", "2f"])
+            .unwrap()
+            .render_tokens(),
+        ["fade", "l", "2"]
+    );
 }
 
 #[test]
