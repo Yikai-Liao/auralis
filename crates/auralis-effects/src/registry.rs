@@ -469,7 +469,7 @@ pub const SUPPORTED_EFFECTS: &[EffectDescriptor] = &[
     EffectDescriptor::new(
         EffectKind::HighPass,
         "highpass",
-        &[],
+        &["filter.highpass"],
         "HighPass",
         "highpass [-1|-2] frequency [width]",
         "apply a high-pass filter",

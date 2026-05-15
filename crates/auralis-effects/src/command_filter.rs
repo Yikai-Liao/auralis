@@ -1,9 +1,13 @@
-use crate::BiquadWidth;
 use crate::command::{
-    CommandResult, EffectCommandParseError, is_option_like, parse_f64, render_f64,
+    is_option_like, parse_f64, render_f64, CommandResult, EffectCommandParseError,
 };
+use crate::BiquadWidth;
 
 pub(super) fn parse_frequency_hz(effect: &'static str, value: &str) -> CommandResult<f64> {
+    let value = value
+        .strip_suffix("Hz")
+        .or_else(|| value.strip_suffix("hz"))
+        .unwrap_or(value);
     if let Some(kilohertz) = value.strip_suffix(['k', 'K']) {
         Ok(parse_f64(effect, "frequency", kilohertz)? * 1000.0)
     } else {

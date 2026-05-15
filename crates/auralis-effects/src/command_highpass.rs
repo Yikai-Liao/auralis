@@ -1,11 +1,21 @@
 use crate::command::{
-    CommandResult, EffectCommand, EffectCommandParseError, is_option_like, reject_extra_arguments,
-    render_f64, required_arg,
+    is_option_like, reject_extra_arguments, render_f64, required_arg, CommandResult, EffectCommand,
+    EffectCommandParseError,
 };
 use crate::command_filter::{parse_frequency_hz, parse_width, render_width};
 use crate::{HighPass, HighPassMode};
 
 pub(super) fn parse_highpass(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
+    let named_args;
+    let positional_args;
+    let args = if args.iter().any(|arg| arg.contains('=')) {
+        named_args = named_highpass_args(effect, args)?;
+        positional_args = named_args.iter().map(String::as_str).collect::<Vec<_>>();
+        positional_args.as_slice()
+    } else {
+        args
+    };
+
     match args.first().copied() {
         Some("-1") => {
             let frequency_hz =
@@ -65,6 +75,40 @@ pub(super) fn render_highpass(high_pass: HighPass) -> Vec<String> {
     }
 }
 
+fn named_highpass_args(effect: &'static str, args: &[&str]) -> CommandResult<Vec<String>> {
+    let mut cutoff = None;
+    let mut q = None;
+
+    for arg in args {
+        let Some((name, value)) = arg.split_once('=') else {
+            return Err(EffectCommandParseError::UnexpectedArgument {
+                effect,
+                argument: (*arg).to_owned(),
+            });
+        };
+        match name {
+            "cutoff" => cutoff = Some(value.to_owned()),
+            "q" => q = Some(format!("{value}q")),
+            _ => {
+                return Err(EffectCommandParseError::UnexpectedArgument {
+                    effect,
+                    argument: (*arg).to_owned(),
+                });
+            }
+        }
+    }
+
+    let cutoff = cutoff.ok_or(EffectCommandParseError::MissingArgument {
+        effect,
+        argument: "cutoff",
+    })?;
+    let mut parsed = vec![cutoff];
+    if let Some(q) = q {
+        parsed.push(q);
+    }
+    Ok(parsed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_highpass;
@@ -113,6 +157,16 @@ mod tests {
                 .unwrap()
                 .render_tokens(),
             ["highpass", "1000", "1o"]
+        );
+    }
+
+    #[test]
+    fn parses_documented_named_highpass_form() {
+        assert_eq!(
+            parse_highpass("highpass", &["cutoff=1000Hz", "q=0.707"])
+                .unwrap()
+                .render_tokens(),
+            ["highpass", "1000", "0.707q"]
         );
     }
 
