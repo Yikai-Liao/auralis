@@ -57,6 +57,7 @@ pub fn lower_graph_effect_tokens(
         }
         "filter.lowpass" | "lowpass" => lower_pole_filter_tokens("lowpass", params),
         "filter.highpass" | "highpass" => lower_pole_filter_tokens("highpass", params),
+        "flanger" => lower_flanger_tokens(params),
         "hilbert" => lower_flagged_value_tokens("hilbert", params, "taps", "-n"),
         "loudness" => {
             lower_ordered_tokens("loudness", params, &["gain", "reference", "half_points"])
@@ -277,6 +278,38 @@ fn lower_dither_tokens(
     Ok(tokens)
 }
 
+fn lower_flanger_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["flanger".to_owned()];
+    if let Some(interpolation) = params.get("interpolation") {
+        push_interpolation_flag(
+            &mut tokens,
+            param_as_string(interpolation, "interpolation")?,
+            true,
+        );
+    }
+    let wave = params
+        .get("wave")
+        .map(|value| param_as_string(value, "wave"))
+        .transpose()?;
+    if matches!(wave.as_deref(), Some("triangle" | "t")) {
+        tokens.push("-t".to_owned());
+    }
+    append_optional_ordered(
+        &mut tokens,
+        params,
+        &["delay", "depth", "regen", "width", "speed"],
+    )?;
+    if let Some(wave) = wave {
+        tokens.push(wave_token(wave));
+    }
+    if let Some(phase) = params.get("phase") {
+        tokens.push(param_as_string(phase, "phase")?);
+    }
+    Ok(tokens)
+}
+
 fn lower_reverb_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -441,6 +474,24 @@ fn profile_token(value: String) -> String {
         "music" => "-m".to_owned(),
         "speech" => "-s".to_owned(),
         "linear" => "-l".to_owned(),
+        _ => value,
+    }
+}
+
+fn push_interpolation_flag(tokens: &mut Vec<String>, value: String, flag_linear: bool) {
+    match value.as_str() {
+        "none" | "n" => tokens.push("-n".to_owned()),
+        "linear" | "l" if flag_linear => tokens.push("-l".to_owned()),
+        "linear" | "l" => {}
+        "quadratic" | "q" => tokens.push("-q".to_owned()),
+        _ => tokens.push(value),
+    }
+}
+
+fn wave_token(value: String) -> String {
+    match value.as_str() {
+        "s" => "sine".to_owned(),
+        "t" => "triangle".to_owned(),
         _ => value,
     }
 }

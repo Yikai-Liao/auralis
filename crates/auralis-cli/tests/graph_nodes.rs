@@ -66,7 +66,8 @@ path = "{}"
     assert!(render.status.success(), "{}", stderr(&render));
     assert_eq!(
         read_pcm16_wav_with_sample_rate(&graph_output),
-        read_pcm16_wav_with_sample_rate(&render_output)
+        read_pcm16_wav_with_sample_rate(&render_output),
+        "{name}"
     );
     let _ = fs::remove_file(&graph_output);
     let _ = fs::remove_file(&render_output);
@@ -163,6 +164,29 @@ headroom = "0""#,
         r#"speed = "5"
 depth = "50""#,
         "tremolo 5 50",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_modulation_parameters() {
+    let samples = &[
+        0, 1200, 2400, 3600, 4800, 6000, 4800, 3600, 2400, 1200, 0, -1200, -2400, -3600, -4800,
+        -6000,
+    ];
+
+    assert_graph_node_matches_render(
+        "flanger",
+        samples,
+        "flanger",
+        r#"delay = "1"
+depth = "2"
+regen = "0"
+width = "71"
+speed = "0.5"
+wave = "triangle"
+phase = "25"
+interpolation = "quadratic""#,
+        "flanger -q -t 1 2 0 71 0.5 triangle 25",
     );
 }
 
