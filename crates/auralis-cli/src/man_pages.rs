@@ -84,7 +84,10 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("check", "Validate graph specs or typed effect syntax."),
             ("plan", "Preview execution shape for an Auralis graph spec."),
-            ("graph", "Emit an Auralis graph as mermaid, dot, or json."),
+            (
+                "graph",
+                "Emit an Auralis graph as mermaid, dot, svg, or json.",
+            ),
             ("fmt", "Format an Auralis graph spec."),
             ("completions", "Generate shell completion scripts."),
             ("man", "Print built-in manual pages."),

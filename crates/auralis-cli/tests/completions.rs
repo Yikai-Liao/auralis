@@ -143,6 +143,7 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'--peak[normalize option]'"), "{stdout}");
     assert!(stdout.contains("'--curve[fade option]'"), "{stdout}");
     assert!(stdout.contains("'--locked[plan option]'"), "{stdout}");
+    assert!(stdout.contains("'--output[graph option]'"), "{stdout}");
 }
 
 #[test]

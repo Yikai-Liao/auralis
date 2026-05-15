@@ -1,16 +1,20 @@
-use std::{fs, path::Path};
+use std::{fmt::Write as _, fs, path::Path};
 
 use serde::Serialize;
 
 use crate::{CliError, GraphFormat, graph_plan, spec};
 
-pub(super) fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
+pub(super) fn graph_spec(
+    spec: &Path,
+    output: Option<&Path>,
+    format: GraphFormat,
+) -> Result<(), CliError> {
     let checked = spec::check_graph_spec(spec)?;
-    match format {
-        GraphFormat::Mermaid => print_mermaid_graph(&checked),
-        GraphFormat::Dot => print_dot_graph(&checked),
-        GraphFormat::Svg => print_svg_graph(&checked),
-        GraphFormat::Json => print_json_graph(&checked)?,
+    let rendered = render_graph(&checked, format)?;
+    if let Some(output) = output {
+        fs::write(output, rendered)?;
+    } else {
+        print!("{rendered}");
     }
 
     Ok(())
@@ -122,93 +126,148 @@ fn print_downstream(checked: &spec::CheckedGraphSpec, port: &str) {
     }
 }
 
-fn print_mermaid_graph(checked: &spec::CheckedGraphSpec) {
-    println!("flowchart LR");
+fn render_graph(checked: &spec::CheckedGraphSpec, format: GraphFormat) -> Result<String, CliError> {
+    match format {
+        GraphFormat::Mermaid => Ok(render_mermaid_graph(checked)),
+        GraphFormat::Dot => Ok(render_dot_graph(checked)),
+        GraphFormat::Svg => Ok(render_svg_graph(checked)),
+        GraphFormat::Json => render_json_graph(checked),
+    }
+}
+
+fn render_mermaid_graph(checked: &spec::CheckedGraphSpec) -> String {
+    let mut output = String::new();
+    writeln!(&mut output, "flowchart LR").expect("writing to String cannot fail");
     for source in &checked.sources {
-        println!(
+        writeln!(
+            &mut output,
             "  {}[\"source: {}\"]",
             mermaid_id(&source.id),
             source.path.display()
-        );
+        )
+        .expect("writing to String cannot fail");
     }
     for chain in &checked.chains {
         let mut previous = chain.input.strip_suffix(".audio").unwrap_or(&chain.input);
         for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
             let node_id = mermaid_id(step_id);
-            println!("  {node_id}[\"{label}\"]");
-            println!("  {} --> {node_id}", mermaid_id(previous));
+            writeln!(&mut output, "  {node_id}[\"{label}\"]")
+                .expect("writing to String cannot fail");
+            writeln!(&mut output, "  {} --> {node_id}", mermaid_id(previous))
+                .expect("writing to String cannot fail");
             previous = step_id;
         }
     }
     for node in &checked.nodes {
-        println!(
+        writeln!(
+            &mut output,
             "  {}[\"{}\"]",
             mermaid_id(&node.id),
             graph_plan::node_display_label(node)
-        );
+        )
+        .expect("writing to String cannot fail");
         for input in &node.inputs {
             let upstream = sink_upstream(checked, strip_audio_suffix(input));
-            println!("  {} --> {}", mermaid_id(upstream), mermaid_id(&node.id));
+            writeln!(
+                &mut output,
+                "  {} --> {}",
+                mermaid_id(upstream),
+                mermaid_id(&node.id)
+            )
+            .expect("writing to String cannot fail");
         }
     }
     for sink in &checked.sinks {
-        println!(
+        writeln!(
+            &mut output,
             "  {}[\"sink: {}\"]",
             mermaid_id(&sink.id),
             sink.path.display()
-        );
+        )
+        .expect("writing to String cannot fail");
         let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
         let upstream = sink_upstream(checked, input);
-        println!("  {} --> {}", mermaid_id(upstream), mermaid_id(&sink.id));
+        writeln!(
+            &mut output,
+            "  {} --> {}",
+            mermaid_id(upstream),
+            mermaid_id(&sink.id)
+        )
+        .expect("writing to String cannot fail");
     }
+    output
 }
 
-fn print_dot_graph(checked: &spec::CheckedGraphSpec) {
-    println!("digraph Auralis {{");
-    println!("  rankdir=LR;");
+fn render_dot_graph(checked: &spec::CheckedGraphSpec) -> String {
+    let mut output = String::new();
+    writeln!(&mut output, "digraph Auralis {{").expect("writing to String cannot fail");
+    writeln!(&mut output, "  rankdir=LR;").expect("writing to String cannot fail");
     for source in &checked.sources {
-        println!(
+        writeln!(
+            &mut output,
             "  {} [label={}];",
             dot_id(&source.id),
             dot_label(&format!("source: {}", source.path.display()))
-        );
+        )
+        .expect("writing to String cannot fail");
     }
     for chain in &checked.chains {
         let mut previous = chain.input.strip_suffix(".audio").unwrap_or(&chain.input);
         for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
-            println!("  {} [label={}];", dot_id(step_id), dot_label(label));
-            println!("  {} -> {};", dot_id(previous), dot_id(step_id));
+            writeln!(
+                &mut output,
+                "  {} [label={}];",
+                dot_id(step_id),
+                dot_label(label)
+            )
+            .expect("writing to String cannot fail");
+            writeln!(
+                &mut output,
+                "  {} -> {};",
+                dot_id(previous),
+                dot_id(step_id)
+            )
+            .expect("writing to String cannot fail");
             previous = step_id;
         }
     }
     for node in &checked.nodes {
-        println!(
+        writeln!(
+            &mut output,
             "  {} [label={}];",
             dot_id(&node.id),
             dot_label(&graph_plan::node_display_label(node))
-        );
+        )
+        .expect("writing to String cannot fail");
         for input in &node.inputs {
-            println!(
+            writeln!(
+                &mut output,
                 "  {} -> {};",
                 dot_id(sink_upstream(checked, strip_audio_suffix(input))),
                 dot_id(&node.id)
-            );
+            )
+            .expect("writing to String cannot fail");
         }
     }
     for sink in &checked.sinks {
-        println!(
+        writeln!(
+            &mut output,
             "  {} [label={}];",
             dot_id(&sink.id),
             dot_label(&format!("sink: {}", sink.path.display()))
-        );
+        )
+        .expect("writing to String cannot fail");
         let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
-        println!(
+        writeln!(
+            &mut output,
             "  {} -> {};",
             dot_id(sink_upstream(checked, input)),
             dot_id(&sink.id)
-        );
+        )
+        .expect("writing to String cannot fail");
     }
-    println!("}}");
+    writeln!(&mut output, "}}").expect("writing to String cannot fail");
+    output
 }
 
 #[derive(Debug, Serialize)]
@@ -230,11 +289,9 @@ struct JsonGraphEdge {
     to: String,
 }
 
-fn print_json_graph(checked: &spec::CheckedGraphSpec) -> Result<(), CliError> {
+fn render_json_graph(checked: &spec::CheckedGraphSpec) -> Result<String, CliError> {
     let graph = build_json_graph(checked);
-
-    println!("{}", serde_json::to_string_pretty(&graph)?);
-    Ok(())
+    Ok(format!("{}\n", serde_json::to_string_pretty(&graph)?))
 }
 
 fn build_json_graph(checked: &spec::CheckedGraphSpec) -> JsonGraph {
@@ -297,7 +354,7 @@ fn build_json_graph(checked: &spec::CheckedGraphSpec) -> JsonGraph {
     graph
 }
 
-fn print_svg_graph(checked: &spec::CheckedGraphSpec) {
+fn render_svg_graph(checked: &spec::CheckedGraphSpec) -> String {
     let graph = build_json_graph(checked);
     let card_width = 200_i32;
     let card_height = 44_i32;
@@ -310,33 +367,82 @@ fn print_svg_graph(checked: &spec::CheckedGraphSpec) {
             .saturating_mul(card_height + gap)
             .saturating_sub(gap);
 
-    println!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\">"
-    );
-    println!("  <style>");
-    println!("    text {{ font-family: monospace; font-size: 12px; fill: #111827; }}");
-    println!("    .kind {{ font-size: 10px; fill: #6b7280; }}");
-    println!("    .source {{ fill: #dbeafe; stroke: #2563eb; }}");
-    println!("    .step {{ fill: #dcfce7; stroke: #16a34a; }}");
-    println!("    .node {{ fill: #f3e8ff; stroke: #7c3aed; }}");
-    println!("    .sink {{ fill: #fee2e2; stroke: #dc2626; }}");
-    println!("    .edge {{ stroke: #94a3b8; stroke-width: 2; fill: none; }}");
-    println!("  </style>");
-    println!("  <defs>");
-    println!(
-        "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\">"
-    );
-    println!("      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"#94a3b8\" />");
-    println!("    </marker>");
-    println!("  </defs>");
+    let mut output = String::new();
+    append_svg_header(&mut output, width, height);
 
+    let positions = svg_node_positions(&graph, margin, card_height, gap);
+    append_svg_edges(&mut output, &graph, &positions, card_width, card_height);
+    append_svg_nodes(&mut output, &graph, &positions, card_width, card_height);
+
+    writeln!(&mut output, "</svg>").expect("writing to String cannot fail");
+    output
+}
+
+fn append_svg_header(output: &mut String, width: i32, height: i32) {
+    writeln!(
+        output,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\">"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(output, "  <style>").expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "    text {{ font-family: monospace; font-size: 12px; fill: #111827; }}"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(output, "    .kind {{ font-size: 10px; fill: #6b7280; }}")
+        .expect("writing to String cannot fail");
+    writeln!(output, "    .source {{ fill: #dbeafe; stroke: #2563eb; }}")
+        .expect("writing to String cannot fail");
+    writeln!(output, "    .step {{ fill: #dcfce7; stroke: #16a34a; }}")
+        .expect("writing to String cannot fail");
+    writeln!(output, "    .node {{ fill: #f3e8ff; stroke: #7c3aed; }}")
+        .expect("writing to String cannot fail");
+    writeln!(output, "    .sink {{ fill: #fee2e2; stroke: #dc2626; }}")
+        .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "    .edge {{ stroke: #94a3b8; stroke-width: 2; fill: none; }}"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(output, "  </style>").expect("writing to String cannot fail");
+    writeln!(output, "  <defs>").expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\">"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"#94a3b8\" />"
+    )
+    .expect("writing to String cannot fail");
+    writeln!(output, "    </marker>").expect("writing to String cannot fail");
+    writeln!(output, "  </defs>").expect("writing to String cannot fail");
+}
+
+fn svg_node_positions(
+    graph: &JsonGraph,
+    margin: i32,
+    card_height: i32,
+    gap: i32,
+) -> std::collections::BTreeMap<String, (i32, i32)> {
     let mut positions = std::collections::BTreeMap::new();
     for (index, node) in graph.nodes.iter().enumerate() {
         let x = margin;
         let y = margin + coordinate_index(index).saturating_mul(card_height + gap);
         positions.insert(node.id.clone(), (x, y));
     }
+    positions
+}
 
+fn append_svg_edges(
+    output: &mut String,
+    graph: &JsonGraph,
+    positions: &std::collections::BTreeMap<String, (i32, i32)>,
+    card_width: i32,
+    card_height: i32,
+) {
     for edge in &graph.edges {
         let Some(&(from_x, from_y)) = positions.get(&edge.from) else {
             continue;
@@ -348,28 +454,46 @@ fn print_svg_graph(checked: &spec::CheckedGraphSpec) {
         let y1 = from_y + card_height;
         let x2 = to_x + card_width / 2;
         let y2 = to_y;
-        println!(
+        writeln!(
+            output,
             "  <path class=\"edge\" marker-end=\"url(#arrow)\" d=\"M{x1} {y1} L{x2} {y2}\" />"
-        );
+        )
+        .expect("writing to String cannot fail");
     }
+}
 
+fn append_svg_nodes(
+    output: &mut String,
+    graph: &JsonGraph,
+    positions: &std::collections::BTreeMap<String, (i32, i32)>,
+    card_width: i32,
+    card_height: i32,
+) {
     for node in &graph.nodes {
         let (x, y) = positions[&node.id];
         let label = xml_escape(&node.label);
         let kind = xml_escape(node.kind);
-        println!(
+        writeln!(
+            output,
             "  <rect class=\"{}\" x=\"{x}\" y=\"{y}\" width=\"{card_width}\" height=\"{card_height}\" rx=\"10\" />",
             node.kind
-        );
-        println!(
+        )
+        .expect("writing to String cannot fail");
+        writeln!(
+            output,
             "  <text class=\"kind\" x=\"{}\" y=\"{}\">{kind}</text>",
             x + 12,
             y + 16
-        );
-        println!("  <text x=\"{}\" y=\"{}\">{label}</text>", x + 12, y + 31);
+        )
+        .expect("writing to String cannot fail");
+        writeln!(
+            output,
+            "  <text x=\"{}\" y=\"{}\">{label}</text>",
+            x + 12,
+            y + 31
+        )
+        .expect("writing to String cannot fail");
     }
-
-    println!("</svg>");
 }
 
 fn mermaid_id(id: &str) -> String {

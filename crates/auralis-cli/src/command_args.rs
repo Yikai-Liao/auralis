@@ -762,6 +762,10 @@ pub(crate) struct GraphArgs {
     /// Auralis graph spec to render.
     pub(crate) spec: PathBuf,
 
+    /// Output file to write instead of stdout.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: Option<PathBuf>,
+
     /// Output graph format.
     #[arg(long, value_name = "FORMAT", default_value = "mermaid")]
     pub(crate) format: GraphFormat,

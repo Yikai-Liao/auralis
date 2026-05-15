@@ -963,7 +963,11 @@ fn run(cli: Cli) -> Result<(), CliError> {
             chain.as_deref(),
         ),
         Command::Plan(PlanArgs { spec, json, locked }) => plan_graph_spec(&spec, json, locked),
-        Command::Graph(GraphArgs { spec, format }) => graph_spec(&spec, format),
+        Command::Graph(GraphArgs {
+            spec,
+            output,
+            format,
+        }) => graph_spec(&spec, output.as_deref(), format),
         Command::Fmt(FmtArgs { spec, check }) => format_graph_spec(&spec, check),
         Command::Init(InitArgs { spec }) => init_project(&spec),
         Command::Completions(CompletionsArgs { shell }) => {

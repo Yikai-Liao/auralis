@@ -660,6 +660,62 @@ path = "build/out.wav"
 }
 
 #[test]
+fn graph_spec_writes_svg_to_output_file() {
+    let spec = temp_path("auralis-cli-graph-spec-svg-output", "toml");
+    let graph_output = temp_path("auralis-cli-graph-spec-svg-output", "svg");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "graph",
+            spec.to_str().unwrap(),
+            "--format",
+            "svg",
+            "-o",
+            graph_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(stdout(&command_output), "");
+    let graph_svg = fs::read_to_string(&graph_output).unwrap();
+    fs::remove_file(graph_output).unwrap();
+    assert!(graph_svg.contains("<svg "), "{graph_svg}");
+    assert!(graph_svg.contains(">gain -3dB<"), "{graph_svg}");
+    assert!(
+        graph_svg.contains("marker-end=\"url(#arrow)\""),
+        "{graph_svg}"
+    );
+}
+
+#[test]
 fn plan_graph_spec_reuses_validation_errors() {
     let spec = temp_path("auralis-cli-plan-spec-unknown-input", "toml");
     fs::write(
@@ -2171,6 +2227,23 @@ fn render_help_documents_modern_effect_inputs() {
         stdout.contains("Read the effect chain from a SoX-ng-style effects file"),
         "{stdout}"
     );
+}
+
+#[test]
+fn graph_help_documents_output_file_flag() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", "--help"])
+        .output()
+        .unwrap();
+
+    assert!(command_output.status.success());
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("-o, --output <FILE>"), "{stdout}");
+    assert!(
+        stdout.contains("Output file to write instead of stdout"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--format <FORMAT>"), "{stdout}");
 }
 
 #[test]

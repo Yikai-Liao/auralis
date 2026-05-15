@@ -436,7 +436,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "graph",
-        options: &["--format"],
+        options: &["-o", "--output", "--format"],
     },
     CompletionSpec {
         name: "fmt",
