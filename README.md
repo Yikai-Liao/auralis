@@ -27,10 +27,11 @@ Auralis is pre-alpha. The repository already contains:
   PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law RIFF or RIFX output through
   the newer `OutputFormat::Wav(WavEncodeOptions)` boundary, alongside
   `auralis inspect`;
-- `auralis run` with positional SoX-ng-style effect chains, effects files,
-  input combiners, output channel/rate/level/dither policies, and many typed
-  effects, with specialized/native-backed/format-boundary effects classified
-  before inclusion;
+- `auralis render` for WAV processing with typed `--fx`/`--chain` effect
+  inputs, effects files, input combiners, output channel/rate/level/dither
+  policies, and many typed effects, with
+  specialized/native-backed/format-boundary effects classified before
+  inclusion;
 - a deterministic Rust testkit, SoX-ng golden manifests with complex
   chain/boundary cases, L0-L7 layered coverage metadata, fuzz/parser seeds,
   optional Python helpers for cross-tool golden execution and reporting, and a

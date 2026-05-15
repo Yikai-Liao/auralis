@@ -8,13 +8,13 @@ vocabulary with planar internal audio buffers. The codec trait boundary is in
 place for WAV-first scope and explicit unsupported-format reporting. PCM8 and
 PCM16 WAV decoding into planar `f32` buffers are implemented, PCM16 legacy WAV
 writing remains in place, PCM8/PCM16 writing is available through the newer
-output-format boundary, the `auralis inspect` CLI reports PCM16 WAV metadata, and
-`auralis run input.wav output.wav` performs a decode-through-buffer copy
-pipeline and can apply constant gain with `--gain-db <DB>`, SoX-ng-style
-multi-range trim positions, zero padding with frame counts and insertion
-positions, frame-level
-reversal with `--reverse`, constant DC offset with `--dc-shift <SHIFT>`, or
-linear fades with `--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
+output-format boundary, the `auralis inspect` CLI reports PCM16 WAV metadata,
+and `auralis render input.wav -o output.wav` performs a
+decode-through-buffer copy pipeline and can apply constant gain with
+`--gain-db <DB>`, SoX-ng-style multi-range trim positions, zero padding with
+frame counts and insertion positions, frame-level reversal with `--reverse`,
+constant DC offset with `--dc-shift <SHIFT>`, or linear fades with
+`--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `Hilbert`, `Sinc`, `Dither`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 `Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Stat`, `Stats`, `Synth`, `Fir`, `FirFit`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
@@ -68,9 +68,7 @@ The chain path also supports explicit SoX-ng-style `channels number` conversion
 at a user-visible effect position, using the same conversion primitive as the
 output `--channels` policy, and `rate [quality/options] frequency` conversion
 with a deterministic scalar linear scaffold for all implemented SoX-ng quality
-and override metadata. `auralis run <input.wav> <output.wav> gain -3 channels 1 rate -h -M -s -R 120 44100 norm -6 contrast softvol 2 loudness -6 65 127 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 highpass 500 lowpass 1000 riaa chorus -l 0.5 1 1 0.25 1 0 flanger -l 0 0 0 100 1 phaser -l 0.4 0.74 3 0.4 0.5 reverb 50 50 100 0 0 0 echo 0.5 1 1 0.5 echos 0.5 1 1 0.25 biquad 0.5 0 0 1 -0.5 0 tempo 1.25 pitch 1200 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 silence 0 repeat 1 remix 1 oops swap dcshift 0.125 reverse` exposes the same typed chain model at the CLI,
-preserving positional user order while the earlier single-effect flags remain
-available for compatibility. The golden
+and override metadata. `auralis render <input.wav> -o <output.wav> --fx "gain -3 channels 1 rate -h -M -s -R 120 44100 norm -6 contrast softvol 2 loudness -6 65 127 allpass 1000 0.707q band -n 1000 2q bandpass -c 1000 2q bandreject 1000 2q bass 6 treble -6 equalizer 1000 1q 6 highpass 500 lowpass 1000 riaa chorus -l 0.5 1 1 0.25 1 0 flanger -l 0 0 0 100 1 phaser -l 0.4 0.74 3 0.4 0.5 reverb 50 50 100 0 0 0 echo 0.5 1 1 0.5 echos 0.5 1 1 0.25 biquad 0.5 0 0 1 -0.5 0 tempo 1.25 pitch 1200 tremolo 5 overdrive 12 25 saturation sqrt 0.75 0.1 0.25 silence 0 repeat 1 remix 1 oops swap dcshift 0.125 reverse"` exposes the same typed chain model at the CLI. The golden
 suite now includes standalone effect coverage in `tests/golden/effects.toml`
 plus a `tests/golden/chains.toml` manifest for representative editing, level,
 gain headroom/reclaim, and fade/gain filter-style positional chains against
@@ -131,13 +129,14 @@ cross-tool/reporting layer; the full test policy lives in
 The effects crate also parses
 SoX-ng-inspired effects files into typed `EffectChain` values with blank-line,
 comment, quote, escape, and line/column diagnostic handling, and
-`auralis run --effects-file <FILE>` executes those chains through the same
-ordered pipeline as positional CLI effect chains. Positional chains and effects
-files preserve explicit `:` chain boundaries for deterministic rendering and
-diagnostics, while unsupported `newfile` and `restart` boundary controls return
-stable not-yet-implemented errors. The high-level facade and CLI also support
-SoX-ng-style concatenate, sequence, mix, mix-power, merge, and multiply input
-combiners. In `auralis run first.wav out.wav --combine concatenate --input second.wav`,
+`auralis render <INPUT.wav> -o <OUTPUT.wav> --effects-file <FILE>` executes
+those chains through the same ordered pipeline as positional CLI effect
+chains. Positional chains and effects files preserve explicit `:` chain
+boundaries for deterministic rendering and diagnostics, while unsupported
+`newfile` and `restart` boundary controls return stable not-yet-implemented
+errors. The high-level facade and CLI also support SoX-ng-style concatenate,
+sequence, mix, mix-power, merge, and multiply input combiners. In
+`auralis render first.wav -o out.wav --combine concatenate --input second.wav`,
 decoded inputs are appended before effects run and must have matching sample
 rates and channel counts. `--combine sequence` uses the same serial playback
 order for boundaries that can be represented in one output WAV, and reports a
@@ -153,16 +152,16 @@ fills shorter input tails with silence. Merge is a structural copy, so SIMD is
 not applicable. `--combine multiply` multiplies corresponding channels and
 samples from every input, uses the longest input length and largest channel
 count, treats missing frames or channels as silence, and uses the
-backend-dispatched scalar/SIMD multiply kernel. `auralis run --channels N`
+backend-dispatched scalar/SIMD multiply kernel. `auralis render ... --channels N`
 uses an explicit output policy that mirrors SoX-ng's output `--channels`
 shorthand: the CLI preserves the pipeline channel count by default, converts
 only when a target count is requested, and `--no-auto-channels` turns that
-conversion into a strict channel-count check for tests. `auralis run --rate N`
+conversion into a strict channel-count check for tests. `auralis render ... --rate N`
 uses the same explicit output-boundary policy for sample rate: the CLI
 preserves the pipeline rate by default, applies Auralis' deterministic scalar
 linear resampler only when requested, and `--no-auto-rate` turns the request
 into a strict sample-rate check. The fuller user-visible `rate` effect and
-quality modes remain future DEVELOPMENT.md work. `auralis run --guard` applies
+quality modes remain future DEVELOPMENT.md work. `auralis render ... --guard` applies
 an explicit final output-level policy that attenuates only when the processed
 buffer would exceed full scale before PCM16 encoding, while `--norm[=DB]`
 normalizes non-silent output to a requested peak level, defaulting to 0 dBFS.
