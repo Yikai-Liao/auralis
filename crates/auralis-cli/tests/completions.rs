@@ -30,6 +30,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("vol"), "{stdout}");
     assert!(stdout.contains("softvol"), "{stdout}");
     assert!(stdout.contains("tremolo"), "{stdout}");
+    assert!(stdout.contains("speed"), "{stdout}");
+    assert!(stdout.contains("tempo"), "{stdout}");
+    assert!(stdout.contains("pitch"), "{stdout}");
     assert!(stdout.contains("bass"), "{stdout}");
     assert!(stdout.contains("treble"), "{stdout}");
     assert!(stdout.contains("equalizer"), "{stdout}");
@@ -77,6 +80,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'vol:vol'"), "{stdout}");
     assert!(stdout.contains("'softvol:softvol'"), "{stdout}");
     assert!(stdout.contains("'tremolo:tremolo'"), "{stdout}");
+    assert!(stdout.contains("'speed:speed'"), "{stdout}");
+    assert!(stdout.contains("'tempo:tempo'"), "{stdout}");
+    assert!(stdout.contains("'pitch:pitch'"), "{stdout}");
     assert!(stdout.contains("'bass:bass'"), "{stdout}");
     assert!(stdout.contains("'treble:treble'"), "{stdout}");
     assert!(stdout.contains("'equalizer:equalizer'"), "{stdout}");
@@ -131,6 +137,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         "vol",
         "softvol",
         "tremolo",
+        "speed",
+        "tempo",
+        "pitch",
         "bass",
         "treble",
         "equalizer",
@@ -159,6 +168,8 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("saturation", "parameter"),
         ("softvol", "headroom"),
         ("tremolo", "depth"),
+        ("tempo", "profile"),
+        ("pitch", "quick"),
         ("bass", "frequency"),
         ("treble", "width"),
         ("equalizer", "gain"),

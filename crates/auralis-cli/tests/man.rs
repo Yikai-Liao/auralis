@@ -34,6 +34,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("vol"), "{stdout}");
     assert!(stdout.contains("softvol"), "{stdout}");
     assert!(stdout.contains("tremolo"), "{stdout}");
+    assert!(stdout.contains("speed"), "{stdout}");
+    assert!(stdout.contains("tempo"), "{stdout}");
+    assert!(stdout.contains("pitch"), "{stdout}");
     assert!(stdout.contains("bass"), "{stdout}");
     assert!(stdout.contains("treble"), "{stdout}");
     assert!(stdout.contains("equalizer"), "{stdout}");
@@ -220,6 +223,42 @@ fn level_and_modulation_man_pages_describe_recipe_lowering() {
             "tremolo - apply tremolo modulation",
             "render --fx 'tremolo ...'",
             "--depth PERCENT",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
+}
+
+#[test]
+fn time_and_pitch_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "speed",
+            "speed - change playback speed",
+            "render --fx 'speed ...'",
+            "FACTOR",
+        ),
+        (
+            "tempo",
+            "tempo - change tempo without changing pitch",
+            "render --fx 'tempo ...'",
+            "--profile PROFILE",
+        ),
+        (
+            "pitch",
+            "pitch - shift pitch without changing tempo",
+            "render --fx 'pitch ...'",
+            "--quick",
         ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))

@@ -294,6 +294,52 @@ fn level_and_modulation_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn time_and_pitch_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        ("speed", vec!["1.25"], "speed 1.25"),
+        (
+            "tempo",
+            vec![
+                "1.25",
+                "--quick",
+                "--profile",
+                "speech",
+                "--segment",
+                "60",
+                "--search",
+                "10",
+                "--overlap",
+                "8",
+            ],
+            "tempo -q -s 1.25 60 10 8",
+        ),
+        (
+            "pitch",
+            vec![
+                "-1200",
+                "--quick",
+                "--segment",
+                "60",
+                "--search",
+                "10",
+                "--overlap",
+                "8",
+            ],
+            "pitch -q -1200 60 10 8",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[-12000, -6000, 0, 6000, 12000, 6000, 0, -6000],
+        );
+    }
+}
+
+#[test]
 fn eq_recipes_lower_to_typed_render_effects() {
     let cases = [
         (

@@ -421,6 +421,116 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Change playback speed and sample rate.
+    Speed {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Speed factor, or cents with a `c` suffix.
+        #[arg(value_name = "FACTOR", allow_hyphen_values = true)]
+        factor: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Change tempo without changing pitch.
+    Tempo {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Tempo factor.
+        #[arg(value_name = "FACTOR", allow_hyphen_values = true)]
+        factor: String,
+
+        /// Prefer quicker search.
+        #[arg(long)]
+        quick: bool,
+
+        /// Tuning profile: music, speech, or linear.
+        #[arg(long, value_name = "PROFILE")]
+        profile: Option<String>,
+
+        /// Segment length in milliseconds.
+        #[arg(long, value_name = "MS", allow_hyphen_values = true)]
+        segment: Option<String>,
+
+        /// Search length in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            allow_hyphen_values = true,
+            requires = "segment"
+        )]
+        search: Option<String>,
+
+        /// Overlap length in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            allow_hyphen_values = true,
+            requires = "search"
+        )]
+        overlap: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Shift pitch without changing tempo.
+    Pitch {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Pitch shift in cents.
+        #[arg(value_name = "CENTS", allow_hyphen_values = true)]
+        cents: String,
+
+        /// Prefer quicker search.
+        #[arg(long)]
+        quick: bool,
+
+        /// Segment length in milliseconds.
+        #[arg(long, value_name = "MS", allow_hyphen_values = true)]
+        segment: Option<String>,
+
+        /// Search length in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            allow_hyphen_values = true,
+            requires = "segment"
+        )]
+        search: Option<String>,
+
+        /// Overlap length in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            allow_hyphen_values = true,
+            requires = "search"
+        )]
+        overlap: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Boost or cut bass frequencies in one audio file.
     Bass {
         /// PCM16 WAV input file to read.
@@ -1115,6 +1225,56 @@ fn run(cli: Cli) -> Result<(), CliError> {
             backend,
             ["tremolo", speed.as_str(), depth.as_str()],
         ),
+        Command::Speed {
+            input,
+            factor,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["speed", factor.as_str()]),
+        Command::Tempo {
+            input,
+            factor,
+            quick,
+            profile,
+            segment,
+            search,
+            overlap,
+            output,
+            backend,
+        } => run_tempo_recipe(
+            &input,
+            &factor,
+            quick,
+            profile.as_deref(),
+            TimingArgs {
+                segment: segment.as_deref(),
+                search: search.as_deref(),
+                overlap: overlap.as_deref(),
+            },
+            &output,
+            backend,
+        ),
+        Command::Pitch {
+            input,
+            cents,
+            quick,
+            segment,
+            search,
+            overlap,
+            output,
+            backend,
+        } => run_pitch_recipe(
+            &input,
+            &cents,
+            quick,
+            TimingArgs {
+                segment: segment.as_deref(),
+                search: search.as_deref(),
+                overlap: overlap.as_deref(),
+            },
+            &output,
+            backend,
+        ),
         Command::Bass {
             input,
             gain,
@@ -1508,6 +1668,82 @@ fn run_vol_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+#[derive(Clone, Copy)]
+struct TimingArgs<'a> {
+    segment: Option<&'a str>,
+    search: Option<&'a str>,
+    overlap: Option<&'a str>,
+}
+
+fn run_tempo_recipe(
+    input: &Path,
+    factor: &str,
+    quick: bool,
+    profile: Option<&str>,
+    timing: TimingArgs<'_>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["tempo".to_owned()];
+    if quick {
+        effect_chain.push("-q".to_owned());
+    }
+    if let Some(profile) = profile {
+        effect_chain.push(match profile {
+            "music" => "-m".to_owned(),
+            "speech" => "-s".to_owned(),
+            "linear" => "-l".to_owned(),
+            _ => profile.to_owned(),
+        });
+    }
+    effect_chain.push(factor.to_owned());
+    push_timing_args(&mut effect_chain, timing);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_pitch_recipe(
+    input: &Path,
+    cents: &str,
+    quick: bool,
+    timing: TimingArgs<'_>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["pitch".to_owned()];
+    if quick {
+        effect_chain.push("-q".to_owned());
+    }
+    effect_chain.push(cents.to_owned());
+    push_timing_args(&mut effect_chain, timing);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn push_timing_args(effect_chain: &mut Vec<String>, timing: TimingArgs<'_>) {
+    if timing.segment.is_none() && timing.search.is_none() && timing.overlap.is_none() {
+        return;
+    }
+    effect_chain.push(timing.segment.unwrap_or("0").to_owned());
+    if timing.search.is_none() && timing.overlap.is_none() {
+        return;
+    }
+    effect_chain.push(timing.search.unwrap_or("0").to_owned());
+    if let Some(overlap) = timing.overlap {
+        effect_chain.push(overlap.to_owned());
+    }
 }
 
 fn run_pole_filter_recipe(
@@ -2229,6 +2465,35 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--depth", "--backend"],
     },
     CompletionSpec {
+        name: "speed",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "tempo",
+        options: &[
+            "-o",
+            "--output",
+            "--quick",
+            "--profile",
+            "--segment",
+            "--search",
+            "--overlap",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "pitch",
+        options: &[
+            "-o",
+            "--output",
+            "--quick",
+            "--segment",
+            "--search",
+            "--overlap",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "bass",
         options: &["-o", "--output", "--frequency", "--width", "--backend"],
     },
@@ -2420,6 +2685,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("vol", "Apply SoX-ng volume scaling."),
             ("softvol", "Apply soft volume changes."),
             ("tremolo", "Apply tremolo modulation."),
+            ("speed", "Change playback speed and sample rate."),
+            ("tempo", "Change tempo without changing pitch."),
+            ("pitch", "Shift pitch without changing tempo."),
             ("bass", "Boost or cut bass frequencies."),
             ("treble", "Boost or cut treble frequencies."),
             ("equalizer", "Apply one peaking equalizer band."),
@@ -2656,6 +2924,51 @@ const MAN_PAGES: &[ManPage] = &[
         options: &[
             ("SPEED_HZ", "Modulation speed in Hz."),
             ("--depth PERCENT", "Modulation depth percentage."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "speed",
+        summary: "change playback speed",
+        synopsis: "auralis speed INPUT.wav FACTOR -o OUTPUT.wav [--backend BACKEND]",
+        description: "Speed is a recipe alias for changing playback speed and output sample rate. It lowers to the same typed effect pipeline as `render --fx 'speed ...'`.",
+        options: &[
+            ("FACTOR", "Speed factor, or cents with a `c` suffix."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "tempo",
+        summary: "change tempo without changing pitch",
+        synopsis: "auralis tempo INPUT.wav FACTOR [--quick] [--profile PROFILE] [--segment MS [--search MS [--overlap MS]]] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Tempo is a recipe alias for time stretching without pitch shift. It lowers to the same typed effect pipeline as `render --fx 'tempo ...'`.",
+        options: &[
+            ("FACTOR", "Tempo factor."),
+            ("--quick", "Prefer quicker search."),
+            (
+                "--profile PROFILE",
+                "Tuning profile: music, speech, or linear.",
+            ),
+            ("--segment MS", "Segment length in milliseconds."),
+            ("--search MS", "Search length in milliseconds."),
+            ("--overlap MS", "Overlap length in milliseconds."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "pitch",
+        summary: "shift pitch without changing tempo",
+        synopsis: "auralis pitch INPUT.wav CENTS [--quick] [--segment MS [--search MS [--overlap MS]]] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Pitch is a recipe alias for shifting pitch while preserving duration. It lowers to the same typed effect pipeline as `render --fx 'pitch ...'`.",
+        options: &[
+            ("CENTS", "Pitch shift in cents."),
+            ("--quick", "Prefer quicker search."),
+            ("--segment MS", "Segment length in milliseconds."),
+            ("--search MS", "Search length in milliseconds."),
+            ("--overlap MS", "Overlap length in milliseconds."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
