@@ -41,9 +41,18 @@ pub(super) fn format_graph_spec(spec: &Path, check: bool) -> Result<(), CliError
     Ok(())
 }
 
-pub(super) fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliError> {
+pub(super) fn explain_graph_target(spec: &Path, target: &str, json: bool) -> Result<(), CliError> {
     let checked = spec::check_graph_spec(spec)?;
+    if json {
+        return explain_graph_target_json(&checked, target);
+    }
+    explain_graph_target_human(&checked, target)
+}
 
+fn explain_graph_target_human(
+    checked: &spec::CheckedGraphSpec,
+    target: &str,
+) -> Result<(), CliError> {
     if let Some(source) = checked.sources.iter().find(|source| source.id == target) {
         println!("Node: {}", source.id);
         println!("Kind: source");
@@ -51,7 +60,7 @@ pub(super) fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliE
         println!("  {}", source.path.display());
         println!("Output port:");
         println!("  {}.audio", source.id);
-        print_downstream(&checked, &format!("{}.audio", source.id));
+        print_downstream(checked, &format!("{}.audio", source.id));
         return Ok(());
     }
 
@@ -73,7 +82,7 @@ pub(super) fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliE
                 println!("  {step_id:<24} {} ({reason})", mode.label());
             }
         }
-        print_downstream(&checked, &format!("{}.audio", chain.id));
+        print_downstream(checked, &format!("{}.audio", chain.id));
         return Ok(());
     }
 
@@ -93,7 +102,7 @@ pub(super) fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliE
         } else {
             println!("  {} ({reason})", mode.label());
         }
-        print_downstream(&checked, &format!("{}.audio", node.id));
+        print_downstream(checked, &format!("{}.audio", node.id));
         return Ok(());
     }
 
@@ -112,6 +121,139 @@ pub(super) fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliE
     Err(CliError::UnknownExplainTarget {
         target: target.to_owned(),
     })
+}
+
+fn explain_graph_target_json(
+    checked: &spec::CheckedGraphSpec,
+    target: &str,
+) -> Result<(), CliError> {
+    if let Some(source) = checked.sources.iter().find(|source| source.id == target) {
+        return print_json_explain(&JsonExplain {
+            id: &source.id,
+            kind: "source",
+            input: None,
+            path: Some(source.path.display().to_string()),
+            output_port: Some(format!("{}.audio", source.id)),
+            op: None,
+            inputs: Vec::new(),
+            steps: Vec::new(),
+            mode: None,
+            reason: None,
+            downstream: downstream_consumers(checked, &format!("{}.audio", source.id)),
+        });
+    }
+    if let Some(chain) = checked.chains.iter().find(|chain| chain.id == target) {
+        return print_json_explain(&JsonExplain {
+            id: &chain.id,
+            kind: "chain",
+            input: Some(chain.input.clone()),
+            path: None,
+            output_port: Some(format!("{}.audio", chain.id)),
+            op: None,
+            inputs: Vec::new(),
+            steps: json_explain_steps(chain),
+            mode: None,
+            reason: None,
+            downstream: downstream_consumers(checked, &format!("{}.audio", chain.id)),
+        });
+    }
+    if let Some(node) = checked.nodes.iter().find(|node| node.id == target) {
+        let (mode, reason) = graph_plan::classify_node_plan_mode(node);
+        return print_json_explain(&JsonExplain {
+            id: &node.id,
+            kind: "node",
+            input: None,
+            path: None,
+            output_port: Some(format!("{}.audio", node.id)),
+            op: Some(graph_plan::node_display_label(node)),
+            inputs: node.inputs.clone(),
+            steps: Vec::new(),
+            mode: Some(mode.label()),
+            reason: non_empty_reason(reason),
+            downstream: downstream_consumers(checked, &format!("{}.audio", node.id)),
+        });
+    }
+    if let Some(sink) = checked.sinks.iter().find(|sink| sink.id == target) {
+        return print_json_explain(&JsonExplain {
+            id: &sink.id,
+            kind: "sink",
+            input: Some(sink.input.clone()),
+            path: Some(sink.path.display().to_string()),
+            output_port: None,
+            op: None,
+            inputs: Vec::new(),
+            steps: Vec::new(),
+            mode: None,
+            reason: None,
+            downstream: Vec::new(),
+        });
+    }
+
+    Err(CliError::UnknownExplainTarget {
+        target: target.to_owned(),
+    })
+}
+
+fn json_explain_steps(chain: &spec::CheckedChain) -> Vec<JsonExplainStep<'_>> {
+    chain
+        .step_ids
+        .iter()
+        .zip(chain.step_labels.iter())
+        .map(|(id, label)| {
+            let (mode, reason) = graph_plan::classify_plan_step(label);
+            JsonExplainStep {
+                id,
+                label,
+                mode: mode.label(),
+                reason: non_empty_reason(reason),
+            }
+        })
+        .collect()
+}
+
+#[derive(Debug, Serialize)]
+struct JsonExplain<'a> {
+    id: &'a str,
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output_port: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    op: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    inputs: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    steps: Vec<JsonExplainStep<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
+    downstream: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonExplainStep<'a> {
+    id: &'a str,
+    label: &'a str,
+    mode: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
+}
+
+fn print_json_explain(explain: &JsonExplain<'_>) -> Result<(), CliError> {
+    println!("{}", serde_json::to_string_pretty(&explain)?);
+    Ok(())
+}
+
+fn non_empty_reason(reason: &'static str) -> Option<&'static str> {
+    if reason.is_empty() {
+        None
+    } else {
+        Some(reason)
+    }
 }
 
 fn print_downstream(checked: &spec::CheckedGraphSpec, port: &str) {

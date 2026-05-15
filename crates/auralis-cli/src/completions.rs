@@ -463,7 +463,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "explain",
-        options: &[],
+        options: &["--json"],
     },
     CompletionSpec {
         name: "run",

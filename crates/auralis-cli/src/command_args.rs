@@ -843,6 +843,10 @@ pub(crate) struct ExplainArgs {
 
     /// Chain, node, sink, or source id to explain.
     pub(crate) target: String,
+
+    /// Emit machine-readable JSON output.
+    #[arg(long)]
+    pub(crate) json: bool,
 }
 
 #[derive(Debug, Args)]

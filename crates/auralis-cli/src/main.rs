@@ -969,7 +969,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
             Ok(())
         }
         Command::Man(ManArgs { topic }) => print_man_page(topic.as_deref()),
-        Command::Explain(ExplainArgs { spec, target }) => explain_graph_target(&spec, &target),
+        Command::Explain(ExplainArgs { spec, target, json }) => {
+            explain_graph_target(&spec, &target, json)
+        }
         Command::Run(RunArgs {
             spec,
             target,
