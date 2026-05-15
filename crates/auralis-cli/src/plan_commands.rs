@@ -281,12 +281,8 @@ fn checked_pipe_spec(pipe: PipeArgs) -> Result<spec::CheckedGraphSpec, CliError>
         output,
         backend: _,
     } = pipe;
-    validate_effect_input(&[], Some(expression.as_str()))?;
-    let step_labels = expression
-        .split('|')
-        .map(str::trim)
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let effect_chain = parse_effect_input(&[], Some(expression.as_str()))?;
+    let step_labels = effect_chain_step_labels(&effect_chain);
     let step_ids = step_labels
         .iter()
         .enumerate()
@@ -325,29 +321,31 @@ fn render_step_labels(
     fx: &[String],
     chain: Option<&str>,
 ) -> Result<Vec<String>, CliError> {
-    match (effects_file, !fx.is_empty(), chain) {
-        (Some(path), false, None) => {
-            auralis::parse_effects_file(path)?;
-            Ok(vec![format!("effects-file {}", path.display())])
-        }
-        (None, true, None) => {
-            validate_effect_input(fx, None)?;
-            Ok(fx.to_vec())
-        }
-        (None, false, Some(chain)) => {
-            validate_effect_input(&[], Some(chain))?;
-            Ok(chain.split('|').map(str::trim).map(str::to_owned).collect())
-        }
-        (None, false, None) => Ok(Vec::new()),
+    let effect_chain = match (effects_file, !fx.is_empty(), chain) {
+        (Some(path), false, None) => auralis::parse_effects_file(path).map_err(CliError::from),
+        (None, true, None) => parse_effect_input(fx, None),
+        (None, false, Some(chain)) => parse_effect_input(&[], Some(chain)),
+        (None, false, None) => Ok(auralis::EffectChain::empty()),
         _ => Err(CliError::MixedEffectInputs),
-    }
+    }?;
+    Ok(effect_chain_step_labels(&effect_chain))
 }
 
-fn validate_effect_input(fx: &[String], chain: Option<&str>) -> Result<(), CliError> {
+fn parse_effect_input(
+    fx: &[String],
+    chain: Option<&str>,
+) -> Result<auralis::EffectChain, CliError> {
     let tokens = effect_input_to_chain_tokens(fx, chain)?;
     let token_refs = tokens.iter().map(String::as_str).collect::<Vec<_>>();
-    auralis::parse_effect_chain(&token_refs)?;
-    Ok(())
+    auralis::parse_effect_chain(&token_refs).map_err(CliError::from)
+}
+
+fn effect_chain_step_labels(chain: &auralis::EffectChain) -> Vec<String> {
+    chain
+        .commands()
+        .iter()
+        .map(|command| command.render_tokens().join(" "))
+        .collect()
 }
 
 #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
