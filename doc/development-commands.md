@@ -1,76 +1,100 @@
 # Auralis Development Commands
 
-## Development commands
+Commands below are intended to be run from the repository root unless a block
+explicitly changes directory. Local shell commands should use `rtk`.
 
-Rust:
+## Rust checks
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-cargo test --doc --workspace
-cargo bench
+rtk cargo fmt --all --check
+rtk cargo clippy --workspace --all-targets --all-features -- -D warnings
+rtk cargo test --workspace --all-features
+rtk cargo test --doc --workspace
+rtk cargo bench
 ```
 
-Python test environment must use `uv`:
+## Python tests
+
+Python test tooling must run through the project `uv` environment. Do not use
+ad-hoc system `pip` installs for project tests.
 
 ```bash
 cd tools/pytest
-uv sync
-uv run pytest
+rtk uv sync
+rtk uv run pytest
 ```
 
-Do not use ad-hoc system `pip` installs for project tests.
+## SoX-ng golden validation
 
-Python is an auxiliary test layer, not the default place for new behavior
-coverage. Prefer Rust `auralis-testkit` integration tests for durable SoX-ng
-golden and complex pipeline cases when practical, then keep Python for
-cross-tool execution, numerical checks, and failure artifacts. Python must not
-be the only critical behavior check unless the feature records why a Rust test
-would be impractical.
-
-Release and gnhf golden validation must run with a real SoX-ng oracle:
+Release and golden validation must run with a real SoX-ng oracle.
 
 ```bash
 export AURALIS_SOX_NG_BIN=${AURALIS_SOX_NG_BIN:-/usr/local/bin/sox_ng}
-cargo test --workspace --all-features golden
+rtk cargo test --workspace --all-features golden
 cd tools/pytest
-uv run pytest -m golden
+rtk uv run pytest -m golden
 ```
 
-The Rust `golden` test filter and pytest `-m golden` gate fail immediately when
-the oracle is missing. Set `AURALIS_REQUIRE_SOX_NG=1` to force the same Rust
-oracle check during a broader test invocation.
+Set `AURALIS_REQUIRE_SOX_NG=1` when a broader Rust test invocation must fail
+instead of skipping SoX-ng oracle checks.
 
-Pipeline-sensitive milestones should grow complex pipeline golden manifests in
-Rust/testkit first. Coverage report artifacts are expected for later milestones
-that touch shared behavior, parser surfaces, or DSP modules; record the summary
-or LCOV path in validation notes when that gate applies. The layered coverage
-gate can emit its artifact directly:
+## SoX-ng effect benchmarks
+
+The preserved baseline is `target/benchmarks/sox_ng`. Do not use that path as a
+new benchmark `--output-dir`; write every new run to a fresh directory under
+`target/benchmarks/`.
+
+List benchmarkable effect cases:
 
 ```bash
-python3 tools/check_layered_coverage.py --report target/layered-coverage/report.json
+cd tools/pytest
+rtk uv run python ../benchmark_sox_ng_effects.py --repo-root ../.. --list-cases
 ```
 
----
+Run one effect benchmark:
 
-## First milestone
+```bash
+cd tools/pytest
+rtk uv run python ../benchmark_sox_ng_effects.py \
+  --repo-root ../.. \
+  --effect stats \
+  --output-dir ../../target/benchmarks/sox_ng_stats_current \
+  --iterations 5 \
+  --warmups 1 \
+  --duration-seconds 90
+```
 
-The first meaningful milestone is not “many effects”. It is a tested pipeline.
+Run the full implemented-effects benchmark suite:
 
-Milestone 1 acceptance:
+```bash
+cd tools/pytest
+rtk uv run python ../benchmark_sox_ng_effects.py \
+  --repo-root ../.. \
+  --output-dir ../../target/benchmarks/sox_ng_full_current \
+  --iterations 5 \
+  --warmups 1 \
+  --duration-seconds 90
+```
 
-- Rust workspace exists.
-- WAV read/write works for PCM16 mono/stereo.
-- Internal planar `f32` representation exists.
-- CLI can inspect WAV files.
-- CLI can copy WAV input to WAV output through the internal pipeline.
-- CLI can apply `gain`.
-- Library supports equivalent chainable calls.
-- Golden tests compare `gain` against `sox_ng`.
-- Analytical tests verify `gain` math.
-- Chunk invariance passes for `gain`.
-- Documentation examples compile.
-- Python pytest harness runs under `uv`.
+Confirm a promising result with a second run. Use `--skip-build` only after the
+first run has built `target/release/auralis`.
 
----
+```bash
+cd tools/pytest
+rtk uv run python ../benchmark_sox_ng_effects.py \
+  --repo-root ../.. \
+  --effect stats \
+  --output-dir ../../target/benchmarks/sox_ng_stats_confirm \
+  --iterations 5 \
+  --warmups 1 \
+  --duration-seconds 90 \
+  --skip-build
+```
+
+Each benchmark output directory contains `report.json` and `report.md`.
+
+## Coverage report
+
+```bash
+rtk python3 tools/check_layered_coverage.py --report target/layered-coverage/report.json
+```
