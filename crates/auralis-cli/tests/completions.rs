@@ -22,6 +22,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("earwax"), "{stdout}");
     assert!(stdout.contains("echo"), "{stdout}");
     assert!(stdout.contains("echos"), "{stdout}");
+    assert!(stdout.contains("chorus"), "{stdout}");
+    assert!(stdout.contains("flanger"), "{stdout}");
+    assert!(stdout.contains("phaser"), "{stdout}");
     assert!(stdout.contains("oops"), "{stdout}");
     assert!(stdout.contains("riaa"), "{stdout}");
     assert!(stdout.contains("swap"), "{stdout}");
@@ -74,6 +77,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'earwax:earwax'"), "{stdout}");
     assert!(stdout.contains("'echo:echo'"), "{stdout}");
     assert!(stdout.contains("'echos:echos'"), "{stdout}");
+    assert!(stdout.contains("'chorus:chorus'"), "{stdout}");
+    assert!(stdout.contains("'flanger:flanger'"), "{stdout}");
+    assert!(stdout.contains("'phaser:phaser'"), "{stdout}");
     assert!(stdout.contains("'oops:oops'"), "{stdout}");
     assert!(stdout.contains("'riaa:riaa'"), "{stdout}");
     assert!(stdout.contains("'swap:swap'"), "{stdout}");
@@ -133,6 +139,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         "earwax",
         "echo",
         "echos",
+        "chorus",
+        "flanger",
+        "phaser",
         "oops",
         "riaa",
         "swap",
@@ -173,6 +182,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("fade", "out"),
         ("echo", "tap"),
         ("echos", "gain-in"),
+        ("chorus", "stage"),
+        ("flanger", "interpolation"),
+        ("phaser", "regen"),
         ("saturation", "parameter"),
         ("softvol", "headroom"),
         ("tremolo", "depth"),

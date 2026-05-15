@@ -458,6 +458,81 @@ fn echo_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn modulation_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "chorus",
+            vec![
+                "--gain-in",
+                "0.6",
+                "--gain-out",
+                "0.8",
+                "--interpolation",
+                "quadratic",
+                "--wave",
+                "triangle",
+                "--stage",
+                "1,0.25,1,0",
+                "--stage",
+                "2,-0.125,1,0,sine",
+            ],
+            "chorus -q -t 0.6 0.8 1 0.25 1 0 2 -0.125 1 0 -sine",
+        ),
+        (
+            "flanger",
+            vec![
+                "--delay",
+                "1",
+                "--depth",
+                "2",
+                "--regen",
+                "25",
+                "--width",
+                "100",
+                "--speed",
+                "1",
+                "--wave",
+                "sine",
+                "--phase",
+                "50",
+                "--interpolation",
+                "none",
+            ],
+            "flanger 1 2 25 100 1 sine 50 none",
+        ),
+        (
+            "phaser",
+            vec![
+                "--gain-in",
+                "0.8",
+                "--gain-out",
+                "0.74",
+                "--delay",
+                "3",
+                "--regen",
+                "0.4",
+                "--speed",
+                "0.5",
+                "--wave",
+                "sine",
+                "--interpolation",
+                "quadratic",
+            ],
+            "phaser -q -s 0.8 0.74 3 0.4 0.5",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[12_000, 0, -6_000, 0, 3_000],
+        );
+    }
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");

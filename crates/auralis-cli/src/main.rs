@@ -253,6 +253,193 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Add chorus modulation to one audio file.
+    Chorus {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Clean input gain.
+        #[arg(
+            long = "gain-in",
+            value_name = "GAIN",
+            default_value = "0.5",
+            allow_hyphen_values = true
+        )]
+        gain_in: String,
+
+        /// Output gain.
+        #[arg(
+            long = "gain-out",
+            value_name = "GAIN",
+            default_value = "1",
+            allow_hyphen_values = true
+        )]
+        gain_out: String,
+
+        /// Interpolation mode: none, linear, or quadratic.
+        #[arg(long, value_name = "MODE", default_value = "none")]
+        interpolation: String,
+
+        /// Default modulation wave: sine or triangle.
+        #[arg(long, value_name = "WAVE", default_value = "sine")]
+        wave: String,
+
+        /// Chorus stage as `delay_ms,decay,speed_hz,depth_ms[,wave]`; repeat for multiple stages.
+        #[arg(long = "stage", value_name = "STAGE", allow_hyphen_values = true)]
+        stages: Vec<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Add flanger modulation to one audio file.
+    Flanger {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Base delay in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        delay: String,
+
+        /// Sweep depth in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            default_value = "2",
+            allow_hyphen_values = true
+        )]
+        depth: String,
+
+        /// Regeneration percentage.
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        regen: String,
+
+        /// Wet width percentage.
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            default_value = "71",
+            allow_hyphen_values = true
+        )]
+        width: String,
+
+        /// Modulation speed in Hz.
+        #[arg(
+            long,
+            value_name = "HZ",
+            default_value = "0.5",
+            allow_hyphen_values = true
+        )]
+        speed: String,
+
+        /// Modulation wave: sine or triangle.
+        #[arg(long, value_name = "WAVE", default_value = "sine")]
+        wave: String,
+
+        /// Stereo phase percentage.
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            default_value = "25",
+            allow_hyphen_values = true
+        )]
+        phase: String,
+
+        /// Interpolation mode: none, linear, or quadratic.
+        #[arg(long, value_name = "MODE", default_value = "linear")]
+        interpolation: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Add phaser modulation to one audio file.
+    Phaser {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Clean input gain.
+        #[arg(
+            long = "gain-in",
+            value_name = "GAIN",
+            default_value = "0.4",
+            allow_hyphen_values = true
+        )]
+        gain_in: String,
+
+        /// Output gain.
+        #[arg(
+            long = "gain-out",
+            value_name = "GAIN",
+            default_value = "0.74",
+            allow_hyphen_values = true
+        )]
+        gain_out: String,
+
+        /// Delay in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            default_value = "3",
+            allow_hyphen_values = true
+        )]
+        delay: String,
+
+        /// Regeneration amount.
+        #[arg(
+            long,
+            value_name = "AMOUNT",
+            default_value = "0.4",
+            allow_hyphen_values = true
+        )]
+        regen: String,
+
+        /// Modulation speed in Hz.
+        #[arg(
+            long,
+            value_name = "HZ",
+            default_value = "0.5",
+            allow_hyphen_values = true
+        )]
+        speed: String,
+
+        /// Modulation wave: sine or triangle.
+        #[arg(long, value_name = "WAVE", default_value = "sine")]
+        wave: String,
+
+        /// Interpolation mode: none, linear, or quadratic.
+        #[arg(long, value_name = "MODE", default_value = "none")]
+        interpolation: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Extract out-of-phase stereo content.
     Oops {
         /// PCM16 WAV input file to read.
@@ -1223,6 +1410,76 @@ fn run(cli: Cli) -> Result<(), CliError> {
         } => run_echo_recipe(
             "echos", &input, &gain_in, &gain_out, &taps, &output, backend,
         ),
+        Command::Chorus {
+            input,
+            gain_in,
+            gain_out,
+            interpolation,
+            wave,
+            stages,
+            output,
+            backend,
+        } => run_chorus_recipe(
+            &input,
+            &gain_in,
+            &gain_out,
+            &interpolation,
+            &wave,
+            &stages,
+            &output,
+            backend,
+        ),
+        Command::Flanger {
+            input,
+            delay,
+            depth,
+            regen,
+            width,
+            speed,
+            wave,
+            phase,
+            interpolation,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            [
+                "flanger",
+                delay.as_str(),
+                depth.as_str(),
+                regen.as_str(),
+                width.as_str(),
+                speed.as_str(),
+                wave.as_str(),
+                phase.as_str(),
+                interpolation.as_str(),
+            ],
+        ),
+        Command::Phaser {
+            input,
+            gain_in,
+            gain_out,
+            delay,
+            regen,
+            speed,
+            wave,
+            interpolation,
+            output,
+            backend,
+        } => run_phaser_recipe(
+            &input,
+            &gain_in,
+            &gain_out,
+            &delay,
+            &regen,
+            &speed,
+            &wave,
+            &interpolation,
+            &output,
+            backend,
+        ),
         Command::Oops {
             input,
             output,
@@ -1795,6 +2052,89 @@ fn run_echo_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_chorus_recipe(
+    input: &Path,
+    gain_in: &str,
+    gain_out: &str,
+    interpolation: &str,
+    wave: &str,
+    stages: &[String],
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["chorus".to_owned()];
+    push_interpolation_flag(&mut effect_chain, interpolation);
+    push_wave_flag(&mut effect_chain, wave);
+    effect_chain.push(gain_in.to_owned());
+    effect_chain.push(gain_out.to_owned());
+    for stage in stages {
+        for part in stage.split(',') {
+            match part {
+                "sine" => effect_chain.push("-sine".to_owned()),
+                "triangle" => effect_chain.push("-triangle".to_owned()),
+                other => effect_chain.push(other.to_owned()),
+            }
+        }
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_phaser_recipe(
+    input: &Path,
+    gain_in: &str,
+    gain_out: &str,
+    delay: &str,
+    regen: &str,
+    speed: &str,
+    wave: &str,
+    interpolation: &str,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["phaser".to_owned()];
+    push_interpolation_flag(&mut effect_chain, interpolation);
+    push_wave_flag(&mut effect_chain, wave);
+    effect_chain.extend([
+        gain_in.to_owned(),
+        gain_out.to_owned(),
+        delay.to_owned(),
+        regen.to_owned(),
+        speed.to_owned(),
+    ]);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn push_interpolation_flag(effect_chain: &mut Vec<String>, interpolation: &str) {
+    match interpolation {
+        "none" => effect_chain.push("-n".to_owned()),
+        "linear" => effect_chain.push("-l".to_owned()),
+        "quadratic" => effect_chain.push("-q".to_owned()),
+        other => effect_chain.push(other.to_owned()),
+    }
+}
+
+fn push_wave_flag(effect_chain: &mut Vec<String>, wave: &str) {
+    match wave {
+        "sine" => effect_chain.push("-s".to_owned()),
+        "triangle" => effect_chain.push("-t".to_owned()),
+        other => effect_chain.push(other.to_owned()),
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -2559,6 +2899,50 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "chorus",
+        options: &[
+            "-o",
+            "--output",
+            "--gain-in",
+            "--gain-out",
+            "--interpolation",
+            "--wave",
+            "--stage",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "flanger",
+        options: &[
+            "-o",
+            "--output",
+            "--delay",
+            "--depth",
+            "--regen",
+            "--width",
+            "--speed",
+            "--wave",
+            "--phase",
+            "--interpolation",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "phaser",
+        options: &[
+            "-o",
+            "--output",
+            "--gain-in",
+            "--gain-out",
+            "--delay",
+            "--regen",
+            "--speed",
+            "--wave",
+            "--interpolation",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "oops",
         options: &["-o", "--output", "--backend"],
     },
@@ -2826,6 +3210,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("earwax", "Apply a stereo headphone-cue filter."),
             ("echo", "Add one or more parallel delayed echoes."),
             ("echos", "Add one or more cascaded delayed echoes."),
+            ("chorus", "Add chorus modulation."),
+            ("flanger", "Add flanger modulation."),
+            ("phaser", "Add phaser modulation."),
             ("oops", "Extract out-of-phase stereo content."),
             ("riaa", "Apply RIAA vinyl playback equalization."),
             ("swap", "Swap adjacent channel pairs."),
@@ -2977,6 +3364,68 @@ const MAN_PAGES: &[ManPage] = &[
             (
                 "--tap DELAY_MS,DECAY",
                 "Echo tap delay in milliseconds and decay; repeat for multiple taps.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "chorus",
+        summary: "add chorus modulation",
+        synopsis: "auralis chorus INPUT.wav [--gain-in GAIN] [--gain-out GAIN] [--interpolation MODE] [--wave WAVE] [--stage DELAY_MS,DECAY,SPEED_HZ,DEPTH_MS[,WAVE]]... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Chorus is a recipe alias for chorus modulation. It lowers to the same typed effect pipeline as `render --fx 'chorus ...'`.",
+        options: &[
+            ("--gain-in GAIN", "Clean input gain."),
+            ("--gain-out GAIN", "Output gain."),
+            (
+                "--interpolation MODE",
+                "Interpolation mode: none, linear, or quadratic.",
+            ),
+            ("--wave WAVE", "Default modulation wave: sine or triangle."),
+            (
+                "--stage STAGE",
+                "Chorus stage as delay, decay, speed, and depth; repeat for multiple stages.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "flanger",
+        summary: "add flanger modulation",
+        synopsis: "auralis flanger INPUT.wav [--delay MS] [--depth MS] [--regen PERCENT] [--width PERCENT] [--speed HZ] [--wave WAVE] [--phase PERCENT] [--interpolation MODE] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Flanger is a recipe alias for swept-delay flanger modulation. It lowers to the same typed effect pipeline as `render --fx 'flanger ...'`.",
+        options: &[
+            ("--delay MS", "Base delay in milliseconds."),
+            ("--depth MS", "Sweep depth in milliseconds."),
+            ("--regen PERCENT", "Regeneration percentage."),
+            ("--width PERCENT", "Wet width percentage."),
+            ("--speed HZ", "Modulation speed."),
+            ("--wave WAVE", "Modulation wave: sine or triangle."),
+            ("--phase PERCENT", "Stereo phase percentage."),
+            (
+                "--interpolation MODE",
+                "Interpolation mode: none, linear, or quadratic.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "phaser",
+        summary: "add phaser modulation",
+        synopsis: "auralis phaser INPUT.wav [--gain-in GAIN] [--gain-out GAIN] [--delay MS] [--regen AMOUNT] [--speed HZ] [--wave WAVE] [--interpolation MODE] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Phaser is a recipe alias for swept-delay phaser modulation. It lowers to the same typed effect pipeline as `render --fx 'phaser ...'`.",
+        options: &[
+            ("--gain-in GAIN", "Clean input gain."),
+            ("--gain-out GAIN", "Output gain."),
+            ("--delay MS", "Delay in milliseconds."),
+            ("--regen AMOUNT", "Regeneration amount."),
+            ("--speed HZ", "Modulation speed."),
+            ("--wave WAVE", "Modulation wave: sine or triangle."),
+            (
+                "--interpolation MODE",
+                "Interpolation mode: none, linear, or quadratic.",
             ),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),

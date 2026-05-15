@@ -26,6 +26,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("earwax"), "{stdout}");
     assert!(stdout.contains("echo"), "{stdout}");
     assert!(stdout.contains("echos"), "{stdout}");
+    assert!(stdout.contains("chorus"), "{stdout}");
+    assert!(stdout.contains("flanger"), "{stdout}");
+    assert!(stdout.contains("phaser"), "{stdout}");
     assert!(stdout.contains("oops"), "{stdout}");
     assert!(stdout.contains("riaa"), "{stdout}");
     assert!(stdout.contains("swap"), "{stdout}");
@@ -170,6 +173,42 @@ fn echo_man_pages_describe_recipe_lowering() {
         assert!(stdout.contains(summary), "{stdout}");
         assert!(stdout.contains(render_form), "{stdout}");
         assert!(stdout.contains("--tap DELAY_MS,DECAY"), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
+}
+
+#[test]
+fn modulation_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "chorus",
+            "chorus - add chorus modulation",
+            "render --fx 'chorus ...'",
+            "--stage STAGE",
+        ),
+        (
+            "flanger",
+            "flanger - add flanger modulation",
+            "render --fx 'flanger ...'",
+            "--phase PERCENT",
+        ),
+        (
+            "phaser",
+            "phaser - add phaser modulation",
+            "render --fx 'phaser ...'",
+            "--regen AMOUNT",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
         assert!(stdout.contains("-o, --output FILE"), "{stdout}");
     }
 }
