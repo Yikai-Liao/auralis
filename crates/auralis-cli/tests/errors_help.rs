@@ -512,6 +512,81 @@ path = "build/out.wav"
 }
 
 #[test]
+fn plan_graph_spec_reports_json_for_valid_linear_spec() {
+    let spec = temp_path("auralis-cli-plan-spec-json", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+name = "episode"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["plan", spec.to_str().unwrap(), "--json"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    let plan: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(plan["pipeline"], "episode");
+    assert_eq!(
+        plan["inputs"][0],
+        serde_json::json!({"id": "voice", "path": "input/voice.wav"})
+    );
+    assert_eq!(
+        plan["outputs"][0],
+        serde_json::json!({"id": "wav", "path": "build/out.wav"})
+    );
+    assert_eq!(
+        plan["graph"],
+        serde_json::json!({
+            "sources": 1,
+            "chains": 1,
+            "nodes": 0,
+            "sinks": 1,
+            "expanded_steps": 2
+        })
+    );
+    assert_eq!(
+        plan["execution"],
+        serde_json::json!([
+            {"action": "read", "id": "voice"},
+            {
+                "action": "chain",
+                "id": "voice_clean",
+                "input": "voice.audio",
+                "steps": ["cut", "voice_clean/02-gain"]
+            },
+            {"action": "write", "id": "wav", "input": "voice_clean.audio"}
+        ])
+    );
+}
+
+#[test]
 fn check_accepts_documented_named_fade_effect_syntax() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "fade out=3f curve=linear"])

@@ -159,6 +159,10 @@ enum Command {
     Plan {
         /// Auralis graph spec to plan.
         spec: PathBuf,
+
+        /// Emit machine-readable JSON output.
+        #[arg(long)]
+        json: bool,
     },
 
     /// Emit an Auralis graph spec as a graph description.
@@ -280,7 +284,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &fx,
             chain.as_deref(),
         ),
-        Command::Plan { spec } => plan_graph_spec(&spec),
+        Command::Plan { spec, json } => plan_graph_spec(&spec, json),
         Command::Graph { spec, format } => graph_spec(&spec, format),
         Command::Run { spec } => run_graph_spec(&spec),
         Command::Ops { effect } => print_ops(effect.as_deref()),
@@ -377,13 +381,16 @@ fn check_graph_spec(spec: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
+fn plan_graph_spec(spec: &Path, json: bool) -> Result<(), CliError> {
     let checked = spec::check_graph_spec(spec)?;
     let pipeline_name = checked
         .name
         .as_deref()
         .or_else(|| spec.file_stem().and_then(OsStr::to_str))
         .unwrap_or("Auralis.toml");
+    if json {
+        return print_json_plan(spec, pipeline_name, &checked);
+    }
 
     println!("Pipeline: {pipeline_name}");
     println!("Spec: {}", spec.display());
@@ -422,6 +429,109 @@ fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
         println!("  write {} <- {}", sink.id, sink.input);
     }
 
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct JsonPlan {
+    pipeline: String,
+    spec: String,
+    inputs: Vec<JsonPlanIo>,
+    outputs: Vec<JsonPlanIo>,
+    graph: JsonPlanGraph,
+    execution: Vec<JsonPlanStep>,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonPlanIo {
+    id: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonPlanGraph {
+    sources: usize,
+    chains: usize,
+    nodes: usize,
+    sinks: usize,
+    expanded_steps: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "action")]
+enum JsonPlanStep {
+    #[serde(rename = "read")]
+    Read { id: String },
+    #[serde(rename = "chain")]
+    Chain {
+        id: String,
+        input: String,
+        steps: Vec<String>,
+    },
+    #[serde(rename = "node")]
+    Node { id: String },
+    #[serde(rename = "write")]
+    Write { id: String, input: String },
+}
+
+fn print_json_plan(
+    spec: &Path,
+    pipeline_name: &str,
+    checked: &spec::CheckedGraphSpec,
+) -> Result<(), CliError> {
+    let mut execution = Vec::new();
+    for source in &checked.sources {
+        execution.push(JsonPlanStep::Read {
+            id: source.id.clone(),
+        });
+    }
+    for chain in &checked.chains {
+        execution.push(JsonPlanStep::Chain {
+            id: chain.id.clone(),
+            input: chain.input.clone(),
+            steps: chain.step_ids.clone(),
+        });
+    }
+    for node in &checked.nodes {
+        execution.push(JsonPlanStep::Node { id: node.clone() });
+    }
+    for sink in &checked.sinks {
+        execution.push(JsonPlanStep::Write {
+            id: sink.id.clone(),
+            input: sink.input.clone(),
+        });
+    }
+
+    let plan = JsonPlan {
+        pipeline: pipeline_name.to_owned(),
+        spec: spec.display().to_string(),
+        inputs: checked
+            .sources
+            .iter()
+            .map(|source| JsonPlanIo {
+                id: source.id.clone(),
+                path: source.path.display().to_string(),
+            })
+            .collect(),
+        outputs: checked
+            .sinks
+            .iter()
+            .map(|sink| JsonPlanIo {
+                id: sink.id.clone(),
+                path: sink.path.display().to_string(),
+            })
+            .collect(),
+        graph: JsonPlanGraph {
+            sources: checked.source_count,
+            chains: checked.chain_count,
+            nodes: checked.node_count,
+            sinks: checked.sink_count,
+            expanded_steps: checked.expanded_step_ids.len(),
+        },
+        execution,
+    };
+
+    println!("{}", serde_json::to_string_pretty(&plan)?);
     Ok(())
 }
 
