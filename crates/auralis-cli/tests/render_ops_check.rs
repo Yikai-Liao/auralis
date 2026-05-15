@@ -5,7 +5,7 @@ mod support;
 use support::*;
 
 #[test]
-fn render_fx_output_matches_positional_run_chain() {
+fn render_fx_chain_output_matches_positional_run_chain() {
     let input = temp_path("auralis-cli-render-fx-input", "wav");
     let render_output = temp_path("auralis-cli-render-fx-output", "wav");
     let run_output = temp_path("auralis-cli-render-fx-run-output", "wav");
@@ -18,9 +18,7 @@ fn render_fx_output_matches_positional_run_chain() {
             "-o",
             render_output.to_str().unwrap(),
             "--fx",
-            "gain -6",
-            "--fx",
-            "reverse",
+            "gain -6 reverse",
         ])
         .output()
         .unwrap();

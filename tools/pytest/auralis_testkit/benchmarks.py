@@ -570,12 +570,14 @@ def build_auralis_command(
 
     return [
         str(auralis_bin),
-        "run",
+        "render",
         str(input_path),
+        "-o",
         str(output_path),
         "--backend",
         backend,
-        *tokens,
+        "--fx",
+        shlex.join(tokens),
     ]
 
 

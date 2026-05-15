@@ -8,6 +8,7 @@ from auralis_testkit.benchmarks import (
     BackendMode,
     benchmark_case_catalog,
     build_report_summary,
+    build_auralis_command,
     failed_required_run_keys,
     load_resume_cases,
     parse_args,
@@ -38,6 +39,28 @@ def test_benchmark_catalog_marks_backend_capability_and_profile_needs() -> None:
         str(REPO_ROOT / "tmp/profile.prof"),
         "0.25",
     )
+
+
+def test_build_auralis_command_uses_render_fx_surface() -> None:
+    command = build_auralis_command(
+        Path("target/release/auralis"),
+        Path("input.wav"),
+        Path("output.wav"),
+        "simd",
+        ("gain", "-3", "reverse"),
+    )
+
+    assert command == [
+        "target/release/auralis",
+        "render",
+        "input.wav",
+        "-o",
+        "output.wav",
+        "--backend",
+        "simd",
+        "--fx",
+        "gain -3 reverse",
+    ]
 
 
 def test_render_markdown_report_smoke() -> None:
