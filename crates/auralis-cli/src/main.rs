@@ -6,7 +6,8 @@ use std::{
     process::ExitCode,
 };
 
-use auralis_wav::{WavError, decode_pcm16_path};
+use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
+use auralis_wav::{decode_pcm16_path, WavError};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -23,6 +24,119 @@ enum Command {
     Inspect {
         /// PCM16 WAV input file to inspect.
         input: PathBuf,
+    },
+
+    /// Convert one supported audio file into another container format.
+    Convert {
+        /// Input audio file to read.
+        input: PathBuf,
+
+        /// Output audio file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+
+        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
+        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
+        output_channels: Option<auralis::ChannelCount>,
+
+        /// Fail instead of automatically converting channels for --channels.
+        #[arg(long)]
+        no_auto_channels: bool,
+
+        /// Output sample rate; inserts deterministic rate conversion if needed.
+        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
+        output_sample_rate: Option<auralis::SampleRate>,
+
+        /// Fail instead of automatically converting sample rate for --rate.
+        #[arg(long)]
+        no_auto_rate: bool,
+
+        /// Attenuate final output only if it would clip.
+        #[arg(short = 'G', long)]
+        guard: bool,
+
+        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
+        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
+        norm: Option<f64>,
+
+        /// Select WAV sample encoding when the output container is WAV.
+        #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]
+        sample: Option<auralis::WavSampleFormat>,
+    },
+
+    /// Render one ordered stream with typed effect syntax.
+    Render {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+
+        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
+        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
+        output_channels: Option<auralis::ChannelCount>,
+
+        /// Fail instead of automatically converting channels for --channels.
+        #[arg(long)]
+        no_auto_channels: bool,
+
+        /// Output sample rate; inserts deterministic rate conversion if needed.
+        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
+        output_sample_rate: Option<auralis::SampleRate>,
+
+        /// Fail instead of automatically converting sample rate for --rate.
+        #[arg(long)]
+        no_auto_rate: bool,
+
+        /// Attenuate final output only if it would clip.
+        #[arg(short = 'G', long)]
+        guard: bool,
+
+        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
+        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
+        norm: Option<f64>,
+
+        /// Apply deterministic TPDF dither before PCM16 encoding.
+        #[arg(long)]
+        dither: bool,
+
+        /// Deterministic seed used when --dither is enabled.
+        #[arg(long, value_name = "SEED")]
+        dither_seed: Option<u32>,
+
+        /// Read the effect chain from a SoX-ng-style effects file.
+        #[arg(long, value_name = "FILE")]
+        effects_file: Option<PathBuf>,
+
+        /// One typed effect command per flag, for example `--fx 'gain -3'`.
+        #[arg(long = "fx", value_name = "EFFECT")]
+        fx: Vec<String>,
+    },
+
+    /// Validate typed effect syntax without running audio processing.
+    Check {
+        /// Read the effect chain from a SoX-ng-style effects file.
+        #[arg(long, value_name = "FILE")]
+        effects_file: Option<PathBuf>,
+
+        /// One typed effect command per flag, for example `--fx 'gain -3'`.
+        #[arg(long = "fx", value_name = "EFFECT")]
+        fx: Vec<String>,
+    },
+
+    /// List implemented typed effects or inspect one effect descriptor.
+    Ops {
+        /// Optional canonical effect name or alias to inspect.
+        effect: Option<String>,
     },
 
     /// Decode, process, and re-encode a PCM16 WAV file.
@@ -144,6 +258,77 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Inspect { input } => inspect(&input),
+        Command::Convert {
+            input,
+            output,
+            backend,
+            output_channels,
+            no_auto_channels,
+            output_sample_rate,
+            no_auto_rate,
+            guard,
+            norm,
+            sample,
+        } => convert_audio(
+            &input,
+            &output,
+            ConvertOptions {
+                backend,
+                output_channels,
+                no_auto_channels,
+                output_sample_rate,
+                no_auto_rate,
+                guard: OutputGuard::from(guard),
+                norm,
+                sample,
+            },
+        ),
+        Command::Render {
+            input,
+            output,
+            backend,
+            output_channels,
+            no_auto_channels,
+            output_sample_rate,
+            no_auto_rate,
+            guard,
+            norm,
+            dither,
+            dither_seed,
+            effects_file,
+            fx,
+        } => {
+            let options = RunOptions {
+                backend,
+                combine: auralis::CombineMethod::Concatenate,
+                additional_inputs: Vec::new(),
+                output_channels,
+                no_auto_channels,
+                output_sample_rate,
+                no_auto_rate,
+                guard: OutputGuard::from(guard),
+                norm,
+                dither: OutputDither::from(dither),
+                dither_seed,
+                gain_db: None,
+                dc_shift: None,
+                trim_start_frame: None,
+                trim_end_frame: None,
+                trim_start_seconds: None,
+                trim_end_seconds: None,
+                pad_start_frame: None,
+                pad_end_frame: None,
+                fade_in_frame: None,
+                fade_out_frame: None,
+                reverse: false,
+                effects_file,
+                effect_chain: effect_specs_to_chain_tokens(&fx)?,
+            };
+
+            run_pipeline(&input, &output, &options)
+        }
+        Command::Check { effects_file, fx } => check_effects(effects_file, &fx),
+        Command::Ops { effect } => print_ops(effect.as_deref()),
         Command::Run {
             input,
             output,
@@ -221,6 +406,21 @@ fn inspect(input: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+fn convert_audio(input: &Path, output: &Path, options: ConvertOptions) -> Result<(), CliError> {
+    let audio = open_audio_file(input, options.backend)?;
+    let format = output_format_from_path(output, options.sample)?;
+
+    audio
+        .into_pipeline()
+        .with_backend(options.backend)
+        .with_sample_rate_conversion_policy(options.sample_rate_conversion_policy()?)
+        .with_channel_conversion_policy(options.channel_conversion_policy()?)
+        .with_output_level_policy(options.output_level_policy()?)
+        .write(output, format)?;
+
+    Ok(())
+}
+
 fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
@@ -286,6 +486,50 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     Ok(())
 }
 
+fn check_effects(effects_file: Option<PathBuf>, fx: &[String]) -> Result<(), CliError> {
+    let effect_chain = parse_effect_spec(effects_file.as_deref(), fx)?;
+
+    println!("status: ok");
+    println!("commands: {}", effect_chain.len());
+    println!("boundaries: {}", effect_chain.boundaries().len());
+
+    Ok(())
+}
+
+fn print_ops(effect: Option<&str>) -> Result<(), CliError> {
+    match effect {
+        Some(name) => print_one_op(name),
+        None => {
+            for descriptor in SUPPORTED_EFFECTS {
+                println!(
+                    "{:<12} {}",
+                    descriptor.canonical_name(),
+                    descriptor.summary()
+                );
+            }
+
+            Ok(())
+        }
+    }
+}
+
+fn print_one_op(name: &str) -> Result<(), CliError> {
+    let descriptor = EffectRegistry::resolve(name).map_err(CliError::from)?;
+
+    println!("name: {}", descriptor.canonical_name());
+    println!("kind: {:?}", descriptor.kind());
+    println!("summary: {}", descriptor.summary());
+    println!("typed_api: {}", descriptor.typed_api());
+    println!("sox_ng_syntax: {}", descriptor.sox_ng_syntax());
+    if descriptor.aliases().is_empty() {
+        println!("aliases: none");
+    } else {
+        println!("aliases: {}", descriptor.aliases().join(", "));
+    }
+
+    Ok(())
+}
+
 #[derive(Debug)]
 struct RunOptions {
     backend: auralis::BackendKind,
@@ -312,6 +556,56 @@ struct RunOptions {
     reverse: bool,
     effects_file: Option<PathBuf>,
     effect_chain: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ConvertOptions {
+    backend: auralis::BackendKind,
+    output_channels: Option<auralis::ChannelCount>,
+    no_auto_channels: bool,
+    output_sample_rate: Option<auralis::SampleRate>,
+    no_auto_rate: bool,
+    guard: OutputGuard,
+    norm: Option<f64>,
+    sample: Option<auralis::WavSampleFormat>,
+}
+
+impl ConvertOptions {
+    fn channel_conversion_policy(&self) -> Result<auralis::ChannelConversionPolicy, CliError> {
+        match (self.output_channels, self.no_auto_channels) {
+            (None, false) => Ok(auralis::ChannelConversionPolicy::Preserve),
+            (Some(channels), false) => Ok(auralis::ChannelConversionPolicy::automatic(channels)),
+            (Some(channels), true) => Ok(auralis::ChannelConversionPolicy::require(channels)),
+            (None, true) => Err(CliError::NoAutoChannelsWithoutOutputChannels),
+        }
+    }
+
+    fn sample_rate_conversion_policy(
+        &self,
+    ) -> Result<auralis::SampleRateConversionPolicy, CliError> {
+        match (self.output_sample_rate, self.no_auto_rate) {
+            (None, false) => Ok(auralis::SampleRateConversionPolicy::Preserve),
+            (Some(sample_rate), false) => {
+                Ok(auralis::SampleRateConversionPolicy::automatic(sample_rate))
+            }
+            (Some(sample_rate), true) => {
+                Ok(auralis::SampleRateConversionPolicy::require(sample_rate))
+            }
+            (None, true) => Err(CliError::NoAutoRateWithoutOutputRate),
+        }
+    }
+
+    fn output_level_policy(&self) -> Result<auralis::OutputLevelPolicy, CliError> {
+        match (self.guard, self.norm) {
+            (OutputGuard::Disabled, None) => Ok(auralis::OutputLevelPolicy::Preserve),
+            (OutputGuard::Enabled, None) => Ok(auralis::OutputLevelPolicy::guard()),
+            (OutputGuard::Disabled, Some(target)) => auralis::Decibels::new(target)
+                .map(auralis::OutputLevelPolicy::normalize)
+                .map_err(auralis::Error::from)
+                .map_err(CliError::from),
+            (OutputGuard::Enabled, Some(_)) => Err(CliError::MixedGuardAndNorm),
+        }
+    }
 }
 
 impl RunOptions {
@@ -433,6 +727,40 @@ impl RunOptions {
     }
 }
 
+fn parse_effect_spec(
+    effects_file: Option<&Path>,
+    fx: &[String],
+) -> Result<auralis::EffectChain, CliError> {
+    let has_effects_file = effects_file.is_some();
+    let has_fx = !fx.is_empty();
+
+    match (has_effects_file, has_fx) {
+        (true, true) => Err(CliError::MixedEffectsFileAndFx),
+        (false, false) => Err(CliError::MissingEffectSpec),
+        (true, false) => auralis::parse_effects_file(effects_file.unwrap()).map_err(CliError::from),
+        (false, true) => {
+            let tokens = effect_specs_to_chain_tokens(fx)?;
+            let token_refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
+            auralis::parse_effect_chain(&token_refs).map_err(CliError::from)
+        }
+    }
+}
+
+fn effect_specs_to_chain_tokens(specs: &[String]) -> Result<Vec<String>, CliError> {
+    let mut tokens = Vec::new();
+
+    for spec in specs {
+        let parsed =
+            shlex::split(spec).ok_or_else(|| CliError::InvalidEffectSpec { spec: spec.clone() })?;
+        if parsed.is_empty() {
+            return Err(CliError::EmptyEffectSpec);
+        }
+        tokens.extend(parsed);
+    }
+
+    Ok(tokens)
+}
+
 fn open_pipeline(
     input: &Path,
     options: &RunOptions,
@@ -506,6 +834,71 @@ fn open_pipeline(
     Ok(audio.into_pipeline())
 }
 
+fn open_audio_file(
+    input: &Path,
+    backend: auralis::BackendKind,
+) -> Result<auralis::AudioFile, CliError> {
+    match path_extension(input) {
+        Some("wav") => {
+            auralis::AudioFile::open_wav_with_backend(input, backend).map_err(CliError::from)
+        }
+        Some("flac") => auralis::AudioFile::open_flac(input).map_err(CliError::from),
+        Some("au" | "snd") => auralis::AudioFile::open_au(input).map_err(CliError::from),
+        _ => Err(CliError::UnsupportedConvertInputFormat {
+            path: input.to_path_buf(),
+        }),
+    }
+}
+
+fn output_format_from_path(
+    output: &Path,
+    wav_sample: Option<auralis::WavSampleFormat>,
+) -> Result<auralis::OutputFormat, CliError> {
+    match path_extension(output) {
+        Some("wav") => Ok(auralis::OutputFormat::Wav(match wav_sample {
+            Some(sample) => auralis::WavEncodeOptions::new(sample),
+            None => auralis::WavEncodeOptions::default(),
+        })),
+        Some("flac") => {
+            if wav_sample.is_some() {
+                return Err(CliError::WavSampleFormatRequiresWavOutput);
+            }
+            Ok(auralis::OutputFormat::Flac(auralis::FlacEncodeOptions))
+        }
+        Some("aiff" | "aif") => {
+            if wav_sample.is_some() {
+                return Err(CliError::WavSampleFormatRequiresWavOutput);
+            }
+            Ok(auralis::OutputFormat::Aiff(
+                auralis::AiffEncodeOptions::default(),
+            ))
+        }
+        Some("aifc") => {
+            if wav_sample.is_some() {
+                return Err(CliError::WavSampleFormatRequiresWavOutput);
+            }
+            Ok(auralis::OutputFormat::Aiff(
+                auralis::AiffEncodeOptions::aifc_signed16_le(),
+            ))
+        }
+        Some("au" | "snd") => {
+            if wav_sample.is_some() {
+                return Err(CliError::WavSampleFormatRequiresWavOutput);
+            }
+            Ok(auralis::OutputFormat::Au(
+                auralis::AuEncodeOptions::default(),
+            ))
+        }
+        _ => Err(CliError::UnsupportedConvertOutputFormat {
+            path: output.to_path_buf(),
+        }),
+    }
+}
+
+fn path_extension(path: &Path) -> Option<&str> {
+    path.extension().and_then(OsStr::to_str)
+}
+
 fn synth_prefix_frame_limit(effect_chain: &auralis::EffectChain) -> Option<auralis::FrameCount> {
     match effect_chain.commands().first()? {
         auralis::EffectCommand::Synth(synth) => synth.input_prefix_frames(),
@@ -527,7 +920,11 @@ enum OutputGuard {
 
 impl From<bool> for OutputGuard {
     fn from(value: bool) -> Self {
-        if value { Self::Enabled } else { Self::Disabled }
+        if value {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
     }
 }
 
@@ -539,7 +936,11 @@ enum OutputDither {
 
 impl From<bool> for OutputDither {
     fn from(value: bool) -> Self {
-        if value { Self::Enabled } else { Self::Disabled }
+        if value {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
     }
 }
 
@@ -593,14 +994,36 @@ fn parse_sample_rate(value: &str) -> Result<auralis::SampleRate, String> {
         .map_err(|_| "rate must be a positive integer no larger than 4294967295".to_owned())
 }
 
+fn parse_wav_sample_format(value: &str) -> Result<auralis::WavSampleFormat, String> {
+    match value {
+        "pcm8" => Ok(auralis::WavSampleFormat::Pcm8),
+        "pcm16" => Ok(auralis::WavSampleFormat::Pcm16),
+        "pcm24" => Ok(auralis::WavSampleFormat::Pcm24),
+        "pcm32" => Ok(auralis::WavSampleFormat::Pcm32),
+        "float32" => Ok(auralis::WavSampleFormat::Float32),
+        "float64" => Ok(auralis::WavSampleFormat::Float64),
+        "ulaw" => Ok(auralis::WavSampleFormat::ULaw),
+        "alaw" => Ok(auralis::WavSampleFormat::ALaw),
+        _ => Err(
+            "sample format must be `pcm8`, `pcm16`, `pcm24`, `pcm32`, `float32`, `float64`, `ulaw`, or `alaw`"
+                .to_owned(),
+        ),
+    }
+}
+
 #[derive(Debug)]
 enum CliError {
     Auralis(auralis::Error),
     ChainParse(auralis::EffectChainParseError),
+    EffectName(auralis::EffectNameError),
     EffectsFile(auralis::EffectsFileReadError),
     Wav(WavError),
+    EmptyEffectSpec,
+    InvalidEffectSpec { spec: String },
     IncompleteTrimRange { unit: TrimUnit },
+    MissingEffectSpec,
     MixedTrimUnits,
+    MixedEffectsFileAndFx,
     MixedEffectSyntax,
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
@@ -608,7 +1031,10 @@ enum CliError {
     DitherSeedWithoutDither,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
+    UnsupportedConvertInputFormat { path: PathBuf },
+    UnsupportedConvertOutputFormat { path: PathBuf },
     UnsupportedFormat { path: PathBuf, role: PathRole },
+    WavSampleFormatRequiresWavOutput,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -637,8 +1063,14 @@ impl std::fmt::Display for CliError {
         match self {
             Self::Auralis(error) => write!(formatter, "{error}"),
             Self::ChainParse(error) => write!(formatter, "{error}"),
+            Self::EffectName(error) => write!(formatter, "{error}"),
             Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
+            Self::EmptyEffectSpec => formatter.write_str("--fx requires a non-empty effect string"),
+            Self::InvalidEffectSpec { spec } => write!(
+                formatter,
+                "effect string `{spec}` contains unmatched shell quoting"
+            ),
             Self::IncompleteTrimRange { unit } => match unit {
                 TrimUnit::Frames => formatter
                     .write_str("frame trim requires both --trim-start-frame and --trim-end-frame"),
@@ -646,8 +1078,14 @@ impl std::fmt::Display for CliError {
                     "seconds trim requires both --trim-start-seconds and --trim-end-seconds",
                 ),
             },
+            Self::MissingEffectSpec => {
+                formatter.write_str("one of --fx or --effects-file is required")
+            }
             Self::MixedTrimUnits => formatter
                 .write_str("trim range must use either frame units or seconds units, not both"),
+            Self::MixedEffectsFileAndFx => {
+                formatter.write_str("--effects-file cannot be combined with --fx")
+            }
             Self::MixedEffectSyntax => formatter
                 .write_str("positional effect chains cannot be combined with legacy effect flags"),
             Self::MixedEffectsFileAndPositionalChain => formatter
@@ -665,12 +1103,25 @@ impl std::fmt::Display for CliError {
             Self::NoAutoRateWithoutOutputRate => {
                 formatter.write_str("--no-auto-rate requires --rate")
             }
+            Self::UnsupportedConvertInputFormat { path } => write!(
+                formatter,
+                "unsupported convert input format for {}; supported inputs are wav, flac, au, and snd",
+                path.display()
+            ),
+            Self::UnsupportedConvertOutputFormat { path } => write!(
+                formatter,
+                "unsupported convert output format for {}; supported outputs are wav, flac, aiff, aif, aifc, au, and snd",
+                path.display()
+            ),
             Self::UnsupportedFormat { path, role } => {
                 write!(
                     formatter,
                     "unsupported {role} format for {}; only PCM16 WAV is supported",
                     path.display()
                 )
+            }
+            Self::WavSampleFormatRequiresWavOutput => {
+                formatter.write_str("--sample is supported only for WAV output")
             }
         }
     }
@@ -685,6 +1136,12 @@ impl From<auralis::Error> for CliError {
 impl From<auralis::EffectChainParseError> for CliError {
     fn from(error: auralis::EffectChainParseError) -> Self {
         Self::ChainParse(error)
+    }
+}
+
+impl From<auralis::EffectNameError> for CliError {
+    fn from(error: auralis::EffectNameError) -> Self {
+        Self::EffectName(error)
     }
 }
 
