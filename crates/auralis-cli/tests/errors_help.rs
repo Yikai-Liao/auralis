@@ -419,6 +419,65 @@ path = "build/out.wav"
 }
 
 #[test]
+fn graph_spec_reports_json_for_valid_linear_spec() {
+    let spec = temp_path("auralis-cli-graph-spec-json", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "json"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    let graph: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(
+        graph["nodes"],
+        serde_json::json!([
+            {"id": "voice", "kind": "source", "label": "input/voice.wav"},
+            {"id": "cut", "kind": "step", "label": "trim"},
+            {"id": "voice_clean/02-gain", "kind": "step", "label": "gain -3dB"},
+            {"id": "wav", "kind": "sink", "label": "build/out.wav"},
+        ])
+    );
+    assert_eq!(
+        graph["edges"],
+        serde_json::json!([
+            {"from": "voice", "to": "cut"},
+            {"from": "cut", "to": "voice_clean/02-gain"},
+            {"from": "voice_clean/02-gain", "to": "wav"},
+        ])
+    );
+}
+
+#[test]
 fn plan_graph_spec_reuses_validation_errors() {
     let spec = temp_path("auralis-cli-plan-spec-unknown-input", "toml");
     fs::write(

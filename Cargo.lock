@@ -116,6 +116,7 @@ dependencies = [
  "auralis-wav",
  "clap",
  "serde",
+ "serde_json",
  "shlex",
  "toml",
 ]

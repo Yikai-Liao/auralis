@@ -11,6 +11,7 @@ use std::{
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
 use auralis_wav::{decode_pcm16_path, WavError};
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::Serialize;
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Deterministic audio DSP tools.")]
@@ -187,6 +188,7 @@ enum Command {
 enum GraphFormat {
     Mermaid,
     Dot,
+    Json,
 }
 
 fn main() -> ExitCode {
@@ -428,6 +430,7 @@ fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
     match format {
         GraphFormat::Mermaid => print_mermaid_graph(&checked),
         GraphFormat::Dot => print_dot_graph(&checked),
+        GraphFormat::Json => print_json_graph(&checked)?,
     }
 
     Ok(())
@@ -501,6 +504,80 @@ fn print_dot_graph(checked: &spec::CheckedGraphSpec) {
         );
     }
     println!("}}");
+}
+
+#[derive(Debug, Serialize)]
+struct JsonGraph {
+    nodes: Vec<JsonGraphNode>,
+    edges: Vec<JsonGraphEdge>,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonGraphNode {
+    id: String,
+    kind: &'static str,
+    label: String,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonGraphEdge {
+    from: String,
+    to: String,
+}
+
+fn print_json_graph(checked: &spec::CheckedGraphSpec) -> Result<(), CliError> {
+    let mut graph = JsonGraph {
+        nodes: Vec::new(),
+        edges: Vec::new(),
+    };
+
+    for source in &checked.sources {
+        graph.nodes.push(JsonGraphNode {
+            id: source.id.clone(),
+            kind: "source",
+            label: source.path.display().to_string(),
+        });
+    }
+
+    for chain in &checked.chains {
+        let mut previous = chain.input.strip_suffix(".audio").unwrap_or(&chain.input);
+        for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
+            graph.nodes.push(JsonGraphNode {
+                id: step_id.clone(),
+                kind: "step",
+                label: label.clone(),
+            });
+            graph.edges.push(JsonGraphEdge {
+                from: previous.to_string(),
+                to: step_id.clone(),
+            });
+            previous = step_id;
+        }
+    }
+
+    for node in &checked.nodes {
+        graph.nodes.push(JsonGraphNode {
+            id: node.clone(),
+            kind: "node",
+            label: node.clone(),
+        });
+    }
+
+    for sink in &checked.sinks {
+        graph.nodes.push(JsonGraphNode {
+            id: sink.id.clone(),
+            kind: "sink",
+            label: sink.path.display().to_string(),
+        });
+        let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
+        graph.edges.push(JsonGraphEdge {
+            from: sink_upstream(checked, input).to_string(),
+            to: sink.id.clone(),
+        });
+    }
+
+    println!("{}", serde_json::to_string_pretty(&graph)?);
+    Ok(())
 }
 
 fn mermaid_id(id: &str) -> String {
@@ -1095,6 +1172,7 @@ enum CliError {
     EffectName(auralis::EffectNameError),
     EffectsFile(auralis::EffectsFileReadError),
     GraphSpec(spec::GraphSpecError),
+    Json(serde_json::Error),
     Wav(WavError),
     EmptyEffectSpec,
     InvalidEffectSpec { spec: String },
@@ -1137,6 +1215,7 @@ impl std::fmt::Display for CliError {
             Self::EffectName(error) => write!(formatter, "{error}"),
             Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::GraphSpec(error) => write!(formatter, "{error}"),
+            Self::Json(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::EmptyEffectSpec => {
                 formatter.write_str("effect input requires a non-empty effect")
@@ -1226,6 +1305,12 @@ impl From<auralis::EffectsFileReadError> for CliError {
 impl From<spec::GraphSpecError> for CliError {
     fn from(error: spec::GraphSpecError) -> Self {
         Self::GraphSpec(error)
+    }
+}
+
+impl From<serde_json::Error> for CliError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error)
     }
 }
 
