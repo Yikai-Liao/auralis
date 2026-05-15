@@ -5,8 +5,8 @@ mod params;
 pub use params::EffectTokenError;
 use params::{
     fade_curve_token, global_wave_flag, invalid_param, param_as_bool, param_as_dbfs,
-    param_as_frequency_hz, param_as_string, param_as_string_array, profile_token,
-    push_interpolation_flag, rate_quality_flag, splice_fade_token, stage_wave_flag,
+    param_as_frequency_hz, param_as_string, param_as_string_array, param_as_table_array,
+    profile_token, push_interpolation_flag, rate_quality_flag, splice_fade_token, stage_wave_flag,
     stretch_fade_token, wave_token,
 };
 
@@ -136,6 +136,7 @@ fn lower_graph_effect_tokens_m_to_z(
         "stat" => lower_stat_tokens(params),
         "stats" => lower_stats_tokens(params),
         "stretch" => lower_stretch_tokens(params),
+        "synth" => lower_synth_tokens(params),
         "tempo" => lower_tempo_tokens(params),
         "treble" => lower_ordered_tokens("treble", params, &["gain", "frequency", "width"]),
         "tremolo" => lower_ordered_tokens("tremolo", params, &["speed", "depth"]),
@@ -768,6 +769,65 @@ fn lower_stretch_tokens(
     }
     append_optional_ordered(&mut tokens, params, &["shift", "fading"])?;
     Ok(tokens)
+}
+
+fn lower_synth_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["synth".to_owned()];
+    if param_as_bool(params.get("no_headroom"), "no_headroom")? {
+        tokens.push("-n".to_owned());
+    }
+    if let Some(length) = params.get("length") {
+        tokens.push(param_as_string(length, "length")?);
+    }
+    if let Some(channels) = params.get("channels") {
+        for channel in param_as_table_array(channels, "channels")? {
+            append_synth_channel_tokens(&mut tokens, channel)?;
+        }
+    }
+    Ok(tokens)
+}
+
+fn append_synth_channel_tokens(
+    tokens: &mut Vec<String>,
+    channel: &toml::map::Map<String, toml::Value>,
+) -> Result<(), EffectTokenError> {
+    let waveform = channel
+        .get("waveform")
+        .ok_or_else(|| invalid_param("waveform"))
+        .and_then(|value| param_as_string(value, "waveform"))?;
+    tokens.push(wave_token(waveform));
+
+    if let Some(combine) = channel.get("combine") {
+        tokens.push(param_as_string(combine, "combine")?);
+        if let Some(vdelay) = channel.get("vdelay") {
+            tokens.push(param_as_string(vdelay, "vdelay")?);
+        }
+    }
+
+    if let Some(frequency) = channel.get("frequency") {
+        tokens.push(param_as_string(frequency, "frequency")?);
+    }
+    append_synth_shape_tokens(tokens, channel)
+}
+
+fn append_synth_shape_tokens(
+    tokens: &mut Vec<String>,
+    channel: &toml::map::Map<String, toml::Value>,
+) -> Result<(), EffectTokenError> {
+    let mut missing_prefix = false;
+    for param in ["offset", "phase", "p1", "p2", "p3"] {
+        let Some(value) = channel.get(param) else {
+            missing_prefix = true;
+            continue;
+        };
+        if missing_prefix {
+            return Err(invalid_param(param));
+        }
+        tokens.push(param_as_string(value, param)?);
+    }
+    Ok(())
 }
 
 fn lower_tempo_tokens(

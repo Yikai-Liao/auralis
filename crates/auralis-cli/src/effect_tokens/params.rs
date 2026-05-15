@@ -34,6 +34,22 @@ pub(super) fn param_as_string_array(
         .collect()
 }
 
+pub(super) fn param_as_table_array<'a>(
+    value: &'a toml::Value,
+    param: &'static str,
+) -> Result<Vec<&'a toml::map::Map<String, toml::Value>>, EffectTokenError> {
+    let toml::Value::Array(values) = value else {
+        return Err(invalid_param(param));
+    };
+    values
+        .iter()
+        .map(|value| match value {
+            toml::Value::Table(table) => Ok(table),
+            _ => Err(invalid_param(param)),
+        })
+        .collect()
+}
+
 pub(super) fn param_as_bool(
     value: Option<&toml::Value>,
     param: &'static str,

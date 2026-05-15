@@ -672,6 +672,24 @@ fading = "0.25""#,
 }
 
 #[test]
+fn graph_nodes_lower_named_synth_parameters() {
+    let samples = &[0; 64];
+
+    assert_graph_node_matches_render(
+        "synth",
+        samples,
+        "synth",
+        r#"no_headroom = true
+length = "16s"
+channels = [
+  { waveform = "sine", frequency = "440" },
+  { waveform = "triangle", combine = "mix", frequency = "220", offset = "0", phase = "25", p1 = "25" },
+]"#,
+        "synth -n 16s sine 440 triangle mix 220 0 25 25",
+    );
+}
+
+#[test]
 fn graph_nodes_lower_named_segment_edit_parameters() {
     let samples = (0..128)
         .map(|index| {
