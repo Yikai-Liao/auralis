@@ -18,16 +18,43 @@ pub fn check_graph_spec(path: &Path) -> Result<CheckedGraphSpec, GraphSpecError>
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedGraphSpec {
+    pub name: Option<String>,
     pub source_count: usize,
     pub chain_count: usize,
     pub node_count: usize,
     pub sink_count: usize,
+    pub sources: Vec<CheckedSource>,
+    pub chains: Vec<CheckedChain>,
+    pub nodes: Vec<String>,
+    pub sinks: Vec<CheckedSink>,
     pub expanded_step_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckedSource {
+    pub id: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckedChain {
+    pub id: String,
+    pub input: String,
+    pub step_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckedSink {
+    pub id: String,
+    pub input: String,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
 struct GraphSpec {
     version: String,
+    #[serde(default)]
+    name: Option<String>,
     #[serde(default)]
     sources: Vec<SourceSpec>,
     #[serde(default)]
@@ -126,40 +153,7 @@ impl GraphSpec {
             .map(|id| format!("{id}.audio"))
             .collect::<BTreeSet<_>>();
 
-        let mut expanded_step_ids = Vec::new();
-        for chain in &self.chains {
-            ensure_known_port(&chain.input, "chain", &chain.id, &available_ports)?;
-            if chain.steps.is_empty() {
-                return Err(GraphSpecError::EmptyChain {
-                    id: chain.id.clone(),
-                });
-            }
-
-            let mut seen_step_ids = BTreeSet::new();
-            for (index, step) in chain.steps.iter().enumerate() {
-                if step.op.trim().is_empty() {
-                    return Err(GraphSpecError::EmptyStepOp {
-                        chain_id: chain.id.clone(),
-                        index,
-                    });
-                }
-
-                let expanded_id = step
-                    .id
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| format!("{}/{:02}-{}", chain.id, index + 1, step.op));
-                if !seen_step_ids.insert(expanded_id.clone()) {
-                    return Err(GraphSpecError::DuplicateChainStepId {
-                        chain_id: chain.id.clone(),
-                        step_id: expanded_id,
-                    });
-                }
-                expanded_step_ids.push(expanded_id);
-            }
-        }
+        let (checked_chains, expanded_step_ids) = validate_chains(&self.chains, &available_ports)?;
 
         for node in &self.nodes {
             match (&node.input, node.inputs.is_empty()) {
@@ -189,13 +183,86 @@ impl GraphSpec {
         }
 
         Ok(CheckedGraphSpec {
+            name: self.name,
             source_count: self.sources.len(),
             chain_count: self.chains.len(),
             node_count: self.nodes.len(),
             sink_count: self.sinks.len(),
+            sources: self
+                .sources
+                .into_iter()
+                .map(|source| CheckedSource {
+                    id: source.id,
+                    path: source.path,
+                })
+                .collect(),
+            chains: checked_chains,
+            nodes: self.nodes.into_iter().map(|node| node.id).collect(),
+            sinks: self
+                .sinks
+                .into_iter()
+                .map(|sink| CheckedSink {
+                    id: sink.id,
+                    input: sink.input,
+                    path: sink.path,
+                })
+                .collect(),
             expanded_step_ids,
         })
     }
+}
+
+fn validate_chains(
+    chains: &[ChainSpec],
+    available_ports: &BTreeSet<String>,
+) -> Result<(Vec<CheckedChain>, Vec<String>), GraphSpecError> {
+    let mut checked_chains = Vec::new();
+    let mut expanded_step_ids = Vec::new();
+
+    for chain in chains {
+        ensure_known_port(&chain.input, "chain", &chain.id, available_ports)?;
+        if chain.steps.is_empty() {
+            return Err(GraphSpecError::EmptyChain {
+                id: chain.id.clone(),
+            });
+        }
+
+        let mut seen_step_ids = BTreeSet::new();
+        let mut step_ids = Vec::new();
+        for (index, step) in chain.steps.iter().enumerate() {
+            if step.op.trim().is_empty() {
+                return Err(GraphSpecError::EmptyStepOp {
+                    chain_id: chain.id.clone(),
+                    index,
+                });
+            }
+
+            let expanded_id = step
+                .id
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map_or_else(
+                    || format!("{}/{:02}-{}", chain.id, index + 1, step.op),
+                    str::to_owned,
+                );
+            if !seen_step_ids.insert(expanded_id.clone()) {
+                return Err(GraphSpecError::DuplicateChainStepId {
+                    chain_id: chain.id.clone(),
+                    step_id: expanded_id,
+                });
+            }
+            expanded_step_ids.push(expanded_id.clone());
+            step_ids.push(expanded_id);
+        }
+        checked_chains.push(CheckedChain {
+            id: chain.id.clone(),
+            input: chain.input.clone(),
+            step_ids,
+        });
+    }
+
+    Ok((checked_chains, expanded_step_ids))
 }
 
 fn ensure_non_empty_id(id: &str, kind: &'static str) -> Result<(), GraphSpecError> {
@@ -357,6 +424,7 @@ mod tests {
     fn generates_stable_step_ids_for_implicit_chain_steps() {
         let spec = GraphSpec {
             version: "auralis.graph/v1".to_owned(),
+            name: None,
             sources: vec![SourceSpec {
                 id: "voice".to_owned(),
                 path: PathBuf::from("input/voice.wav"),

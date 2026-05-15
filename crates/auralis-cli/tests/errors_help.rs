@@ -236,6 +236,99 @@ path = "build/out.wav"
 }
 
 #[test]
+fn plan_graph_spec_reports_preview_for_valid_spec() {
+    let spec = temp_path("auralis-cli-plan-spec-valid", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+name = "episode-42"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "filter.highpass" },
+]
+
+[[nodes]]
+id = "master"
+input = "voice_clean.audio"
+
+[[sinks]]
+id = "wav"
+input = "master.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["plan", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(command_output.status.success());
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("Pipeline: episode-42"), "{stdout}");
+    assert!(stdout.contains("Inputs:"), "{stdout}");
+    assert!(stdout.contains("voice  input/voice.wav"), "{stdout}");
+    assert!(stdout.contains("Outputs:"), "{stdout}");
+    assert!(stdout.contains("wav  build/out.wav"), "{stdout}");
+    assert!(stdout.contains("expanded steps: 2"), "{stdout}");
+    assert!(
+        stdout.contains("chain voice_clean <- voice.audio"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("step cut"), "{stdout}");
+    assert!(
+        stdout.contains("step voice_clean/02-filter.highpass"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("node master"), "{stdout}");
+    assert!(stdout.contains("write wav <- master.audio"), "{stdout}");
+}
+
+#[test]
+fn plan_graph_spec_reuses_validation_errors() {
+    let spec = temp_path("auralis-cli-plan-spec-unknown-input", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "wav"
+input = "missing.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["plan", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("unknown input port `missing.audio`"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("voice.audio"), "{stderr}");
+}
+
+#[test]
 fn render_help_documents_modern_effect_inputs() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["render", "--help"])

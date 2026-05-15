@@ -154,6 +154,12 @@ enum Command {
         chain: Option<String>,
     },
 
+    /// Preview the execution shape for an Auralis graph spec.
+    Plan {
+        /// Auralis graph spec to plan.
+        spec: PathBuf,
+    },
+
     /// List implemented typed effects or inspect one effect descriptor.
     Ops {
         /// Optional canonical effect name or alias to inspect.
@@ -250,6 +256,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &fx,
             chain.as_deref(),
         ),
+        Command::Plan { spec } => plan_graph_spec(&spec),
         Command::Ops { effect } => print_ops(effect.as_deref()),
     }
 }
@@ -340,6 +347,54 @@ fn check_graph_spec(spec: &Path) -> Result<(), CliError> {
     println!("nodes: {}", checked.node_count);
     println!("sinks: {}", checked.sink_count);
     println!("expanded_steps: {}", checked.expanded_step_ids.len());
+
+    Ok(())
+}
+
+fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
+    let checked = spec::check_graph_spec(spec)?;
+    let pipeline_name = checked
+        .name
+        .as_deref()
+        .or_else(|| spec.file_stem().and_then(OsStr::to_str))
+        .unwrap_or("Auralis.toml");
+
+    println!("Pipeline: {pipeline_name}");
+    println!("Spec: {}", spec.display());
+    println!();
+    println!("Inputs:");
+    for source in &checked.sources {
+        println!("  {}  {}", source.id, source.path.display());
+    }
+    println!();
+    println!("Outputs:");
+    for sink in &checked.sinks {
+        println!("  {}  {}", sink.id, sink.path.display());
+    }
+    println!();
+    println!("Graph:");
+    println!("  sources: {}", checked.source_count);
+    println!("  chains: {}", checked.chain_count);
+    println!("  nodes: {}", checked.node_count);
+    println!("  sinks: {}", checked.sink_count);
+    println!("  expanded steps: {}", checked.expanded_step_ids.len());
+    println!();
+    println!("Execution:");
+    for source in &checked.sources {
+        println!("  read {}", source.id);
+    }
+    for chain in &checked.chains {
+        println!("  chain {} <- {}", chain.id, chain.input);
+        for step_id in &chain.step_ids {
+            println!("    step {step_id}");
+        }
+    }
+    for node in &checked.nodes {
+        println!("  node {node}");
+    }
+    for sink in &checked.sinks {
+        println!("  write {} <- {}", sink.id, sink.input);
+    }
 
     Ok(())
 }
