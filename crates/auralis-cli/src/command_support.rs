@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fs::OpenOptions, io::Write, path::Path};
+use std::{ffi::OsStr, fs::OpenOptions, io::Write, path::Path, path::PathBuf};
 
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
 use auralis_wav::decode_pcm16_path;
@@ -88,11 +88,13 @@ pub(super) fn check_command(
 }
 
 pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(), CliError> {
-    graph_plan::plan_graph_spec(spec, json, locked)
+    let spec_ref = parse_graph_spec_ref(spec);
+    graph_plan::plan_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), json, locked)
 }
 
 pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
-    graph_runtime::run_graph_spec(spec, locked)
+    let spec_ref = parse_graph_spec_ref(spec);
+    graph_runtime::run_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), locked)
 }
 
 pub(super) fn init_project(spec: &Path) -> Result<(), CliError> {
@@ -171,6 +173,29 @@ pub(super) fn ensure_wav_extension(path: &Path, role: PathRole) -> Result<(), Cl
             path: path.to_path_buf(),
             role,
         })
+    }
+}
+
+struct GraphSpecRef {
+    path: PathBuf,
+    target: Option<String>,
+}
+
+fn parse_graph_spec_ref(spec: &Path) -> GraphSpecRef {
+    let spec = spec.to_string_lossy();
+    if let Some((path, target)) = spec.rsplit_once('#') {
+        let target = target.trim();
+        if !target.is_empty() {
+            return GraphSpecRef {
+                path: PathBuf::from(path),
+                target: Some(target.to_owned()),
+            };
+        }
+    }
+
+    GraphSpecRef {
+        path: PathBuf::from(spec.as_ref()),
+        target: None,
     }
 }
 

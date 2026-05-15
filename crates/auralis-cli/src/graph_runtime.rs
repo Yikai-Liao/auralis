@@ -11,14 +11,19 @@ use crate::{
     effect_tokens, executor, spec,
 };
 
-pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
+pub(super) fn run_graph_spec(
+    spec: &Path,
+    target: Option<&str>,
+    locked: bool,
+) -> Result<(), CliError> {
     if locked {
         spec::verify_graph_lock(spec)?;
     }
     let checked = spec::check_graph_spec(spec)?;
+    let selected_sinks = selected_sinks(&checked, target)?;
     let spec_dir = spec.parent().unwrap_or_else(|| Path::new(""));
     let mut grouped_sinks = BTreeMap::<String, Vec<&spec::CheckedSink>>::new();
-    for sink in &checked.sinks {
+    for sink in selected_sinks {
         grouped_sinks
             .entry(sink.input.clone())
             .or_default()
@@ -39,6 +44,29 @@ pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> 
     }
 
     Ok(())
+}
+
+fn selected_sinks<'a>(
+    checked: &'a spec::CheckedGraphSpec,
+    target: Option<&str>,
+) -> Result<Vec<&'a spec::CheckedSink>, CliError> {
+    let Some(target) = target else {
+        return Ok(checked.sinks.iter().collect());
+    };
+
+    let target_port = format!("{target}.audio");
+    let sinks = checked
+        .sinks
+        .iter()
+        .filter(|sink| sink.id == target || sink.input == target_port)
+        .collect::<Vec<_>>();
+    if !sinks.is_empty() {
+        return Ok(sinks);
+    }
+
+    Err(CliError::UnknownExplainTarget {
+        target: target.to_owned(),
+    })
 }
 
 fn render_graph_port_audio(

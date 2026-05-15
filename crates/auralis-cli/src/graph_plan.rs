@@ -4,11 +4,19 @@ use serde::Serialize;
 
 use crate::{CliError, graph_runtime, spec};
 
-pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(), CliError> {
+pub(super) fn plan_graph_spec(
+    spec: &Path,
+    target: Option<&str>,
+    json: bool,
+    locked: bool,
+) -> Result<(), CliError> {
     if locked {
         spec::verify_graph_lock(spec)?;
     }
     let checked = spec::check_graph_spec(spec)?;
+    if let Some(target) = target {
+        ensure_known_target(&checked, target)?;
+    }
     let plan = build_plan(&checked);
     let pipeline_name = checked
         .name
@@ -21,6 +29,9 @@ pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(
 
     println!("Pipeline: {pipeline_name}");
     println!("Spec: {}", spec.display());
+    if let Some(target) = target {
+        println!("Target: {target}");
+    }
     println!();
     println!("Inputs:");
     for source in &checked.sources {
@@ -78,6 +89,20 @@ pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(
     }
 
     Ok(())
+}
+
+fn ensure_known_target(checked: &spec::CheckedGraphSpec, target: &str) -> Result<(), CliError> {
+    if checked.sources.iter().any(|source| source.id == target)
+        || checked.chains.iter().any(|chain| chain.id == target)
+        || checked.nodes.iter().any(|node| node.id == target)
+        || checked.sinks.iter().any(|sink| sink.id == target)
+    {
+        return Ok(());
+    }
+
+    Err(CliError::UnknownExplainTarget {
+        target: target.to_owned(),
+    })
 }
 
 #[derive(Debug, Serialize)]
