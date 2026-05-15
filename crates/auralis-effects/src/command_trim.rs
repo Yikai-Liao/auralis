@@ -1,8 +1,8 @@
 use auralis_core::FrameCount;
 
 use crate::{
-    Trim, TrimPosition,
     command::{CommandResult, EffectCommand, EffectCommandParseError},
+    Trim, TrimPosition,
 };
 
 pub(super) fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
@@ -12,6 +12,18 @@ pub(super) fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<E
             argument: "position",
         });
     }
+
+    let range_args;
+    let args = if args.len() == 1 {
+        if let Some(expanded) = expand_range_arg(args[0]) {
+            range_args = expanded;
+            range_args.iter().map(String::as_str).collect::<Vec<_>>()
+        } else {
+            args.to_vec()
+        }
+    } else {
+        args.to_vec()
+    };
 
     let positions = args
         .iter()
@@ -27,6 +39,24 @@ pub(super) fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<E
             argument: "position",
             source,
         })
+}
+
+fn expand_range_arg(value: &str) -> Option<Vec<String>> {
+    let (start, end) = value.split_once("..")?;
+    let mut args = Vec::new();
+
+    args.push(if start.is_empty() {
+        "0".to_owned()
+    } else {
+        start.to_owned()
+    });
+    args.push(if end.is_empty() {
+        "-0".to_owned()
+    } else {
+        format!("={end}")
+    });
+
+    Some(args)
 }
 
 pub(super) fn render_trim(trim: &Trim) -> Vec<String> {
@@ -63,7 +93,10 @@ fn parse_trim_frame_count(
     original: &str,
     frame_text: &str,
 ) -> CommandResult<FrameCount> {
-    let frame_text = frame_text.strip_suffix('s').unwrap_or(frame_text);
+    let frame_text = frame_text
+        .strip_suffix('s')
+        .or_else(|| frame_text.strip_suffix('f'))
+        .unwrap_or(frame_text);
     frame_text
         .parse::<u64>()
         .map(FrameCount::new)

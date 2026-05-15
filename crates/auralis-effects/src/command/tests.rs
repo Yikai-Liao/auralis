@@ -1,4 +1,4 @@
-use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
+use super::{parse_effect_command, EffectCommand, EffectCommandParseError};
 use crate::{
     Centercut, Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad,
     PositionedPad, Saturation, SoftVol, Trim, TrimPosition,
@@ -302,6 +302,34 @@ fn parses_sox_ng_trim_positions() {
             .unwrap()
             .render_tokens(),
         ["trim", "2", "4", "=10", "-2", "-0"]
+    );
+}
+
+#[test]
+fn parses_documented_trim_ranges() {
+    assert_eq!(
+        parse_effect_command(&["trim", "10s..30s"])
+            .unwrap()
+            .render_tokens(),
+        ["trim", "10", "=30"]
+    );
+    assert_eq!(
+        parse_effect_command(&["trim", "..30s"])
+            .unwrap()
+            .render_tokens(),
+        ["trim", "0", "=30"]
+    );
+    assert_eq!(
+        parse_effect_command(&["trim", "10s.."])
+            .unwrap()
+            .render_tokens(),
+        ["trim", "10", "-0"]
+    );
+    assert_eq!(
+        parse_effect_command(&["trim", "0f..44100f"])
+            .unwrap()
+            .render_tokens(),
+        ["trim", "0", "=44100"]
     );
 }
 

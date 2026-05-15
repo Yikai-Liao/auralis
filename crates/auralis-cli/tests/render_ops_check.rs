@@ -145,6 +145,23 @@ fn check_fx_accepts_documented_highpass_named_parameters() {
 }
 
 #[test]
+fn check_fx_accepts_documented_trim_range() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", "--fx", "trim 10s..30s"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("status: ok"), "{stdout}");
+    assert!(stdout.contains("commands: 1"), "{stdout}");
+}
+
+#[test]
 fn check_chain_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--chain", "gain -3 | reverse"])
