@@ -1,5 +1,6 @@
 //! Auralis command-line entrypoint.
 
+mod command_args;
 mod command_support;
 mod completions;
 mod effect_tokens;
@@ -15,23 +16,25 @@ mod spec;
 
 use std::{path::PathBuf, process::ExitCode};
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
-use command_support::{
-    OpsSchemaFormat, PathRole, check_command, effect_input_to_chain_tokens, inspect,
-    plan_graph_spec, print_ops, run_graph_spec,
+pub(crate) use command_args::GraphFormat;
+use command_args::{
+    CheckArgs, CompletionsArgs, ConvertArgs, ExplainArgs, FmtArgs, GraphArgs, InspectArgs, ManArgs,
+    OpsArgs, PlanArgs, RenderArgs, RunArgs,
 };
-use completions::{CompletionShell, print_completions};
+use command_support::{
+    PathRole, check_command, effect_input_to_chain_tokens, inspect, plan_graph_spec, print_ops,
+    run_graph_spec,
+};
+use completions::print_completions;
 pub(crate) use errors::CliError;
 use executor::{
     ConvertOptions, OutputDither, OutputGuard, RenderOptions, convert_audio, run_pipeline,
 };
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
-use parsers::{
-    parse_backend, parse_channel_count, parse_combine_method, parse_dbfs, parse_filter_poles,
-    parse_sample_rate, parse_wav_sample_format,
-};
+use parsers::{parse_backend, parse_dbfs, parse_filter_poles};
 use recipes::{
     StretchRecipeOptions, TimingArgs, normalize_audio, run_band_recipe, run_bandpass_recipe,
     run_chorus_recipe, run_combine_recipe, run_dc_shift_recipe, run_delay_recipe,
@@ -52,56 +55,10 @@ struct Cli {
 #[allow(clippy::large_enum_variant)]
 enum Command {
     /// Print metadata for a supported audio file.
-    Inspect {
-        /// PCM16 WAV input file to inspect.
-        input: PathBuf,
-
-        /// Emit machine-readable JSON output.
-        #[arg(long)]
-        json: bool,
-    },
+    Inspect(InspectArgs),
 
     /// Convert one supported audio file into another container format.
-    Convert {
-        /// Input audio file to read.
-        input: PathBuf,
-
-        /// Output audio file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-
-        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
-        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
-        output_channels: Option<auralis::ChannelCount>,
-
-        /// Fail instead of automatically converting channels for --channels.
-        #[arg(long)]
-        no_auto_channels: bool,
-
-        /// Output sample rate; inserts deterministic rate conversion if needed.
-        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
-        output_sample_rate: Option<auralis::SampleRate>,
-
-        /// Fail instead of automatically converting sample rate for --rate.
-        #[arg(long)]
-        no_auto_rate: bool,
-
-        /// Attenuate final output only if it would clip.
-        #[arg(short = 'G', long)]
-        guard: bool,
-
-        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
-        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
-        norm: Option<f64>,
-
-        /// Select WAV sample encoding when the output container is WAV.
-        #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]
-        sample: Option<auralis::WavSampleFormat>,
-    },
+    Convert(ConvertArgs),
 
     /// Keep one range from an audio file.
     Trim {
@@ -1487,175 +1444,34 @@ enum Command {
     },
 
     /// Render one ordered stream with typed effect syntax.
-    Render {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-
-        /// Input-combiner method to apply before effects.
-        #[arg(long, value_name = "METHOD", default_value = "concatenate", value_parser = parse_combine_method)]
-        combine: auralis::CombineMethod,
-
-        /// Additional PCM16 WAV input files to combine after the first input.
-        #[arg(long = "input", value_name = "FILE")]
-        additional_inputs: Vec<PathBuf>,
-
-        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
-        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
-        output_channels: Option<auralis::ChannelCount>,
-
-        /// Fail instead of automatically converting channels for --channels.
-        #[arg(long)]
-        no_auto_channels: bool,
-
-        /// Output sample rate; inserts deterministic rate conversion if needed.
-        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
-        output_sample_rate: Option<auralis::SampleRate>,
-
-        /// Fail instead of automatically converting sample rate for --rate.
-        #[arg(long)]
-        no_auto_rate: bool,
-
-        /// Attenuate final output only if it would clip.
-        #[arg(short = 'G', long)]
-        guard: bool,
-
-        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
-        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
-        norm: Option<f64>,
-
-        /// Apply deterministic TPDF dither before PCM16 encoding.
-        #[arg(long)]
-        dither: bool,
-
-        /// Deterministic seed used when --dither is enabled.
-        #[arg(long, value_name = "SEED")]
-        dither_seed: Option<u32>,
-
-        /// Read the effect chain from a SoX-ng-style effects file.
-        #[arg(long, value_name = "FILE")]
-        effects_file: Option<PathBuf>,
-
-        /// One typed effect command per flag, for example `--fx 'gain -3'`.
-        #[arg(long = "fx", value_name = "EFFECT")]
-        fx: Vec<String>,
-
-        /// Compact ordered effect chain, for example `--chain 'gain -3 | reverse'`.
-        #[arg(long = "chain", value_name = "CHAIN")]
-        chain: Option<String>,
-    },
+    Render(RenderArgs),
 
     /// Validate typed effect syntax without running audio processing.
-    Check {
-        /// Auralis graph spec to validate.
-        spec: Option<PathBuf>,
-
-        /// Require an up-to-date Auralis.lock instead of refreshing it.
-        #[arg(long)]
-        locked: bool,
-
-        /// Read the effect chain from a SoX-ng-style effects file.
-        #[arg(long, value_name = "FILE")]
-        effects_file: Option<PathBuf>,
-
-        /// One typed effect command per flag, for example `--fx 'gain -3'`.
-        #[arg(long = "fx", value_name = "EFFECT")]
-        fx: Vec<String>,
-
-        /// Compact ordered effect chain, for example `--chain 'gain -3 | reverse'`.
-        #[arg(long = "chain", value_name = "CHAIN")]
-        chain: Option<String>,
-    },
+    Check(CheckArgs),
 
     /// Preview the execution shape for an Auralis graph spec.
-    Plan {
-        /// Auralis graph spec to plan.
-        spec: PathBuf,
-
-        /// Emit machine-readable JSON output.
-        #[arg(long)]
-        json: bool,
-
-        /// Require an up-to-date Auralis.lock before planning.
-        #[arg(long)]
-        locked: bool,
-    },
+    Plan(PlanArgs),
 
     /// Emit an Auralis graph spec as a graph description.
-    Graph {
-        /// Auralis graph spec to render.
-        spec: PathBuf,
-
-        /// Output graph format.
-        #[arg(long, value_name = "FORMAT", default_value = "mermaid")]
-        format: GraphFormat,
-    },
+    Graph(GraphArgs),
 
     /// Format an Auralis graph spec.
-    Fmt {
-        /// Auralis graph spec to format.
-        spec: PathBuf,
-
-        /// Check whether formatting changes would be required.
-        #[arg(long)]
-        check: bool,
-    },
+    Fmt(FmtArgs),
 
     /// Generate shell completion scripts.
-    Completions {
-        /// Shell to generate completions for.
-        shell: CompletionShell,
-    },
+    Completions(CompletionsArgs),
 
     /// Print built-in manual pages for Auralis commands.
-    Man {
-        /// Optional command topic, for example `render` or `plan`.
-        topic: Option<String>,
-    },
+    Man(ManArgs),
 
     /// Explain how one graph node or target participates in execution.
-    Explain {
-        /// Auralis graph spec to inspect.
-        spec: PathBuf,
-
-        /// Chain, node, sink, or source id to explain.
-        target: String,
-    },
+    Explain(ExplainArgs),
 
     /// Run an Auralis graph spec.
-    Run {
-        /// Auralis graph spec to execute.
-        spec: PathBuf,
-
-        /// Require an up-to-date Auralis.lock before running.
-        #[arg(long)]
-        locked: bool,
-    },
+    Run(RunArgs),
 
     /// List implemented typed effects or inspect one effect descriptor.
-    Ops {
-        /// Optional canonical effect name or alias to inspect.
-        effect: Option<String>,
-
-        /// Emit machine-readable schema output.
-        #[arg(long, value_name = "FORMAT")]
-        schema: Option<OpsSchemaFormat>,
-    },
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum GraphFormat {
-    Mermaid,
-    Dot,
-    Svg,
-    Json,
+    Ops(OpsArgs),
 }
 
 fn main() -> ExitCode {
@@ -1671,8 +1487,8 @@ fn main() -> ExitCode {
 #[allow(clippy::too_many_lines)]
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
-        Command::Inspect { input, json } => inspect(&input, json),
-        Command::Convert {
+        Command::Inspect(InspectArgs { input, json }) => inspect(&input, json),
+        Command::Convert(ConvertArgs {
             input,
             output,
             backend,
@@ -1683,7 +1499,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             guard,
             norm,
             sample,
-        } => convert_audio(
+        }) => convert_audio(
             &input,
             &output,
             ConvertOptions {
@@ -2275,7 +2091,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Multiply),
-        Command::Render {
+        Command::Render(RenderArgs {
             input,
             output,
             backend,
@@ -2292,7 +2108,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             effects_file,
             fx,
             chain,
-        } => {
+        }) => {
             if effects_file.is_some() && (!fx.is_empty() || chain.is_some()) {
                 return Err(CliError::MixedEffectInputs);
             }
@@ -2314,29 +2130,29 @@ fn run(cli: Cli) -> Result<(), CliError> {
 
             run_pipeline(&input, &output, &options)
         }
-        Command::Check {
+        Command::Check(CheckArgs {
             spec,
             locked,
             effects_file,
             fx,
             chain,
-        } => check_command(
+        }) => check_command(
             spec.as_deref(),
             locked,
             effects_file.as_deref(),
             &fx,
             chain.as_deref(),
         ),
-        Command::Plan { spec, json, locked } => plan_graph_spec(&spec, json, locked),
-        Command::Graph { spec, format } => graph_spec(&spec, format),
-        Command::Fmt { spec, check } => format_graph_spec(&spec, check),
-        Command::Completions { shell } => {
+        Command::Plan(PlanArgs { spec, json, locked }) => plan_graph_spec(&spec, json, locked),
+        Command::Graph(GraphArgs { spec, format }) => graph_spec(&spec, format),
+        Command::Fmt(FmtArgs { spec, check }) => format_graph_spec(&spec, check),
+        Command::Completions(CompletionsArgs { shell }) => {
             print_completions(shell);
             Ok(())
         }
-        Command::Man { topic } => print_man_page(topic.as_deref()),
-        Command::Explain { spec, target } => explain_graph_target(&spec, &target),
-        Command::Run { spec, locked } => run_graph_spec(&spec, locked),
-        Command::Ops { effect, schema } => print_ops(effect.as_deref(), schema),
+        Command::Man(ManArgs { topic }) => print_man_page(topic.as_deref()),
+        Command::Explain(ExplainArgs { spec, target }) => explain_graph_target(&spec, &target),
+        Command::Run(RunArgs { spec, locked }) => run_graph_spec(&spec, locked),
+        Command::Ops(OpsArgs { effect, schema }) => print_ops(effect.as_deref(), schema),
     }
 }
