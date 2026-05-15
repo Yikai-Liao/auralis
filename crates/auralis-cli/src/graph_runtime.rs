@@ -5,7 +5,7 @@ use std::{
 
 use auralis::EffectRegistry;
 
-use crate::{CliError, PathRole, effect_tokens, ensure_wav_extension, spec};
+use crate::{CliError, PathRole, effect_tokens, ensure_wav_extension, executor, spec};
 
 pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
     if locked {
@@ -94,13 +94,7 @@ fn render_graph_input_audio(
             input: input.to_owned(),
         })?;
     let upstream = render_graph_port_audio(checked, spec_dir, &chain.input, render_cache)?;
-    let token_refs: Vec<&str> = chain.effect_tokens.iter().map(String::as_str).collect();
-    let effect_chain = auralis::parse_effect_chain(&token_refs)?;
-    auralis::AudioFile::from_audio_buffer(upstream)
-        .into_pipeline()
-        .apply_effect_chain(&effect_chain)
-        .into_audio_buffer()
-        .map_err(CliError::from)
+    executor::apply_effect_tokens_to_buffer(upstream, &chain.effect_tokens)
 }
 
 fn render_graph_node_audio(
@@ -118,13 +112,7 @@ fn render_graph_node_audio(
             let upstream =
                 render_graph_port_audio(checked, spec_dir, &node.inputs[0], render_cache)?;
             let effect_tokens = node_effect_tokens(op, &node.params)?;
-            let token_refs: Vec<&str> = effect_tokens.iter().map(String::as_str).collect();
-            let effect_chain = auralis::parse_effect_chain(&token_refs)?;
-            auralis::AudioFile::from_audio_buffer(upstream)
-                .into_pipeline()
-                .apply_effect_chain(&effect_chain)
-                .into_audio_buffer()
-                .map_err(CliError::from)
+            executor::apply_effect_tokens_to_buffer(upstream, &effect_tokens)
         }
         Some(_) | None => Err(CliError::UnsupportedGraphNodeInputs {
             node: node.id.clone(),
@@ -144,11 +132,7 @@ fn render_graph_mix_sum_node(
         let rendered = render_graph_port_audio(checked, spec_dir, input, render_cache)?;
         let rendered = if let Some(Some(gain)) = node.input_gains.get(index) {
             let token_refs = ["gain", gain.as_str()];
-            let effect_chain = auralis::parse_effect_chain(&token_refs)?;
-            auralis::AudioFile::from_audio_buffer(rendered)
-                .into_pipeline()
-                .apply_effect_chain(&effect_chain)
-                .into_audio_buffer()?
+            executor::apply_effect_token_refs_to_buffer(rendered, &token_refs)?
         } else {
             rendered
         };
