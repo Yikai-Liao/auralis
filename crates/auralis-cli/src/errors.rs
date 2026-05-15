@@ -23,6 +23,7 @@ pub(crate) enum CliError {
     MixedEffectInputs,
     MixedGuardAndNorm,
     DitherSeedWithoutDither,
+    CacheClearNeedsConfirmation,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
     LockedRequiresSpec,
@@ -93,6 +94,9 @@ impl std::fmt::Display for CliError {
             }
             Self::MixedGuardAndNorm => formatter.write_str("--guard cannot be combined with --norm"),
             Self::DitherSeedWithoutDither => formatter.write_str("--dither-seed requires --dither"),
+            Self::CacheClearNeedsConfirmation => {
+                formatter.write_str("cache clear requires --yes to remove files")
+            }
             Self::NoAutoChannelsWithoutOutputChannels => {
                 formatter.write_str("--no-auto-channels requires --channels")
             }

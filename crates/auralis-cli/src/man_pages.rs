@@ -91,7 +91,7 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("fmt", "Format an Auralis graph spec."),
             ("init", "Create an Auralis graph spec scaffold."),
-            ("cache", "Inspect local persistent cache state."),
+            ("cache", "Inspect or clear local persistent cache state."),
             ("completions", "Generate shell completion scripts."),
             ("man", "Print built-in manual pages."),
             (
@@ -906,16 +906,18 @@ const MAN_PAGES: &[ManPage] = &[
     },
     ManPage {
         name: "cache",
-        summary: "inspect local persistent cache state",
-        synopsis: "auralis cache status [--root DIR] [--json]",
-        description: "Cache status reports whether the local persistent cache directory exists and summarizes file count and bytes without mutating cache contents.",
+        summary: "inspect or clear local persistent cache state",
+        synopsis: "auralis cache status [--root DIR] [--json]\nauralis cache clear [--root DIR] --yes",
+        description: "Cache status reports whether the local persistent cache directory exists and summarizes file count and bytes. Cache clear removes files under the selected cache root after explicit confirmation.",
         options: &[
             ("status", "Print cache directory status."),
+            ("clear", "Remove files under the cache root."),
             (
                 "--root DIR",
-                "Cache root to inspect, defaulting to .auralis/cache.",
+                "Cache root to inspect or clear, defaulting to .auralis/cache.",
             ),
             ("--json", "Emit machine-readable JSON output."),
+            ("--yes", "Confirm cache clear removal."),
         ],
     },
     ManPage {

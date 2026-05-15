@@ -798,6 +798,9 @@ pub(crate) struct CacheArgs {
 pub(crate) enum CacheCommand {
     /// Print local persistent-cache status.
     Status(CacheStatusArgs),
+
+    /// Remove files from the local persistent cache.
+    Clear(CacheClearArgs),
 }
 
 #[derive(Debug, Args)]
@@ -809,6 +812,17 @@ pub(crate) struct CacheStatusArgs {
     /// Emit machine-readable JSON output.
     #[arg(long)]
     pub(crate) json: bool,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CacheClearArgs {
+    /// Cache root directory to clear.
+    #[arg(long, value_name = "DIR", default_value = ".auralis/cache")]
+    pub(crate) root: PathBuf,
+
+    /// Confirm destructive cache removal.
+    #[arg(long)]
+    pub(crate) yes: bool,
 }
 
 #[derive(Debug, Args)]

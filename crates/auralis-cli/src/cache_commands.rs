@@ -7,7 +7,10 @@ use std::{
 
 use serde::Serialize;
 
-use crate::CliError;
+use crate::{
+    CliError,
+    command_args::{CacheArgs, CacheCommand},
+};
 
 #[derive(Debug, Serialize)]
 struct CacheStatus {
@@ -31,6 +34,39 @@ pub(super) fn print_cache_status(root: &Path, json: bool) -> Result<(), CliError
         println!("Entries: {}", status.entries);
         println!("Bytes: {}", status.bytes);
     }
+
+    Ok(())
+}
+
+pub(super) fn run_cache_command(args: CacheArgs) -> Result<(), CliError> {
+    match args.command {
+        CacheCommand::Status(status) => print_cache_status(&status.root, status.json),
+        CacheCommand::Clear(clear) => clear_cache(&clear.root, clear.yes),
+    }
+}
+
+fn clear_cache(root: &Path, confirmed: bool) -> Result<(), CliError> {
+    if !confirmed {
+        return Err(CliError::CacheClearNeedsConfirmation);
+    }
+
+    let status = read_cache_status(root)?;
+
+    if root.exists() {
+        for entry in fs::read_dir(root)? {
+            let entry = entry?;
+            let path = entry.path();
+            if entry.file_type()?.is_dir() {
+                fs::remove_dir_all(path)?;
+            } else {
+                fs::remove_file(path)?;
+            }
+        }
+    }
+
+    println!("Cache: {}", status.path.display());
+    println!("Removed entries: {}", status.entries);
+    println!("Removed bytes: {}", status.bytes);
 
     Ok(())
 }

@@ -75,6 +75,7 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("--locked"), "{stdout}");
     assert!(stdout.contains("--cache"), "{stdout}");
     assert!(stdout.contains("--root"), "{stdout}");
+    assert!(stdout.contains("--yes"), "{stdout}");
     assert!(stdout.contains("--schema"), "{stdout}");
 }
 
@@ -248,6 +249,7 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("render", "chain"),
         ("pipe", "output"),
         ("run", "cache"),
+        ("cache", "yes"),
     ] {
         assert_fish_option(&stdout, command, option);
     }

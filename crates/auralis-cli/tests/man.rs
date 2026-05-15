@@ -139,7 +139,7 @@ fn init_man_page_includes_scaffold_contract() {
 }
 
 #[test]
-fn cache_man_page_includes_status_contract() {
+fn cache_man_page_includes_status_and_clear_contracts() {
     let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["man", "cache"])
         .output()
@@ -148,14 +148,19 @@ fn cache_man_page_includes_status_contract() {
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let stdout = stdout(&output);
     assert!(
-        stdout.contains("cache - inspect local persistent cache state"),
+        stdout.contains("cache - inspect or clear local persistent cache state"),
         "{stdout}"
     );
     assert!(
         stdout.contains("auralis cache status [--root DIR] [--json]"),
         "{stdout}"
     );
+    assert!(
+        stdout.contains("auralis cache clear [--root DIR] --yes"),
+        "{stdout}"
+    );
     assert!(stdout.contains("--root DIR"), "{stdout}");
+    assert!(stdout.contains("--yes"), "{stdout}");
 }
 
 #[test]
