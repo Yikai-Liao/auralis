@@ -4,8 +4,8 @@ use crate::{
     CliError,
     command_args::{
         ChannelsArgs, ChorusArgs, ContrastArgs, DcShiftArgs, EchoArgs, FlangerArgs, GainArgs,
-        NormArgs, OverdriveArgs, PhaserArgs, RateArgs, SaturationArgs, SimpleRecipeArgs,
-        SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+        NormArgs, NormalizeArgs, OverdriveArgs, PhaserArgs, RateArgs, SaturationArgs,
+        SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     graph_plan,
     plan_args::PlanCommand,
@@ -31,6 +31,7 @@ pub(super) fn plan_recipe_surface_command(
 ) -> Result<(), CliError> {
     match command {
         PlanCommand::Trim(trim) => plan_trim_command(trim, json),
+        PlanCommand::Normalize(normalize) => plan_normalize_command(normalize, json),
         PlanCommand::Gain(gain) => plan_gain_command(gain, json),
         PlanCommand::Norm(norm) => plan_norm_command(norm, json),
         PlanCommand::Rate(rate) => plan_rate_command(rate, json),
@@ -97,6 +98,17 @@ fn plan_trim_command(trim: TrimArgs, json: bool) -> Result<(), CliError> {
         backend: _,
     } = trim;
     plan_recipe_command("trim", input, output, ["trim", range.as_str()], json)
+}
+
+fn plan_normalize_command(normalize: NormalizeArgs, json: bool) -> Result<(), CliError> {
+    let NormalizeArgs {
+        input,
+        output,
+        peak,
+        backend: _,
+    } = normalize;
+    let peak = peak.to_string();
+    plan_recipe_command("normalize", input, output, ["norm", peak.as_str()], json)
 }
 
 fn plan_gain_command(gain: GainArgs, json: bool) -> Result<(), CliError> {

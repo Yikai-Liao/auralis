@@ -5,8 +5,9 @@ use clap::{Args, Subcommand};
 use crate::{
     command_args::{
         ChannelsArgs, ChorusArgs, ContrastArgs, ConvertArgs, DcShiftArgs, EchoArgs, FlangerArgs,
-        GainArgs, NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs, RenderArgs,
-        SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+        GainArgs, NormArgs, NormalizeArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs,
+        RenderArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs,
+        TrimArgs, VolArgs,
     },
     recipe_args::{
         BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,
@@ -48,6 +49,8 @@ pub(crate) enum PlanCommand {
     Pipe(PipeArgs),
     /// Plan a trim recipe command without executing it.
     Trim(TrimArgs),
+    /// Plan a normalize recipe command without executing it.
+    Normalize(NormalizeArgs),
     /// Plan a gain recipe command without executing it.
     Gain(GainArgs),
     /// Plan a norm recipe command without executing it.
