@@ -98,6 +98,47 @@ fn normalize_recipe_accepts_dbfs_suffix_and_uses_render_norm_policy() {
 }
 
 #[test]
+fn gain_recipe_lowers_to_typed_render_gain() {
+    let input = temp_path("auralis-cli-gain-recipe-input", "wav");
+    let recipe_output = temp_path("auralis-cli-gain-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-gain-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[1024, -2048, 4096, -8192]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "gain",
+            input.to_str().unwrap(),
+            "-6dB",
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "gain -6dB",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn reverse_recipe_lowers_to_typed_render_reverse() {
     let input = temp_path("auralis-cli-reverse-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-reverse-recipe-output", "wav");

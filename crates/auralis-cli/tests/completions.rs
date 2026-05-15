@@ -16,6 +16,7 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("_auralis_completions()"), "{stdout}");
     assert!(stdout.contains("trim"), "{stdout}");
     assert!(stdout.contains("normalize"), "{stdout}");
+    assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
@@ -35,6 +36,7 @@ fn zsh_completions_include_modern_commands_and_flags() {
     let stdout = stdout(&output);
     assert!(stdout.contains("#compdef auralis"), "{stdout}");
     assert!(stdout.contains("'normalize:normalize'"), "{stdout}");
+    assert!(stdout.contains("'gain:gain'"), "{stdout}");
     assert!(stdout.contains("'reverse:reverse'"), "{stdout}");
     assert!(stdout.contains("'fmt:fmt'"), "{stdout}");
     assert!(stdout.contains("'--check[fmt option]'"), "{stdout}");
@@ -57,6 +59,10 @@ fn fish_completions_include_modern_commands_and_flags() {
     );
     assert!(
         stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'trim'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'gain'"),
         "{stdout}"
     );
     assert!(

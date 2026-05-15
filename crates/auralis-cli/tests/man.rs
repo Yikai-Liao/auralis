@@ -20,6 +20,7 @@ fn top_level_man_page_lists_modern_commands() {
     );
     assert!(stdout.contains("trim"), "{stdout}");
     assert!(stdout.contains("normalize"), "{stdout}");
+    assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
@@ -76,6 +77,23 @@ fn reverse_man_page_describes_recipe_lowering() {
         "{stdout}"
     );
     assert!(stdout.contains("render --fx reverse"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn gain_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "gain"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("gain - adjust one audio file by gain"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --fx 'gain ...'"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
 }
 

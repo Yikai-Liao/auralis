@@ -111,6 +111,24 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Adjust one audio file by a gain amount.
+    Gain {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Gain adjustment in dB, for example `-3` or `-3dB`.
+        #[arg(value_name = "DB", allow_hyphen_values = true)]
+        db: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Reverse one audio file.
     Reverse {
         /// PCM16 WAV input file to read.
@@ -360,6 +378,12 @@ fn run(cli: Cli) -> Result<(), CliError> {
             peak,
             backend,
         } => normalize_audio(&input, &output, peak, backend),
+        Command::Gain {
+            input,
+            db,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["gain", db.as_str()]),
         Command::Reverse {
             input,
             output,
@@ -1030,6 +1054,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--peak", "--backend"],
     },
     CompletionSpec {
+        name: "gain",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "reverse",
         options: &["-o", "--output", "--backend"],
     },
@@ -1109,6 +1137,7 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("trim", "Keep one range from an audio file."),
             ("normalize", "Normalize one audio file to a peak level."),
+            ("gain", "Adjust one audio file by a gain amount."),
             ("reverse", "Reverse one audio file."),
             (
                 "render",
@@ -1153,6 +1182,20 @@ const MAN_PAGES: &[ManPage] = &[
                 "--peak DBFS",
                 "Peak target in dBFS, accepting values like `-1` or `-1dBFS`.",
             ),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "gain",
+        summary: "adjust one audio file by gain",
+        synopsis: "auralis gain INPUT.wav DB -o OUTPUT.wav [--backend BACKEND]",
+        description: "Gain is a recipe alias for a single gain adjustment. It lowers to the same typed effect pipeline as `render --fx 'gain ...'`.",
+        options: &[
+            (
+                "DB",
+                "Gain adjustment in dB, accepting values like `-3` or `-3dB`.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
     },
