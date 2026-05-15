@@ -85,6 +85,42 @@ fn render_chain_output_matches_repeated_fx_chain() {
 }
 
 #[test]
+fn render_mix_combines_inputs_before_chain() {
+    let first = temp_path("auralis-cli-render-mix-first", "wav");
+    let second = temp_path("auralis-cli-render-mix-second", "wav");
+    let output = temp_path("auralis-cli-render-mix-output", "wav");
+    write_pcm16_wav(&first, 1, &[1000, -1000]);
+    write_pcm16_wav(&second, 1, &[3000, 1000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--combine",
+            "mix",
+            "--input",
+            second.to_str().unwrap(),
+            "--chain",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![0, 2000]));
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
 fn check_fx_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "gain -3", "--fx", "reverse"])

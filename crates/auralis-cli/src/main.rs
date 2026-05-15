@@ -81,6 +81,14 @@ enum Command {
         #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
         backend: auralis::BackendKind,
 
+        /// Input-combiner method to apply before effects.
+        #[arg(long, value_name = "METHOD", default_value = "concatenate", value_parser = parse_combine_method)]
+        combine: auralis::CombineMethod,
+
+        /// Additional PCM16 WAV input files to combine after the first input.
+        #[arg(long = "input", value_name = "FILE")]
+        additional_inputs: Vec<PathBuf>,
+
         /// Output channel count; inserts SoX-ng-style channel conversion if needed.
         #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
         output_channels: Option<auralis::ChannelCount>,
@@ -296,6 +304,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             input,
             output,
             backend,
+            combine,
+            additional_inputs,
             output_channels,
             no_auto_channels,
             output_sample_rate,
@@ -310,8 +320,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
         } => {
             let options = RunOptions {
                 backend,
-                combine: auralis::CombineMethod::Concatenate,
-                additional_inputs: Vec::new(),
+                combine,
+                additional_inputs,
                 output_channels,
                 no_auto_channels,
                 output_sample_rate,
