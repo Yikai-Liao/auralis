@@ -5,17 +5,18 @@ mod support;
 use support::*;
 
 #[test]
-fn run_merge_turns_two_mono_inputs_into_stereo() {
-    let first = temp_path("auralis-cli-run-merge-mono-first", "wav");
-    let second = temp_path("auralis-cli-run-merge-mono-second", "wav");
-    let output = temp_path("auralis-cli-run-merge-mono-output", "wav");
+fn render_merge_turns_two_mono_inputs_into_stereo() {
+    let first = temp_path("auralis-cli-render-merge-mono-first", "wav");
+    let second = temp_path("auralis-cli-render-merge-mono-second", "wav");
+    let output = temp_path("auralis-cli-render-merge-mono-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[3000, 1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "merge",
@@ -38,17 +39,18 @@ fn run_merge_turns_two_mono_inputs_into_stereo() {
 }
 
 #[test]
-fn run_merge_treats_mismatched_lengths_as_trailing_silence() {
-    let first = temp_path("auralis-cli-run-merge-length-first", "wav");
-    let second = temp_path("auralis-cli-run-merge-length-second", "wav");
-    let output = temp_path("auralis-cli-run-merge-length-output", "wav");
+fn render_merge_treats_mismatched_lengths_as_trailing_silence() {
+    let first = temp_path("auralis-cli-render-merge-length-first", "wav");
+    let second = temp_path("auralis-cli-render-merge-length-second", "wav");
+    let output = temp_path("auralis-cli-render-merge-length-output", "wav");
     write_pcm16_wav(&first, 1, &[1000, -1000]);
     write_pcm16_wav(&second, 1, &[500, 0, -500]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "merge",
@@ -74,23 +76,25 @@ fn run_merge_treats_mismatched_lengths_as_trailing_silence() {
 }
 
 #[test]
-fn run_merge_combines_multichannel_inputs_before_effects() {
-    let first = temp_path("auralis-cli-run-merge-stereo-first", "wav");
-    let second = temp_path("auralis-cli-run-merge-mono-second", "wav");
-    let output = temp_path("auralis-cli-run-merge-stereo-output", "wav");
+fn render_merge_combines_multichannel_inputs_before_effects() {
+    let first = temp_path("auralis-cli-render-merge-stereo-first", "wav");
+    let second = temp_path("auralis-cli-render-merge-mono-second", "wav");
+    let output = temp_path("auralis-cli-render-merge-stereo-output", "wav");
     write_pcm16_wav(&first, 2, &[-1000, 1000, -2000, 2000]);
     write_pcm16_wav(&second, 1, &[3000, -3000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "merge",
             "--input",
             second.to_str().unwrap(),
-            "--reverse",
+            "--chain",
+            "reverse",
         ])
         .output()
         .unwrap();
@@ -111,17 +115,18 @@ fn run_merge_combines_multichannel_inputs_before_effects() {
 }
 
 #[test]
-fn run_multiply_multiplies_equal_length_mono_inputs() {
-    let first = temp_path("auralis-cli-run-multiply-mono-first", "wav");
-    let second = temp_path("auralis-cli-run-multiply-mono-second", "wav");
-    let output = temp_path("auralis-cli-run-multiply-mono-output", "wav");
+fn render_multiply_multiplies_equal_length_mono_inputs() {
+    let first = temp_path("auralis-cli-render-multiply-mono-first", "wav");
+    let second = temp_path("auralis-cli-render-multiply-mono-second", "wav");
+    let output = temp_path("auralis-cli-render-multiply-mono-output", "wav");
     write_pcm16_wav(&first, 1, &[16_384, -16_384]);
     write_pcm16_wav(&second, 1, &[8192, 16_384]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "multiply",
@@ -144,17 +149,18 @@ fn run_multiply_multiplies_equal_length_mono_inputs() {
 }
 
 #[test]
-fn run_multiply_treats_mismatched_lengths_as_silence() {
-    let first = temp_path("auralis-cli-run-multiply-length-first", "wav");
-    let second = temp_path("auralis-cli-run-multiply-length-second", "wav");
-    let output = temp_path("auralis-cli-run-multiply-length-output", "wav");
+fn render_multiply_treats_mismatched_lengths_as_silence() {
+    let first = temp_path("auralis-cli-render-multiply-length-first", "wav");
+    let second = temp_path("auralis-cli-render-multiply-length-second", "wav");
+    let output = temp_path("auralis-cli-render-multiply-length-output", "wav");
     write_pcm16_wav(&first, 1, &[16_384, -16_384]);
     write_pcm16_wav(&second, 1, &[16_384, 0, 8192]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "multiply",
@@ -177,17 +183,18 @@ fn run_multiply_treats_mismatched_lengths_as_silence() {
 }
 
 #[test]
-fn run_multiply_accepts_mismatched_channel_counts_with_silence() {
-    let first = temp_path("auralis-cli-run-multiply-channel-first", "wav");
-    let second = temp_path("auralis-cli-run-multiply-channel-second", "wav");
-    let output = temp_path("auralis-cli-run-multiply-channel-output", "wav");
+fn render_multiply_accepts_mismatched_channel_counts_with_silence() {
+    let first = temp_path("auralis-cli-render-multiply-channel-first", "wav");
+    let second = temp_path("auralis-cli-render-multiply-channel-second", "wav");
+    let output = temp_path("auralis-cli-render-multiply-channel-output", "wav");
     write_pcm16_wav(&first, 1, &[16_384, -16_384]);
     write_pcm16_wav(&second, 2, &[16_384, 8192, -16_384, 8192]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "multiply",
@@ -210,23 +217,25 @@ fn run_multiply_accepts_mismatched_channel_counts_with_silence() {
 }
 
 #[test]
-fn run_multiply_combines_stereo_inputs_before_effects() {
-    let first = temp_path("auralis-cli-run-multiply-stereo-first", "wav");
-    let second = temp_path("auralis-cli-run-multiply-stereo-second", "wav");
-    let output = temp_path("auralis-cli-run-multiply-stereo-output", "wav");
+fn render_multiply_combines_stereo_inputs_before_effects() {
+    let first = temp_path("auralis-cli-render-multiply-stereo-first", "wav");
+    let second = temp_path("auralis-cli-render-multiply-stereo-second", "wav");
+    let output = temp_path("auralis-cli-render-multiply-stereo-output", "wav");
     write_pcm16_wav(&first, 2, &[-16_384, 16_384, -8192, 8192]);
     write_pcm16_wav(&second, 2, &[8192, -8192, 0, 16_384]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--combine",
             "multiply",
             "--input",
             second.to_str().unwrap(),
-            "--reverse",
+            "--chain",
+            "reverse",
         ])
         .output()
         .unwrap();
@@ -244,18 +253,19 @@ fn run_multiply_combines_stereo_inputs_before_effects() {
 }
 
 #[test]
-fn run_multiply_backend_scalar_and_requested_simd_match() {
-    let first = temp_path("auralis-cli-run-multiply-backend-first", "wav");
-    let second = temp_path("auralis-cli-run-multiply-backend-second", "wav");
-    let scalar_output = temp_path("auralis-cli-run-multiply-backend-scalar-output", "wav");
-    let simd_output = temp_path("auralis-cli-run-multiply-backend-simd-output", "wav");
+fn render_multiply_backend_scalar_and_requested_simd_match() {
+    let first = temp_path("auralis-cli-render-multiply-backend-first", "wav");
+    let second = temp_path("auralis-cli-render-multiply-backend-second", "wav");
+    let scalar_output = temp_path("auralis-cli-render-multiply-backend-scalar-output", "wav");
+    let simd_output = temp_path("auralis-cli-render-multiply-backend-simd-output", "wav");
     write_pcm16_wav(&first, 1, &[-32768, -12345, 0, 12345, 32767]);
     write_pcm16_wav(&second, 1, &[32767, 12345, 0, -12345, -32768]);
 
     let scalar = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             scalar_output.to_str().unwrap(),
             "--backend",
             "scalar",
@@ -268,8 +278,9 @@ fn run_multiply_backend_scalar_and_requested_simd_match() {
         .unwrap();
     let simd = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             first.to_str().unwrap(),
+            "-o",
             simd_output.to_str().unwrap(),
             "--backend",
             "simd",
