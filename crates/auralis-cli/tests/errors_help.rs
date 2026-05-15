@@ -5,18 +5,19 @@ mod support;
 use support::*;
 
 #[test]
-fn run_invalid_gain_argument_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-invalid-gain-input", "wav");
-    let output = temp_path("auralis-cli-run-invalid-gain-output", "wav");
+fn render_invalid_gain_argument_returns_clear_error() {
+    let input = temp_path("auralis-cli-render-invalid-gain-input", "wav");
+    let output = temp_path("auralis-cli-render-invalid-gain-output", "wav");
     write_pcm16_wav(&input, 1, &[0]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
-            "--gain-db",
-            "NaN",
+            "--fx",
+            "gain NaN",
         ])
         .output()
         .unwrap();
@@ -25,25 +26,23 @@ fn run_invalid_gain_argument_returns_clear_error() {
     let _ = fs::remove_file(output);
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
-    assert!(
-        stderr.contains("error: decibels must be finite"),
-        "{stderr}"
-    );
+    assert!(stderr.contains("decibels must be finite"), "{stderr}");
 }
 
 #[test]
-fn run_invalid_dc_shift_argument_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-invalid-dc-shift-input", "wav");
-    let output = temp_path("auralis-cli-run-invalid-dc-shift-output", "wav");
+fn render_invalid_dc_shift_argument_returns_clear_error() {
+    let input = temp_path("auralis-cli-render-invalid-dc-shift-input", "wav");
+    let output = temp_path("auralis-cli-render-invalid-dc-shift-output", "wav");
     write_pcm16_wav(&input, 1, &[0]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
-            "--dc-shift",
-            "2.1",
+            "--fx",
+            "dcshift 2.1",
         ])
         .output()
         .unwrap();
@@ -53,26 +52,25 @@ fn run_invalid_dc_shift_argument_returns_clear_error() {
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("error: dc shift must be finite and in the range -2.0..=2.0"),
+        stderr.contains("dc shift must be finite and in the range -2.0..=2.0"),
         "{stderr}"
     );
 }
 
 #[test]
-fn run_invalid_trim_range_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-invalid-trim-input", "wav");
-    let output = temp_path("auralis-cli-run-invalid-trim-output", "wav");
+fn render_invalid_trim_range_returns_clear_error() {
+    let input = temp_path("auralis-cli-render-invalid-trim-input", "wav");
+    let output = temp_path("auralis-cli-render-invalid-trim-output", "wav");
     write_pcm16_wav(&input, 1, &[0, 1, 2]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
-            "--trim-start-frame",
-            "3",
-            "--trim-end-frame",
-            "1",
+            "--fx",
+            "trim 3 =1",
         ])
         .output()
         .unwrap();
@@ -82,52 +80,35 @@ fn run_invalid_trim_range_returns_clear_error() {
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("error: trim start frame must be less than or equal"),
+        stderr.contains("trim start frame must be less than or equal"),
         "{stderr}"
     );
 }
 
 #[test]
-fn run_incomplete_trim_range_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-incomplete-trim-input", "wav");
-    let output = temp_path("auralis-cli-run-incomplete-trim-output", "wav");
-    write_pcm16_wav(&input, 1, &[0, 1, 2]);
-
+fn check_missing_trim_position_returns_clear_error() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args([
-            "run",
-            input.to_str().unwrap(),
-            output.to_str().unwrap(),
-            "--trim-start-frame",
-            "1",
-        ])
+        .args(["check", "--fx", "trim"])
         .output()
         .unwrap();
 
-    fs::remove_file(input).unwrap();
-    let _ = fs::remove_file(output);
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("error: frame trim requires both --trim-start-frame and --trim-end-frame"),
+        stderr.contains("error: effect chain command 0 (`trim`) failed to parse: effect `trim` requires argument `position`"),
         "{stderr}"
     );
 }
 
 #[test]
-fn run_help_documents_gain_and_trim_units() {
+fn render_help_documents_modern_effect_inputs() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run", "--help"])
+        .args(["render", "--help"])
         .output()
         .unwrap();
 
     assert!(command_output.status.success());
     let stdout = stdout(&command_output);
-    assert!(stdout.contains("--gain-db <DB>"), "{stdout}");
-    assert!(
-        stdout.contains("Constant gain to apply, in decibels"),
-        "{stdout}"
-    );
     assert!(stdout.contains("--backend <BACKEND>"), "{stdout}");
     assert!(
         stdout.contains("Sample-processing backend to request"),
@@ -179,47 +160,33 @@ fn run_help_documents_gain_and_trim_units() {
         "{stdout}"
     );
     assert!(stdout.contains("--dither-seed <SEED>"), "{stdout}");
-    assert!(stdout.contains("--dc-shift <SHIFT>"), "{stdout}");
+    assert!(stdout.contains("--fx <EFFECT>"), "{stdout}");
     assert!(
-        stdout.contains("Constant normalized DC offset to add"),
+        stdout.contains("One typed effect command per flag"),
         "{stdout}"
     );
-    assert!(stdout.contains("--trim-start-frame <FRAME>"), "{stdout}");
-    assert!(stdout.contains("--trim-end-frame <FRAME>"), "{stdout}");
-    assert!(
-        stdout.contains("--trim-start-seconds <SECONDS>"),
-        "{stdout}"
-    );
-    assert!(stdout.contains("--trim-end-seconds <SECONDS>"), "{stdout}");
-    assert!(stdout.contains("--pad-start-frame <FRAMES>"), "{stdout}");
-    assert!(stdout.contains("--pad-end-frame <FRAMES>"), "{stdout}");
-    assert!(stdout.contains("--fade-in-frame <FRAMES>"), "{stdout}");
-    assert!(stdout.contains("--fade-out-frame <FRAMES>"), "{stdout}");
-    assert!(stdout.contains("--reverse"), "{stdout}");
-    assert!(
-        stdout.contains("Reverse frame order within each channel"),
-        "{stdout}"
-    );
+    assert!(stdout.contains("--chain <CHAIN>"), "{stdout}");
+    assert!(stdout.contains("Compact ordered effect chain"), "{stdout}");
     assert!(stdout.contains("--effects-file <FILE>"), "{stdout}");
     assert!(
         stdout.contains("Read the effect chain from a SoX-ng-style effects file"),
         "{stdout}"
     );
-    assert!(stdout.contains("[EFFECT]..."), "{stdout}");
-    assert!(
-        stdout.contains("Positional SoX-ng-style effect chain tokens"),
-        "{stdout}"
-    );
 }
 
 #[test]
-fn run_unsupported_input_extension_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-input-unsupported", "flac");
-    let output = temp_path("auralis-cli-run-output", "wav");
+fn render_unsupported_input_extension_returns_clear_error() {
+    let input = temp_path("auralis-cli-render-input-unsupported", "flac");
+    let output = temp_path("auralis-cli-render-output", "wav");
     fs::write(&input, b"not a supported input").unwrap();
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
 
@@ -235,13 +202,18 @@ fn run_unsupported_input_extension_returns_clear_error() {
 }
 
 #[test]
-fn run_unsupported_output_extension_returns_clear_error() {
-    let input = temp_path("auralis-cli-run-input", "wav");
-    let output = temp_path("auralis-cli-run-output-unsupported", "flac");
+fn render_unsupported_output_extension_returns_clear_error() {
+    let input = temp_path("auralis-cli-render-input", "wav");
+    let output = temp_path("auralis-cli-render-output-unsupported", "flac");
     write_pcm16_wav(&input, 1, &[0]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
 
