@@ -427,11 +427,11 @@ path = "{}"
 }
 
 #[test]
-fn run_graph_spec_applies_gain_chain_step_param() {
-    let spec = temp_path("auralis-cli-run-spec-gain-param", "toml");
-    let input = temp_path("auralis-cli-run-spec-gain-param-input", "wav");
-    let graph_output = temp_path("auralis-cli-run-spec-gain-param-output", "wav");
-    let render_output = temp_path("auralis-cli-run-spec-gain-param-render-output", "wav");
+fn run_graph_spec_applies_gain_chain_step_db_param() {
+    let spec = temp_path("auralis-cli-run-spec-gain-db-param", "toml");
+    let input = temp_path("auralis-cli-run-spec-gain-db-param-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-gain-db-param-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-gain-db-param-render-output", "wav");
     write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
     fs::write(
         &spec,
@@ -446,7 +446,7 @@ path = "{}"
 id = "voice_quiet"
 input = "voice.audio"
 steps = [
-  {{ op = "gain", by = "-6" }},
+  {{ op = "gain", by = "-6dB" }},
 ]
 
 [[sinks]]
@@ -471,7 +471,7 @@ path = "{}"
             "-o",
             render_output.to_str().unwrap(),
             "--fx",
-            "gain -6",
+            "gain -6dB",
         ])
         .output()
         .unwrap();

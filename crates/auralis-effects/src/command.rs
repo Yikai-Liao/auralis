@@ -610,7 +610,13 @@ pub(super) fn parse_decibels(
     argument: &'static str,
     value: &str,
 ) -> CommandResult<Decibels> {
-    let db = parse_f64(effect, argument, value)?;
+    let db =
+        parse_db_suffix_f64(value).map_err(|source| EffectCommandParseError::InvalidNumber {
+            effect,
+            argument,
+            value: value.to_owned(),
+            source,
+        })?;
 
     Decibels::new(db).map_err(|source| EffectCommandParseError::InvalidCoreValue {
         effect,
@@ -700,7 +706,15 @@ fn reject_option_like_argument(effect: &'static str, value: &str) -> CommandResu
 }
 
 pub(crate) fn is_option_like(value: &str) -> bool {
-    value.starts_with('-') && value.parse::<f64>().is_err()
+    value.starts_with('-') && parse_db_suffix_f64(value).is_err()
+}
+
+fn parse_db_suffix_f64(value: &str) -> Result<f64, std::num::ParseFloatError> {
+    let value = value
+        .strip_suffix("dB")
+        .or_else(|| value.strip_suffix("db"))
+        .unwrap_or(value);
+    value.parse::<f64>()
 }
 
 pub(super) fn render_f64(value: f64) -> String {
