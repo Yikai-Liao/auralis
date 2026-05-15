@@ -7,7 +7,7 @@ use std::{
 };
 
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
-use auralis_wav::{decode_pcm16_path, WavError};
+use auralis_wav::{WavError, decode_pcm16_path};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -154,111 +154,6 @@ enum Command {
         /// Optional canonical effect name or alias to inspect.
         effect: Option<String>,
     },
-
-    /// Decode, process, and re-encode a PCM16 WAV file.
-    Run {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// PCM16 WAV output file to create.
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-
-        /// Input-combiner method to apply before effects.
-        #[arg(long, value_name = "METHOD", default_value = "concatenate", value_parser = parse_combine_method)]
-        combine: auralis::CombineMethod,
-
-        /// Additional PCM16 WAV input files to combine after the first input.
-        #[arg(long = "input", value_name = "FILE")]
-        additional_inputs: Vec<PathBuf>,
-
-        /// Output channel count; inserts SoX-ng-style channel conversion if needed.
-        #[arg(short = 'c', long = "channels", value_name = "CHANNELS", value_parser = parse_channel_count)]
-        output_channels: Option<auralis::ChannelCount>,
-
-        /// Fail instead of automatically converting channels for --channels.
-        #[arg(long)]
-        no_auto_channels: bool,
-
-        /// Output sample rate; inserts deterministic rate conversion if needed.
-        #[arg(short = 'r', long = "rate", value_name = "RATE", value_parser = parse_sample_rate)]
-        output_sample_rate: Option<auralis::SampleRate>,
-
-        /// Fail instead of automatically converting sample rate for --rate.
-        #[arg(long)]
-        no_auto_rate: bool,
-
-        /// Attenuate final output only if it would clip.
-        #[arg(short = 'G', long)]
-        guard: bool,
-
-        /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
-        #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
-        norm: Option<f64>,
-
-        /// Apply deterministic TPDF dither before PCM16 encoding.
-        #[arg(long)]
-        dither: bool,
-
-        /// Deterministic seed used when --dither is enabled.
-        #[arg(long, value_name = "SEED")]
-        dither_seed: Option<u32>,
-
-        /// Constant gain to apply, in decibels.
-        #[arg(long, value_name = "DB", allow_hyphen_values = true)]
-        gain_db: Option<f64>,
-
-        /// Constant normalized DC offset to add, in full-scale sample units.
-        #[arg(long, value_name = "SHIFT", allow_hyphen_values = true)]
-        dc_shift: Option<f32>,
-
-        /// First frame to keep for an end-exclusive trim.
-        #[arg(long, value_name = "FRAME")]
-        trim_start_frame: Option<u64>,
-
-        /// End-exclusive frame to keep for a frame-based trim.
-        #[arg(long, value_name = "FRAME")]
-        trim_end_frame: Option<u64>,
-
-        /// Start time in seconds for an end-exclusive trim.
-        #[arg(long, value_name = "SECONDS", allow_hyphen_values = true)]
-        trim_start_seconds: Option<f64>,
-
-        /// End time in seconds for a seconds-based trim.
-        #[arg(long, value_name = "SECONDS", allow_hyphen_values = true)]
-        trim_end_seconds: Option<f64>,
-
-        /// Silent frames to add before the input audio.
-        #[arg(long, value_name = "FRAMES")]
-        pad_start_frame: Option<u64>,
-
-        /// Silent frames to add after the input audio.
-        #[arg(long, value_name = "FRAMES")]
-        pad_end_frame: Option<u64>,
-
-        /// Frames over which to linearly fade in from silence.
-        #[arg(long, value_name = "FRAMES")]
-        fade_in_frame: Option<u64>,
-
-        /// Frames over which to linearly fade out to silence.
-        #[arg(long, value_name = "FRAMES")]
-        fade_out_frame: Option<u64>,
-
-        /// Reverse frame order within each channel.
-        #[arg(long)]
-        reverse: bool,
-
-        /// Read the effect chain from a SoX-ng-style effects file.
-        #[arg(long, value_name = "FILE")]
-        effects_file: Option<PathBuf>,
-
-        /// Positional SoX-ng-style effect chain tokens, such as `gain -3 : reverse`.
-        #[arg(value_name = "EFFECT", num_args = 0.., allow_hyphen_values = true)]
-        effect_chain: Vec<String>,
-    },
 }
 
 fn main() -> ExitCode {
@@ -321,7 +216,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             if effects_file.is_some() && (!fx.is_empty() || chain.is_some()) {
                 return Err(CliError::MixedEffectInputs);
             }
-            let options = RunOptions {
+            let options = RenderOptions {
                 backend,
                 combine,
                 additional_inputs,
@@ -333,17 +228,6 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 norm,
                 dither: OutputDither::from(dither),
                 dither_seed,
-                gain_db: None,
-                dc_shift: None,
-                trim_start_frame: None,
-                trim_end_frame: None,
-                trim_start_seconds: None,
-                trim_end_seconds: None,
-                pad_start_frame: None,
-                pad_end_frame: None,
-                fade_in_frame: None,
-                fade_out_frame: None,
-                reverse: false,
                 effects_file,
                 effect_chain: effect_input_to_chain_tokens(&fx, chain.as_deref())?,
             };
@@ -356,63 +240,6 @@ fn run(cli: Cli) -> Result<(), CliError> {
             chain,
         } => check_effects(effects_file.as_deref(), &fx, chain.as_deref()),
         Command::Ops { effect } => print_ops(effect.as_deref()),
-        Command::Run {
-            input,
-            output,
-            backend,
-            combine,
-            additional_inputs,
-            output_channels,
-            no_auto_channels,
-            output_sample_rate,
-            no_auto_rate,
-            guard,
-            norm,
-            dither,
-            dither_seed,
-            gain_db,
-            dc_shift,
-            trim_start_frame,
-            trim_end_frame,
-            trim_start_seconds,
-            trim_end_seconds,
-            pad_start_frame,
-            pad_end_frame,
-            fade_in_frame,
-            fade_out_frame,
-            reverse,
-            effects_file,
-            effect_chain,
-        } => {
-            let options = RunOptions {
-                backend,
-                combine,
-                additional_inputs,
-                output_channels,
-                no_auto_channels,
-                output_sample_rate,
-                no_auto_rate,
-                guard: OutputGuard::from(guard),
-                norm,
-                dither: OutputDither::from(dither),
-                dither_seed,
-                gain_db,
-                dc_shift,
-                trim_start_frame,
-                trim_end_frame,
-                trim_start_seconds,
-                trim_end_seconds,
-                pad_start_frame,
-                pad_end_frame,
-                fade_in_frame,
-                fade_out_frame,
-                reverse,
-                effects_file,
-                effect_chain,
-            };
-
-            run_pipeline(&input, &output, &options)
-        }
     }
 }
 
@@ -448,7 +275,7 @@ fn convert_audio(input: &Path, output: &Path, options: ConvertOptions) -> Result
     Ok(())
 }
 
-fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(), CliError> {
+fn run_pipeline(input: &Path, output: &Path, options: &RenderOptions) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     ensure_wav_extension(output, PathRole::Output)?;
     for input in &options.additional_inputs {
@@ -467,48 +294,12 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
         .with_output_level_policy(output_level_policy)
         .with_output_dither_policy(output_dither_policy);
 
-    if let Some(effect_chain) = effect_chain {
-        pipeline
+    match effect_chain {
+        Some(effect_chain) => pipeline
             .apply_effect_chain(&effect_chain)
-            .write_wav(output)?;
-        return Ok(());
+            .write_wav(output)?,
+        None => pipeline.write_wav(output)?,
     }
-
-    let trim = options.trim_mode()?;
-    let pipeline = if let Some(gain_db) = options.gain_db {
-        pipeline.gain_db(gain_db)
-    } else {
-        pipeline
-    };
-    let pipeline = if let Some(dc_shift) = options.dc_shift {
-        pipeline.dc_shift(dc_shift)
-    } else {
-        pipeline
-    };
-    let pipeline = match trim {
-        Some(TrimMode::Frames { start, end }) => pipeline.trim_frames(start, end),
-        Some(TrimMode::Seconds { start, end }) => pipeline.trim_seconds(start, end),
-        None => pipeline,
-    };
-    let pipeline = match (options.pad_start_frame, options.pad_end_frame) {
-        (Some(start), Some(end)) => pipeline.pad_frames(start, end),
-        (Some(start), None) => pipeline.pad_frames(start, 0),
-        (None, Some(end)) => pipeline.pad_frames(0, end),
-        (None, None) => pipeline,
-    };
-    let pipeline = match (options.fade_in_frame, options.fade_out_frame) {
-        (Some(fade_in), Some(fade_out)) => pipeline.fade_frames(fade_in, fade_out),
-        (Some(fade_in), None) => pipeline.fade_frames(fade_in, 0),
-        (None, Some(fade_out)) => pipeline.fade_frames(0, fade_out),
-        (None, None) => pipeline,
-    };
-    let pipeline = if options.reverse {
-        pipeline.reverse()
-    } else {
-        pipeline
-    };
-
-    pipeline.write_wav(output)?;
 
     Ok(())
 }
@@ -561,7 +352,7 @@ fn print_one_op(name: &str) -> Result<(), CliError> {
 }
 
 #[derive(Debug)]
-struct RunOptions {
+struct RenderOptions {
     backend: auralis::BackendKind,
     combine: auralis::CombineMethod,
     additional_inputs: Vec<PathBuf>,
@@ -573,17 +364,6 @@ struct RunOptions {
     norm: Option<f64>,
     dither: OutputDither,
     dither_seed: Option<u32>,
-    gain_db: Option<f64>,
-    dc_shift: Option<f32>,
-    trim_start_frame: Option<u64>,
-    trim_end_frame: Option<u64>,
-    trim_start_seconds: Option<f64>,
-    trim_end_seconds: Option<f64>,
-    pad_start_frame: Option<u64>,
-    pad_end_frame: Option<u64>,
-    fade_in_frame: Option<u64>,
-    fade_out_frame: Option<u64>,
-    reverse: bool,
     effects_file: Option<PathBuf>,
     effect_chain: Vec<String>,
 }
@@ -638,23 +418,8 @@ impl ConvertOptions {
     }
 }
 
-impl RunOptions {
+impl RenderOptions {
     fn effect_chain(&self) -> Result<Option<auralis::EffectChain>, CliError> {
-        let has_positional_chain = !self.effect_chain.is_empty();
-        let has_effects_file = self.effects_file.is_some();
-
-        match (has_positional_chain, has_effects_file) {
-            (false, false) => return Ok(None),
-            (true, true) => return Err(CliError::MixedEffectsFileAndPositionalChain),
-            (true, false) if self.has_legacy_effect_options() => {
-                return Err(CliError::MixedEffectSyntax);
-            }
-            (false, true) if self.has_legacy_effect_options() => {
-                return Err(CliError::MixedEffectsFileAndLegacyEffectFlags);
-            }
-            _ => {}
-        }
-
         if let Some(path) = &self.effects_file {
             return auralis::parse_effects_file(path)
                 .map(Some)
@@ -669,20 +434,6 @@ impl RunOptions {
         auralis::parse_effect_chain(&tokens)
             .map(Some)
             .map_err(CliError::from)
-    }
-
-    fn has_legacy_effect_options(&self) -> bool {
-        self.gain_db.is_some()
-            || self.dc_shift.is_some()
-            || self.trim_start_frame.is_some()
-            || self.trim_end_frame.is_some()
-            || self.trim_start_seconds.is_some()
-            || self.trim_end_seconds.is_some()
-            || self.pad_start_frame.is_some()
-            || self.pad_end_frame.is_some()
-            || self.fade_in_frame.is_some()
-            || self.fade_out_frame.is_some()
-            || self.reverse
     }
 
     fn channel_conversion_policy(&self) -> Result<auralis::ChannelConversionPolicy, CliError> {
@@ -731,28 +482,6 @@ impl RunOptions {
                 Ok(auralis::OutputDitherPolicy::automatic_with_config(config))
             }
             (OutputDither::Disabled, Some(_)) => Err(CliError::DitherSeedWithoutDither),
-        }
-    }
-
-    fn trim_mode(&self) -> Result<Option<TrimMode>, CliError> {
-        let has_frame_trim = self.trim_start_frame.is_some() || self.trim_end_frame.is_some();
-        let has_seconds_trim = self.trim_start_seconds.is_some() || self.trim_end_seconds.is_some();
-
-        match (has_frame_trim, has_seconds_trim) {
-            (false, false) => Ok(None),
-            (true, true) => Err(CliError::MixedTrimUnits),
-            (true, false) => match (self.trim_start_frame, self.trim_end_frame) {
-                (Some(start), Some(end)) => Ok(Some(TrimMode::Frames { start, end })),
-                _ => Err(CliError::IncompleteTrimRange {
-                    unit: TrimUnit::Frames,
-                }),
-            },
-            (false, true) => match (self.trim_start_seconds, self.trim_end_seconds) {
-                (Some(start), Some(end)) => Ok(Some(TrimMode::Seconds { start, end })),
-                _ => Err(CliError::IncompleteTrimRange {
-                    unit: TrimUnit::Seconds,
-                }),
-            },
         }
     }
 }
@@ -822,7 +551,7 @@ fn effect_specs_to_chain_tokens(specs: &[String]) -> Result<Vec<String>, CliErro
 
 fn open_pipeline(
     input: &Path,
-    options: &RunOptions,
+    options: &RenderOptions,
     effect_chain: Option<&auralis::EffectChain>,
 ) -> Result<auralis::Pipeline, CliError> {
     if options.additional_inputs.is_empty() {
@@ -966,12 +695,6 @@ fn synth_prefix_frame_limit(effect_chain: &auralis::EffectChain) -> Option<aural
 }
 
 #[derive(Debug, Clone, Copy)]
-enum TrimMode {
-    Frames { start: u64, end: u64 },
-    Seconds { start: f64, end: f64 },
-}
-
-#[derive(Debug, Clone, Copy)]
 enum OutputGuard {
     Disabled,
     Enabled,
@@ -979,11 +702,7 @@ enum OutputGuard {
 
 impl From<bool> for OutputGuard {
     fn from(value: bool) -> Self {
-        if value {
-            Self::Enabled
-        } else {
-            Self::Disabled
-        }
+        if value { Self::Enabled } else { Self::Disabled }
     }
 }
 
@@ -995,11 +714,7 @@ enum OutputDither {
 
 impl From<bool> for OutputDither {
     fn from(value: bool) -> Self {
-        if value {
-            Self::Enabled
-        } else {
-            Self::Disabled
-        }
+        if value { Self::Enabled } else { Self::Disabled }
     }
 }
 
@@ -1079,13 +794,8 @@ enum CliError {
     Wav(WavError),
     EmptyEffectSpec,
     InvalidEffectSpec { spec: String },
-    IncompleteTrimRange { unit: TrimUnit },
     MissingEffectSpec,
     MixedEffectInputs,
-    MixedTrimUnits,
-    MixedEffectSyntax,
-    MixedEffectsFileAndPositionalChain,
-    MixedEffectsFileAndLegacyEffectFlags,
     MixedGuardAndNorm,
     DitherSeedWithoutDither,
     NoAutoChannelsWithoutOutputChannels,
@@ -1100,12 +810,6 @@ enum CliError {
 enum PathRole {
     Input,
     Output,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum TrimUnit {
-    Frames,
-    Seconds,
 }
 
 impl std::fmt::Display for PathRole {
@@ -1125,32 +829,18 @@ impl std::fmt::Display for CliError {
             Self::EffectName(error) => write!(formatter, "{error}"),
             Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
-            Self::EmptyEffectSpec => formatter.write_str("effect input requires a non-empty effect"),
+            Self::EmptyEffectSpec => {
+                formatter.write_str("effect input requires a non-empty effect")
+            }
             Self::InvalidEffectSpec { spec } => write!(
                 formatter,
                 "effect string `{spec}` contains unmatched shell quoting"
             ),
-            Self::IncompleteTrimRange { unit } => match unit {
-                TrimUnit::Frames => formatter
-                    .write_str("frame trim requires both --trim-start-frame and --trim-end-frame"),
-                TrimUnit::Seconds => formatter.write_str(
-                    "seconds trim requires both --trim-start-seconds and --trim-end-seconds",
-                ),
-            },
             Self::MissingEffectSpec => {
                 formatter.write_str("one of --fx, --chain, or --effects-file is required")
             }
             Self::MixedEffectInputs => {
                 formatter.write_str("--fx, --chain, and --effects-file are mutually exclusive")
-            }
-            Self::MixedTrimUnits => formatter
-                .write_str("trim range must use either frame units or seconds units, not both"),
-            Self::MixedEffectSyntax => formatter
-                .write_str("positional effect chains cannot be combined with legacy effect flags"),
-            Self::MixedEffectsFileAndPositionalChain => formatter
-                .write_str("effects files cannot be combined with positional effect chain tokens"),
-            Self::MixedEffectsFileAndLegacyEffectFlags => {
-                formatter.write_str("effects files cannot be combined with legacy effect flags")
             }
             Self::MixedGuardAndNorm => {
                 formatter.write_str("--guard cannot be combined with --norm")

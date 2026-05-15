@@ -5,6 +5,32 @@ mod support;
 use support::*;
 
 #[test]
+fn top_level_help_omits_legacy_run_subcommand() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["--help"])
+        .output()
+        .unwrap();
+
+    assert!(command_output.status.success());
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("render"), "{stdout}");
+    assert!(stdout.contains("convert"), "{stdout}");
+    assert!(!stdout.contains("\n  run "), "{stdout}");
+}
+
+#[test]
+fn legacy_run_subcommand_returns_unknown_command_error() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run"])
+        .output()
+        .unwrap();
+
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(stderr.contains("unrecognized subcommand 'run'"), "{stderr}");
+}
+
+#[test]
 fn render_invalid_gain_argument_returns_clear_error() {
     let input = temp_path("auralis-cli-render-invalid-gain-input", "wav");
     let output = temp_path("auralis-cli-render-invalid-gain-output", "wav");
