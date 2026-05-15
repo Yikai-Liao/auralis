@@ -670,6 +670,48 @@ fn plan_timing_and_filter_recipes_use_graph_plan_contract() {
 }
 
 #[test]
+fn plan_edit_recipes_use_graph_plan_contract() {
+    let cases: [(&str, &[&str]); 6] = [
+        ("fade", &["--in", "3", "--out", "2", "--curve", "linear"]),
+        ("delay", &["--position", "1s"]),
+        ("pad", &["--start", "2", "--at", "3@4", "--end", "5"]),
+        ("repeat", &["2"]),
+        ("downsample", &["3"]),
+        ("upsample", &["2"]),
+    ];
+
+    for (name, args) in cases {
+        let input = temp_path(&format!("auralis-cli-plan-{name}-input"), "wav");
+        let output = temp_path(&format!("auralis-cli-plan-{name}-output"), "wav");
+        let mut command_args = vec!["plan", "--json", name, input.to_str().unwrap()];
+        command_args.extend(args);
+        command_args.extend(["-o", output.to_str().unwrap()]);
+
+        let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(command_args)
+            .output()
+            .unwrap();
+
+        assert!(
+            command_output.status.success(),
+            "stderr: {}",
+            stderr(&command_output)
+        );
+        let plan: serde_json::Value = serde_json::from_str(&stdout(&command_output)).unwrap();
+        assert_eq!(plan["pipeline"], name);
+        assert_eq!(plan["spec"], format!("command:{name}"));
+        assert_eq!(plan["graph"]["sources"], 1);
+        assert_eq!(plan["graph"]["chains"], 1);
+        assert!(
+            plan["execution"][1]["steps"][0]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("{name}/01-{name}"))
+        );
+    }
+}
+
+#[test]
 fn check_fx_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "gain -3", "--fx", "reverse"])

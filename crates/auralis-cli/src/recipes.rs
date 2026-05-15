@@ -24,14 +24,7 @@ pub(super) fn run_fade_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec![
-        "fade".to_owned(),
-        format!("in={fade_in}"),
-        format!("curve={curve}"),
-    ];
-    if let Some(fade_out) = fade_out {
-        effect_chain.push(format!("out={fade_out}"));
-    }
+    let effect_chain = fade_effect_tokens(fade_in, fade_out, curve);
 
     run_effect_recipe(
         input,
@@ -47,8 +40,7 @@ pub(super) fn run_delay_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["delay".to_owned()];
-    effect_chain.extend(positions.iter().cloned());
+    let effect_chain = delay_effect_tokens(positions);
 
     run_effect_recipe(
         input,
@@ -66,9 +58,7 @@ pub(super) fn run_pad_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["pad".to_owned(), start.to_owned()];
-    effect_chain.extend(positioned.iter().cloned());
-    effect_chain.push(end.to_owned());
+    let effect_chain = pad_effect_tokens(start, end, positioned);
 
     run_effect_recipe(
         input,
@@ -76,6 +66,35 @@ pub(super) fn run_pad_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+pub(super) fn fade_effect_tokens(
+    fade_in: &str,
+    fade_out: Option<&str>,
+    curve: &str,
+) -> Vec<String> {
+    let mut effect_chain = vec![
+        "fade".to_owned(),
+        format!("in={fade_in}"),
+        format!("curve={curve}"),
+    ];
+    if let Some(fade_out) = fade_out {
+        effect_chain.push(format!("out={fade_out}"));
+    }
+    effect_chain
+}
+
+pub(super) fn delay_effect_tokens(positions: &[String]) -> Vec<String> {
+    let mut effect_chain = vec!["delay".to_owned()];
+    effect_chain.extend(positions.iter().cloned());
+    effect_chain
+}
+
+pub(super) fn pad_effect_tokens(start: &str, end: &str, positioned: &[String]) -> Vec<String> {
+    let mut effect_chain = vec!["pad".to_owned(), start.to_owned()];
+    effect_chain.extend(positioned.iter().cloned());
+    effect_chain.push(end.to_owned());
+    effect_chain
 }
 
 pub(super) fn run_saturation_recipe(

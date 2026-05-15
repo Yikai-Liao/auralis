@@ -9,8 +9,9 @@ use crate::{
         SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     recipe_args::{
-        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, EqualizerArgs, PitchArgs, PoleFilterArgs,
-        TempoArgs, TrebleArgs,
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DownsampleArgs, EqualizerArgs,
+        FadeArgs, PadArgs, PitchArgs, PoleFilterArgs, RepeatArgs, TempoArgs, TrebleArgs,
+        UpsampleArgs,
     },
 };
 
@@ -119,4 +120,16 @@ pub(crate) enum PlanCommand {
     /// Plan a lowpass recipe command without executing it.
     #[command(name = "lowpass")]
     LowPass(PoleFilterArgs),
+    /// Plan a fade recipe command without executing it.
+    Fade(FadeArgs),
+    /// Plan a delay recipe command without executing it.
+    Delay(DelayArgs),
+    /// Plan a pad recipe command without executing it.
+    Pad(PadArgs),
+    /// Plan a repeat recipe command without executing it.
+    Repeat(RepeatArgs),
+    /// Plan a downsample recipe command without executing it.
+    Downsample(DownsampleArgs),
+    /// Plan an upsample recipe command without executing it.
+    Upsample(UpsampleArgs),
 }

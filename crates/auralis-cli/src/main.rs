@@ -15,6 +15,7 @@ mod man_pages;
 mod parsers;
 mod plan_args;
 mod plan_commands;
+mod plan_recipes;
 mod recipe_args;
 mod recipes;
 mod spec;
