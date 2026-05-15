@@ -1,5 +1,5 @@
 use crate::AudioBuffer;
-use auralis_effects::{Dither, DEFAULT_DITHER_SEED};
+use auralis_effects::{DEFAULT_DITHER_SEED, Dither};
 use thiserror::Error;
 
 /// Output-boundary dither configuration for PCM16 writing.

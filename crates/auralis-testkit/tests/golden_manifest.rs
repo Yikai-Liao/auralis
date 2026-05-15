@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use auralis_testkit::golden::{
-    quote_command_arg, render_command_line, GoldenCommand, GoldenManifest, GoldenManifestError,
-    GoldenMetric,
+    GoldenCommand, GoldenManifest, GoldenManifestError, GoldenMetric, quote_command_arg,
+    render_command_line,
 };
 
 const VALID_MANIFEST: &str = r#"

@@ -1,7 +1,7 @@
-use crate::command::{
-    is_option_like, parse_f64, render_f64, CommandResult, EffectCommandParseError,
-};
 use crate::BiquadWidth;
+use crate::command::{
+    CommandResult, EffectCommandParseError, is_option_like, parse_f64, render_f64,
+};
 
 pub(super) fn parse_frequency_hz(effect: &'static str, value: &str) -> CommandResult<f64> {
     let value = value

@@ -2,10 +2,10 @@
 
 use auralis_core::{ChannelCount, Decibels, FrameCount};
 use auralis_effects::{
-    parse_effect_command, Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients,
-    BiquadWidth, Centercut, Channels, Contrast, DcShift, Deemph, EffectCommand, Equalizer, Fade,
-    FadeCurve, Gain, HighPass, Loudness, LowPass, Oops, Pad, PositionedPad, Reverse, Saturation,
-    SaturationType, SoftVol, Swap, Treble, Tremolo, Trim,
+    Band, BandPass, BandReject, Bass, Biquad, BiquadCoefficients, BiquadWidth, Centercut, Channels,
+    Contrast, DcShift, Deemph, EffectCommand, Equalizer, Fade, FadeCurve, Gain, HighPass, Loudness,
+    LowPass, Oops, Pad, PositionedPad, Reverse, Saturation, SaturationType, SoftVol, Swap, Treble,
+    Tremolo, Trim, parse_effect_command,
 };
 
 #[test]

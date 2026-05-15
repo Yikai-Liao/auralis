@@ -277,8 +277,7 @@ fn design_coefficients(knots: &[FirFitKnot], sample_rate: SampleRate) -> Result<
     let mut coefficients = vec![0.0; FIRFIT_TAP_COUNT];
     for distance in 0..=FIRFIT_CENTER_TAP {
         let mut sum = 0.0;
-        let phase_step =
-            std::f64::consts::PI * distance as f64 / FIRFIT_RESPONSE_STEPS as f64;
+        let phase_step = std::f64::consts::PI * distance as f64 / FIRFIT_RESPONSE_STEPS as f64;
         let (sin_step, cos_step) = phase_step.sin_cos();
         let mut sin_phase = 0.0;
         let mut cos_phase = 1.0;

@@ -1,4 +1,4 @@
-use super::{parse_effect_command, EffectCommand, EffectCommandParseError};
+use super::{EffectCommand, EffectCommandParseError, parse_effect_command};
 use crate::{
     Centercut, Contrast, DcShift, EffectError, Fade, FadeCurve, Gain, GainChannelMode, Pad,
     PositionedPad, Saturation, SoftVol, Trim, TrimPosition,

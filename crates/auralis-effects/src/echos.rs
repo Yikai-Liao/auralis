@@ -229,7 +229,15 @@ fn process_channel(
     output: &mut Vec<f32>,
 ) {
     if let [(delay, decay)] = taps {
-        process_single_tap_channel(input, output_frames, *delay, gain_in, gain_out, *decay, output);
+        process_single_tap_channel(
+            input,
+            output_frames,
+            *delay,
+            gain_in,
+            gain_out,
+            *decay,
+            output,
+        );
         return;
     }
 

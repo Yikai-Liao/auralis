@@ -450,11 +450,7 @@ fn ratio(numerator: u64, denominator: u64) -> f32 {
     }
 }
 
-fn sample_at_frame(
-    samples: &mut [f32],
-    segment_start: u64,
-    frame_index: u64,
-) -> Option<&mut f32> {
+fn sample_at_frame(samples: &mut [f32], segment_start: u64, frame_index: u64) -> Option<&mut f32> {
     let offset = frame_index.checked_sub(segment_start)?;
     samples.get_mut(usize::try_from(offset).ok()?)
 }

@@ -16,6 +16,9 @@ fn top_level_help_documents_modern_run_subcommand() {
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("convert"), "{stdout}");
     assert!(stdout.contains("graph"), "{stdout}");
+    assert!(stdout.contains("completions"), "{stdout}");
+    assert!(stdout.contains("man"), "{stdout}");
+    assert!(stdout.contains("explain"), "{stdout}");
     assert!(stdout.contains("run"), "{stdout}");
 }
 
@@ -173,6 +176,81 @@ path = "build/out.wav"
 }
 
 #[test]
+fn check_graph_spec_writes_lockfile_for_valid_spec() {
+    let spec_dir = temp_path("auralis-cli-check-lock-dir", "dir");
+    fs::create_dir(&spec_dir).unwrap();
+    let spec = spec_dir.join("Auralis.toml");
+    let lock = spec_dir.join("Auralis.lock");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "wav"
+input = "voice.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let lock_toml = fs::read_to_string(&lock).unwrap();
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(lock).unwrap();
+    fs::remove_dir(spec_dir).unwrap();
+    assert!(lock_toml.contains("version = \"auralis.lock/v1\""));
+    assert!(lock_toml.contains("semantic_hash = "));
+    assert!(lock_toml.contains("[[outputs]]"));
+}
+
+#[test]
+fn check_locked_requires_existing_lockfile() {
+    let spec_dir = temp_path("auralis-cli-check-locked-missing-dir", "dir");
+    fs::create_dir(&spec_dir).unwrap();
+    let spec = spec_dir.join("Auralis.toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "wav"
+input = "voice.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap(), "--locked"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_dir(spec_dir).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(stderr.contains("missing graph lock"), "{stderr}");
+    assert!(stderr.contains("run `auralis check"), "{stderr}");
+}
+
+#[test]
 fn check_graph_spec_reports_unknown_input_port() {
     let spec = temp_path("auralis-cli-check-spec-unknown-input", "toml");
     fs::write(
@@ -285,6 +363,8 @@ path = "build/out.wav"
     assert!(stdout.contains("Outputs:"), "{stdout}");
     assert!(stdout.contains("wav  build/out.wav"), "{stdout}");
     assert!(stdout.contains("expanded steps: 2"), "{stdout}");
+    assert!(stdout.contains("streaming segments: 1"), "{stdout}");
+    assert!(stdout.contains("whole-buffer barriers: 0"), "{stdout}");
     assert!(
         stdout.contains("chain voice_clean <- voice.audio"),
         "{stdout}"
@@ -294,8 +374,13 @@ path = "build/out.wav"
         stdout.contains("step voice_clean/02-filter.highpass"),
         "{stdout}"
     );
-    assert!(stdout.contains("node master"), "{stdout}");
+    assert!(stdout.contains("node master (passthrough)"), "{stdout}");
     assert!(stdout.contains("write wav <- master.audio"), "{stdout}");
+    assert!(stdout.contains("Segments:"), "{stdout}");
+    assert!(
+        stdout.contains("S1  voice.read -> cut -> voice_clean/02-filter.highpass"),
+        "{stdout}"
+    );
 }
 
 #[test]
@@ -478,6 +563,103 @@ path = "build/out.wav"
 }
 
 #[test]
+fn graph_spec_reports_node_labels_for_typed_nodes() {
+    let spec = temp_path("auralis-cli-graph-spec-node-labels", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[nodes]]
+id = "quiet"
+op = "gain"
+input = "voice.audio"
+by = "-6dB"
+
+[[sinks]]
+id = "wav"
+input = "quiet.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let mermaid = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "mermaid"])
+        .output()
+        .unwrap();
+    let graph_json = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "json"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(mermaid.status.success(), "{}", stderr(&mermaid));
+    assert!(graph_json.status.success(), "{}", stderr(&graph_json));
+    let mermaid_stdout = stdout(&mermaid);
+    assert!(
+        mermaid_stdout.contains("quiet[\"gain -6\"]"),
+        "{mermaid_stdout}"
+    );
+    let graph: serde_json::Value = serde_json::from_str(&stdout(&graph_json)).unwrap();
+    assert_eq!(
+        graph["nodes"][1],
+        serde_json::json!({"id": "quiet", "kind": "node", "label": "gain -6"})
+    );
+}
+
+#[test]
+fn graph_spec_reports_svg_for_valid_linear_spec() {
+    let spec = temp_path("auralis-cli-graph-spec-svg", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "svg"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("<svg "), "{stdout}");
+    assert!(stdout.contains("class=\"source\""), "{stdout}");
+    assert!(stdout.contains("class=\"step\""), "{stdout}");
+    assert!(stdout.contains("class=\"sink\""), "{stdout}");
+    assert!(stdout.contains(">input/voice.wav<"), "{stdout}");
+    assert!(stdout.contains(">gain -3dB<"), "{stdout}");
+    assert!(stdout.contains("marker-end=\"url(#arrow)\""), "{stdout}");
+}
+
+#[test]
 fn plan_graph_spec_reuses_validation_errors() {
     let spec = temp_path("auralis-cli-plan-spec-unknown-input", "toml");
     fs::write(
@@ -509,6 +691,69 @@ path = "build/out.wav"
         "{stderr}"
     );
     assert!(stderr.contains("voice.audio"), "{stderr}");
+}
+
+#[test]
+fn plan_locked_rejects_stale_lockfile() {
+    let spec_dir = temp_path("auralis-cli-plan-locked-stale-dir", "dir");
+    fs::create_dir(&spec_dir).unwrap();
+    let spec = spec_dir.join("Auralis.toml");
+    let lock = spec_dir.join("Auralis.lock");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "wav"
+input = "voice.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let check_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(check_output.status.success(), "{}", stderr(&check_output));
+
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_fx"
+input = "voice.audio"
+steps = [{ op = "reverse" }]
+
+[[sinks]]
+id = "wav"
+input = "voice_fx.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["plan", spec.to_str().unwrap(), "--locked"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(lock).unwrap();
+    fs::remove_dir(spec_dir).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(stderr.contains("graph lock"), "{stderr}");
+    assert!(stderr.contains("is stale"), "{stderr}");
 }
 
 #[test]
@@ -568,7 +813,10 @@ path = "build/out.wav"
             "chains": 1,
             "nodes": 0,
             "sinks": 1,
-            "expanded_steps": 2
+            "expanded_steps": 2,
+            "streaming_segments": 1,
+            "whole_buffer_barriers": 0,
+            "fanout_points": 0
         })
     );
     assert_eq!(
@@ -584,6 +832,196 @@ path = "build/out.wav"
             {"action": "write", "id": "wav", "input": "voice_clean.audio"}
         ])
     );
+    assert_eq!(
+        plan["segments"],
+        serde_json::json!([
+            {
+                "id": "S1",
+                "mode": "streaming",
+                "summary": "voice.read -> cut -> voice_clean/02-gain",
+                "reason": null
+            }
+        ])
+    );
+    assert_eq!(plan["fanout_points"], serde_json::json!([]));
+}
+
+#[test]
+fn plan_graph_spec_reports_barrier_and_fanout_details() {
+    let spec = temp_path("auralis-cli-plan-spec-barrier-fanout", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_fx"
+input = "voice.audio"
+steps = [
+  { op = "reverse" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_fx.audio"
+path = "build/out.wav"
+
+[[sinks]]
+id = "preview"
+input = "voice_fx.audio"
+path = "build/preview.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["plan", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("whole-buffer barriers: 1"), "{stdout}");
+    assert!(stdout.contains("fanout points: 1"), "{stdout}");
+    assert!(stdout.contains("B1  voice_fx/01-reverse"), "{stdout}");
+    assert!(
+        stdout.contains("reason: reverse requires a full-buffer materialization"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("voice_fx.audio -> sink wav, sink preview"),
+        "{stdout}"
+    );
+}
+
+#[test]
+fn explain_graph_chain_reports_modes_and_downstream() {
+    let spec = temp_path("auralis-cli-explain-spec-chain", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_fx"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "reverse" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_fx.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["explain", spec.to_str().unwrap(), "voice_fx"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("Node: voice_fx"), "{stdout}");
+    assert!(stdout.contains("Kind: chain"), "{stdout}");
+    assert!(stdout.contains("Expanded steps:"), "{stdout}");
+    assert!(stdout.contains("cut"), "{stdout}");
+    assert!(stdout.contains("voice_fx/02-reverse"), "{stdout}");
+    assert!(stdout.contains("streaming"), "{stdout}");
+    assert!(stdout.contains("whole-buffer barrier"), "{stdout}");
+    assert!(stdout.contains("Downstream:"), "{stdout}");
+    assert!(stdout.contains("wav"), "{stdout}");
+}
+
+#[test]
+fn explain_rejects_unknown_target() {
+    let spec = temp_path("auralis-cli-explain-spec-missing", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["explain", spec.to_str().unwrap(), "missing"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("spec does not define a source, chain, node, or sink named `missing`"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn explain_graph_node_reports_op_and_mode() {
+    let spec = temp_path("auralis-cli-explain-spec-node", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[nodes]]
+id = "quiet"
+op = "gain"
+input = "voice.audio"
+by = "-6dB"
+
+[[sinks]]
+id = "wav"
+input = "quiet.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["explain", spec.to_str().unwrap(), "quiet"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("Kind: node"), "{stdout}");
+    assert!(stdout.contains("Op:"), "{stdout}");
+    assert!(stdout.contains("gain -6"), "{stdout}");
+    assert!(stdout.contains("Execution mode:"), "{stdout}");
+    assert!(stdout.contains("streaming"), "{stdout}");
 }
 
 #[test]
@@ -645,6 +1083,124 @@ path = "{}"
     assert!(stdout.contains("wrote"), "{stdout}");
     assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -2000, 3000]));
     fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_locked_accepts_matching_lockfile() {
+    let spec_dir = temp_path("auralis-cli-run-locked-dir", "dir");
+    fs::create_dir(&spec_dir).unwrap();
+    let spec = spec_dir.join("Auralis.toml");
+    let lock = spec_dir.join("Auralis.lock");
+    let input = temp_path("auralis-cli-run-locked-input", "wav");
+    let output = temp_path("auralis-cli-run-locked-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[sinks]]
+id = "wav"
+input = "voice.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let check_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(check_output.status.success(), "{}", stderr(&check_output));
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap(), "--locked"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -2000, 3000]));
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(lock).unwrap();
+    fs::remove_dir(spec_dir).unwrap();
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_writes_shared_chain_output_to_multiple_sinks() {
+    let spec = temp_path("auralis-cli-run-spec-shared-chain", "toml");
+    let input = temp_path("auralis-cli-run-spec-shared-chain-input", "wav");
+    let wav_output = temp_path("auralis-cli-run-spec-shared-chain-output", "wav");
+    let preview_output = temp_path("auralis-cli-run-spec-shared-chain-preview", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "voice_reversed"
+input = "voice.audio"
+steps = [
+  {{ op = "reverse" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_reversed.audio"
+path = "{}"
+
+[[sinks]]
+id = "preview"
+input = "voice_reversed.audio"
+path = "{}"
+"#,
+            input.display(),
+            wav_output.display(),
+            preview_output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("wrote"), "{stdout}");
+    assert!(stdout.contains("preview"), "{stdout}");
+    assert_eq!(read_pcm16_wav(&wav_output), (1, vec![3000, -2000, 1000]));
+    assert_eq!(
+        read_pcm16_wav(&preview_output),
+        (1, vec![3000, -2000, 1000])
+    );
+    fs::remove_file(wav_output).unwrap();
+    fs::remove_file(preview_output).unwrap();
 }
 
 #[test]
@@ -1071,15 +1627,19 @@ path = "{}"
 }
 
 #[test]
-fn run_graph_spec_reports_unsupported_node_execution() {
+fn run_graph_spec_runs_single_input_node_passthrough() {
     let spec = temp_path("auralis-cli-run-spec-node", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
     fs::write(
         &spec,
-        r#"version = "auralis.graph/v1"
+        format!(
+            r#"version = "auralis.graph/v1"
 
 [[sources]]
 id = "voice"
-path = "input/voice.wav"
+path = "{}"
 
 [[nodes]]
 id = "master"
@@ -1088,8 +1648,11 @@ input = "voice.audio"
 [[sinks]]
 id = "wav"
 input = "master.audio"
-path = "build/out.wav"
+path = "{}"
 "#,
+            input.display(),
+            output.display()
+        ),
     )
     .unwrap();
 
@@ -1099,10 +1662,392 @@ path = "build/out.wav"
         .unwrap();
 
     fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -2000, 3000]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_single_input_gain_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-gain", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-gain-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-gain-output", "wav");
+    write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "quiet"
+op = "gain"
+input = "voice.audio"
+by = "-6dB"
+
+[[sinks]]
+id = "wav"
+input = "quiet.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&output),
+        (1, vec![-8211, -4106, 0, 4106, 8211])
+    );
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_mix_sum_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-mix", "toml");
+    let voice = temp_path("auralis-cli-run-spec-node-mix-voice", "wav");
+    let music = temp_path("auralis-cli-run-spec-node-mix-music", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-mix-output", "wav");
+    write_pcm16_wav(&voice, 1, &[1000, -1000]);
+    write_pcm16_wav(&music, 1, &[3000, 1000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[sources]]
+id = "music"
+path = "{}"
+
+[[nodes]]
+id = "master"
+op = "mix.sum"
+inputs = [
+  {{ from = "voice.audio", gain = "0dB" }},
+  {{ from = "music.audio", gain = "-6dB" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "master.audio"
+path = "{}"
+"#,
+            voice.display(),
+            music.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(voice).unwrap();
+    fs::remove_file(music).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![1252, -249]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_trim_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-trim", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-trim-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-trim-output", "wav");
+    write_pcm16_wav(&input, 1, &[10, 20, 30, 40, 50]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "trimmed"
+op = "trim"
+input = "voice.audio"
+range = "1..4"
+
+[[sinks]]
+id = "wav"
+input = "trimmed.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![20, 30, 40]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_fade_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-fade", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-fade-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-node-fade-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, 1000, 1000, 1000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "faded"
+op = "fade"
+input = "voice.audio"
+curve = "linear"
+fade_in = "2"
+fade_out = "2"
+
+[[sinks]]
+id = "wav"
+input = "faded.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![0, 500, 1000, 500]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_highpass_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-highpass", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-highpass-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-node-highpass-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-node-highpass-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000, -4000, 5000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "filtered"
+op = "filter.highpass"
+input = "voice.audio"
+cutoff = "1000Hz"
+q = 0.707
+
+[[sinks]]
+id = "wav"
+input = "filtered.audio"
+path = "{}"
+"#,
+            input.display(),
+            graph_output.display()
+        ),
+    )
+    .unwrap();
+
+    let graph = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "filter.highpass cutoff=1000Hz q=0.707",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(graph.status.success(), "{}", stderr(&graph));
+    assert!(render.status.success(), "{}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&graph_output),
+        read_pcm16_wav(&render_output)
+    );
+    fs::remove_file(graph_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_runs_norm_peak_node() {
+    let spec = temp_path("auralis-cli-run-spec-node-norm", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-norm-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-node-norm-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-node-norm-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000, -4000, 5000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[nodes]]
+id = "normalized"
+op = "norm.peak"
+input = "voice.audio"
+target = "-6dBFS"
+
+[[sinks]]
+id = "wav"
+input = "normalized.audio"
+path = "{}"
+"#,
+            input.display(),
+            graph_output.display()
+        ),
+    )
+    .unwrap();
+
+    let graph = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "norm -6",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(graph.status.success(), "{}", stderr(&graph));
+    assert!(render.status.success(), "{}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&graph_output),
+        read_pcm16_wav(&render_output)
+    );
+    fs::remove_file(graph_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_rejects_unsupported_node_op_execution() {
+    let spec = temp_path("auralis-cli-run-spec-node-unsupported-op", "toml");
+    let input = temp_path("auralis-cli-run-spec-node-unsupported-op-input", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[sources]]
+id = "music"
+path = "{}"
+
+[[nodes]]
+id = "master"
+op = "limiter"
+input = "voice.audio"
+ceiling = "-1dBFS"
+
+[[sinks]]
+id = "wav"
+input = "master.audio"
+path = "build/out.wav"
+"#,
+            input.display(),
+            input.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("run currently supports source-to-chain-to-sink graph specs only"),
+        stderr.contains("node op `limiter` is not supported"),
         "{stderr}"
     );
 }

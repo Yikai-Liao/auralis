@@ -4,19 +4,157 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+const LOCK_VERSION: &str = "auralis.lock/v1";
 
 pub fn check_graph_spec(path: &Path) -> Result<CheckedGraphSpec, GraphSpecError> {
     let source = fs::read_to_string(path).map_err(|error| GraphSpecError::Read {
         path: path.to_path_buf(),
         error,
     })?;
-    let spec = toml::from_str::<GraphSpec>(&source).map_err(GraphSpecError::Toml)?;
+    let spec = parse_graph_spec(&source)?;
 
     spec.validate()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+pub fn format_graph_spec(path: &Path) -> Result<String, GraphSpecError> {
+    let source = fs::read_to_string(path).map_err(|error| GraphSpecError::Read {
+        path: path.to_path_buf(),
+        error,
+    })?;
+    format_graph_spec_source(&source)
+}
+
+pub fn format_graph_spec_source(source: &str) -> Result<String, GraphSpecError> {
+    let spec = parse_graph_spec(source)?;
+    spec.clone().validate()?;
+    toml::to_string_pretty(&spec).map_err(GraphSpecError::TomlSerialize)
+}
+
+pub fn sync_graph_lock(path: &Path) -> Result<(), GraphSpecError> {
+    let graph_lock = build_graph_lock(path)?;
+    let lock_path = graph_lock_path(path);
+    let lock_toml = toml::to_string_pretty(&graph_lock).map_err(GraphSpecError::LockSerialize)?;
+    fs::write(&lock_path, lock_toml).map_err(|error| GraphSpecError::LockWrite {
+        path: lock_path,
+        error,
+    })
+}
+
+pub fn verify_graph_lock(path: &Path) -> Result<(), GraphSpecError> {
+    let expected = build_graph_lock(path)?;
+    let lock_path = graph_lock_path(path);
+    let source = match fs::read_to_string(&lock_path) {
+        Ok(source) => source,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(GraphSpecError::MissingLock {
+                path: lock_path,
+                spec_path: path.to_path_buf(),
+            });
+        }
+        Err(error) => {
+            return Err(GraphSpecError::LockRead {
+                path: lock_path,
+                error,
+            });
+        }
+    };
+    let actual = toml::from_str::<GraphLock>(&source).map_err(GraphSpecError::LockToml)?;
+    if actual != expected {
+        return Err(GraphSpecError::LockMismatch {
+            path: lock_path,
+            spec_path: path.to_path_buf(),
+        });
+    }
+    Ok(())
+}
+
+fn parse_graph_spec(source: &str) -> Result<GraphSpec, GraphSpecError> {
+    toml::from_str::<GraphSpec>(source).map_err(GraphSpecError::Toml)
+}
+
+fn build_graph_lock(path: &Path) -> Result<GraphLock, GraphSpecError> {
+    let source = fs::read_to_string(path).map_err(|error| GraphSpecError::Read {
+        path: path.to_path_buf(),
+        error,
+    })?;
+    let spec = parse_graph_spec(&source)?;
+    let checked = spec.clone().validate()?;
+    let formatted = toml::to_string_pretty(&spec).map_err(GraphSpecError::TomlSerialize)?;
+
+    Ok(GraphLock {
+        version: LOCK_VERSION.to_owned(),
+        spec_version: spec.version,
+        auralis_version: env!("CARGO_PKG_VERSION").to_owned(),
+        backend: "scalar".to_owned(),
+        semantic_hash: stable_hash_hex(&formatted),
+        operations: checked
+            .chains
+            .iter()
+            .flat_map(|chain| {
+                chain
+                    .step_ids
+                    .iter()
+                    .zip(chain.step_labels.iter())
+                    .map(|(id, label)| LockedOperation {
+                        id: id.clone(),
+                        op: label.clone(),
+                    })
+            })
+            .collect(),
+        outputs: checked
+            .sinks
+            .iter()
+            .map(|sink| LockedOutput {
+                id: sink.id.clone(),
+                input: sink.input.clone(),
+                path: sink.path.display().to_string(),
+            })
+            .collect(),
+    })
+}
+
+fn graph_lock_path(path: &Path) -> PathBuf {
+    path.parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("Auralis.lock")
+}
+
+fn stable_hash_hex(source: &str) -> String {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in source.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+struct GraphLock {
+    version: String,
+    spec_version: String,
+    auralis_version: String,
+    backend: String,
+    semantic_hash: String,
+    operations: Vec<LockedOperation>,
+    outputs: Vec<LockedOutput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+struct LockedOperation {
+    id: String,
+    op: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+struct LockedOutput {
+    id: String,
+    input: String,
+    path: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CheckedGraphSpec {
     pub name: Option<String>,
     pub source_count: usize,
@@ -25,7 +163,7 @@ pub struct CheckedGraphSpec {
     pub sink_count: usize,
     pub sources: Vec<CheckedSource>,
     pub chains: Vec<CheckedChain>,
-    pub nodes: Vec<String>,
+    pub nodes: Vec<CheckedNode>,
     pub sinks: Vec<CheckedSink>,
     pub expanded_step_ids: Vec<String>,
 }
@@ -45,6 +183,15 @@ pub struct CheckedChain {
     pub effect_tokens: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct CheckedNode {
+    pub id: String,
+    pub op: Option<String>,
+    pub inputs: Vec<String>,
+    pub input_gains: Vec<Option<String>>,
+    pub params: BTreeMap<String, toml::Value>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedSink {
     pub id: String,
@@ -52,58 +199,65 @@ pub struct CheckedSink {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct GraphSpec {
     version: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     sources: Vec<SourceSpec>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     chains: Vec<ChainSpec>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     nodes: Vec<NodeSpec>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     sinks: Vec<SinkSpec>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct SourceSpec {
     id: String,
     path: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ChainSpec {
     id: String,
     input: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     steps: Vec<ChainStepSpec>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ChainStepSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
     op: String,
-    #[serde(default, flatten)]
+    #[serde(default, flatten, skip_serializing_if = "BTreeMap::is_empty")]
     params: BTreeMap<String, toml::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct NodeSpec {
     id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    op: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     input: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     inputs: Vec<NodeInputSpec>,
+    #[serde(default, flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    params: BTreeMap<String, toml::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct NodeInputSpec {
     from: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    gain: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct SinkSpec {
     id: String,
     input: String,
@@ -201,7 +355,32 @@ impl GraphSpec {
                 })
                 .collect(),
             chains: checked_chains,
-            nodes: self.nodes.into_iter().map(|node| node.id).collect(),
+            nodes: self
+                .nodes
+                .into_iter()
+                .map(|node| {
+                    let NodeSpec {
+                        id,
+                        op,
+                        input,
+                        inputs,
+                        params,
+                    } = node;
+                    let input_gains = inputs.iter().map(|input| input.gain.clone()).collect();
+                    let inputs = input
+                        .into_iter()
+                        .chain(inputs.into_iter().map(|input| input.from))
+                        .collect();
+
+                    CheckedNode {
+                        id,
+                        op,
+                        inputs,
+                        input_gains,
+                        params,
+                    }
+                })
+                .collect(),
             sinks: self
                 .sinks
                 .into_iter()
@@ -512,6 +691,25 @@ pub enum GraphSpecError {
         error: std::io::Error,
     },
     Toml(toml::de::Error),
+    TomlSerialize(toml::ser::Error),
+    LockRead {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    LockWrite {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    LockToml(toml::de::Error),
+    LockSerialize(toml::ser::Error),
+    MissingLock {
+        path: PathBuf,
+        spec_path: PathBuf,
+    },
+    LockMismatch {
+        path: PathBuf,
+        spec_path: PathBuf,
+    },
     UnsupportedVersion {
         version: String,
     },
@@ -569,6 +767,39 @@ impl fmt::Display for GraphSpecError {
                 )
             }
             Self::Toml(error) => write!(formatter, "invalid graph spec TOML: {error}"),
+            Self::TomlSerialize(error) => {
+                write!(formatter, "failed to serialize graph spec TOML: {error}")
+            }
+            Self::LockRead { path, error } => {
+                write!(
+                    formatter,
+                    "failed to read graph lock {}: {error}",
+                    path.display()
+                )
+            }
+            Self::LockWrite { path, error } => {
+                write!(
+                    formatter,
+                    "failed to write graph lock {}: {error}",
+                    path.display()
+                )
+            }
+            Self::LockToml(error) => write!(formatter, "invalid graph lock TOML: {error}"),
+            Self::LockSerialize(error) => {
+                write!(formatter, "failed to serialize graph lock TOML: {error}")
+            }
+            Self::MissingLock { path, spec_path } => write!(
+                formatter,
+                "missing graph lock {}; run `auralis check {}` to create it",
+                path.display(),
+                spec_path.display()
+            ),
+            Self::LockMismatch { path, spec_path } => write!(
+                formatter,
+                "graph lock {} is stale; run `auralis check {}` to refresh it",
+                path.display(),
+                spec_path.display()
+            ),
             Self::UnsupportedVersion { version } => write!(
                 formatter,
                 "unsupported graph spec version `{version}`; expected `auralis.graph/v1`"
@@ -676,5 +907,34 @@ mod tests {
                 "voice_clean/02-filter.highpass".to_owned(),
             ]
         );
+    }
+
+    #[test]
+    fn formats_graph_spec_into_stable_pretty_toml() {
+        let formatted = format_graph_spec_source(
+            r#"version = "auralis.graph/v1"
+name = "episode"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [{ op = "trim", range = "10s..30s" }]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+        )
+        .unwrap();
+
+        assert!(formatted.contains("version = \"auralis.graph/v1\""));
+        assert!(formatted.contains("name = \"episode\""));
+        assert!(formatted.contains("[[chains.steps]]"));
+        assert!(formatted.contains("range = \"10s..30s\""));
     }
 }

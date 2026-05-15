@@ -1,8 +1,8 @@
 use auralis_core::FrameCount;
 
 use crate::{
-    command::{CommandResult, EffectCommand, EffectCommandParseError},
     Trim, TrimPosition,
+    command::{CommandResult, EffectCommand, EffectCommandParseError},
 };
 
 pub(super) fn parse_trim(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {

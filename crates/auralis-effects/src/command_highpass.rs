@@ -1,6 +1,6 @@
 use crate::command::{
-    is_option_like, reject_extra_arguments, render_f64, required_arg, CommandResult, EffectCommand,
-    EffectCommandParseError,
+    CommandResult, EffectCommand, EffectCommandParseError, is_option_like, reject_extra_arguments,
+    render_f64, required_arg,
 };
 use crate::command_filter::{parse_frequency_hz, parse_width, render_width};
 use crate::{HighPass, HighPassMode};

@@ -354,10 +354,12 @@ mod tests {
         mcompand.process_buffer(&mut audio).unwrap();
 
         assert_eq!(audio.frames(), FrameCount::new(6));
-        assert!(audio
-            .as_planar_f32()
-            .iter()
-            .all(|sample| sample.is_finite()));
+        assert!(
+            audio
+                .as_planar_f32()
+                .iter()
+                .all(|sample| sample.is_finite())
+        );
     }
 
     #[test]

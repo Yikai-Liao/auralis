@@ -258,3 +258,50 @@ fn ops_effect_alias_resolves_to_descriptor() {
     assert!(stdout.contains("typed_api: DcShift"), "{stdout}");
     assert!(stdout.contains("aliases: dc-shift"), "{stdout}");
 }
+
+#[test]
+fn ops_schema_json_lists_effect_registry_entries() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["ops", "--schema", "json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    let schema: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(schema.is_array(), "{stdout}");
+    let gain = schema
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["name"] == "gain")
+        .unwrap();
+    assert_eq!(gain["typed_api"], "Gain");
+    assert_eq!(gain["sox_ng_syntax"], "gain [options] [gain-dB]");
+}
+
+#[test]
+fn ops_schema_json_for_alias_resolves_single_descriptor() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["ops", "dc-shift", "--schema", "json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    let schema: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(schema["name"], "dcshift");
+    assert_eq!(schema["typed_api"], "DcShift");
+    assert_eq!(
+        schema["aliases"],
+        serde_json::json!(["dc-shift", "dc_shift"])
+    );
+}

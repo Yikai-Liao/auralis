@@ -4,12 +4,13 @@ mod spec;
 
 use std::{
     ffi::OsStr,
+    fs,
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
-use auralis_wav::{decode_pcm16_path, WavError};
+use auralis_wav::{WavError, decode_pcm16_path};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 
@@ -27,6 +28,10 @@ enum Command {
     Inspect {
         /// PCM16 WAV input file to inspect.
         input: PathBuf,
+
+        /// Emit machine-readable JSON output.
+        #[arg(long)]
+        json: bool,
     },
 
     /// Convert one supported audio file into another container format.
@@ -142,6 +147,10 @@ enum Command {
         /// Auralis graph spec to validate.
         spec: Option<PathBuf>,
 
+        /// Require an up-to-date Auralis.lock instead of refreshing it.
+        #[arg(long)]
+        locked: bool,
+
         /// Read the effect chain from a SoX-ng-style effects file.
         #[arg(long, value_name = "FILE")]
         effects_file: Option<PathBuf>,
@@ -163,6 +172,10 @@ enum Command {
         /// Emit machine-readable JSON output.
         #[arg(long)]
         json: bool,
+
+        /// Require an up-to-date Auralis.lock before planning.
+        #[arg(long)]
+        locked: bool,
     },
 
     /// Emit an Auralis graph spec as a graph description.
@@ -175,16 +188,55 @@ enum Command {
         format: GraphFormat,
     },
 
+    /// Format an Auralis graph spec.
+    Fmt {
+        /// Auralis graph spec to format.
+        spec: PathBuf,
+
+        /// Check whether formatting changes would be required.
+        #[arg(long)]
+        check: bool,
+    },
+
+    /// Generate shell completion scripts.
+    Completions {
+        /// Shell to generate completions for.
+        shell: CompletionShell,
+    },
+
+    /// Print built-in manual pages for Auralis commands.
+    Man {
+        /// Optional command topic, for example `render` or `plan`.
+        topic: Option<String>,
+    },
+
+    /// Explain how one graph node or target participates in execution.
+    Explain {
+        /// Auralis graph spec to inspect.
+        spec: PathBuf,
+
+        /// Chain, node, sink, or source id to explain.
+        target: String,
+    },
+
     /// Run an Auralis graph spec.
     Run {
         /// Auralis graph spec to execute.
         spec: PathBuf,
+
+        /// Require an up-to-date Auralis.lock before running.
+        #[arg(long)]
+        locked: bool,
     },
 
     /// List implemented typed effects or inspect one effect descriptor.
     Ops {
         /// Optional canonical effect name or alias to inspect.
         effect: Option<String>,
+
+        /// Emit machine-readable schema output.
+        #[arg(long, value_name = "FORMAT")]
+        schema: Option<OpsSchemaFormat>,
     },
 }
 
@@ -192,7 +244,20 @@ enum Command {
 enum GraphFormat {
     Mermaid,
     Dot,
+    Svg,
     Json,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum OpsSchemaFormat {
+    Json,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
 }
 
 fn main() -> ExitCode {
@@ -208,7 +273,7 @@ fn main() -> ExitCode {
 #[allow(clippy::too_many_lines)]
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
-        Command::Inspect { input } => inspect(&input),
+        Command::Inspect { input, json } => inspect(&input, json),
         Command::Convert {
             input,
             output,
@@ -275,28 +340,57 @@ fn run(cli: Cli) -> Result<(), CliError> {
         }
         Command::Check {
             spec,
+            locked,
             effects_file,
             fx,
             chain,
         } => check_command(
             spec.as_deref(),
+            locked,
             effects_file.as_deref(),
             &fx,
             chain.as_deref(),
         ),
-        Command::Plan { spec, json } => plan_graph_spec(&spec, json),
+        Command::Plan { spec, json, locked } => plan_graph_spec(&spec, json, locked),
         Command::Graph { spec, format } => graph_spec(&spec, format),
-        Command::Run { spec } => run_graph_spec(&spec),
-        Command::Ops { effect } => print_ops(effect.as_deref()),
+        Command::Fmt { spec, check } => format_graph_spec(&spec, check),
+        Command::Completions { shell } => print_completions(shell),
+        Command::Man { topic } => print_man_page(topic.as_deref()),
+        Command::Explain { spec, target } => explain_graph_target(&spec, &target),
+        Command::Run { spec, locked } => run_graph_spec(&spec, locked),
+        Command::Ops { effect, schema } => print_ops(effect.as_deref(), schema),
     }
 }
 
-fn inspect(input: &Path) -> Result<(), CliError> {
+#[derive(Debug, Serialize)]
+struct JsonInspectOutput {
+    format: &'static str,
+    sample_rate: u32,
+    channels: u16,
+    sample_format: &'static str,
+    duration_frames: u64,
+    duration_seconds: String,
+}
+
+fn inspect(input: &Path, json: bool) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
     let audio = decode_pcm16_path(input)?;
     let sample_rate = audio.spec().sample_rate().as_u32();
     let frames = audio.frames().as_u64();
     let duration_seconds = format_duration_seconds(frames, sample_rate);
+
+    if json {
+        let output = JsonInspectOutput {
+            format: "wav",
+            sample_rate,
+            channels: audio.channels().as_u16(),
+            sample_format: "pcm16",
+            duration_frames: frames,
+            duration_seconds,
+        };
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
+    }
 
     println!("format: wav");
     println!("sample_rate: {sample_rate}");
@@ -354,6 +448,7 @@ fn run_pipeline(input: &Path, output: &Path, options: &RenderOptions) -> Result<
 
 fn check_command(
     spec: Option<&Path>,
+    locked: bool,
     effects_file: Option<&Path>,
     fx: &[String],
     chain: Option<&str>,
@@ -362,13 +457,21 @@ fn check_command(
         if effects_file.is_some() || !fx.is_empty() || chain.is_some() {
             return Err(CliError::MixedCheckInputs);
         }
-        return check_graph_spec(spec);
+        return check_graph_spec(spec, locked);
     }
 
+    if locked {
+        return Err(CliError::LockedRequiresSpec);
+    }
     check_effects(effects_file, fx, chain)
 }
 
-fn check_graph_spec(spec: &Path) -> Result<(), CliError> {
+fn check_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
+    if locked {
+        spec::verify_graph_lock(spec)?;
+    } else {
+        spec::sync_graph_lock(spec)?;
+    }
     let checked = spec::check_graph_spec(spec)?;
 
     println!("status: ok");
@@ -381,15 +484,19 @@ fn check_graph_spec(spec: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn plan_graph_spec(spec: &Path, json: bool) -> Result<(), CliError> {
+fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(), CliError> {
+    if locked {
+        spec::verify_graph_lock(spec)?;
+    }
     let checked = spec::check_graph_spec(spec)?;
+    let plan = build_plan(&checked);
     let pipeline_name = checked
         .name
         .as_deref()
         .or_else(|| spec.file_stem().and_then(OsStr::to_str))
         .unwrap_or("Auralis.toml");
     if json {
-        return print_json_plan(spec, pipeline_name, &checked);
+        return print_json_plan(spec, pipeline_name, &checked, &plan);
     }
 
     println!("Pipeline: {pipeline_name}");
@@ -411,6 +518,9 @@ fn plan_graph_spec(spec: &Path, json: bool) -> Result<(), CliError> {
     println!("  nodes: {}", checked.node_count);
     println!("  sinks: {}", checked.sink_count);
     println!("  expanded steps: {}", checked.expanded_step_ids.len());
+    println!("  streaming segments: {}", plan.streaming_segments);
+    println!("  whole-buffer barriers: {}", plan.whole_buffer_barriers);
+    println!("  fanout points: {}", plan.fanout_points.len());
     println!();
     println!("Execution:");
     for source in &checked.sources {
@@ -423,10 +533,28 @@ fn plan_graph_spec(spec: &Path, json: bool) -> Result<(), CliError> {
         }
     }
     for node in &checked.nodes {
-        println!("  node {node}");
+        println!("  node {} ({})", node.id, node_display_label(node));
     }
     for sink in &checked.sinks {
         println!("  write {} <- {}", sink.id, sink.input);
+    }
+    if !plan.segments.is_empty() {
+        println!();
+        println!("Segments:");
+        for segment in &plan.segments {
+            println!("  {}  {}", segment.id, segment.summary);
+            println!("      mode: {}", segment.mode);
+            if let Some(reason) = &segment.reason {
+                println!("      reason: {reason}");
+            }
+        }
+    }
+    if !plan.fanout_points.is_empty() {
+        println!();
+        println!("Fanout:");
+        for fanout in &plan.fanout_points {
+            println!("  {} -> {}", fanout.port, fanout.consumers.join(", "));
+        }
     }
 
     Ok(())
@@ -440,6 +568,8 @@ struct JsonPlan {
     outputs: Vec<JsonPlanIo>,
     graph: JsonPlanGraph,
     execution: Vec<JsonPlanStep>,
+    segments: Vec<JsonPlanSegment>,
+    fanout_points: Vec<JsonPlanFanout>,
 }
 
 #[derive(Debug, Serialize)]
@@ -455,6 +585,9 @@ struct JsonPlanGraph {
     nodes: usize,
     sinks: usize,
     expanded_steps: usize,
+    streaming_segments: usize,
+    whole_buffer_barriers: usize,
+    fanout_points: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -469,15 +602,73 @@ enum JsonPlanStep {
         steps: Vec<String>,
     },
     #[serde(rename = "node")]
-    Node { id: String },
+    Node {
+        id: String,
+        inputs: Vec<String>,
+        label: String,
+    },
     #[serde(rename = "write")]
     Write { id: String, input: String },
+}
+
+#[derive(Debug, Serialize)]
+struct JsonPlanSegment {
+    id: String,
+    mode: String,
+    summary: String,
+    reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonPlanFanout {
+    port: String,
+    consumers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PlanStepMode {
+    Streaming,
+    WholeBufferBarrier,
+    AnalysisPass,
+}
+
+impl PlanStepMode {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Streaming => "streaming",
+            Self::WholeBufferBarrier => "whole-buffer barrier",
+            Self::AnalysisPass => "analysis pass",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PlanSegment {
+    id: String,
+    mode: &'static str,
+    summary: String,
+    reason: Option<String>,
+}
+
+#[derive(Debug)]
+struct FanoutPoint {
+    port: String,
+    consumers: Vec<String>,
+}
+
+#[derive(Debug)]
+struct GraphPlan {
+    streaming_segments: usize,
+    whole_buffer_barriers: usize,
+    segments: Vec<PlanSegment>,
+    fanout_points: Vec<FanoutPoint>,
 }
 
 fn print_json_plan(
     spec: &Path,
     pipeline_name: &str,
     checked: &spec::CheckedGraphSpec,
+    plan: &GraphPlan,
 ) -> Result<(), CliError> {
     let mut execution = Vec::new();
     for source in &checked.sources {
@@ -493,7 +684,11 @@ fn print_json_plan(
         });
     }
     for node in &checked.nodes {
-        execution.push(JsonPlanStep::Node { id: node.clone() });
+        execution.push(JsonPlanStep::Node {
+            id: node.id.clone(),
+            inputs: node.inputs.clone(),
+            label: node_display_label(node),
+        });
     }
     for sink in &checked.sinks {
         execution.push(JsonPlanStep::Write {
@@ -527,12 +722,133 @@ fn print_json_plan(
             nodes: checked.node_count,
             sinks: checked.sink_count,
             expanded_steps: checked.expanded_step_ids.len(),
+            streaming_segments: plan.streaming_segments,
+            whole_buffer_barriers: plan.whole_buffer_barriers,
+            fanout_points: plan.fanout_points.len(),
         },
         execution,
+        segments: plan
+            .segments
+            .iter()
+            .map(|segment| JsonPlanSegment {
+                id: segment.id.clone(),
+                mode: segment.mode.to_owned(),
+                summary: segment.summary.clone(),
+                reason: segment.reason.clone(),
+            })
+            .collect(),
+        fanout_points: plan
+            .fanout_points
+            .iter()
+            .map(|fanout| JsonPlanFanout {
+                port: fanout.port.clone(),
+                consumers: fanout.consumers.clone(),
+            })
+            .collect(),
     };
 
     println!("{}", serde_json::to_string_pretty(&plan)?);
     Ok(())
+}
+
+fn build_plan(checked: &spec::CheckedGraphSpec) -> GraphPlan {
+    let mut segments = Vec::new();
+    let mut streaming_segments = 0;
+    let mut whole_buffer_barriers = 0;
+
+    for chain in &checked.chains {
+        let upstream = chain
+            .input
+            .strip_suffix(".audio")
+            .unwrap_or(chain.input.as_str());
+        let mut stream_steps = vec![format!("{upstream}.read")];
+        for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
+            match classify_plan_step(label) {
+                (PlanStepMode::Streaming, _) => stream_steps.push(step_id.clone()),
+                (mode, reason) => {
+                    if stream_steps.len() > 1 {
+                        streaming_segments += 1;
+                        segments.push(PlanSegment {
+                            id: format!("S{streaming_segments}"),
+                            mode: PlanStepMode::Streaming.label(),
+                            summary: stream_steps.join(" -> "),
+                            reason: None,
+                        });
+                        stream_steps = Vec::new();
+                    }
+                    whole_buffer_barriers += 1;
+                    segments.push(PlanSegment {
+                        id: format!("B{whole_buffer_barriers}"),
+                        mode: mode.label(),
+                        summary: step_id.clone(),
+                        reason: Some(reason.to_owned()),
+                    });
+                }
+            }
+        }
+        if stream_steps.len() > 1 {
+            streaming_segments += 1;
+            segments.push(PlanSegment {
+                id: format!("S{streaming_segments}"),
+                mode: PlanStepMode::Streaming.label(),
+                summary: stream_steps.join(" -> "),
+                reason: None,
+            });
+        }
+    }
+
+    GraphPlan {
+        streaming_segments,
+        whole_buffer_barriers,
+        segments,
+        fanout_points: fanout_points(checked),
+    }
+}
+
+fn classify_plan_step(label: &str) -> (PlanStepMode, &'static str) {
+    let op = label.split_whitespace().next().unwrap_or(label);
+    match op {
+        "reverse" => (
+            PlanStepMode::WholeBufferBarrier,
+            "reverse requires a full-buffer materialization",
+        ),
+        "norm" => (
+            PlanStepMode::AnalysisPass,
+            "norm.peak scans the whole stream before applying gain",
+        ),
+        _ => (PlanStepMode::Streaming, ""),
+    }
+}
+
+fn fanout_points(checked: &spec::CheckedGraphSpec) -> Vec<FanoutPoint> {
+    let mut consumers = std::collections::BTreeMap::<String, Vec<String>>::new();
+    for chain in &checked.chains {
+        consumers
+            .entry(chain.input.clone())
+            .or_default()
+            .push(format!("chain {}", chain.id));
+    }
+    for node in &checked.nodes {
+        for input in &node.inputs {
+            consumers
+                .entry(input.clone())
+                .or_default()
+                .push(format!("node {}", node.id));
+        }
+    }
+    for sink in &checked.sinks {
+        consumers
+            .entry(sink.input.clone())
+            .or_default()
+            .push(format!("sink {}", sink.id));
+    }
+
+    consumers
+        .into_iter()
+        .filter_map(|(port, consumers)| {
+            (consumers.len() > 1).then_some(FanoutPoint { port, consumers })
+        })
+        .collect()
 }
 
 fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
@@ -540,10 +856,457 @@ fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
     match format {
         GraphFormat::Mermaid => print_mermaid_graph(&checked),
         GraphFormat::Dot => print_dot_graph(&checked),
+        GraphFormat::Svg => print_svg_graph(&checked),
         GraphFormat::Json => print_json_graph(&checked)?,
     }
 
     Ok(())
+}
+
+struct CompletionSpec {
+    name: &'static str,
+    options: &'static [&'static str],
+}
+
+struct ManPage {
+    name: &'static str,
+    summary: &'static str,
+    synopsis: &'static str,
+    description: &'static str,
+    options: &'static [(&'static str, &'static str)],
+}
+
+const COMPLETION_SPECS: &[CompletionSpec] = &[
+    CompletionSpec {
+        name: "inspect",
+        options: &["--json"],
+    },
+    CompletionSpec {
+        name: "convert",
+        options: &[
+            "-o",
+            "--output",
+            "--backend",
+            "-c",
+            "--channels",
+            "--no-auto-channels",
+            "-r",
+            "--rate",
+            "--no-auto-rate",
+            "-G",
+            "--guard",
+            "--norm",
+            "--sample",
+        ],
+    },
+    CompletionSpec {
+        name: "render",
+        options: &[
+            "-o",
+            "--output",
+            "--backend",
+            "--combine",
+            "--input",
+            "-c",
+            "--channels",
+            "--no-auto-channels",
+            "-r",
+            "--rate",
+            "--no-auto-rate",
+            "-G",
+            "--guard",
+            "--norm",
+            "--dither",
+            "--dither-seed",
+            "--effects-file",
+            "--fx",
+            "--chain",
+        ],
+    },
+    CompletionSpec {
+        name: "check",
+        options: &["--locked", "--effects-file", "--fx", "--chain"],
+    },
+    CompletionSpec {
+        name: "plan",
+        options: &["--json", "--locked"],
+    },
+    CompletionSpec {
+        name: "graph",
+        options: &["--format"],
+    },
+    CompletionSpec {
+        name: "fmt",
+        options: &["--check"],
+    },
+    CompletionSpec {
+        name: "completions",
+        options: &[],
+    },
+    CompletionSpec {
+        name: "man",
+        options: &[],
+    },
+    CompletionSpec {
+        name: "explain",
+        options: &[],
+    },
+    CompletionSpec {
+        name: "run",
+        options: &["--locked"],
+    },
+    CompletionSpec {
+        name: "ops",
+        options: &["--schema"],
+    },
+];
+
+const MAN_PAGES: &[ManPage] = &[
+    ManPage {
+        name: "auralis",
+        summary: "modern deterministic audio processing CLI",
+        synopsis: "auralis <command> [options]",
+        description: "Auralis exposes conversion, ordered render pipelines, graph planning, graph execution, inspection, and developer tooling from one typed command surface.",
+        options: &[
+            ("inspect", "Print PCM16 WAV metadata, optionally as JSON."),
+            (
+                "convert",
+                "Convert one supported audio file into another container format.",
+            ),
+            (
+                "render",
+                "Run one ordered DSP pipeline over one combined input stream.",
+            ),
+            ("check", "Validate graph specs or typed effect syntax."),
+            ("plan", "Preview execution shape for an Auralis graph spec."),
+            ("graph", "Emit an Auralis graph as mermaid, dot, or json."),
+            ("fmt", "Format an Auralis graph spec."),
+            ("completions", "Generate shell completion scripts."),
+            ("man", "Print built-in manual pages."),
+            (
+                "explain",
+                "Explain why a node or target participates in execution.",
+            ),
+            ("run", "Run an Auralis graph spec."),
+            ("ops", "Inspect the typed operation registry."),
+        ],
+    },
+    ManPage {
+        name: "render",
+        summary: "run one ordered DSP pipeline",
+        synopsis: "auralis render INPUT.wav -o OUTPUT.wav [--fx EFFECT]... [--chain CHAIN] [options]",
+        description: "Render is the primary linear-chain entry point. It combines optional additional inputs, parses typed effect syntax, applies output-boundary policies, and writes one output artifact.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--fx EFFECT", "Append one ordered typed effect string."),
+            (
+                "--chain CHAIN",
+                "Use a compact pipe-delimited effect chain.",
+            ),
+            (
+                "--combine METHOD",
+                "Combine multiple inputs before effects.",
+            ),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+            ("--channels CHANNELS", "Set the output channel count."),
+            ("--rate RATE", "Set the output sample rate."),
+            ("--guard", "Apply clip guard at the output boundary."),
+            (
+                "--norm [DB]",
+                "Normalize the output boundary to a peak target.",
+            ),
+            (
+                "--dither",
+                "Apply deterministic TPDF dither before PCM16 encoding.",
+            ),
+        ],
+    },
+    ManPage {
+        name: "plan",
+        summary: "preview graph execution",
+        synopsis: "auralis plan SPEC [--json] [--locked]",
+        description: "Plan validates an Auralis graph spec, exposes streaming segments, whole-buffer barriers, fanout points, and output targets, and can emit a machine-readable JSON form for tooling.",
+        options: &[
+            ("--json", "Emit machine-readable JSON output."),
+            (
+                "--locked",
+                "Require a matching Auralis.lock before planning.",
+            ),
+        ],
+    },
+    ManPage {
+        name: "run",
+        summary: "execute an Auralis graph spec",
+        synopsis: "auralis run SPEC [--locked]",
+        description: "Run executes the currently supported source-to-chain-to-sink subset of graph specs. Unsupported graph nodes should be inspected with `plan` first.",
+        options: &[(
+            "--locked",
+            "Require a matching Auralis.lock before running.",
+        )],
+    },
+    ManPage {
+        name: "check",
+        summary: "validate effect syntax or graph specs",
+        synopsis: "auralis check [SPEC] [--locked] [--fx EFFECT]... [--chain CHAIN] [--effects-file FILE]",
+        description: "Check validates either one graph spec or one effect-input mode. For graph specs, the default mode refreshes Auralis.lock while `--locked` requires an up-to-date lock.",
+        options: &[
+            (
+                "--locked",
+                "Require a matching Auralis.lock instead of refreshing it.",
+            ),
+            ("--fx EFFECT", "Validate one typed effect string."),
+            ("--chain CHAIN", "Validate a compact pipe-delimited chain."),
+            (
+                "--effects-file FILE",
+                "Validate a SoX-ng-style effects file.",
+            ),
+        ],
+    },
+    ManPage {
+        name: "ops",
+        summary: "inspect the typed operation registry",
+        synopsis: "auralis ops [EFFECT] [--schema json]",
+        description: "Ops lists implemented typed operations, resolves aliases, and can emit machine-readable registry metadata for tooling.",
+        options: &[("--schema json", "Emit machine-readable JSON output.")],
+    },
+];
+
+fn print_completions(shell: CompletionShell) -> Result<(), CliError> {
+    match shell {
+        CompletionShell::Bash => print_bash_completions(),
+        CompletionShell::Zsh => print_zsh_completions(),
+        CompletionShell::Fish => print_fish_completions(),
+    }
+    Ok(())
+}
+
+fn print_man_page(topic: Option<&str>) -> Result<(), CliError> {
+    let page = topic
+        .map(|topic| {
+            MAN_PAGES
+                .iter()
+                .find(|page| page.name == topic)
+                .ok_or_else(|| CliError::UnknownManTopic {
+                    topic: topic.to_owned(),
+                })
+        })
+        .transpose()?
+        .unwrap_or(&MAN_PAGES[0]);
+
+    println!("NAME");
+    println!("  {} - {}", page.name, page.summary);
+    println!();
+    println!("SYNOPSIS");
+    println!("  {}", page.synopsis);
+    println!();
+    println!("DESCRIPTION");
+    println!("  {}", page.description);
+    if !page.options.is_empty() {
+        println!();
+        println!("OPTIONS");
+        for (name, description) in page.options {
+            println!("  {}", name);
+            println!("    {}", description);
+        }
+    }
+
+    Ok(())
+}
+
+fn print_bash_completions() {
+    let commands = COMPLETION_SPECS
+        .iter()
+        .map(|spec| spec.name)
+        .collect::<Vec<_>>()
+        .join(" ");
+    println!("_auralis_completions() {{");
+    println!("  local cur prev words cword");
+    println!("  _init_completion || return");
+    println!();
+    println!("  case \"$prev\" in");
+    println!("    auralis)");
+    println!("      COMPREPLY=( $(compgen -W \"{commands}\" -- \"$cur\") )");
+    println!("      return");
+    println!("      ;;");
+    for spec in COMPLETION_SPECS {
+        if spec.options.is_empty() {
+            continue;
+        }
+        println!("    {})", spec.name);
+        println!(
+            "      COMPREPLY=( $(compgen -W \"{}\" -- \"$cur\") )",
+            spec.options.join(" ")
+        );
+        println!("      return");
+        println!("      ;;");
+    }
+    println!("  esac");
+    println!();
+    println!("  if [[ $cword -eq 1 ]]; then");
+    println!("    COMPREPLY=( $(compgen -W \"{commands}\" -- \"$cur\") )");
+    println!("    return");
+    println!("  fi");
+    println!("}}");
+    println!("complete -F _auralis_completions auralis");
+}
+
+fn print_zsh_completions() {
+    println!("#compdef auralis");
+    println!("local -a commands");
+    println!("commands=(");
+    for spec in COMPLETION_SPECS {
+        println!("  '{}:{}'", spec.name, spec.name);
+    }
+    println!(")");
+    println!("if (( CURRENT == 2 )); then");
+    println!("  _describe 'command' commands");
+    println!("  return");
+    println!("fi");
+    println!("case $words[2] in");
+    for spec in COMPLETION_SPECS {
+        println!("  {})", spec.name);
+        if spec.options.is_empty() {
+            println!("    _message 'no additional option completions'");
+        } else {
+            println!("    _values 'option' \\");
+            for option in spec.options {
+                println!("      '{}[{} option]' \\", option, spec.name);
+            }
+            println!("      ;");
+        }
+        println!("    ;;");
+    }
+    println!("esac");
+}
+
+fn print_fish_completions() {
+    for spec in COMPLETION_SPECS {
+        println!(
+            "complete -c auralis -n '__fish_use_subcommand' -a '{}' -d '{}'",
+            spec.name, spec.name
+        );
+    }
+    for spec in COMPLETION_SPECS {
+        for option in spec.options {
+            let (flag_kind, flag_name) = if let Some(long) = option.strip_prefix("--") {
+                ("-l", long)
+            } else if let Some(short) = option.strip_prefix('-') {
+                ("-s", short)
+            } else {
+                continue;
+            };
+            println!(
+                "complete -c auralis -n '__fish_seen_subcommand_from {}' {} {}",
+                spec.name, flag_kind, flag_name
+            );
+        }
+    }
+}
+
+fn format_graph_spec(spec: &Path, check: bool) -> Result<(), CliError> {
+    let formatted = spec::format_graph_spec(spec)?;
+    let current = fs::read_to_string(spec).map_err(|error| spec::GraphSpecError::Read {
+        path: spec.to_path_buf(),
+        error,
+    })?;
+    if check {
+        if current == formatted {
+            return Ok(());
+        }
+        return Err(CliError::GraphSpecNeedsFormatting {
+            path: spec.to_path_buf(),
+        });
+    }
+
+    if current != formatted {
+        fs::write(spec, formatted)?;
+    }
+    Ok(())
+}
+
+fn explain_graph_target(spec: &Path, target: &str) -> Result<(), CliError> {
+    let checked = spec::check_graph_spec(spec)?;
+
+    if let Some(source) = checked.sources.iter().find(|source| source.id == target) {
+        println!("Node: {}", source.id);
+        println!("Kind: source");
+        println!("Path:");
+        println!("  {}", source.path.display());
+        println!("Output port:");
+        println!("  {}.audio", source.id);
+        print_downstream(&checked, &format!("{}.audio", source.id));
+        return Ok(());
+    }
+
+    if let Some(chain) = checked.chains.iter().find(|chain| chain.id == target) {
+        println!("Node: {}", chain.id);
+        println!("Kind: chain");
+        println!("Input:");
+        println!("  {}", chain.input);
+        println!("Expanded steps:");
+        for step_id in &chain.step_ids {
+            println!("  {step_id}");
+        }
+        println!("Execution mode:");
+        for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
+            let (mode, reason) = classify_plan_step(label);
+            if reason.is_empty() {
+                println!("  {step_id:<24} {}", mode.label());
+            } else {
+                println!("  {step_id:<24} {} ({reason})", mode.label());
+            }
+        }
+        print_downstream(&checked, &format!("{}.audio", chain.id));
+        return Ok(());
+    }
+
+    if let Some(node) = checked.nodes.iter().find(|node| node.id == target) {
+        println!("Node: {}", node.id);
+        println!("Kind: node");
+        println!("Op:");
+        println!("  {}", node_display_label(node));
+        println!("Inputs:");
+        for input in &node.inputs {
+            println!("  {input}");
+        }
+        println!("Execution mode:");
+        let (mode, reason) = classify_node_plan_mode(node);
+        if reason.is_empty() {
+            println!("  {}", mode.label());
+        } else {
+            println!("  {} ({reason})", mode.label());
+        }
+        print_downstream(&checked, &format!("{}.audio", node.id));
+        return Ok(());
+    }
+
+    if let Some(sink) = checked.sinks.iter().find(|sink| sink.id == target) {
+        println!("Node: {}", sink.id);
+        println!("Kind: sink");
+        println!("Input:");
+        println!("  {}", sink.input);
+        println!("Path:");
+        println!("  {}", sink.path.display());
+        println!("Downstream:");
+        println!("  none");
+        return Ok(());
+    }
+
+    Err(CliError::UnknownExplainTarget {
+        target: target.to_owned(),
+    })
+}
+
+fn print_downstream(checked: &spec::CheckedGraphSpec, port: &str) {
+    println!("Downstream:");
+    let downstream = downstream_consumers(checked, port);
+    if downstream.is_empty() {
+        println!("  none");
+        return;
+    }
+    for consumer in downstream {
+        println!("  {consumer}");
+    }
 }
 
 fn print_mermaid_graph(checked: &spec::CheckedGraphSpec) {
@@ -565,7 +1328,15 @@ fn print_mermaid_graph(checked: &spec::CheckedGraphSpec) {
         }
     }
     for node in &checked.nodes {
-        println!("  {}[\"{}\"]", mermaid_id(node), node);
+        println!(
+            "  {}[\"{}\"]",
+            mermaid_id(&node.id),
+            node_display_label(node)
+        );
+        for input in &node.inputs {
+            let upstream = sink_upstream(checked, strip_audio_suffix(input));
+            println!("  {} --> {}", mermaid_id(upstream), mermaid_id(&node.id));
+        }
     }
     for sink in &checked.sinks {
         println!(
@@ -598,7 +1369,18 @@ fn print_dot_graph(checked: &spec::CheckedGraphSpec) {
         }
     }
     for node in &checked.nodes {
-        println!("  {} [label={}];", dot_id(node), dot_label(node));
+        println!(
+            "  {} [label={}];",
+            dot_id(&node.id),
+            dot_label(&node_display_label(node))
+        );
+        for input in &node.inputs {
+            println!(
+                "  {} -> {};",
+                dot_id(sink_upstream(checked, strip_audio_suffix(input))),
+                dot_id(&node.id)
+            );
+        }
     }
     for sink in &checked.sinks {
         println!(
@@ -636,6 +1418,13 @@ struct JsonGraphEdge {
 }
 
 fn print_json_graph(checked: &spec::CheckedGraphSpec) -> Result<(), CliError> {
+    let graph = build_json_graph(checked);
+
+    println!("{}", serde_json::to_string_pretty(&graph)?);
+    Ok(())
+}
+
+fn build_json_graph(checked: &spec::CheckedGraphSpec) -> JsonGraph {
     let mut graph = JsonGraph {
         nodes: Vec::new(),
         edges: Vec::new(),
@@ -667,10 +1456,16 @@ fn print_json_graph(checked: &spec::CheckedGraphSpec) -> Result<(), CliError> {
 
     for node in &checked.nodes {
         graph.nodes.push(JsonGraphNode {
-            id: node.clone(),
+            id: node.id.clone(),
             kind: "node",
-            label: node.clone(),
+            label: node_display_label(node),
         });
+        for input in &node.inputs {
+            graph.edges.push(JsonGraphEdge {
+                from: sink_upstream(checked, strip_audio_suffix(input)).to_string(),
+                to: node.id.clone(),
+            });
+        }
     }
 
     for sink in &checked.sinks {
@@ -686,8 +1481,78 @@ fn print_json_graph(checked: &spec::CheckedGraphSpec) -> Result<(), CliError> {
         });
     }
 
-    println!("{}", serde_json::to_string_pretty(&graph)?);
-    Ok(())
+    graph
+}
+
+fn print_svg_graph(checked: &spec::CheckedGraphSpec) {
+    let graph = build_json_graph(checked);
+    let card_width = 200_i32;
+    let card_height = 44_i32;
+    let gap = 28_i32;
+    let margin = 24_i32;
+    let width = margin * 2 + card_width;
+    let height = margin * 2 + (graph.nodes.len() as i32 * (card_height + gap)).saturating_sub(gap);
+
+    println!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\">"
+    );
+    println!("  <style>");
+    println!("    text {{ font-family: monospace; font-size: 12px; fill: #111827; }}");
+    println!("    .kind {{ font-size: 10px; fill: #6b7280; }}");
+    println!("    .source {{ fill: #dbeafe; stroke: #2563eb; }}");
+    println!("    .step {{ fill: #dcfce7; stroke: #16a34a; }}");
+    println!("    .node {{ fill: #f3e8ff; stroke: #7c3aed; }}");
+    println!("    .sink {{ fill: #fee2e2; stroke: #dc2626; }}");
+    println!("    .edge {{ stroke: #94a3b8; stroke-width: 2; fill: none; }}");
+    println!("  </style>");
+    println!("  <defs>");
+    println!(
+        "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\">"
+    );
+    println!("      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"#94a3b8\" />");
+    println!("    </marker>");
+    println!("  </defs>");
+
+    let mut positions = std::collections::BTreeMap::new();
+    for (index, node) in graph.nodes.iter().enumerate() {
+        let x = margin;
+        let y = margin + index as i32 * (card_height + gap);
+        positions.insert(node.id.clone(), (x, y));
+    }
+
+    for edge in &graph.edges {
+        let Some(&(from_x, from_y)) = positions.get(&edge.from) else {
+            continue;
+        };
+        let Some(&(to_x, to_y)) = positions.get(&edge.to) else {
+            continue;
+        };
+        let x1 = from_x + card_width / 2;
+        let y1 = from_y + card_height;
+        let x2 = to_x + card_width / 2;
+        let y2 = to_y;
+        println!(
+            "  <path class=\"edge\" marker-end=\"url(#arrow)\" d=\"M{x1} {y1} L{x2} {y2}\" />"
+        );
+    }
+
+    for node in &graph.nodes {
+        let (x, y) = positions[&node.id];
+        let label = xml_escape(&node.label);
+        let kind = xml_escape(node.kind);
+        println!(
+            "  <rect class=\"{}\" x=\"{x}\" y=\"{y}\" width=\"{card_width}\" height=\"{card_height}\" rx=\"10\" />",
+            node.kind
+        );
+        println!(
+            "  <text class=\"kind\" x=\"{}\" y=\"{}\">{kind}</text>",
+            x + 12,
+            y + 16
+        );
+        println!("  <text x=\"{}\" y=\"{}\">{label}</text>", x + 12, y + 31);
+    }
+
+    println!("</svg>");
 }
 
 fn mermaid_id(id: &str) -> String {
@@ -699,6 +1564,10 @@ fn mermaid_id(id: &str) -> String {
         .collect()
 }
 
+fn strip_audio_suffix(port: &str) -> &str {
+    port.strip_suffix(".audio").unwrap_or(port)
+}
+
 fn sink_upstream<'a>(checked: &'a spec::CheckedGraphSpec, input: &'a str) -> &'a str {
     checked
         .chains
@@ -706,6 +1575,26 @@ fn sink_upstream<'a>(checked: &'a spec::CheckedGraphSpec, input: &'a str) -> &'a
         .find(|chain| chain.id == input)
         .and_then(|chain| chain.step_ids.last())
         .map_or(input, String::as_str)
+}
+
+fn downstream_consumers(checked: &spec::CheckedGraphSpec, port: &str) -> Vec<String> {
+    let mut consumers = Vec::new();
+    for chain in &checked.chains {
+        if chain.input == port {
+            consumers.push(chain.id.clone());
+        }
+    }
+    for node in &checked.nodes {
+        if node.inputs.iter().any(|input| input == port) {
+            consumers.push(node.id.clone());
+        }
+    }
+    for sink in &checked.sinks {
+        if sink.input == port {
+            consumers.push(sink.id.clone());
+        }
+    }
+    consumers
 }
 
 fn dot_id(id: &str) -> String {
@@ -716,46 +1605,165 @@ fn dot_label(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn run_graph_spec(spec: &Path) -> Result<(), CliError> {
-    let checked = spec::check_graph_spec(spec)?;
-    if !checked.nodes.is_empty() {
-        return Err(CliError::UnsupportedGraphRunShape);
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn node_display_label(node: &spec::CheckedNode) -> String {
+    match node.op.as_deref() {
+        None => "passthrough".to_owned(),
+        Some("mix.sum") => "mix.sum".to_owned(),
+        Some(op) => node_effect_tokens(op, &node.params).map_or_else(
+            |_| op.to_owned(),
+            |tokens| {
+                if tokens.is_empty() {
+                    op.to_owned()
+                } else {
+                    tokens.join(" ")
+                }
+            },
+        ),
     }
+}
 
+fn classify_node_plan_mode(node: &spec::CheckedNode) -> (PlanStepMode, &'static str) {
+    match node.op.as_deref() {
+        None => (PlanStepMode::Streaming, "passthrough node"),
+        Some("mix.sum") => (PlanStepMode::Streaming, "multi-input streaming mix"),
+        Some("norm.peak") => (
+            PlanStepMode::AnalysisPass,
+            "norm.peak scans the whole stream before applying gain",
+        ),
+        Some("reverse") => (
+            PlanStepMode::WholeBufferBarrier,
+            "reverse requires a full-buffer materialization",
+        ),
+        Some(_) => (PlanStepMode::Streaming, ""),
+    }
+}
+
+fn param_as_string(value: &toml::Value) -> Option<String> {
+    match value {
+        toml::Value::String(value) => Some(value.clone()),
+        toml::Value::Integer(value) => Some(value.to_string()),
+        toml::Value::Float(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn strip_db_suffix(value: &str) -> String {
+    value
+        .strip_suffix("dBFS")
+        .or_else(|| value.strip_suffix("dbfs"))
+        .or_else(|| value.strip_suffix("dB"))
+        .or_else(|| value.strip_suffix("db"))
+        .unwrap_or(value)
+        .to_owned()
+}
+
+fn param_as_frequency_hz(value: &toml::Value) -> Option<String> {
+    let value = param_as_string(value)?;
+    Some(
+        value
+            .strip_suffix("Hz")
+            .or_else(|| value.strip_suffix("hz"))
+            .unwrap_or(&value)
+            .to_owned(),
+    )
+}
+
+fn fade_curve_token(value: String) -> String {
+    match value.as_str() {
+        "linear" => "t".to_owned(),
+        "logarithmic" => "l".to_owned(),
+        "quarter-sine" => "q".to_owned(),
+        "half-sine" => "h".to_owned(),
+        "inverted-parabola" => "p".to_owned(),
+        _ => value,
+    }
+}
+
+fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
+    if locked {
+        spec::verify_graph_lock(spec)?;
+    }
+    let checked = spec::check_graph_spec(spec)?;
     let spec_dir = spec.parent().unwrap_or_else(|| Path::new(""));
+    let mut grouped_sinks = std::collections::BTreeMap::<String, Vec<&spec::CheckedSink>>::new();
     for sink in &checked.sinks {
-        let (source, effect_chain) = resolve_graph_sink_pipeline(&checked, sink)?;
-        let input = resolve_spec_path(spec_dir, &source.path);
-        let output = resolve_spec_path(spec_dir, &sink.path);
+        grouped_sinks
+            .entry(sink.input.clone())
+            .or_default()
+            .push(sink);
+    }
+    let mut render_cache = std::collections::BTreeMap::<String, auralis::AudioBuffer>::new();
 
-        ensure_wav_extension(&input, PathRole::Input)?;
-        ensure_wav_extension(&output, PathRole::Output)?;
-        let pipeline = auralis::AudioFile::open_wav(&input)?.into_pipeline();
-        match effect_chain {
-            Some(effect_chain) => pipeline
-                .apply_effect_chain(&effect_chain)
-                .write_wav(&output)?,
-            None => pipeline.write_wav(&output)?,
+    for (input_port, sinks) in grouped_sinks {
+        let rendered = render_graph_port_audio(&checked, spec_dir, &input_port, &mut render_cache)?;
+        for sink in sinks {
+            let output = resolve_spec_path(spec_dir, &sink.path);
+            ensure_wav_extension(&output, PathRole::Output)?;
+            auralis::AudioFile::from_audio_buffer(rendered.clone())
+                .into_pipeline()
+                .write_wav(&output)?;
+            println!("wrote {} <- {}", sink.path.display(), sink.input);
         }
-        println!("wrote {} <- {}", sink.path.display(), sink.input);
     }
 
     Ok(())
 }
 
-fn resolve_graph_sink_pipeline<'a>(
-    checked: &'a spec::CheckedGraphSpec,
-    sink: &spec::CheckedSink,
-) -> Result<(&'a spec::CheckedSource, Option<auralis::EffectChain>), CliError> {
-    let Some(input_id) = sink.input.strip_suffix(".audio") else {
+fn render_graph_port_audio(
+    checked: &spec::CheckedGraphSpec,
+    spec_dir: &Path,
+    input: &str,
+    render_cache: &mut std::collections::BTreeMap<String, auralis::AudioBuffer>,
+) -> Result<auralis::AudioBuffer, CliError> {
+    if let Some(rendered) = render_cache.get(input) {
+        return Ok(rendered.clone());
+    }
+
+    let mut visited = std::collections::BTreeSet::new();
+    let rendered = render_graph_input_audio(checked, spec_dir, input, render_cache, &mut visited)?;
+    render_cache.insert(input.to_owned(), rendered.clone());
+    Ok(rendered)
+}
+
+fn render_graph_input_audio(
+    checked: &spec::CheckedGraphSpec,
+    spec_dir: &Path,
+    input: &str,
+    render_cache: &mut std::collections::BTreeMap<String, auralis::AudioBuffer>,
+    visited: &mut std::collections::BTreeSet<String>,
+) -> Result<auralis::AudioBuffer, CliError> {
+    let Some(input_id) = input.strip_suffix(".audio") else {
         return Err(CliError::UnsupportedGraphSink {
-            sink: sink.id.clone(),
-            input: sink.input.clone(),
+            sink: input.to_owned(),
+            input: input.to_owned(),
         });
     };
+    if !visited.insert(input_id.to_owned()) {
+        return Err(CliError::UnsupportedGraphRunShape);
+    }
 
     if let Some(source) = checked.sources.iter().find(|source| source.id == input_id) {
-        return Ok((source, None));
+        let input = resolve_spec_path(spec_dir, &source.path);
+        ensure_wav_extension(&input, PathRole::Input)?;
+        return auralis::AudioFile::open_wav(&input)?
+            .into_pipeline()
+            .into_audio_buffer()
+            .map_err(CliError::from);
+    }
+
+    if let Some(node) = checked.nodes.iter().find(|node| node.id == input_id) {
+        let rendered = render_graph_node_audio(checked, spec_dir, node, render_cache, visited)?;
+        render_cache.insert(input.to_owned(), rendered.clone());
+        return Ok(rendered);
     }
 
     let chain = checked
@@ -763,27 +1771,195 @@ fn resolve_graph_sink_pipeline<'a>(
         .iter()
         .find(|chain| chain.id == input_id)
         .ok_or_else(|| CliError::UnsupportedGraphSink {
-            sink: sink.id.clone(),
-            input: sink.input.clone(),
+            sink: input.to_owned(),
+            input: input.to_owned(),
         })?;
-    let Some(source_id) = chain.input.strip_suffix(".audio") else {
-        return Err(CliError::UnsupportedGraphChainInput {
-            chain: chain.id.clone(),
-            input: chain.input.clone(),
-        });
-    };
-    let source = checked
-        .sources
-        .iter()
-        .find(|source| source.id == source_id)
-        .ok_or_else(|| CliError::UnsupportedGraphChainInput {
-            chain: chain.id.clone(),
-            input: chain.input.clone(),
-        })?;
+    let upstream = render_graph_port_audio(checked, spec_dir, &chain.input, render_cache)?;
     let token_refs: Vec<&str> = chain.effect_tokens.iter().map(String::as_str).collect();
     let effect_chain = auralis::parse_effect_chain(&token_refs)?;
+    auralis::AudioFile::from_audio_buffer(upstream)
+        .into_pipeline()
+        .apply_effect_chain(&effect_chain)
+        .into_audio_buffer()
+        .map_err(CliError::from)
+}
 
-    Ok((source, Some(effect_chain)))
+fn render_graph_node_audio(
+    checked: &spec::CheckedGraphSpec,
+    spec_dir: &Path,
+    node: &spec::CheckedNode,
+    render_cache: &mut std::collections::BTreeMap<String, auralis::AudioBuffer>,
+    visited: &mut std::collections::BTreeSet<String>,
+) -> Result<auralis::AudioBuffer, CliError> {
+    match node.op.as_deref() {
+        None if node.inputs.len() == 1 => {
+            render_graph_port_audio(checked, spec_dir, &node.inputs[0], render_cache)
+        }
+        Some("mix.sum") => {
+            render_graph_mix_sum_node(checked, spec_dir, node, render_cache, visited)
+        }
+        Some(op) if node.inputs.len() == 1 => {
+            let upstream =
+                render_graph_port_audio(checked, spec_dir, &node.inputs[0], render_cache)?;
+            let effect_tokens = node_effect_tokens(op, &node.params)?;
+            let token_refs: Vec<&str> = effect_tokens.iter().map(String::as_str).collect();
+            let effect_chain = auralis::parse_effect_chain(&token_refs)?;
+            auralis::AudioFile::from_audio_buffer(upstream)
+                .into_pipeline()
+                .apply_effect_chain(&effect_chain)
+                .into_audio_buffer()
+                .map_err(CliError::from)
+        }
+        Some(_) | None => Err(CliError::UnsupportedGraphNodeInputs {
+            node: node.id.clone(),
+            inputs: node.inputs.clone(),
+        }),
+    }
+}
+
+fn render_graph_mix_sum_node(
+    checked: &spec::CheckedGraphSpec,
+    spec_dir: &Path,
+    node: &spec::CheckedNode,
+    render_cache: &mut std::collections::BTreeMap<String, auralis::AudioBuffer>,
+    _visited: &mut std::collections::BTreeSet<String>,
+) -> Result<auralis::AudioBuffer, CliError> {
+    let mut inputs = Vec::with_capacity(node.inputs.len());
+    for (index, input) in node.inputs.iter().enumerate() {
+        let rendered = render_graph_port_audio(checked, spec_dir, input, render_cache)?;
+        let rendered = if let Some(Some(gain)) = node.input_gains.get(index) {
+            let token_refs = ["gain", gain.as_str()];
+            let effect_chain = auralis::parse_effect_chain(&token_refs)?;
+            auralis::AudioFile::from_audio_buffer(rendered)
+                .into_pipeline()
+                .apply_effect_chain(&effect_chain)
+                .into_audio_buffer()?
+        } else {
+            rendered
+        };
+        inputs.push(rendered);
+    }
+
+    auralis::AudioFile::from_audio_buffers_mixed(&inputs)?
+        .into_pipeline()
+        .into_audio_buffer()
+        .map_err(CliError::from)
+}
+
+fn node_effect_tokens(
+    op: &str,
+    params: &std::collections::BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, CliError> {
+    match op {
+        "gain" => {
+            let Some(by) = params.get("by") else {
+                return Ok(vec!["gain".to_owned()]);
+            };
+            let Some(by) = param_as_string(by) else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `by` must be a string or number".to_owned(),
+                });
+            };
+            Ok(vec!["gain".to_owned(), strip_db_suffix(&by)])
+        }
+        "dcshift" => {
+            let Some(shift) = params.get("shift") else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `shift` is required".to_owned(),
+                });
+            };
+            let Some(shift) = param_as_string(shift) else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `shift` must be a string or number".to_owned(),
+                });
+            };
+            Ok(vec!["dcshift".to_owned(), shift])
+        }
+        "trim" => {
+            let Some(range) = params.get("range") else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `range` is required".to_owned(),
+                });
+            };
+            let Some(range) = param_as_string(range) else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `range` must be a string or number".to_owned(),
+                });
+            };
+            let Some((start, end)) = range.split_once("..") else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `range` must use start..end syntax".to_owned(),
+                });
+            };
+            Ok(vec!["trim".to_owned(), start.to_owned(), format!("={end}")])
+        }
+        "fade" => {
+            let Some(fade_in) = params.get("fade_in") else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `fade_in` is required".to_owned(),
+                });
+            };
+            let Some(fade_in) = param_as_string(fade_in) else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `fade_in` must be a string or number".to_owned(),
+                });
+            };
+            let curve = params
+                .get("curve")
+                .and_then(param_as_string)
+                .map_or_else(|| "l".to_owned(), fade_curve_token);
+            let fade_out = params.get("fade_out").and_then(param_as_string);
+            Ok(match fade_out {
+                Some(fade_out) => vec!["fade".to_owned(), curve, fade_in, "0".to_owned(), fade_out],
+                None => vec!["fade".to_owned(), curve, fade_in],
+            })
+        }
+        "filter.highpass" => {
+            let Some(cutoff) = params.get("cutoff") else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `cutoff` is required".to_owned(),
+                });
+            };
+            let Some(cutoff) = param_as_frequency_hz(cutoff) else {
+                return Err(CliError::UnsupportedGraphNodeOp {
+                    op: op.to_owned(),
+                    reason: "parameter `cutoff` must be a string or number".to_owned(),
+                });
+            };
+            let mut tokens = vec!["highpass".to_owned(), cutoff];
+            if let Some(q) = params.get("q") {
+                let Some(q) = param_as_string(q) else {
+                    return Err(CliError::UnsupportedGraphNodeOp {
+                        op: op.to_owned(),
+                        reason: "parameter `q` must be a string or number".to_owned(),
+                    });
+                };
+                tokens.push(format!("{q}q"));
+            }
+            Ok(tokens)
+        }
+        "norm.peak" => {
+            let target = params
+                .get("target")
+                .and_then(param_as_string)
+                .map(|value| strip_db_suffix(&value))
+                .unwrap_or_else(|| "0".to_owned());
+            Ok(vec!["norm".to_owned(), target])
+        }
+        unsupported => Err(CliError::UnsupportedGraphNodeOp {
+            op: unsupported.to_owned(),
+            reason: "node op is not implemented by the current graph runner".to_owned(),
+        }),
+    }
 }
 
 fn resolve_spec_path(spec_dir: &Path, path: &Path) -> PathBuf {
@@ -808,7 +1984,11 @@ fn check_effects(
     Ok(())
 }
 
-fn print_ops(effect: Option<&str>) -> Result<(), CliError> {
+fn print_ops(effect: Option<&str>, schema: Option<OpsSchemaFormat>) -> Result<(), CliError> {
+    if matches!(schema, Some(OpsSchemaFormat::Json)) {
+        return print_ops_json(effect);
+    }
+
     if let Some(name) = effect {
         return print_one_op(name);
     }
@@ -822,6 +2002,50 @@ fn print_ops(effect: Option<&str>) -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct JsonOpDescriptor {
+    name: String,
+    kind: String,
+    summary: String,
+    typed_api: String,
+    sox_ng_syntax: String,
+    aliases: Vec<String>,
+}
+
+fn print_ops_json(effect: Option<&str>) -> Result<(), CliError> {
+    if let Some(name) = effect {
+        let descriptor = EffectRegistry::resolve(name).map_err(CliError::from)?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json_op_descriptor(*descriptor))?
+        );
+        return Ok(());
+    }
+
+    let descriptors = SUPPORTED_EFFECTS
+        .iter()
+        .copied()
+        .map(json_op_descriptor)
+        .collect::<Vec<_>>();
+    println!("{}", serde_json::to_string_pretty(&descriptors)?);
+    Ok(())
+}
+
+fn json_op_descriptor(descriptor: auralis::EffectDescriptor) -> JsonOpDescriptor {
+    JsonOpDescriptor {
+        name: descriptor.canonical_name().to_owned(),
+        kind: format!("{:?}", descriptor.kind()),
+        summary: descriptor.summary().to_owned(),
+        typed_api: descriptor.typed_api().to_owned(),
+        sox_ng_syntax: descriptor.sox_ng_syntax().to_owned(),
+        aliases: descriptor
+            .aliases()
+            .iter()
+            .map(|alias| (*alias).to_owned())
+            .collect(),
+    }
 }
 
 fn print_one_op(name: &str) -> Result<(), CliError> {
@@ -1283,6 +2507,7 @@ enum CliError {
     EffectsFile(auralis::EffectsFileReadError),
     GraphSpec(spec::GraphSpecError),
     Json(serde_json::Error),
+    Io(std::io::Error),
     Wav(WavError),
     EmptyEffectSpec,
     InvalidEffectSpec { spec: String },
@@ -1293,7 +2518,13 @@ enum CliError {
     DitherSeedWithoutDither,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
+    LockedRequiresSpec,
+    GraphSpecNeedsFormatting { path: PathBuf },
+    UnknownManTopic { topic: String },
+    UnknownExplainTarget { target: String },
     UnsupportedGraphRunShape,
+    UnsupportedGraphNodeInputs { node: String, inputs: Vec<String> },
+    UnsupportedGraphNodeOp { op: String, reason: String },
     UnsupportedGraphChainInput { chain: String, input: String },
     UnsupportedGraphSink { sink: String, input: String },
     UnsupportedConvertInputFormat { path: PathBuf },
@@ -1326,6 +2557,7 @@ impl std::fmt::Display for CliError {
             Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::GraphSpec(error) => write!(formatter, "{error}"),
             Self::Json(error) => write!(formatter, "{error}"),
+            Self::Io(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::EmptyEffectSpec => {
                 formatter.write_str("effect input requires a non-empty effect")
@@ -1353,8 +2585,34 @@ impl std::fmt::Display for CliError {
             Self::NoAutoRateWithoutOutputRate => {
                 formatter.write_str("--no-auto-rate requires --rate")
             }
+            Self::LockedRequiresSpec => {
+                formatter.write_str("--locked requires a graph spec input")
+            }
+            Self::GraphSpecNeedsFormatting { path } => write!(
+                formatter,
+                "graph spec {} is not formatted; run `auralis fmt {}`",
+                path.display(),
+                path.display()
+            ),
+            Self::UnknownManTopic { topic } => write!(
+                formatter,
+                "no built-in manual page for `{topic}`"
+            ),
+            Self::UnknownExplainTarget { target } => write!(
+                formatter,
+                "spec does not define a source, chain, node, or sink named `{target}`"
+            ),
             Self::UnsupportedGraphRunShape => formatter.write_str(
                 "run currently supports source-to-chain-to-sink graph specs only; use `plan` to inspect unsupported nodes",
+            ),
+            Self::UnsupportedGraphNodeInputs { node, inputs } => write!(
+                formatter,
+                "node `{node}` cannot be run with inputs [{}]; only single-input passthrough nodes are supported",
+                inputs.join(", ")
+            ),
+            Self::UnsupportedGraphNodeOp { op, reason } => write!(
+                formatter,
+                "node op `{op}` is not supported by the current graph runner: {reason}"
             ),
             Self::UnsupportedGraphChainInput { chain, input } => write!(
                 formatter,
@@ -1421,6 +2679,12 @@ impl From<spec::GraphSpecError> for CliError {
 impl From<serde_json::Error> for CliError {
     fn from(error: serde_json::Error) -> Self {
         Self::Json(error)
+    }
+}
+
+impl From<std::io::Error> for CliError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
     }
 }
 

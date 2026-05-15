@@ -43,37 +43,37 @@ pub use auralis_core::{
     TimeSeconds,
 };
 pub use auralis_effects::{
-    parse_effect_chain, parse_effects_file, parse_effects_file_str, EffectChain,
-    EffectChainBoundary, EffectChainError, EffectChainParseError, EffectCommand, EffectDescriptor,
-    EffectKind, EffectNameError, EffectRegistry, EffectsFileParseError, EffectsFileReadError,
-    SUPPORTED_EFFECTS,
+    EffectChain, EffectChainBoundary, EffectChainError, EffectChainParseError, EffectCommand,
+    EffectDescriptor, EffectKind, EffectNameError, EffectRegistry, EffectsFileParseError,
+    EffectsFileReadError, SUPPORTED_EFFECTS, parse_effect_chain, parse_effects_file,
+    parse_effects_file_str,
 };
 pub use auralis_flac::FlacError;
 pub use auralis_simd::BackendKind;
 
 pub use audio_file::AudioFile;
 pub use channel_policy::{
-    convert_audio_channels, convert_audio_channels_with_backend, ChannelConversionError,
-    ChannelConversionPolicy,
+    ChannelConversionError, ChannelConversionPolicy, convert_audio_channels,
+    convert_audio_channels_with_backend,
 };
 pub use combine::{
-    concatenate_audio_buffers, merge_audio_buffers, mix_audio_buffers,
-    mix_audio_buffers_with_backend, mix_power_audio_buffers, mix_power_audio_buffers_with_backend,
-    multiply_audio_buffers, multiply_audio_buffers_with_backend, sequence_audio_buffers,
-    CombineMethod, InputCombineError,
+    CombineMethod, InputCombineError, concatenate_audio_buffers, merge_audio_buffers,
+    mix_audio_buffers, mix_audio_buffers_with_backend, mix_power_audio_buffers,
+    mix_power_audio_buffers_with_backend, multiply_audio_buffers,
+    multiply_audio_buffers_with_backend, sequence_audio_buffers,
 };
 pub use dither_policy::{
-    dither_audio_for_pcm16, OutputDitherConfig, OutputDitherError, OutputDitherMode,
-    OutputDitherPolicy,
+    OutputDitherConfig, OutputDitherError, OutputDitherMode, OutputDitherPolicy,
+    dither_audio_for_pcm16,
 };
 pub use errors::Error;
 pub use level_policy::{
-    guard_audio_level, guard_audio_level_with_backend, normalize_audio_level,
-    normalize_audio_level_with_backend, OutputLevelError, OutputLevelPolicy,
+    OutputLevelError, OutputLevelPolicy, guard_audio_level, guard_audio_level_with_backend,
+    normalize_audio_level, normalize_audio_level_with_backend,
 };
 pub use pipeline::Pipeline;
 pub use rate_policy::{
-    convert_audio_sample_rate, SampleRateConversionError, SampleRateConversionPolicy,
+    SampleRateConversionError, SampleRateConversionPolicy, convert_audio_sample_rate,
 };
 
 /// Crate-local result type using [`Error`].

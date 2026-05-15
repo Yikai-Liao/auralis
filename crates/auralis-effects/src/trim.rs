@@ -202,7 +202,8 @@ impl Trim {
     /// are outside the input buffer or cannot be represented.
     pub fn process_buffer_in_place(&self, audio: &mut AudioBuffer) -> Result<()> {
         let ranges = self.resolved_ranges(audio.frames())?;
-        audio.retain_frame_ranges(&ranges)
+        audio
+            .retain_frame_ranges(&ranges)
             .map_err(|_| EffectError::TrimRangeOutOfBounds)
     }
 

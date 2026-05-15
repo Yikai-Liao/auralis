@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use auralis_testkit::golden_report::{
-    GoldenFailureReport, GoldenJsonNumber, GoldenMetricComparison, GoldenMetricFailure,
-    GoldenOutputMetadata, GoldenThresholds, GOLDEN_FAILURE_REPORT_SCHEMA,
+    GOLDEN_FAILURE_REPORT_SCHEMA, GoldenFailureReport, GoldenJsonNumber, GoldenMetricComparison,
+    GoldenMetricFailure, GoldenOutputMetadata, GoldenThresholds,
 };
 use serde_json::json;
 

@@ -527,8 +527,8 @@ impl AudioBuffer {
         for &(start, end) in ranges {
             let start = usize::try_from(start.as_u64())
                 .map_err(|_| AuralisError::InvalidAudioBufferShape)?;
-            let end = usize::try_from(end.as_u64())
-                .map_err(|_| AuralisError::InvalidAudioBufferShape)?;
+            let end =
+                usize::try_from(end.as_u64()).map_err(|_| AuralisError::InvalidAudioBufferShape)?;
             if start < previous_end || start > end || end > input_frames {
                 return Err(AuralisError::InvalidAudioBufferShape);
             }
@@ -842,12 +842,9 @@ mod tests {
 
     #[test]
     fn set_spec_updates_metadata_in_place() {
-        let mut buffer = AudioBuffer::from_planar_f32(
-            test_spec(1),
-            FrameCount::new(2),
-            vec![0.0, 0.25],
-        )
-        .unwrap();
+        let mut buffer =
+            AudioBuffer::from_planar_f32(test_spec(1), FrameCount::new(2), vec![0.0, 0.25])
+                .unwrap();
         let spec = AudioSpec::new(
             SampleRate::new(24_000).unwrap(),
             ChannelCount::new(1).unwrap(),

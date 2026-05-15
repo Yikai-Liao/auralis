@@ -1,8 +1,8 @@
 use auralis_core::FrameCount;
 
 use crate::command::{
-    parse_frame_count, reject_extra_arguments, CommandResult, EffectCommand,
-    EffectCommandParseError,
+    CommandResult, EffectCommand, EffectCommandParseError, parse_frame_count,
+    reject_extra_arguments,
 };
 use crate::{Fade, FadeCurve};
 

@@ -1,0 +1,60 @@
+//! Integration tests for the `auralis completions` command.
+
+mod support;
+
+use support::*;
+
+#[test]
+fn bash_completions_include_modern_commands_and_flags() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["completions", "bash"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(stdout.contains("_auralis_completions()"), "{stdout}");
+    assert!(stdout.contains("render"), "{stdout}");
+    assert!(stdout.contains("plan"), "{stdout}");
+    assert!(stdout.contains("completions"), "{stdout}");
+    assert!(stdout.contains("--locked"), "{stdout}");
+    assert!(stdout.contains("--schema"), "{stdout}");
+}
+
+#[test]
+fn zsh_completions_include_modern_commands_and_flags() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["completions", "zsh"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(stdout.contains("#compdef auralis"), "{stdout}");
+    assert!(stdout.contains("'fmt:fmt'"), "{stdout}");
+    assert!(stdout.contains("'--check[fmt option]'"), "{stdout}");
+    assert!(stdout.contains("'--locked[plan option]'"), "{stdout}");
+}
+
+#[test]
+fn fish_completions_include_modern_commands_and_flags() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["completions", "fish"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'ops'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from check' -l locked"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from render' -l chain"),
+        "{stdout}"
+    );
+}

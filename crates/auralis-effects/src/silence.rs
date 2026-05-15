@@ -310,15 +310,19 @@ impl Silence {
     }
 
     fn above_threshold_frame(channels: &[&[f32]], frame: usize, threshold: f32) -> bool {
-        channels
-            .iter()
-            .any(|channel| channel.get(frame).is_some_and(|sample| sample.abs() > threshold))
+        channels.iter().any(|channel| {
+            channel
+                .get(frame)
+                .is_some_and(|sample| sample.abs() > threshold)
+        })
     }
 
     fn below_threshold_frame(channels: &[&[f32]], frame: usize, threshold: f32) -> bool {
-        !channels
-            .iter()
-            .all(|channel| channel.get(frame).is_some_and(|sample| sample.abs() > threshold))
+        !channels.iter().all(|channel| {
+            channel
+                .get(frame)
+                .is_some_and(|sample| sample.abs() > threshold)
+        })
     }
 }
 
