@@ -23,6 +23,8 @@ pub fn lower_graph_effect_tokens(
         "bass" => lower_ordered_tokens("bass", params, &["gain", "frequency", "width"]),
         "contrast" => lower_ordered_tokens("contrast", params, &["amount"]),
         "dcshift" => lower_ordered_tokens("dcshift", params, &["shift", "limiter_gain"]),
+        "delay" => lower_repeated_tokens("delay", params, "positions"),
+        "dither" => lower_dither_tokens(params),
         "downsample" => lower_ordered_tokens("downsample", params, &["factor"]),
         "equalizer" => lower_ordered_tokens("equalizer", params, &["frequency", "width", "gain"]),
         "gain" => {
@@ -55,6 +57,10 @@ pub fn lower_graph_effect_tokens(
         }
         "filter.lowpass" | "lowpass" => lower_pole_filter_tokens("lowpass", params),
         "filter.highpass" | "highpass" => lower_pole_filter_tokens("highpass", params),
+        "hilbert" => lower_flagged_value_tokens("hilbert", params, "taps", "-n"),
+        "loudness" => {
+            lower_ordered_tokens("loudness", params, &["gain", "reference", "half_points"])
+        }
         "norm.peak" => {
             let Some(target) = params.get("target") else {
                 return Ok(vec!["norm".to_owned()]);
@@ -62,11 +68,16 @@ pub fn lower_graph_effect_tokens(
             Ok(vec!["norm".to_owned(), param_as_dbfs(target, "target")?])
         }
         "overdrive" => lower_ordered_tokens("overdrive", params, &["gain", "color"]),
+        "pad" => lower_pad_tokens(params),
+        "pitch" => lower_pitch_tokens(params),
         "repeat" => lower_ordered_tokens("repeat", params, &["count"]),
+        "reverb" => lower_reverb_tokens(params),
         "softvol" => {
             lower_ordered_tokens("softvol", params, &["volume", "double_time", "headroom"])
         }
         "speed" => lower_ordered_tokens("speed", params, &["factor"]),
+        "stretch" => lower_stretch_tokens(params),
+        "tempo" => lower_tempo_tokens(params),
         "treble" => lower_ordered_tokens("treble", params, &["gain", "frequency", "width"]),
         "tremolo" => lower_ordered_tokens("tremolo", params, &["speed", "depth"]),
         "trim" => {
@@ -102,6 +113,64 @@ fn lower_ordered_tokens(
         tokens.push(param_as_string(value, param)?);
     }
     Ok(tokens)
+}
+
+fn lower_optional_ordered_tokens(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+    ordered_params: &[&'static str],
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec![op.to_owned()];
+    append_optional_ordered(&mut tokens, params, ordered_params)?;
+    Ok(tokens)
+}
+
+fn append_optional_ordered(
+    tokens: &mut Vec<String>,
+    params: &BTreeMap<String, toml::Value>,
+    ordered_params: &[&'static str],
+) -> Result<(), EffectTokenError> {
+    let mut missing_prefix = false;
+    for param in ordered_params {
+        let Some(value) = params.get(*param) else {
+            missing_prefix = true;
+            continue;
+        };
+        if missing_prefix {
+            return Err(invalid_param(param));
+        }
+        tokens.push(param_as_string(value, param)?);
+    }
+    Ok(())
+}
+
+fn lower_repeated_tokens(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+    param: &'static str,
+) -> Result<Vec<String>, EffectTokenError> {
+    let Some(values) = params.get(param) else {
+        return Ok(vec![op.to_owned()]);
+    };
+    let mut tokens = vec![op.to_owned()];
+    tokens.extend(param_as_string_array(values, param)?);
+    Ok(tokens)
+}
+
+fn lower_flagged_value_tokens(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+    param: &'static str,
+    flag: &str,
+) -> Result<Vec<String>, EffectTokenError> {
+    let Some(value) = params.get(param) else {
+        return Ok(vec![op.to_owned()]);
+    };
+    Ok(vec![
+        op.to_owned(),
+        flag.to_owned(),
+        param_as_string(value, param)?,
+    ])
 }
 
 fn lower_pole_filter_tokens(
@@ -158,6 +227,138 @@ fn lower_bandpass_tokens(
     Ok(tokens)
 }
 
+fn lower_pad_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    if params.is_empty() {
+        return Ok(vec!["pad".to_owned()]);
+    }
+
+    let mut tokens = vec!["pad".to_owned()];
+    tokens.push(
+        params
+            .get("start")
+            .map(|value| param_as_string(value, "start"))
+            .transpose()?
+            .unwrap_or_else(|| "0".to_owned()),
+    );
+    if let Some(positioned) = params.get("positioned") {
+        tokens.extend(param_as_string_array(positioned, "positioned")?);
+    }
+    tokens.push(
+        params
+            .get("end")
+            .map(|value| param_as_string(value, "end"))
+            .transpose()?
+            .unwrap_or_else(|| "0".to_owned()),
+    );
+    Ok(tokens)
+}
+
+fn lower_dither_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["dither".to_owned()];
+    if params
+        .get("noise_shape")
+        .map(|value| param_as_string(value, "noise_shape"))
+        .transpose()?
+        .as_deref()
+        == Some("shibata")
+    {
+        tokens.push("-s".to_owned());
+    } else if param_as_bool(params.get("sloped"), "sloped")? {
+        tokens.push("-S".to_owned());
+    }
+    if let Some(precision) = params.get("precision") {
+        tokens.push("-p".to_owned());
+        tokens.push(param_as_string(precision, "precision")?);
+    }
+    Ok(tokens)
+}
+
+fn lower_reverb_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["reverb".to_owned()];
+    if param_as_bool(params.get("wet_only"), "wet_only")? {
+        tokens.push("-w".to_owned());
+    }
+    append_optional_ordered(
+        &mut tokens,
+        params,
+        &[
+            "reverberance",
+            "hf_damping",
+            "room_scale",
+            "stereo_depth",
+            "pre_delay",
+            "wet_gain",
+        ],
+    )?;
+    Ok(tokens)
+}
+
+fn lower_stretch_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = lower_optional_ordered_tokens("stretch", params, &["factor", "window"])?;
+    if let Some(fade) = params.get("fade") {
+        if tokens.len() < 3 {
+            return Err(invalid_param("fade"));
+        }
+        tokens.push(stretch_fade_token(param_as_string(fade, "fade")?));
+    } else if params.contains_key("shift") || params.contains_key("fading") {
+        if tokens.len() < 3 {
+            return Err(invalid_param("shift"));
+        }
+        tokens.push("l".to_owned());
+    }
+    append_optional_ordered(&mut tokens, params, &["shift", "fading"])?;
+    Ok(tokens)
+}
+
+fn lower_tempo_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["tempo".to_owned()];
+    if param_as_bool(params.get("quick"), "quick")? {
+        tokens.push("-q".to_owned());
+    }
+    if let Some(profile) = params.get("profile") {
+        tokens.push(profile_token(param_as_string(profile, "profile")?));
+    }
+    let Some(factor) = params.get("factor") else {
+        return if tokens.len() == 1 {
+            Ok(tokens)
+        } else {
+            Err(invalid_param("factor"))
+        };
+    };
+    tokens.push(param_as_string(factor, "factor")?);
+    append_optional_ordered(&mut tokens, params, &["segment", "search", "overlap"])?;
+    Ok(tokens)
+}
+
+fn lower_pitch_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["pitch".to_owned()];
+    if param_as_bool(params.get("quick"), "quick")? {
+        tokens.push("-q".to_owned());
+    }
+    let Some(cents) = params.get("cents") else {
+        return if tokens.len() == 1 {
+            Ok(tokens)
+        } else {
+            Err(invalid_param("cents"))
+        };
+    };
+    tokens.push(param_as_string(cents, "cents")?);
+    append_optional_ordered(&mut tokens, params, &["segment", "search", "overlap"])?;
+    Ok(tokens)
+}
+
 fn param_as_string(value: &toml::Value, param: &'static str) -> Result<String, EffectTokenError> {
     match value {
         toml::Value::String(value) => Ok(value.clone()),
@@ -165,6 +366,19 @@ fn param_as_string(value: &toml::Value, param: &'static str) -> Result<String, E
         toml::Value::Float(value) => Ok(value.to_string()),
         _ => Err(invalid_param(param)),
     }
+}
+
+fn param_as_string_array(
+    value: &toml::Value,
+    param: &'static str,
+) -> Result<Vec<String>, EffectTokenError> {
+    let toml::Value::Array(values) = value else {
+        return Err(invalid_param(param));
+    };
+    values
+        .iter()
+        .map(|value| param_as_string(value, param))
+        .collect()
 }
 
 fn param_as_bool(
@@ -208,6 +422,25 @@ fn fade_curve_token(value: String) -> String {
         "quarter-sine" => "q".to_owned(),
         "half-sine" => "h".to_owned(),
         "inverted-parabola" => "p".to_owned(),
+        _ => value,
+    }
+}
+
+fn stretch_fade_token(value: String) -> String {
+    match value.as_str() {
+        "linear" => "l".to_owned(),
+        "sqrt" => "s".to_owned(),
+        "half" => "h".to_owned(),
+        "quarter" => "q".to_owned(),
+        _ => value,
+    }
+}
+
+fn profile_token(value: String) -> String {
+    match value.as_str() {
+        "music" => "-m".to_owned(),
+        "speech" => "-s".to_owned(),
+        "linear" => "-l".to_owned(),
         _ => value,
     }
 }

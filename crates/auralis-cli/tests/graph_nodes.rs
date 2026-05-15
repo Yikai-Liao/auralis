@@ -186,3 +186,102 @@ fn graph_nodes_lower_named_resampling_and_repeat_parameters() {
         "upsample 2",
     );
 }
+
+#[test]
+fn graph_nodes_lower_named_structural_and_fir_parameters() {
+    let samples = &[1000, -2000, 3000, -4000, 5000, -6000];
+
+    assert_graph_node_matches_render("delay", samples, "delay", r#"positions = ["1"]"#, "delay 1");
+    assert_graph_node_matches_render(
+        "pad",
+        samples,
+        "pad",
+        r#"start = "1"
+positioned = ["2@2"]
+end = "1""#,
+        "pad 1 2@2 1",
+    );
+    assert_graph_node_matches_render(
+        "hilbert",
+        samples,
+        "hilbert",
+        r#"taps = "5""#,
+        "hilbert -n 5",
+    );
+    assert_graph_node_matches_render(
+        "loudness",
+        samples,
+        "loudness",
+        r#"gain = "-6"
+reference = "70"
+half_points = "127""#,
+        "loudness -6 70 127",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_quantization_and_reverb_parameters() {
+    let samples = &[1000, -2000, 3000, -4000, 5000, -6000];
+
+    assert_graph_node_matches_render(
+        "dither",
+        samples,
+        "dither",
+        r#"sloped = true
+precision = "12""#,
+        "dither -S -p 12",
+    );
+    assert_graph_node_matches_render(
+        "reverb",
+        samples,
+        "reverb",
+        r#"wet_only = true
+reverberance = "75"
+hf_damping = "25"
+room_scale = "50"
+stereo_depth = "0"
+pre_delay = "10"
+wet_gain = "-3""#,
+        "reverb -w 75 25 50 0 10 -3",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_time_and_pitch_parameters() {
+    let samples = &[-12000, -6000, 0, 6000, 12000, 6000, 0, -6000];
+
+    assert_graph_node_matches_render(
+        "tempo",
+        samples,
+        "tempo",
+        r#"factor = "1.25"
+quick = true
+profile = "speech"
+segment = "60"
+search = "10"
+overlap = "8""#,
+        "tempo -q -s 1.25 60 10 8",
+    );
+    assert_graph_node_matches_render(
+        "pitch",
+        samples,
+        "pitch",
+        r#"cents = "-1200"
+quick = true
+segment = "60"
+search = "10"
+overlap = "8""#,
+        "pitch -q -1200 60 10 8",
+    );
+    assert_graph_node_matches_render(
+        "stretch",
+        samples,
+        "stretch",
+        r#"factor = "1.5"
+window = "10"
+fade = "quarter"
+shift = "0.75"
+fading = "0.25""#,
+        "stretch 1.5 10 q 0.75 0.25",
+    );
+}
