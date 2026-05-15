@@ -5,7 +5,7 @@ mod support;
 use support::*;
 
 #[test]
-fn top_level_help_omits_legacy_run_subcommand() {
+fn top_level_help_documents_modern_run_subcommand() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["--help"])
         .output()
@@ -15,19 +15,22 @@ fn top_level_help_omits_legacy_run_subcommand() {
     let stdout = stdout(&command_output);
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("convert"), "{stdout}");
-    assert!(!stdout.contains("\n  run "), "{stdout}");
+    assert!(stdout.contains("run"), "{stdout}");
 }
 
 #[test]
-fn legacy_run_subcommand_returns_unknown_command_error() {
+fn run_rejects_legacy_positional_audio_shape() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run"])
+        .args(["run", "input.wav", "output.wav", "reverse"])
         .output()
         .unwrap();
 
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
-    assert!(stderr.contains("unrecognized subcommand 'run'"), "{stderr}");
+    assert!(
+        stderr.contains("unexpected argument 'output.wav'"),
+        "{stderr}"
+    );
 }
 
 #[test]
@@ -326,6 +329,90 @@ path = "build/out.wav"
         "{stderr}"
     );
     assert!(stderr.contains("voice.audio"), "{stderr}");
+}
+
+#[test]
+fn run_graph_spec_writes_direct_source_to_sink_output() {
+    let spec = temp_path("auralis-cli-run-spec-direct", "toml");
+    let input = temp_path("auralis-cli-run-spec-direct-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-direct-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[sinks]]
+id = "wav"
+input = "voice.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("wrote"), "{stdout}");
+    assert_eq!(read_pcm16_wav(&output), (1, vec![1000, -2000, 3000]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_reports_unsupported_chain_execution() {
+    let spec = temp_path("auralis-cli-run-spec-chain", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { op = "reverse" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("run currently supports direct source-to-sink graph specs only"),
+        "{stderr}"
+    );
 }
 
 #[test]

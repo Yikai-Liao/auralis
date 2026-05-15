@@ -160,6 +160,12 @@ enum Command {
         spec: PathBuf,
     },
 
+    /// Run an Auralis graph spec.
+    Run {
+        /// Auralis graph spec to execute.
+        spec: PathBuf,
+    },
+
     /// List implemented typed effects or inspect one effect descriptor.
     Ops {
         /// Optional canonical effect name or alias to inspect.
@@ -257,6 +263,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             chain.as_deref(),
         ),
         Command::Plan { spec } => plan_graph_spec(&spec),
+        Command::Run { spec } => run_graph_spec(&spec),
         Command::Ops { effect } => print_ops(effect.as_deref()),
     }
 }
@@ -397,6 +404,50 @@ fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+fn run_graph_spec(spec: &Path) -> Result<(), CliError> {
+    let checked = spec::check_graph_spec(spec)?;
+    if !checked.chains.is_empty() || !checked.nodes.is_empty() {
+        return Err(CliError::UnsupportedGraphRunShape);
+    }
+
+    let spec_dir = spec.parent().unwrap_or_else(|| Path::new(""));
+    for sink in &checked.sinks {
+        let Some(source_id) = sink.input.strip_suffix(".audio") else {
+            return Err(CliError::UnsupportedGraphSink {
+                sink: sink.id.clone(),
+                input: sink.input.clone(),
+            });
+        };
+        let source = checked
+            .sources
+            .iter()
+            .find(|source| source.id == source_id)
+            .ok_or_else(|| CliError::UnsupportedGraphSink {
+                sink: sink.id.clone(),
+                input: sink.input.clone(),
+            })?;
+        let input = resolve_spec_path(spec_dir, &source.path);
+        let output = resolve_spec_path(spec_dir, &sink.path);
+
+        ensure_wav_extension(&input, PathRole::Input)?;
+        ensure_wav_extension(&output, PathRole::Output)?;
+        auralis::AudioFile::open_wav(&input)?
+            .into_pipeline()
+            .write_wav(&output)?;
+        println!("wrote {} <- {}", sink.path.display(), sink.input);
+    }
+
+    Ok(())
+}
+
+fn resolve_spec_path(spec_dir: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        spec_dir.join(path)
+    }
 }
 
 fn check_effects(
@@ -897,6 +948,8 @@ enum CliError {
     DitherSeedWithoutDither,
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
+    UnsupportedGraphRunShape,
+    UnsupportedGraphSink { sink: String, input: String },
     UnsupportedConvertInputFormat { path: PathBuf },
     UnsupportedConvertOutputFormat { path: PathBuf },
     UnsupportedFormat { path: PathBuf, role: PathRole },
@@ -953,6 +1006,13 @@ impl std::fmt::Display for CliError {
             Self::NoAutoRateWithoutOutputRate => {
                 formatter.write_str("--no-auto-rate requires --rate")
             }
+            Self::UnsupportedGraphRunShape => formatter.write_str(
+                "run currently supports direct source-to-sink graph specs only; use `plan` to inspect chains and nodes",
+            ),
+            Self::UnsupportedGraphSink { sink, input } => write!(
+                formatter,
+                "sink `{sink}` cannot be run from unsupported input `{input}`"
+            ),
             Self::UnsupportedConvertInputFormat { path } => write!(
                 formatter,
                 "unsupported convert input format for {}; supported inputs are wav, flac, au, and snd",
