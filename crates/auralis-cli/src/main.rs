@@ -143,6 +143,76 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Apply CD/DAT de-emphasis to one audio file.
+    Deemph {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply the stereo headphone-cue filter to one audio file.
+    Earwax {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Extract out-of-phase stereo content.
+    Oops {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply RIAA vinyl playback equalization.
+    Riaa {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Swap adjacent channel pairs.
+    Swap {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Fade one audio file in or out.
     Fade {
         /// PCM16 WAV input file to read.
@@ -490,6 +560,31 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["reverse"]),
+        Command::Deemph {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["deemph"]),
+        Command::Earwax {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["earwax"]),
+        Command::Oops {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["oops"]),
+        Command::Riaa {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["riaa"]),
+        Command::Swap {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["swap"]),
         Command::Fade {
             input,
             fade_in,
@@ -1269,6 +1364,26 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "deemph",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "earwax",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "oops",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "riaa",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "swap",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "fade",
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
@@ -1370,6 +1485,11 @@ const MAN_PAGES: &[ManPage] = &[
             ("normalize", "Normalize one audio file to a peak level."),
             ("gain", "Adjust one audio file by a gain amount."),
             ("reverse", "Reverse one audio file."),
+            ("deemph", "Apply CD/DAT de-emphasis to one audio file."),
+            ("earwax", "Apply a stereo headphone-cue filter."),
+            ("oops", "Extract out-of-phase stereo content."),
+            ("riaa", "Apply RIAA vinyl playback equalization."),
+            ("swap", "Swap adjacent channel pairs."),
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
@@ -1447,6 +1567,56 @@ const MAN_PAGES: &[ManPage] = &[
         summary: "reverse one audio file",
         synopsis: "auralis reverse INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
         description: "Reverse is a recipe alias for reversing all frames in one input. It lowers to the same typed effect pipeline as `render --fx reverse`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "deemph",
+        summary: "apply de-emphasis",
+        synopsis: "auralis deemph INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Deemph is a recipe alias for CD/DAT de-emphasis. It lowers to the same typed effect pipeline as `render --fx deemph`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "earwax",
+        summary: "apply headphone-cue filtering",
+        synopsis: "auralis earwax INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Earwax is a recipe alias for the stereo headphone-cue filter. It lowers to the same typed effect pipeline as `render --fx earwax`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "oops",
+        summary: "extract out-of-phase stereo",
+        synopsis: "auralis oops INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Oops is a recipe alias for extracting out-of-phase stereo content. It lowers to the same typed effect pipeline as `render --fx oops`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "riaa",
+        summary: "apply RIAA equalization",
+        synopsis: "auralis riaa INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Riaa is a recipe alias for vinyl playback equalization. It lowers to the same typed effect pipeline as `render --fx riaa`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "swap",
+        summary: "swap adjacent channel pairs",
+        synopsis: "auralis swap INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Swap is a recipe alias for exchanging adjacent channel pairs. It lowers to the same typed effect pipeline as `render --fx swap`.",
         options: &[
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),

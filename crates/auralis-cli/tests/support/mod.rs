@@ -10,7 +10,16 @@ use std::{
 };
 
 pub fn write_pcm16_wav(path: &Path, channels: u16, samples: &[i16]) {
-    let mut bytes = riff_header(channels, 16, 1, samples.len() * 2);
+    write_pcm16_wav_with_sample_rate(path, 48_000, channels, samples);
+}
+
+pub fn write_pcm16_wav_with_sample_rate(
+    path: &Path,
+    sample_rate: u32,
+    channels: u16,
+    samples: &[i16],
+) {
+    let mut bytes = riff_header(sample_rate, channels, 16, 1, samples.len() * 2);
     for sample in samples {
         bytes.extend_from_slice(&sample.to_le_bytes());
     }
@@ -20,7 +29,7 @@ pub fn write_pcm16_wav(path: &Path, channels: u16, samples: &[i16]) {
 pub fn write_pcm16_wav_with_metadata(path: &Path, channels: u16, samples: &[i16]) {
     let data_bytes = samples.len() * 2;
     let metadata = b"LIST\x04\0\0\0INFO";
-    let mut bytes = riff_header_with_extra(channels, 16, 1, data_bytes, metadata.len());
+    let mut bytes = riff_header_with_extra(48_000, channels, 16, 1, data_bytes, metadata.len());
     bytes.extend_from_slice(metadata);
     bytes.extend_from_slice(b"data");
     bytes.extend_from_slice(&u32::try_from(data_bytes).unwrap().to_le_bytes());
@@ -31,13 +40,26 @@ pub fn write_pcm16_wav_with_metadata(path: &Path, channels: u16, samples: &[i16]
 }
 
 pub fn write_float_wav(path: &Path) {
-    let mut bytes = riff_header(1, 32, 3, 4);
+    let mut bytes = riff_header(48_000, 1, 32, 3, 4);
     bytes.extend_from_slice(&0.0_f32.to_le_bytes());
     fs::write(path, bytes).unwrap();
 }
 
-fn riff_header(channels: u16, bits_per_sample: u16, format_tag: u16, data_bytes: usize) -> Vec<u8> {
-    let mut bytes = riff_header_with_extra(channels, bits_per_sample, format_tag, data_bytes, 0);
+fn riff_header(
+    sample_rate: u32,
+    channels: u16,
+    bits_per_sample: u16,
+    format_tag: u16,
+    data_bytes: usize,
+) -> Vec<u8> {
+    let mut bytes = riff_header_with_extra(
+        sample_rate,
+        channels,
+        bits_per_sample,
+        format_tag,
+        data_bytes,
+        0,
+    );
 
     bytes.extend_from_slice(b"data");
     bytes.extend_from_slice(&u32::try_from(data_bytes).unwrap().to_le_bytes());
@@ -46,13 +68,13 @@ fn riff_header(channels: u16, bits_per_sample: u16, format_tag: u16, data_bytes:
 }
 
 fn riff_header_with_extra(
+    sample_rate: u32,
     channels: u16,
     bits_per_sample: u16,
     format_tag: u16,
     data_bytes: usize,
     extra_bytes: usize,
 ) -> Vec<u8> {
-    let sample_rate = 48_000_u32;
     let bytes_per_sample = u32::from(bits_per_sample) / 8;
     let byte_rate = sample_rate * u32::from(channels) * bytes_per_sample;
     let block_align = channels * (bits_per_sample / 8);

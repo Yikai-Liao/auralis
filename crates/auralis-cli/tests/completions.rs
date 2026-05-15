@@ -18,6 +18,11 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("normalize"), "{stdout}");
     assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
+    assert!(stdout.contains("deemph"), "{stdout}");
+    assert!(stdout.contains("earwax"), "{stdout}");
+    assert!(stdout.contains("oops"), "{stdout}");
+    assert!(stdout.contains("riaa"), "{stdout}");
+    assert!(stdout.contains("swap"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -44,6 +49,11 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'normalize:normalize'"), "{stdout}");
     assert!(stdout.contains("'gain:gain'"), "{stdout}");
     assert!(stdout.contains("'reverse:reverse'"), "{stdout}");
+    assert!(stdout.contains("'deemph:deemph'"), "{stdout}");
+    assert!(stdout.contains("'earwax:earwax'"), "{stdout}");
+    assert!(stdout.contains("'oops:oops'"), "{stdout}");
+    assert!(stdout.contains("'riaa:riaa'"), "{stdout}");
+    assert!(stdout.contains("'swap:swap'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
@@ -80,6 +90,26 @@ fn fish_completions_include_modern_commands_and_flags() {
     );
     assert!(
         stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'reverse'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'deemph'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'earwax'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'oops'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'riaa'"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'swap'"),
         "{stdout}"
     );
     assert!(

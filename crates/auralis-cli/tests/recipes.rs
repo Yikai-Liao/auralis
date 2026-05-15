@@ -194,6 +194,35 @@ fn reverse_recipe_lowers_to_typed_render_reverse() {
 }
 
 #[test]
+fn no_arg_effect_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        ("deemph", 48_000, 1, vec![10_000, -8_000, 6_000, -4_000]),
+        (
+            "earwax",
+            44_100,
+            2,
+            vec![12_000, -12_000, 8_000, -8_000, 4_000, -4_000],
+        ),
+        ("oops", 48_000, 2, vec![16_384, 0, 0, 16_384]),
+        ("riaa", 48_000, 1, vec![4_000, -2_000, 1_000, -500]),
+        ("swap", 48_000, 2, vec![1000, -1000, 2000, -2000]),
+    ];
+
+    for (effect, sample_rate, channels, samples) in cases {
+        assert_recipe_matches_render_effect(effect, sample_rate, channels, &samples);
+    }
+}
+
+#[test]
+fn stereo_channel_recipes_preserve_expected_sample_semantics() {
+    let oops_output = recipe_effect_output("oops", 48_000, 2, &[16_384, 0, 0, 16_384]);
+    let swap_output = recipe_effect_output("swap", 48_000, 2, &[1000, -1000, 2000, -2000]);
+
+    assert_eq!(oops_output, (2, vec![16_384, 16_384, -16_384, -16_384]));
+    assert_eq!(swap_output, (2, vec![-1000, 1000, -2000, 2000]));
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");
@@ -245,6 +274,79 @@ fn fade_recipe_lowers_to_typed_render_fade() {
     fs::remove_file(input).unwrap();
     fs::remove_file(recipe_output).unwrap();
     fs::remove_file(render_output).unwrap();
+}
+
+fn assert_recipe_matches_render_effect(
+    effect: &str,
+    sample_rate: u32,
+    channels: u16,
+    samples: &[i16],
+) {
+    let input = temp_path(&format!("auralis-cli-{effect}-recipe-input"), "wav");
+    let recipe_output = temp_path(&format!("auralis-cli-{effect}-recipe-output"), "wav");
+    let render_output = temp_path(&format!("auralis-cli-{effect}-render-output"), "wav");
+    write_pcm16_wav_with_sample_rate(&input, sample_rate, channels, samples);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            effect,
+            input.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            effect,
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+fn recipe_effect_output(
+    effect: &str,
+    sample_rate: u32,
+    channels: u16,
+    samples: &[i16],
+) -> (u16, Vec<i16>) {
+    let input = temp_path(&format!("auralis-cli-{effect}-semantics-input"), "wav");
+    let output = temp_path(&format!("auralis-cli-{effect}-semantics-output"), "wav");
+    write_pcm16_wav_with_sample_rate(&input, sample_rate, channels, samples);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            effect,
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    let actual = read_pcm16_wav(&output);
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+
+    actual
 }
 
 #[test]

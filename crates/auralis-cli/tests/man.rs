@@ -22,6 +22,11 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("normalize"), "{stdout}");
     assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
+    assert!(stdout.contains("deemph"), "{stdout}");
+    assert!(stdout.contains("earwax"), "{stdout}");
+    assert!(stdout.contains("oops"), "{stdout}");
+    assert!(stdout.contains("riaa"), "{stdout}");
+    assert!(stdout.contains("swap"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -84,6 +89,40 @@ fn reverse_man_page_describes_recipe_lowering() {
     );
     assert!(stdout.contains("render --fx reverse"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn no_arg_effect_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form) in [
+        ("deemph", "deemph - apply de-emphasis", "render --fx deemph"),
+        (
+            "earwax",
+            "earwax - apply headphone-cue filtering",
+            "render --fx earwax",
+        ),
+        (
+            "oops",
+            "oops - extract out-of-phase stereo",
+            "render --fx oops",
+        ),
+        ("riaa", "riaa - apply RIAA equalization", "render --fx riaa"),
+        (
+            "swap",
+            "swap - swap adjacent channel pairs",
+            "render --fx swap",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
 }
 
 #[test]
