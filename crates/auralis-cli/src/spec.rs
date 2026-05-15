@@ -84,6 +84,8 @@ struct ChainSpec {
 struct ChainStepSpec {
     id: Option<String>,
     op: String,
+    #[serde(default, flatten)]
+    params: BTreeMap<String, toml::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -254,7 +256,7 @@ fn validate_chains(
                     step_id: expanded_id,
                 });
             }
-            effect_tokens.push(step.op.clone());
+            effect_tokens.extend(chain_step_effect_tokens(chain, index, step)?);
             expanded_step_ids.push(expanded_id.clone());
             step_ids.push(expanded_id);
         }
@@ -267,6 +269,37 @@ fn validate_chains(
     }
 
     Ok((checked_chains, expanded_step_ids))
+}
+
+fn chain_step_effect_tokens(
+    chain: &ChainSpec,
+    index: usize,
+    step: &ChainStepSpec,
+) -> Result<Vec<String>, GraphSpecError> {
+    match step.op.as_str() {
+        "gain" => {
+            let Some(by) = step.params.get("by") else {
+                return Ok(vec![step.op.clone()]);
+            };
+            let by = param_as_string(by).ok_or_else(|| GraphSpecError::InvalidStepParam {
+                chain_id: chain.id.clone(),
+                index,
+                op: step.op.clone(),
+                param: "by",
+            })?;
+            Ok(vec![step.op.clone(), by])
+        }
+        _ => Ok(vec![step.op.clone()]),
+    }
+}
+
+fn param_as_string(value: &toml::Value) -> Option<String> {
+    match value {
+        toml::Value::String(value) => Some(value.clone()),
+        toml::Value::Integer(value) => Some(value.to_string()),
+        toml::Value::Float(value) => Some(value.to_string()),
+        _ => None,
+    }
 }
 
 fn ensure_non_empty_id(id: &str, kind: &'static str) -> Result<(), GraphSpecError> {
@@ -344,6 +377,12 @@ pub enum GraphSpecError {
         chain_id: String,
         step_id: String,
     },
+    InvalidStepParam {
+        chain_id: String,
+        index: usize,
+        op: String,
+        param: &'static str,
+    },
     AmbiguousNodeInputs {
         id: String,
     },
@@ -397,6 +436,16 @@ impl fmt::Display for GraphSpecError {
                 formatter,
                 "chain `{chain_id}` expands to duplicate step id `{step_id}`"
             ),
+            Self::InvalidStepParam {
+                chain_id,
+                index,
+                op,
+                param,
+            } => write!(
+                formatter,
+                "chain `{chain_id}` step {} `{op}` requires `{param}` to be a string or number",
+                index + 1
+            ),
             Self::AmbiguousNodeInputs { id } => write!(
                 formatter,
                 "node `{id}` cannot set both `input` and `inputs`"
@@ -440,10 +489,12 @@ mod tests {
                     ChainStepSpec {
                         id: None,
                         op: "trim".to_owned(),
+                        params: BTreeMap::new(),
                     },
                     ChainStepSpec {
                         id: None,
                         op: "filter.highpass".to_owned(),
+                        params: BTreeMap::new(),
                     },
                 ],
             }],
