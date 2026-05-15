@@ -20,6 +20,7 @@ fn top_level_man_page_lists_modern_commands() {
     );
     assert!(stdout.contains("trim"), "{stdout}");
     assert!(stdout.contains("normalize"), "{stdout}");
+    assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -59,6 +60,23 @@ fn normalize_man_page_includes_peak_option() {
         "{stdout}"
     );
     assert!(stdout.contains("--peak DBFS"), "{stdout}");
+}
+
+#[test]
+fn reverse_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "reverse"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("reverse - reverse one audio file"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --fx reverse"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
 }
 
 #[test]

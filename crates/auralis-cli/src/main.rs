@@ -111,6 +111,20 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Reverse one audio file.
+    Reverse {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Render one ordered stream with typed effect syntax.
     Render {
         /// PCM16 WAV input file to read.
@@ -346,6 +360,11 @@ fn run(cli: Cli) -> Result<(), CliError> {
             peak,
             backend,
         } => normalize_audio(&input, &output, peak, backend),
+        Command::Reverse {
+            input,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["reverse"]),
         Command::Render {
             input,
             output,
@@ -470,6 +489,15 @@ fn run_trim_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
+    run_effect_recipe(input, output, backend, ["trim", range])
+}
+
+fn run_effect_recipe<'a>(
+    input: &Path,
+    output: &Path,
+    backend: auralis::BackendKind,
+    effect_chain: impl IntoIterator<Item = &'a str>,
+) -> Result<(), CliError> {
     let options = RenderOptions {
         backend,
         combine: auralis::CombineMethod::Concatenate,
@@ -483,7 +511,7 @@ fn run_trim_recipe(
         dither: OutputDither::Disabled,
         dither_seed: None,
         effects_file: None,
-        effect_chain: vec!["trim".to_owned(), range.to_owned()],
+        effect_chain: effect_chain.into_iter().map(ToOwned::to_owned).collect(),
     };
 
     run_pipeline(input, output, &options)
@@ -1002,6 +1030,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--peak", "--backend"],
     },
     CompletionSpec {
+        name: "reverse",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "render",
         options: &[
             "-o",
@@ -1077,6 +1109,7 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("trim", "Keep one range from an audio file."),
             ("normalize", "Normalize one audio file to a peak level."),
+            ("reverse", "Reverse one audio file."),
             (
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
@@ -1120,6 +1153,16 @@ const MAN_PAGES: &[ManPage] = &[
                 "--peak DBFS",
                 "Peak target in dBFS, accepting values like `-1` or `-1dBFS`.",
             ),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "reverse",
+        summary: "reverse one audio file",
+        synopsis: "auralis reverse INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
+        description: "Reverse is a recipe alias for reversing all frames in one input. It lowers to the same typed effect pipeline as `render --fx reverse`.",
+        options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
     },
