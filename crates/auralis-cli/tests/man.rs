@@ -24,6 +24,8 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("deemph"), "{stdout}");
     assert!(stdout.contains("earwax"), "{stdout}");
+    assert!(stdout.contains("echo"), "{stdout}");
+    assert!(stdout.contains("echos"), "{stdout}");
     assert!(stdout.contains("oops"), "{stdout}");
     assert!(stdout.contains("riaa"), "{stdout}");
     assert!(stdout.contains("swap"), "{stdout}");
@@ -140,6 +142,34 @@ fn no_arg_effect_man_pages_describe_recipe_lowering() {
         let stdout = stdout(&output);
         assert!(stdout.contains(summary), "{stdout}");
         assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
+}
+
+#[test]
+fn echo_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form) in [
+        (
+            "echo",
+            "echo - add parallel delayed echoes",
+            "render --fx 'echo ...'",
+        ),
+        (
+            "echos",
+            "echos - add cascaded delayed echoes",
+            "render --fx 'echos ...'",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains("--tap DELAY_MS,DECAY"), "{stdout}");
         assert!(stdout.contains("-o, --output FILE"), "{stdout}");
     }
 }

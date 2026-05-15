@@ -415,6 +415,49 @@ fn filter_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn echo_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "echo",
+            vec![
+                "--gain-in",
+                "0.5",
+                "--gain-out",
+                "1",
+                "--tap",
+                "1,0.25",
+                "--tap",
+                "2,-0.125",
+            ],
+            "echo 0.5 1 1 0.25 2 -0.125",
+        ),
+        (
+            "echos",
+            vec![
+                "--gain-in",
+                "0.5",
+                "--gain-out",
+                "1",
+                "--tap",
+                "1,0.25",
+                "--tap",
+                "2,0.125",
+            ],
+            "echos 0.5 1 1 0.25 2 0.125",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[12_000, 0, -6_000, 0, 3_000],
+        );
+    }
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");

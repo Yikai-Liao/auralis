@@ -171,6 +171,88 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Add one or more parallel delayed echoes.
+    Echo {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Clean input gain.
+        #[arg(
+            long = "gain-in",
+            value_name = "GAIN",
+            default_value = "0.8",
+            allow_hyphen_values = true
+        )]
+        gain_in: String,
+
+        /// Output gain.
+        #[arg(
+            long = "gain-out",
+            value_name = "GAIN",
+            default_value = "0.9",
+            allow_hyphen_values = true
+        )]
+        gain_out: String,
+
+        /// Echo tap as `delay_ms,decay`; repeat for multiple taps.
+        #[arg(
+            long = "tap",
+            value_name = "DELAY_MS,DECAY",
+            required = true,
+            allow_hyphen_values = true
+        )]
+        taps: Vec<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Add one or more cascaded delayed echoes.
+    Echos {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Clean input gain.
+        #[arg(
+            long = "gain-in",
+            value_name = "GAIN",
+            default_value = "0.8",
+            allow_hyphen_values = true
+        )]
+        gain_in: String,
+
+        /// Output gain.
+        #[arg(
+            long = "gain-out",
+            value_name = "GAIN",
+            default_value = "0.9",
+            allow_hyphen_values = true
+        )]
+        gain_out: String,
+
+        /// Echo tap as `delay_ms,decay`; repeat for multiple taps.
+        #[arg(
+            long = "tap",
+            value_name = "DELAY_MS,DECAY",
+            required = true,
+            allow_hyphen_values = true
+        )]
+        taps: Vec<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Extract out-of-phase stereo content.
     Oops {
         /// PCM16 WAV input file to read.
@@ -1123,6 +1205,24 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["earwax"]),
+        Command::Echo {
+            input,
+            gain_in,
+            gain_out,
+            taps,
+            output,
+            backend,
+        } => run_echo_recipe("echo", &input, &gain_in, &gain_out, &taps, &output, backend),
+        Command::Echos {
+            input,
+            gain_in,
+            gain_out,
+            taps,
+            output,
+            backend,
+        } => run_echo_recipe(
+            "echos", &input, &gain_in, &gain_out, &taps, &output, backend,
+        ),
         Command::Oops {
             input,
             output,
@@ -1660,6 +1760,33 @@ fn run_vol_recipe(
     }
     if let Some(limiter_gain) = limiter_gain {
         effect_chain.push(limiter_gain.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_echo_recipe(
+    effect: &str,
+    input: &Path,
+    gain_in: &str,
+    gain_out: &str,
+    taps: &[String],
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec![effect.to_owned(), gain_in.to_owned(), gain_out.to_owned()];
+    for tap in taps {
+        if let Some((delay, decay)) = tap.split_once(',') {
+            effect_chain.push(delay.to_owned());
+            effect_chain.push(decay.to_owned());
+        } else {
+            effect_chain.push(tap.to_owned());
+        }
     }
 
     run_effect_recipe(
@@ -2410,6 +2537,28 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "echo",
+        options: &[
+            "-o",
+            "--output",
+            "--gain-in",
+            "--gain-out",
+            "--tap",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "echos",
+        options: &[
+            "-o",
+            "--output",
+            "--gain-in",
+            "--gain-out",
+            "--tap",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "oops",
         options: &["-o", "--output", "--backend"],
     },
@@ -2675,6 +2824,8 @@ const MAN_PAGES: &[ManPage] = &[
             ("reverse", "Reverse one audio file."),
             ("deemph", "Apply CD/DAT de-emphasis to one audio file."),
             ("earwax", "Apply a stereo headphone-cue filter."),
+            ("echo", "Add one or more parallel delayed echoes."),
+            ("echos", "Add one or more cascaded delayed echoes."),
             ("oops", "Extract out-of-phase stereo content."),
             ("riaa", "Apply RIAA vinyl playback equalization."),
             ("swap", "Swap adjacent channel pairs."),
@@ -2795,6 +2946,38 @@ const MAN_PAGES: &[ManPage] = &[
         synopsis: "auralis earwax INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
         description: "Earwax is a recipe alias for the stereo headphone-cue filter. It lowers to the same typed effect pipeline as `render --fx earwax`.",
         options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "echo",
+        summary: "add parallel delayed echoes",
+        synopsis: "auralis echo INPUT.wav [--gain-in GAIN] [--gain-out GAIN] --tap DELAY_MS,DECAY... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Echo is a recipe alias for one or more parallel delay taps. It lowers to the same typed effect pipeline as `render --fx 'echo ...'`.",
+        options: &[
+            ("--gain-in GAIN", "Clean input gain."),
+            ("--gain-out GAIN", "Output gain."),
+            (
+                "--tap DELAY_MS,DECAY",
+                "Echo tap delay in milliseconds and decay; repeat for multiple taps.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "echos",
+        summary: "add cascaded delayed echoes",
+        synopsis: "auralis echos INPUT.wav [--gain-in GAIN] [--gain-out GAIN] --tap DELAY_MS,DECAY... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Echos is a recipe alias for one or more cascaded delay taps. It lowers to the same typed effect pipeline as `render --fx 'echos ...'`.",
+        options: &[
+            ("--gain-in GAIN", "Clean input gain."),
+            ("--gain-out GAIN", "Output gain."),
+            (
+                "--tap DELAY_MS,DECAY",
+                "Echo tap delay in milliseconds and decay; repeat for multiple taps.",
+            ),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
