@@ -262,6 +262,17 @@ depth = "50""#,
 #[test]
 fn graph_nodes_lower_named_noise_reduction_parameters() {
     let samples = &[1000; 4096];
+    let generated_profile = temp_path("auralis-cli-graph-node-noiseprof-profile", "prof");
+
+    assert_graph_node_matches_render(
+        "noiseprof",
+        samples,
+        "noiseprof",
+        &format!(r#"profile = "{}""#, generated_profile.display()),
+        &format!("noiseprof {}", generated_profile.display()),
+    );
+    let _ = fs::remove_file(&generated_profile);
+
     let profile = temp_path("auralis-cli-graph-node-noisered-profile", "prof");
     fs::write(&profile, noise_profile_text(1)).unwrap();
 
