@@ -5,15 +5,16 @@ mod support;
 use support::*;
 
 #[test]
-fn run_channels_downmixes_stereo_to_mono() {
-    let input = temp_path("auralis-cli-run-channels-downmix-input", "wav");
-    let output = temp_path("auralis-cli-run-channels-downmix-output", "wav");
+fn render_channels_downmixes_stereo_to_mono() {
+    let input = temp_path("auralis-cli-render-channels-downmix-input", "wav");
+    let output = temp_path("auralis-cli-render-channels-downmix-output", "wav");
     write_pcm16_wav(&input, 2, &[8192, 24_576, -16_384, 16_384]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--channels",
             "1",
@@ -32,15 +33,16 @@ fn run_channels_downmixes_stereo_to_mono() {
 }
 
 #[test]
-fn run_channels_upmixes_mono_to_stereo() {
-    let input = temp_path("auralis-cli-run-channels-upmix-input", "wav");
-    let output = temp_path("auralis-cli-run-channels-upmix-output", "wav");
+fn render_channels_upmixes_mono_to_stereo() {
+    let input = temp_path("auralis-cli-render-channels-upmix-input", "wav");
+    let output = temp_path("auralis-cli-render-channels-upmix-output", "wav");
     write_pcm16_wav(&input, 1, &[8192, -16_384]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--channels",
             "2",
@@ -62,15 +64,16 @@ fn run_channels_upmixes_mono_to_stereo() {
 }
 
 #[test]
-fn run_no_auto_channels_rejects_mismatched_output_count() {
-    let input = temp_path("auralis-cli-run-no-auto-channels-input", "wav");
-    let output = temp_path("auralis-cli-run-no-auto-channels-output", "wav");
+fn render_no_auto_channels_rejects_mismatched_output_count() {
+    let input = temp_path("auralis-cli-render-no-auto-channels-input", "wav");
+    let output = temp_path("auralis-cli-render-no-auto-channels-output", "wav");
     write_pcm16_wav(&input, 2, &[1000, -1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--channels",
             "1",
@@ -90,15 +93,16 @@ fn run_no_auto_channels_rejects_mismatched_output_count() {
 }
 
 #[test]
-fn run_no_auto_channels_requires_output_channels() {
-    let input = temp_path("auralis-cli-run-no-auto-channels-missing-input", "wav");
-    let output = temp_path("auralis-cli-run-no-auto-channels-missing-output", "wav");
+fn render_no_auto_channels_requires_output_channels() {
+    let input = temp_path("auralis-cli-render-no-auto-channels-missing-input", "wav");
+    let output = temp_path("auralis-cli-render-no-auto-channels-missing-output", "wav");
     write_pcm16_wav(&input, 1, &[1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--no-auto-channels",
         ])
@@ -116,15 +120,16 @@ fn run_no_auto_channels_requires_output_channels() {
 }
 
 #[test]
-fn run_rate_downsamples_output_sample_rate() {
-    let input = temp_path("auralis-cli-run-rate-downsample-input", "wav");
-    let output = temp_path("auralis-cli-run-rate-downsample-output", "wav");
+fn render_rate_downsamples_output_sample_rate() {
+    let input = temp_path("auralis-cli-render-rate-downsample-input", "wav");
+    let output = temp_path("auralis-cli-render-rate-downsample-output", "wav");
     write_pcm16_wav(&input, 1, &[1000, 1000, 1000, 1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--rate",
             "24000",
@@ -146,15 +151,16 @@ fn run_rate_downsamples_output_sample_rate() {
 }
 
 #[test]
-fn run_rate_upsamples_output_sample_rate() {
-    let input = temp_path("auralis-cli-run-rate-upsample-input", "wav");
-    let output = temp_path("auralis-cli-run-rate-upsample-output", "wav");
+fn render_rate_upsamples_output_sample_rate() {
+    let input = temp_path("auralis-cli-render-rate-upsample-input", "wav");
+    let output = temp_path("auralis-cli-render-rate-upsample-output", "wav");
     write_pcm16_wav(&input, 1, &[1000, 1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--rate",
             "96000",
@@ -176,15 +182,16 @@ fn run_rate_upsamples_output_sample_rate() {
 }
 
 #[test]
-fn run_no_auto_rate_rejects_mismatched_output_rate() {
-    let input = temp_path("auralis-cli-run-no-auto-rate-input", "wav");
-    let output = temp_path("auralis-cli-run-no-auto-rate-output", "wav");
+fn render_no_auto_rate_rejects_mismatched_output_rate() {
+    let input = temp_path("auralis-cli-render-no-auto-rate-input", "wav");
+    let output = temp_path("auralis-cli-render-no-auto-rate-output", "wav");
     write_pcm16_wav(&input, 1, &[1000, -1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--rate",
             "24000",
@@ -204,15 +211,16 @@ fn run_no_auto_rate_rejects_mismatched_output_rate() {
 }
 
 #[test]
-fn run_no_auto_rate_requires_output_rate() {
-    let input = temp_path("auralis-cli-run-no-auto-rate-missing-input", "wav");
-    let output = temp_path("auralis-cli-run-no-auto-rate-missing-output", "wav");
+fn render_no_auto_rate_requires_output_rate() {
+    let input = temp_path("auralis-cli-render-no-auto-rate-missing-input", "wav");
+    let output = temp_path("auralis-cli-render-no-auto-rate-missing-output", "wav");
     write_pcm16_wav(&input, 1, &[1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--no-auto-rate",
         ])
@@ -230,30 +238,32 @@ fn run_no_auto_rate_requires_output_rate() {
 }
 
 #[test]
-fn run_dither_is_explicit_and_repeatable() {
-    let input = temp_path("auralis-cli-run-dither-input", "wav");
-    let plain_output = temp_path("auralis-cli-run-dither-plain-output", "wav");
-    let first_output = temp_path("auralis-cli-run-dither-first-output", "wav");
-    let second_output = temp_path("auralis-cli-run-dither-second-output", "wav");
+fn render_dither_is_explicit_and_repeatable() {
+    let input = temp_path("auralis-cli-render-dither-input", "wav");
+    let plain_output = temp_path("auralis-cli-render-dither-plain-output", "wav");
+    let first_output = temp_path("auralis-cli-render-dither-first-output", "wav");
+    let second_output = temp_path("auralis-cli-render-dither-second-output", "wav");
     write_pcm16_wav(&input, 1, &[1000, -1000, 2000, -2000, 3000, -3000]);
 
     let plain = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             plain_output.to_str().unwrap(),
-            "--gain-db",
-            "-0.1",
+            "--fx",
+            "gain -0.1",
         ])
         .output()
         .unwrap();
     let first = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             first_output.to_str().unwrap(),
-            "--gain-db",
-            "-0.1",
+            "--fx",
+            "gain -0.1",
             "--dither",
             "--dither-seed",
             "0",
@@ -262,11 +272,12 @@ fn run_dither_is_explicit_and_repeatable() {
         .unwrap();
     let second = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             second_output.to_str().unwrap(),
-            "--gain-db",
-            "-0.1",
+            "--fx",
+            "gain -0.1",
             "--dither",
             "--dither-seed",
             "0",
@@ -289,15 +300,16 @@ fn run_dither_is_explicit_and_repeatable() {
 }
 
 #[test]
-fn run_dither_seed_requires_dither() {
-    let input = temp_path("auralis-cli-run-dither-seed-missing-input", "wav");
-    let output = temp_path("auralis-cli-run-dither-seed-missing-output", "wav");
+fn render_dither_seed_requires_dither() {
+    let input = temp_path("auralis-cli-render-dither-seed-missing-input", "wav");
+    let output = temp_path("auralis-cli-render-dither-seed-missing-output", "wav");
     write_pcm16_wav(&input, 1, &[1000]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args([
-            "run",
+            "render",
             input.to_str().unwrap(),
+            "-o",
             output.to_str().unwrap(),
             "--dither-seed",
             "0",
