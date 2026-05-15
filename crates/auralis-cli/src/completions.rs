@@ -447,6 +447,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &[],
     },
     CompletionSpec {
+        name: "cache",
+        options: &["status", "--root", "--json"],
+    },
+    CompletionSpec {
         name: "completions",
         options: &[],
     },

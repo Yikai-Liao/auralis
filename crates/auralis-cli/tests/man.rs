@@ -74,6 +74,7 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("pipe"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("init"), "{stdout}");
+    assert!(stdout.contains("cache"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("man"), "{stdout}");
 }
@@ -135,6 +136,26 @@ fn init_man_page_includes_scaffold_contract() {
         stdout.contains("will not overwrite an existing file"),
         "{stdout}"
     );
+}
+
+#[test]
+fn cache_man_page_includes_status_contract() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "cache"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("cache - inspect local persistent cache state"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("auralis cache status [--root DIR] [--json]"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--root DIR"), "{stdout}");
 }
 
 #[test]

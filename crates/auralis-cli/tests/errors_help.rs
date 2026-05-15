@@ -16,6 +16,7 @@ fn top_level_help_documents_modern_run_subcommand() {
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("convert"), "{stdout}");
     assert!(stdout.contains("graph"), "{stdout}");
+    assert!(stdout.contains("cache"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("man"), "{stdout}");
     assert!(stdout.contains("explain"), "{stdout}");

@@ -82,6 +82,7 @@ const MAN_PAGES: &[ManPage] = &[
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
             ),
+            ("pipe", "Run one compact DSP expression."),
             ("check", "Validate graph specs or typed effect syntax."),
             ("plan", "Preview execution shape for an Auralis graph spec."),
             (
@@ -89,6 +90,8 @@ const MAN_PAGES: &[ManPage] = &[
                 "Emit an Auralis graph as mermaid, dot, svg, or json.",
             ),
             ("fmt", "Format an Auralis graph spec."),
+            ("init", "Create an Auralis graph spec scaffold."),
+            ("cache", "Inspect local persistent cache state."),
             ("completions", "Generate shell completion scripts."),
             ("man", "Print built-in manual pages."),
             (
@@ -900,6 +903,20 @@ const MAN_PAGES: &[ManPage] = &[
             "SPEC",
             "Graph spec path to create, defaulting to Auralis.toml.",
         )],
+    },
+    ManPage {
+        name: "cache",
+        summary: "inspect local persistent cache state",
+        synopsis: "auralis cache status [--root DIR] [--json]",
+        description: "Cache status reports whether the local persistent cache directory exists and summarizes file count and bytes without mutating cache contents.",
+        options: &[
+            ("status", "Print cache directory status."),
+            (
+                "--root DIR",
+                "Cache root to inspect, defaulting to .auralis/cache.",
+            ),
+            ("--json", "Emit machine-readable JSON output."),
+        ],
     },
     ManPage {
         name: "check",

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, ValueEnum};
+use clap::{Args, Subcommand, ValueEnum};
 
 use crate::{
     command_support::OpsSchemaFormat,
@@ -786,6 +786,29 @@ pub(crate) struct InitArgs {
     /// Graph spec path to create.
     #[arg(default_value = "Auralis.toml")]
     pub(crate) spec: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CacheArgs {
+    #[command(subcommand)]
+    pub(crate) command: CacheCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum CacheCommand {
+    /// Print local persistent-cache status.
+    Status(CacheStatusArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CacheStatusArgs {
+    /// Cache root directory to inspect.
+    #[arg(long, value_name = "DIR", default_value = ".auralis/cache")]
+    pub(crate) root: PathBuf,
+
+    /// Emit machine-readable JSON output.
+    #[arg(long)]
+    pub(crate) json: bool,
 }
 
 #[derive(Debug, Args)]

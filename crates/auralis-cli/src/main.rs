@@ -1,5 +1,6 @@
 //! Auralis command-line entrypoint.
 
+mod cache_commands;
 mod command_args;
 mod command_support;
 mod completions;
@@ -19,13 +20,14 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
+use cache_commands::print_cache_status;
 pub(crate) use command_args::GraphFormat;
 use command_args::{
-    ChannelsArgs, CheckArgs, ChorusArgs, CompletionsArgs, ContrastArgs, ConvertArgs, DcShiftArgs,
-    EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs, InitArgs, InspectArgs,
-    ManArgs, NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs, PipeArgs, PlanArgs,
-    RateArgs, RenderArgs, RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs,
-    TremoloArgs, TrimArgs, VolArgs,
+    CacheArgs, CacheCommand, ChannelsArgs, CheckArgs, ChorusArgs, CompletionsArgs, ContrastArgs,
+    ConvertArgs, DcShiftArgs, EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs,
+    InitArgs, InspectArgs, ManArgs, NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs,
+    PipeArgs, PlanArgs, RateArgs, RenderArgs, RunArgs, SaturationArgs, SimpleRecipeArgs,
+    SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
 };
 use command_support::{
     PathRole, check_command, effect_input_to_chain_tokens, init_project, inspect, plan_graph_spec,
@@ -252,6 +254,9 @@ enum Command {
 
     /// Create an Auralis graph spec scaffold.
     Init(InitArgs),
+
+    /// Inspect and manage local persistent cache state.
+    Cache(CacheArgs),
 
     /// Generate shell completion scripts.
     Completions(CompletionsArgs),
@@ -970,6 +975,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
         }) => graph_spec(&spec, output.as_deref(), format),
         Command::Fmt(FmtArgs { spec, check }) => format_graph_spec(&spec, check),
         Command::Init(InitArgs { spec }) => init_project(&spec),
+        Command::Cache(CacheArgs {
+            command: CacheCommand::Status(status),
+        }) => print_cache_status(&status.root, status.json),
         Command::Completions(CompletionsArgs { shell }) => {
             print_completions(shell);
             Ok(())

@@ -70,9 +70,11 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("pipe"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("init"), "{stdout}");
+    assert!(stdout.contains("cache"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("--locked"), "{stdout}");
     assert!(stdout.contains("--cache"), "{stdout}");
+    assert!(stdout.contains("--root"), "{stdout}");
     assert!(stdout.contains("--schema"), "{stdout}");
 }
 
