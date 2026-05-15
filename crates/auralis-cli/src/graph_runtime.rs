@@ -5,7 +5,11 @@ use std::{
 
 use auralis::EffectRegistry;
 
-use crate::{CliError, PathRole, effect_tokens, ensure_wav_extension, executor, spec};
+use crate::{
+    CliError,
+    command_support::{PathRole, ensure_wav_extension},
+    effect_tokens, executor, spec,
+};
 
 pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
     if locked {

@@ -5,7 +5,10 @@ use std::{
 
 use auralis_wav::WavError;
 
-use crate::{CliError, PathRole, ensure_wav_extension};
+use crate::{
+    CliError,
+    command_support::{PathRole, ensure_wav_extension},
+};
 
 #[derive(Debug)]
 pub(super) struct RenderOptions {
