@@ -4,6 +4,7 @@ use std::{
 };
 
 use auralis_wav::WavError;
+use clap::ValueEnum;
 
 use crate::{
     CliError,
@@ -36,7 +37,17 @@ pub(super) struct ConvertOptions {
     pub(super) no_auto_rate: bool,
     pub(super) guard: OutputGuard,
     pub(super) norm: Option<f64>,
+    pub(super) container: Option<OutputContainer>,
     pub(super) sample: Option<auralis::WavSampleFormat>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(super) enum OutputContainer {
+    Wav,
+    Flac,
+    Aiff,
+    Aifc,
+    Au,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -69,7 +80,7 @@ pub(super) fn convert_audio(
     options: ConvertOptions,
 ) -> Result<(), CliError> {
     let audio = open_audio_file(input, options.backend)?;
-    let format = output_format_from_path(output, options.sample)?;
+    let format = output_format(output, options.container, options.sample)?;
 
     audio
         .into_pipeline()
@@ -340,6 +351,52 @@ fn open_audio_file(
     }
 }
 
+fn output_format(
+    output: &Path,
+    container: Option<OutputContainer>,
+    wav_sample: Option<auralis::WavSampleFormat>,
+) -> Result<auralis::OutputFormat, CliError> {
+    if let Some(container) = container {
+        return output_format_from_container(container, wav_sample);
+    }
+
+    output_format_from_path(output, wav_sample)
+}
+
+fn output_format_from_container(
+    container: OutputContainer,
+    wav_sample: Option<auralis::WavSampleFormat>,
+) -> Result<auralis::OutputFormat, CliError> {
+    match container {
+        OutputContainer::Wav => Ok(auralis::OutputFormat::Wav(match wav_sample {
+            Some(sample) => auralis::WavEncodeOptions::new(sample),
+            None => auralis::WavEncodeOptions::default(),
+        })),
+        OutputContainer::Flac => {
+            ensure_non_wav_sample(wav_sample)?;
+            Ok(auralis::OutputFormat::Flac(auralis::FlacEncodeOptions))
+        }
+        OutputContainer::Aiff => {
+            ensure_non_wav_sample(wav_sample)?;
+            Ok(auralis::OutputFormat::Aiff(
+                auralis::AiffEncodeOptions::default(),
+            ))
+        }
+        OutputContainer::Aifc => {
+            ensure_non_wav_sample(wav_sample)?;
+            Ok(auralis::OutputFormat::Aiff(
+                auralis::AiffEncodeOptions::aifc_signed16_le(),
+            ))
+        }
+        OutputContainer::Au => {
+            ensure_non_wav_sample(wav_sample)?;
+            Ok(auralis::OutputFormat::Au(
+                auralis::AuEncodeOptions::default(),
+            ))
+        }
+    }
+}
+
 fn output_format_from_path(
     output: &Path,
     wav_sample: Option<auralis::WavSampleFormat>,
@@ -383,6 +440,14 @@ fn output_format_from_path(
             path: output.to_path_buf(),
         }),
     }
+}
+
+fn ensure_non_wav_sample(wav_sample: Option<auralis::WavSampleFormat>) -> Result<(), CliError> {
+    if wav_sample.is_some() {
+        return Err(CliError::WavSampleFormatRequiresWavOutput);
+    }
+
+    Ok(())
 }
 
 fn path_extension(path: &Path) -> Option<&str> {

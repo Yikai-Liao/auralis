@@ -50,6 +50,43 @@ fn convert_wav_to_flac_writes_flac_header() {
 }
 
 #[test]
+fn convert_container_overrides_output_extension() {
+    let input = temp_path("auralis-cli-convert-container-input", "wav");
+    let output = temp_path("auralis-cli-convert-container-output", "audio");
+    write_pcm16_wav(
+        &input,
+        1,
+        &[
+            -16_384, -14_336, -12_288, -10_240, -8_192, -6_144, -4_096, -2_048, 0, 2_048, 4_096,
+            6_144, 8_192, 10_240, 12_288, 14_336,
+        ],
+    );
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--container",
+            "flac",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let bytes = fs::read(&output).unwrap();
+    assert_eq!(&bytes[..4], b"fLaC");
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
 fn convert_flac_to_wav_decodes_into_pcm16_wav() {
     let input = temp_path("auralis-cli-convert-flac-to-wav-input", "flac");
     let output = temp_path("auralis-cli-convert-flac-to-wav-output", "wav");
@@ -77,6 +114,37 @@ fn convert_flac_to_wav_decodes_into_pcm16_wav() {
 
     fs::remove_file(input).unwrap();
     fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn convert_rejects_wav_sample_for_non_wav_container() {
+    let input = temp_path("auralis-cli-convert-sample-container-input", "wav");
+    let output = temp_path("auralis-cli-convert-sample-container-output", "wav");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--container",
+            "flac",
+            "--sample",
+            "pcm24",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --sample is supported only for WAV output"),
+        "{stderr}"
+    );
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
 }
 
 #[test]

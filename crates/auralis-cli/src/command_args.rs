@@ -5,6 +5,7 @@ use clap::{Args, Subcommand, ValueEnum};
 use crate::{
     command_support::OpsSchemaFormat,
     completions::CompletionShell,
+    executor::OutputContainer,
     parsers::{
         parse_backend, parse_channel_count, parse_combine_method, parse_dbfs, parse_sample_rate,
         parse_wav_sample_format,
@@ -57,6 +58,10 @@ pub(crate) struct ConvertArgs {
     /// Normalize final output to a peak level in dBFS, defaulting to 0 dBFS.
     #[arg(long, value_name = "DB", num_args = 0..=1, default_missing_value = "0", allow_hyphen_values = true)]
     pub(crate) norm: Option<f64>,
+
+    /// Select output container explicitly instead of inferring it from -o.
+    #[arg(long, value_name = "CONTAINER", value_enum)]
+    pub(crate) container: Option<OutputContainer>,
 
     /// Select WAV sample encoding when the output container is WAV.
     #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]

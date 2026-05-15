@@ -4,6 +4,7 @@ mod cache_commands;
 mod command_args;
 mod command_support;
 mod completions;
+mod convert_commands;
 mod effect_tokens;
 mod errors;
 mod executor;
@@ -34,10 +35,9 @@ use command_support::{
     print_ops, run_graph_spec,
 };
 use completions::print_completions;
+use convert_commands::run_convert_command;
 pub(crate) use errors::CliError;
-use executor::{
-    ConvertOptions, OutputDither, OutputGuard, RenderOptions, convert_audio, run_pipeline,
-};
+use executor::{OutputDither, OutputGuard, RenderOptions, run_pipeline};
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
 use recipe_args::{
@@ -288,31 +288,7 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Inspect(InspectArgs { input, json }) => inspect(&input, json),
-        Command::Convert(ConvertArgs {
-            input,
-            output,
-            backend,
-            output_channels,
-            no_auto_channels,
-            output_sample_rate,
-            no_auto_rate,
-            guard,
-            norm,
-            sample,
-        }) => convert_audio(
-            &input,
-            &output,
-            ConvertOptions {
-                backend,
-                output_channels,
-                no_auto_channels,
-                output_sample_rate,
-                no_auto_rate,
-                guard: OutputGuard::from(guard),
-                norm,
-                sample,
-            },
-        ),
+        Command::Convert(args) => run_convert_command(&args),
         Command::Trim(TrimArgs {
             input,
             range,

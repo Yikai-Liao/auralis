@@ -612,6 +612,7 @@ pub(super) fn normalize_audio(
             no_auto_rate: false,
             guard: OutputGuard::Disabled,
             norm: Some(peak),
+            container: None,
             sample: None,
         },
     )

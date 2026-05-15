@@ -34,6 +34,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
             "-G",
             "--guard",
             "--norm",
+            "--container",
             "--sample",
         ],
     },
