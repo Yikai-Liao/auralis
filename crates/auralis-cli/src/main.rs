@@ -14,6 +14,7 @@ mod graph_runtime;
 mod man_pages;
 mod parsers;
 mod plan_args;
+mod plan_combine;
 mod plan_commands;
 mod plan_recipes;
 mod recipe_args;

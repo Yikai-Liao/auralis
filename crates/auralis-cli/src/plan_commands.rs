@@ -6,6 +6,7 @@ use crate::{
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
     graph_plan,
     plan_args::{PlanArgs, PlanCommand},
+    plan_combine::plan_combine_surface_command,
     plan_recipes::plan_recipe_surface_command,
     spec,
 };
@@ -42,6 +43,14 @@ fn plan_modern_command(
         PlanCommand::Pipe(pipe) => {
             reject_graph_plan_options(spec, target, locked)?;
             plan_pipe_command(pipe, json)
+        }
+        combine @ (PlanCommand::Mix(_)
+        | PlanCommand::Concat(_)
+        | PlanCommand::MixPower(_)
+        | PlanCommand::Merge(_)
+        | PlanCommand::Multiply(_)) => {
+            reject_graph_plan_options(spec, target, locked)?;
+            plan_combine_surface_command(combine, json)
         }
         recipe => {
             reject_graph_plan_options(spec, target, locked)?;

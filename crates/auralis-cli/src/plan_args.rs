@@ -9,9 +9,10 @@ use crate::{
         SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     recipe_args::{
-        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, DelayArgs, DitherArgs, DownsampleArgs,
-        EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, PadArgs, PitchArgs, PoleFilterArgs,
-        RepeatArgs, ReverbArgs, StretchArgs, TempoArgs, TrebleArgs, UpsampleArgs,
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,
+        DownsampleArgs, EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, MergeArgs, MixArgs,
+        MixPowerArgs, MultiplyArgs, PadArgs, PitchArgs, PoleFilterArgs, RepeatArgs, ReverbArgs,
+        StretchArgs, TempoArgs, TrebleArgs, UpsampleArgs,
     },
 };
 
@@ -142,4 +143,15 @@ pub(crate) enum PlanCommand {
     Reverb(ReverbArgs),
     /// Plan a stretch recipe command without executing it.
     Stretch(StretchArgs),
+    /// Plan a mix recipe command without executing it.
+    Mix(MixArgs),
+    /// Plan a concat recipe command without executing it.
+    Concat(ConcatArgs),
+    /// Plan a mix-power recipe command without executing it.
+    #[command(name = "mix-power")]
+    MixPower(MixPowerArgs),
+    /// Plan a merge recipe command without executing it.
+    Merge(MergeArgs),
+    /// Plan a multiply recipe command without executing it.
+    Multiply(MultiplyArgs),
 }

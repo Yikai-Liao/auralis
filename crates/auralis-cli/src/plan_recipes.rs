@@ -76,8 +76,14 @@ pub(super) fn plan_recipe_surface_command(
         PlanCommand::Dither(dither) => plan_dither_command(dither, json),
         PlanCommand::Reverb(reverb) => plan_reverb_command(reverb, json),
         PlanCommand::Stretch(stretch) => plan_stretch_command(stretch, json),
-        PlanCommand::Render(_) | PlanCommand::Pipe(_) => {
-            unreachable!("render and pipe are handled before recipe planning")
+        PlanCommand::Render(_)
+        | PlanCommand::Pipe(_)
+        | PlanCommand::Mix(_)
+        | PlanCommand::Concat(_)
+        | PlanCommand::MixPower(_)
+        | PlanCommand::Merge(_)
+        | PlanCommand::Multiply(_) => {
+            unreachable!("non-effect recipes are handled before recipe planning")
         }
     }
 }
