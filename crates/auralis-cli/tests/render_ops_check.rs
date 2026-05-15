@@ -44,9 +44,68 @@ fn render_fx_chain_output_matches_positional_run_chain() {
 }
 
 #[test]
+fn render_chain_output_matches_repeated_fx_chain() {
+    let input = temp_path("auralis-cli-render-chain-input", "wav");
+    let chain_output = temp_path("auralis-cli-render-chain-output", "wav");
+    let fx_output = temp_path("auralis-cli-render-chain-fx-output", "wav");
+    write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
+
+    let chain = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            chain_output.to_str().unwrap(),
+            "--chain",
+            "gain -6 | reverse",
+        ])
+        .output()
+        .unwrap();
+    let fx = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            fx_output.to_str().unwrap(),
+            "--fx",
+            "gain -6",
+            "--fx",
+            "reverse",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(chain.status.success(), "stderr: {}", stderr(&chain));
+    assert!(fx.status.success(), "stderr: {}", stderr(&fx));
+    assert_eq!(read_pcm16_wav(&chain_output), read_pcm16_wav(&fx_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(chain_output).unwrap();
+    fs::remove_file(fx_output).unwrap();
+}
+
+#[test]
 fn check_fx_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "gain -3", "--fx", "reverse"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("status: ok"), "{stdout}");
+    assert!(stdout.contains("commands: 2"), "{stdout}");
+    assert!(stdout.contains("boundaries: 0"), "{stdout}");
+}
+
+#[test]
+fn check_chain_reports_ok_summary() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", "--chain", "gain -3 | reverse"])
         .output()
         .unwrap();
 
@@ -71,7 +130,22 @@ fn check_requires_fx_or_effects_file() {
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("error: one of --fx or --effects-file is required"),
+        stderr.contains("error: one of --fx, --chain, or --effects-file is required"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn check_rejects_mixed_fx_and_chain() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", "--fx", "gain -3", "--chain", "reverse"])
+        .output()
+        .unwrap();
+
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --fx, --chain, and --effects-file are mutually exclusive"),
         "{stderr}"
     );
 }

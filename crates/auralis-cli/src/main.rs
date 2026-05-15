@@ -120,6 +120,10 @@ enum Command {
         /// One typed effect command per flag, for example `--fx 'gain -3'`.
         #[arg(long = "fx", value_name = "EFFECT")]
         fx: Vec<String>,
+
+        /// Compact ordered effect chain, for example `--chain 'gain -3 | reverse'`.
+        #[arg(long = "chain", value_name = "CHAIN")]
+        chain: Option<String>,
     },
 
     /// Validate typed effect syntax without running audio processing.
@@ -131,6 +135,10 @@ enum Command {
         /// One typed effect command per flag, for example `--fx 'gain -3'`.
         #[arg(long = "fx", value_name = "EFFECT")]
         fx: Vec<String>,
+
+        /// Compact ordered effect chain, for example `--chain 'gain -3 | reverse'`.
+        #[arg(long = "chain", value_name = "CHAIN")]
+        chain: Option<String>,
     },
 
     /// List implemented typed effects or inspect one effect descriptor.
@@ -255,6 +263,7 @@ fn main() -> ExitCode {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Inspect { input } => inspect(&input),
@@ -297,6 +306,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             dither_seed,
             effects_file,
             fx,
+            chain,
         } => {
             let options = RunOptions {
                 backend,
@@ -322,12 +332,16 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 fade_out_frame: None,
                 reverse: false,
                 effects_file,
-                effect_chain: effect_specs_to_chain_tokens(&fx)?,
+                effect_chain: effect_input_to_chain_tokens(&fx, chain.as_deref())?,
             };
 
             run_pipeline(&input, &output, &options)
         }
-        Command::Check { effects_file, fx } => check_effects(effects_file, &fx),
+        Command::Check {
+            effects_file,
+            fx,
+            chain,
+        } => check_effects(effects_file.as_deref(), &fx, chain.as_deref()),
         Command::Ops { effect } => print_ops(effect.as_deref()),
         Command::Run {
             input,
@@ -486,8 +500,12 @@ fn run_pipeline(input: &Path, output: &Path, options: &RunOptions) -> Result<(),
     Ok(())
 }
 
-fn check_effects(effects_file: Option<PathBuf>, fx: &[String]) -> Result<(), CliError> {
-    let effect_chain = parse_effect_spec(effects_file.as_deref(), fx)?;
+fn check_effects(
+    effects_file: Option<&Path>,
+    fx: &[String],
+    chain: Option<&str>,
+) -> Result<(), CliError> {
+    let effect_chain = parse_effect_spec(effects_file, fx, chain)?;
 
     println!("status: ok");
     println!("commands: {}", effect_chain.len());
@@ -497,20 +515,19 @@ fn check_effects(effects_file: Option<PathBuf>, fx: &[String]) -> Result<(), Cli
 }
 
 fn print_ops(effect: Option<&str>) -> Result<(), CliError> {
-    match effect {
-        Some(name) => print_one_op(name),
-        None => {
-            for descriptor in SUPPORTED_EFFECTS {
-                println!(
-                    "{:<12} {}",
-                    descriptor.canonical_name(),
-                    descriptor.summary()
-                );
-            }
-
-            Ok(())
-        }
+    if let Some(name) = effect {
+        return print_one_op(name);
     }
+
+    for descriptor in SUPPORTED_EFFECTS {
+        println!(
+            "{:<12} {}",
+            descriptor.canonical_name(),
+            descriptor.summary()
+        );
+    }
+
+    Ok(())
 }
 
 fn print_one_op(name: &str) -> Result<(), CliError> {
@@ -730,20 +747,49 @@ impl RunOptions {
 fn parse_effect_spec(
     effects_file: Option<&Path>,
     fx: &[String],
+    chain: Option<&str>,
 ) -> Result<auralis::EffectChain, CliError> {
     let has_effects_file = effects_file.is_some();
     let has_fx = !fx.is_empty();
+    let has_chain = chain.is_some();
 
-    match (has_effects_file, has_fx) {
-        (true, true) => Err(CliError::MixedEffectsFileAndFx),
-        (false, false) => Err(CliError::MissingEffectSpec),
-        (true, false) => auralis::parse_effects_file(effects_file.unwrap()).map_err(CliError::from),
-        (false, true) => {
-            let tokens = effect_specs_to_chain_tokens(fx)?;
+    match (has_effects_file, has_fx, has_chain) {
+        (true, false, false) => {
+            auralis::parse_effects_file(effects_file.unwrap()).map_err(CliError::from)
+        }
+        (false, true, false) | (false, false, true) => {
+            let tokens = effect_input_to_chain_tokens(fx, chain)?;
             let token_refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
             auralis::parse_effect_chain(&token_refs).map_err(CliError::from)
         }
+        (false, false, false) => Err(CliError::MissingEffectSpec),
+        _ => Err(CliError::MixedEffectInputs),
     }
+}
+
+fn effect_input_to_chain_tokens(
+    fx: &[String],
+    chain: Option<&str>,
+) -> Result<Vec<String>, CliError> {
+    match (!fx.is_empty(), chain) {
+        (true, Some(_)) => Err(CliError::MixedEffectInputs),
+        (true, None) => effect_specs_to_chain_tokens(fx),
+        (false, Some(chain)) => chain_to_effect_specs(chain),
+        (false, None) => Ok(Vec::new()),
+    }
+}
+
+fn chain_to_effect_specs(chain: &str) -> Result<Vec<String>, CliError> {
+    let mut specs = Vec::new();
+
+    for spec in chain.split('|').map(str::trim) {
+        if spec.is_empty() {
+            return Err(CliError::EmptyEffectSpec);
+        }
+        specs.push(spec.to_owned());
+    }
+
+    effect_specs_to_chain_tokens(&specs)
 }
 
 fn effect_specs_to_chain_tokens(specs: &[String]) -> Result<Vec<String>, CliError> {
@@ -1022,8 +1068,8 @@ enum CliError {
     InvalidEffectSpec { spec: String },
     IncompleteTrimRange { unit: TrimUnit },
     MissingEffectSpec,
+    MixedEffectInputs,
     MixedTrimUnits,
-    MixedEffectsFileAndFx,
     MixedEffectSyntax,
     MixedEffectsFileAndPositionalChain,
     MixedEffectsFileAndLegacyEffectFlags,
@@ -1066,7 +1112,7 @@ impl std::fmt::Display for CliError {
             Self::EffectName(error) => write!(formatter, "{error}"),
             Self::EffectsFile(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
-            Self::EmptyEffectSpec => formatter.write_str("--fx requires a non-empty effect string"),
+            Self::EmptyEffectSpec => formatter.write_str("effect input requires a non-empty effect"),
             Self::InvalidEffectSpec { spec } => write!(
                 formatter,
                 "effect string `{spec}` contains unmatched shell quoting"
@@ -1079,13 +1125,13 @@ impl std::fmt::Display for CliError {
                 ),
             },
             Self::MissingEffectSpec => {
-                formatter.write_str("one of --fx or --effects-file is required")
+                formatter.write_str("one of --fx, --chain, or --effects-file is required")
+            }
+            Self::MixedEffectInputs => {
+                formatter.write_str("--fx, --chain, and --effects-file are mutually exclusive")
             }
             Self::MixedTrimUnits => formatter
                 .write_str("trim range must use either frame units or seconds units, not both"),
-            Self::MixedEffectsFileAndFx => {
-                formatter.write_str("--effects-file cannot be combined with --fx")
-            }
             Self::MixedEffectSyntax => formatter
                 .write_str("positional effect chains cannot be combined with legacy effect flags"),
             Self::MixedEffectsFileAndPositionalChain => formatter
