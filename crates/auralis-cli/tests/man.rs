@@ -477,6 +477,18 @@ fn structural_man_pages_describe_recipe_lowering() {
             "render --fx 'repeat ...'",
             "COUNT",
         ),
+        (
+            "downsample",
+            "downsample - keep every Nth sample",
+            "render --fx 'downsample ...'",
+            "FACTOR",
+        ),
+        (
+            "upsample",
+            "upsample - insert zero samples",
+            "render --fx 'upsample ...'",
+            "FACTOR",
+        ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
             .args(["man", topic])

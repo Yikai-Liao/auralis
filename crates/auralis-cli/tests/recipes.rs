@@ -596,6 +596,8 @@ fn structural_recipes_lower_to_typed_render_effects() {
             "pad 1 2@2 1",
         ),
         ("repeat", vec!["2"], "repeat 2"),
+        ("downsample", vec!["3"], "downsample 3"),
+        ("upsample", vec!["3"], "upsample 3"),
     ];
 
     for (effect, recipe_args, render_fx) in cases {

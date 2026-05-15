@@ -51,6 +51,8 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("delay"), "{stdout}");
     assert!(stdout.contains("pad"), "{stdout}");
     assert!(stdout.contains("repeat"), "{stdout}");
+    assert!(stdout.contains("downsample"), "{stdout}");
+    assert!(stdout.contains("upsample"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -109,6 +111,8 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'delay:delay'"), "{stdout}");
     assert!(stdout.contains("'pad:pad'"), "{stdout}");
     assert!(stdout.contains("'repeat:repeat'"), "{stdout}");
+    assert!(stdout.contains("'downsample:downsample'"), "{stdout}");
+    assert!(stdout.contains("'upsample:upsample'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
     assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
@@ -174,6 +178,8 @@ fn fish_completions_include_modern_commands_and_flags() {
         "delay",
         "pad",
         "repeat",
+        "downsample",
+        "upsample",
         "mix",
         "concat",
         "mix-power",

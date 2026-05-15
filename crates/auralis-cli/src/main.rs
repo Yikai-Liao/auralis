@@ -1123,6 +1123,42 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Keep every Nth sample from one audio file.
+    Downsample {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Integer downsample factor.
+        #[arg(value_name = "FACTOR", default_value = "2")]
+        factor: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Insert zero samples between input samples.
+    Upsample {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Integer upsample factor.
+        #[arg(value_name = "FACTOR", default_value = "2")]
+        factor: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Mix two or more audio files into one output.
     Mix {
         /// PCM16 WAV input files to mix.
@@ -1856,6 +1892,18 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["repeat", count.as_str()]),
+        Command::Downsample {
+            input,
+            factor,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["downsample", factor.as_str()]),
+        Command::Upsample {
+            input,
+            factor,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["upsample", factor.as_str()]),
         Command::Mix {
             inputs,
             output,
@@ -3240,6 +3288,14 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "downsample",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "upsample",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "mix",
         options: &["-o", "--output", "--backend"],
     },
@@ -3370,6 +3426,8 @@ const MAN_PAGES: &[ManPage] = &[
             ("delay", "Delay audio channels."),
             ("pad", "Add silence padding."),
             ("repeat", "Append finite copies."),
+            ("downsample", "Keep every Nth sample."),
+            ("upsample", "Insert zero samples between input samples."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
             (
@@ -3938,6 +3996,28 @@ const MAN_PAGES: &[ManPage] = &[
         description: "Repeat is a recipe alias for appending finite copies of one audio file. It lowers to the same typed effect pipeline as `render --fx 'repeat ...'`.",
         options: &[
             ("COUNT", "Number of extra copies to append."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "downsample",
+        summary: "keep every Nth sample",
+        synopsis: "auralis downsample INPUT.wav [FACTOR] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Downsample is a recipe alias for dropping samples by an integer factor. It lowers to the same typed effect pipeline as `render --fx 'downsample ...'`.",
+        options: &[
+            ("FACTOR", "Integer downsample factor."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "upsample",
+        summary: "insert zero samples",
+        synopsis: "auralis upsample INPUT.wav [FACTOR] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Upsample is a recipe alias for inserting zero samples between input samples. It lowers to the same typed effect pipeline as `render --fx 'upsample ...'`.",
+        options: &[
+            ("FACTOR", "Integer upsample factor."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
