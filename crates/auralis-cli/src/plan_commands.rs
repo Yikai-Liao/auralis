@@ -3,11 +3,13 @@ use std::{collections::BTreeMap, path::PathBuf};
 use crate::{
     CliError,
     command_args::{
-        ChannelsArgs, GainArgs, NormArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs, RenderArgs,
-        SimpleRecipeArgs,
+        ChannelsArgs, EchoArgs, GainArgs, NormArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs,
+        RenderArgs, SimpleRecipeArgs, TrimArgs,
     },
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
-    graph_plan, spec,
+    graph_plan,
+    recipes::echo_effect_tokens,
+    spec,
 };
 
 pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
@@ -23,6 +25,10 @@ pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
                 return Err(CliError::PlanCommandRejectsGraphOptions);
             }
             plan_pipe_command(pipe, args.json)
+        }
+        Some(PlanCommand::Trim(trim)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_trim_command(trim, args.json)
         }
         Some(PlanCommand::Gain(gain)) => {
             reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
@@ -44,6 +50,22 @@ pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
             reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
             plan_reverse_command(reverse, args.json)
         }
+        Some(PlanCommand::Deemph(deemph)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_simple_recipe_command("deemph", deemph, args.json)
+        }
+        Some(PlanCommand::Earwax(earwax)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_simple_recipe_command("earwax", earwax, args.json)
+        }
+        Some(PlanCommand::Echo(echo)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_echo_command("echo", echo, args.json)
+        }
+        Some(PlanCommand::Echos(echos)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_echo_command("echos", echos, args.json)
+        }
         None => {
             let spec = args.spec.ok_or(CliError::MissingPlanInput)?;
             plan_graph_spec(&spec, args.target.as_deref(), args.json, args.locked)
@@ -59,6 +81,16 @@ fn plan_render_command(render: RenderArgs, json: bool) -> Result<(), CliError> {
 fn plan_pipe_command(pipe: PipeArgs, json: bool) -> Result<(), CliError> {
     let checked = checked_pipe_spec(pipe)?;
     graph_plan::print_checked_plan("command:pipe", "pipe", &checked, None, json)
+}
+
+fn plan_trim_command(trim: TrimArgs, json: bool) -> Result<(), CliError> {
+    let TrimArgs {
+        input,
+        range,
+        output,
+        backend: _,
+    } = trim;
+    plan_recipe_command("trim", input, output, ["trim", range.as_str()], json)
 }
 
 fn plan_gain_command(gain: GainArgs, json: bool) -> Result<(), CliError> {
@@ -108,12 +140,39 @@ fn plan_channels_command(channels: ChannelsArgs, json: bool) -> Result<(), CliEr
 }
 
 fn plan_reverse_command(reverse: SimpleRecipeArgs, json: bool) -> Result<(), CliError> {
+    plan_simple_recipe_command("reverse", reverse, json)
+}
+
+fn plan_simple_recipe_command(
+    name: &'static str,
+    recipe: SimpleRecipeArgs,
+    json: bool,
+) -> Result<(), CliError> {
     let SimpleRecipeArgs {
         input,
         output,
         backend: _,
-    } = reverse;
-    plan_recipe_command("reverse", input, output, ["reverse"], json)
+    } = recipe;
+    plan_recipe_command(name, input, output, [name], json)
+}
+
+fn plan_echo_command(effect: &'static str, echo: EchoArgs, json: bool) -> Result<(), CliError> {
+    let EchoArgs {
+        input,
+        gain_in,
+        gain_out,
+        taps,
+        output,
+        backend: _,
+    } = echo;
+    let tokens = echo_effect_tokens(effect, &gain_in, &gain_out, &taps);
+    plan_recipe_command(
+        effect,
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
 }
 
 fn reject_graph_plan_options(

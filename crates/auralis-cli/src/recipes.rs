@@ -158,6 +158,22 @@ pub(super) fn run_echo_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
+    let effect_chain = echo_effect_tokens(effect, gain_in, gain_out, taps);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+pub(super) fn echo_effect_tokens(
+    effect: &str,
+    gain_in: &str,
+    gain_out: &str,
+    taps: &[String],
+) -> Vec<String> {
     let mut effect_chain = vec![effect.to_owned(), gain_in.to_owned(), gain_out.to_owned()];
     for tap in taps {
         if let Some((delay, decay)) = tap.split_once(',') {
@@ -167,13 +183,7 @@ pub(super) fn run_echo_recipe(
             effect_chain.push(tap.to_owned());
         }
     }
-
-    run_effect_recipe(
-        input,
-        output,
-        backend,
-        effect_chain.iter().map(String::as_str),
-    )
+    effect_chain
 }
 
 #[allow(clippy::too_many_arguments)]
