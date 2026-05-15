@@ -20,9 +20,11 @@ use clap::{Parser, Subcommand};
 
 pub(crate) use command_args::GraphFormat;
 use command_args::{
-    ChannelsArgs, CheckArgs, CompletionsArgs, ConvertArgs, EchoArgs, ExplainArgs, FmtArgs,
-    GainArgs, GraphArgs, InspectArgs, ManArgs, NormArgs, NormalizeArgs, OpsArgs, PlanArgs,
-    RateArgs, RenderArgs, RunArgs, SimpleRecipeArgs, TrimArgs,
+    ChannelsArgs, CheckArgs, ChorusArgs, CompletionsArgs, ContrastArgs, ConvertArgs, DcShiftArgs,
+    EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs, InspectArgs, ManArgs,
+    NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs, PlanArgs, RateArgs, RenderArgs,
+    RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs,
+    VolArgs,
 };
 use command_support::{
     PathRole, check_command, effect_input_to_chain_tokens, inspect, plan_graph_spec, print_ops,
@@ -95,459 +97,48 @@ enum Command {
     Echos(EchoArgs),
 
     /// Add chorus modulation to one audio file.
-    Chorus {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Clean input gain.
-        #[arg(
-            long = "gain-in",
-            value_name = "GAIN",
-            default_value = "0.5",
-            allow_hyphen_values = true
-        )]
-        gain_in: String,
-
-        /// Output gain.
-        #[arg(
-            long = "gain-out",
-            value_name = "GAIN",
-            default_value = "1",
-            allow_hyphen_values = true
-        )]
-        gain_out: String,
-
-        /// Interpolation mode: none, linear, or quadratic.
-        #[arg(long, value_name = "MODE", default_value = "none")]
-        interpolation: String,
-
-        /// Default modulation wave: sine or triangle.
-        #[arg(long, value_name = "WAVE", default_value = "sine")]
-        wave: String,
-
-        /// Chorus stage as `delay_ms,decay,speed_hz,depth_ms[,wave]`; repeat for multiple stages.
-        #[arg(long = "stage", value_name = "STAGE", allow_hyphen_values = true)]
-        stages: Vec<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Chorus(ChorusArgs),
 
     /// Add flanger modulation to one audio file.
-    Flanger {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Base delay in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        delay: String,
-
-        /// Sweep depth in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            default_value = "2",
-            allow_hyphen_values = true
-        )]
-        depth: String,
-
-        /// Regeneration percentage.
-        #[arg(
-            long,
-            value_name = "PERCENT",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        regen: String,
-
-        /// Wet width percentage.
-        #[arg(
-            long,
-            value_name = "PERCENT",
-            default_value = "71",
-            allow_hyphen_values = true
-        )]
-        width: String,
-
-        /// Modulation speed in Hz.
-        #[arg(
-            long,
-            value_name = "HZ",
-            default_value = "0.5",
-            allow_hyphen_values = true
-        )]
-        speed: String,
-
-        /// Modulation wave: sine or triangle.
-        #[arg(long, value_name = "WAVE", default_value = "sine")]
-        wave: String,
-
-        /// Stereo phase percentage.
-        #[arg(
-            long,
-            value_name = "PERCENT",
-            default_value = "25",
-            allow_hyphen_values = true
-        )]
-        phase: String,
-
-        /// Interpolation mode: none, linear, or quadratic.
-        #[arg(long, value_name = "MODE", default_value = "linear")]
-        interpolation: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Flanger(FlangerArgs),
 
     /// Add phaser modulation to one audio file.
-    Phaser {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Clean input gain.
-        #[arg(
-            long = "gain-in",
-            value_name = "GAIN",
-            default_value = "0.4",
-            allow_hyphen_values = true
-        )]
-        gain_in: String,
-
-        /// Output gain.
-        #[arg(
-            long = "gain-out",
-            value_name = "GAIN",
-            default_value = "0.74",
-            allow_hyphen_values = true
-        )]
-        gain_out: String,
-
-        /// Delay in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            default_value = "3",
-            allow_hyphen_values = true
-        )]
-        delay: String,
-
-        /// Regeneration amount.
-        #[arg(
-            long,
-            value_name = "AMOUNT",
-            default_value = "0.4",
-            allow_hyphen_values = true
-        )]
-        regen: String,
-
-        /// Modulation speed in Hz.
-        #[arg(
-            long,
-            value_name = "HZ",
-            default_value = "0.5",
-            allow_hyphen_values = true
-        )]
-        speed: String,
-
-        /// Modulation wave: sine or triangle.
-        #[arg(long, value_name = "WAVE", default_value = "sine")]
-        wave: String,
-
-        /// Interpolation mode: none, linear, or quadratic.
-        #[arg(long, value_name = "MODE", default_value = "none")]
-        interpolation: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Phaser(PhaserArgs),
 
     /// Extract out-of-phase stereo content.
-    Oops {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Oops(SimpleRecipeArgs),
 
     /// Apply RIAA vinyl playback equalization.
-    Riaa {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Riaa(SimpleRecipeArgs),
 
     /// Swap adjacent channel pairs.
-    Swap {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Swap(SimpleRecipeArgs),
 
     /// Enhance sample contrast.
-    Contrast {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Contrast amount from 0 to 100.
-        #[arg(long, value_name = "AMOUNT", default_value = "75")]
-        amount: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Contrast(ContrastArgs),
 
     /// Apply overdrive distortion.
-    Overdrive {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Overdrive gain.
-        #[arg(
-            long,
-            value_name = "GAIN",
-            default_value = "20",
-            allow_hyphen_values = true
-        )]
-        gain: String,
-
-        /// Overdrive color.
-        #[arg(
-            long,
-            value_name = "COLOR",
-            default_value = "20",
-            allow_hyphen_values = true
-        )]
-        color: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Overdrive(OverdriveArgs),
 
     /// Apply saturation distortion.
-    Saturation {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Saturation curve type: tanh, sqrt, or diode.
-        #[arg(long = "type", value_name = "TYPE", default_value = "tanh")]
-        saturation_type: String,
-
-        /// Wet/dry blend amount.
-        #[arg(
-            long,
-            value_name = "BLEND",
-            default_value = "1",
-            allow_hyphen_values = true
-        )]
-        blend: String,
-
-        /// Input offset before saturation.
-        #[arg(
-            long,
-            value_name = "OFFSET",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        offset: String,
-
-        /// Curve-specific parameter: drive, color, or threshold.
-        #[arg(long, value_name = "VALUE", allow_hyphen_values = true)]
-        parameter: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Saturation(SaturationArgs),
 
     /// Shift the DC level of one audio file.
     #[command(name = "dcshift")]
-    DcShift {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// DC shift amount.
-        #[arg(value_name = "SHIFT", allow_hyphen_values = true)]
-        shift: String,
-
-        /// Optional limiter gain.
-        #[arg(long, value_name = "GAIN", allow_hyphen_values = true)]
-        limiter_gain: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    DcShift(DcShiftArgs),
 
     /// Apply SoX-ng volume scaling to one audio file.
-    Vol {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Volume gain value, for example `0.5` or `-6dB`.
-        #[arg(value_name = "GAIN", allow_hyphen_values = true)]
-        gain: String,
-
-        /// Gain interpretation: amplitude, power, or dB.
-        #[arg(long = "type", value_name = "TYPE")]
-        gain_type: Option<String>,
-
-        /// Optional limiter gain.
-        #[arg(long, value_name = "GAIN", allow_hyphen_values = true)]
-        limiter_gain: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Vol(VolArgs),
 
     /// Apply soft volume changes to one audio file.
     #[command(name = "softvol")]
-    SoftVol {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Volume multiplier.
-        #[arg(
-            long,
-            value_name = "VOLUME",
-            default_value = "1",
-            allow_hyphen_values = true
-        )]
-        volume: String,
-
-        /// Seconds required for volume doubling.
-        #[arg(
-            long,
-            value_name = "SECONDS",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        double_time: String,
-
-        /// Extra headroom in dB.
-        #[arg(
-            long,
-            value_name = "DB",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        headroom: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    SoftVol(SoftVolArgs),
 
     /// Apply tremolo modulation to one audio file.
-    Tremolo {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Modulation speed in Hz.
-        #[arg(value_name = "SPEED_HZ", allow_hyphen_values = true)]
-        speed: String,
-
-        /// Modulation depth percentage.
-        #[arg(
-            long,
-            value_name = "PERCENT",
-            default_value = "40",
-            allow_hyphen_values = true
-        )]
-        depth: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Tremolo(TremoloArgs),
 
     /// Change playback speed and sample rate.
-    Speed {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Speed factor, or cents with a `c` suffix.
-        #[arg(value_name = "FACTOR", allow_hyphen_values = true)]
-        factor: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Speed(SpeedArgs),
 
     /// Change tempo without changing pitch.
     Tempo {
@@ -1385,7 +976,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
         }) => run_echo_recipe(
             "echos", &input, &gain_in, &gain_out, &taps, &output, backend,
         ),
-        Command::Chorus {
+        Command::Chorus(ChorusArgs {
             input,
             gain_in,
             gain_out,
@@ -1394,7 +985,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             stages,
             output,
             backend,
-        } => run_chorus_recipe(
+        }) => run_chorus_recipe(
             &input,
             &gain_in,
             &gain_out,
@@ -1404,7 +995,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Flanger {
+        Command::Flanger(FlangerArgs {
             input,
             delay,
             depth,
@@ -1416,7 +1007,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             interpolation,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
@@ -1432,7 +1023,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 interpolation.as_str(),
             ],
         ),
-        Command::Phaser {
+        Command::Phaser(PhaserArgs {
             input,
             gain_in,
             gain_out,
@@ -1443,7 +1034,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             interpolation,
             output,
             backend,
-        } => run_phaser_recipe(
+        }) => run_phaser_recipe(
             &input,
             &gain_in,
             &gain_out,
@@ -1455,40 +1046,40 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Oops {
+        Command::Oops(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["oops"]),
-        Command::Riaa {
+        }) => run_effect_recipe(&input, &output, backend, ["oops"]),
+        Command::Riaa(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["riaa"]),
-        Command::Swap {
+        }) => run_effect_recipe(&input, &output, backend, ["riaa"]),
+        Command::Swap(SimpleRecipeArgs {
             input,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["swap"]),
-        Command::Contrast {
+        }) => run_effect_recipe(&input, &output, backend, ["swap"]),
+        Command::Contrast(ContrastArgs {
             input,
             amount,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["contrast", amount.as_str()]),
-        Command::Overdrive {
+        }) => run_effect_recipe(&input, &output, backend, ["contrast", amount.as_str()]),
+        Command::Overdrive(OverdriveArgs {
             input,
             gain,
             color,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
             ["overdrive", gain.as_str(), color.as_str()],
         ),
-        Command::Saturation {
+        Command::Saturation(SaturationArgs {
             input,
             saturation_type,
             blend,
@@ -1496,7 +1087,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             parameter,
             output,
             backend,
-        } => run_saturation_recipe(
+        }) => run_saturation_recipe(
             &input,
             &saturation_type,
             &blend,
@@ -1505,21 +1096,21 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::DcShift {
+        Command::DcShift(DcShiftArgs {
             input,
             shift,
             limiter_gain,
             output,
             backend,
-        } => run_dc_shift_recipe(&input, &shift, limiter_gain.as_deref(), &output, backend),
-        Command::Vol {
+        }) => run_dc_shift_recipe(&input, &shift, limiter_gain.as_deref(), &output, backend),
+        Command::Vol(VolArgs {
             input,
             gain,
             gain_type,
             limiter_gain,
             output,
             backend,
-        } => run_vol_recipe(
+        }) => run_vol_recipe(
             &input,
             &gain,
             gain_type.as_deref(),
@@ -1527,14 +1118,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::SoftVol {
+        Command::SoftVol(SoftVolArgs {
             input,
             volume,
             double_time,
             headroom,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
@@ -1545,24 +1136,24 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 headroom.as_str(),
             ],
         ),
-        Command::Tremolo {
+        Command::Tremolo(TremoloArgs {
             input,
             speed,
             depth,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
             ["tremolo", speed.as_str(), depth.as_str()],
         ),
-        Command::Speed {
+        Command::Speed(SpeedArgs {
             input,
             factor,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["speed", factor.as_str()]),
+        }) => run_effect_recipe(&input, &output, backend, ["speed", factor.as_str()]),
         Command::Tempo {
             input,
             factor,
