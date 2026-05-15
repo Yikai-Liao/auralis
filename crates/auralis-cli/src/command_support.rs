@@ -15,14 +15,12 @@ pub(super) enum OpsSchemaFormat {
 #[derive(Debug, Clone, Copy)]
 pub(super) enum PathRole {
     Input,
-    Output,
 }
 
 impl std::fmt::Display for PathRole {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Input => formatter.write_str("input"),
-            Self::Output => formatter.write_str("output"),
         }
     }
 }

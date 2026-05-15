@@ -50,6 +50,65 @@ fn convert_wav_to_flac_writes_flac_header() {
 }
 
 #[test]
+fn convert_export_writes_checkable_graph_spec_that_runs_to_flac() {
+    let dir = temp_path("auralis-cli-convert-export", "dir");
+    fs::create_dir(&dir).unwrap();
+    let input = dir.join("input.wav");
+    let output = dir.join("output.flac");
+    let spec = dir.join("Auralis.toml");
+    write_pcm16_wav(
+        &input,
+        1,
+        &[
+            -16_384, -14_336, -12_288, -10_240, -8_192, -6_144, -4_096, -2_048, 0, 2_048, 4_096,
+            6_144, 8_192, 10_240, 12_288, 14_336,
+        ],
+    );
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--export",
+            spec.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let spec_source = fs::read_to_string(&spec).unwrap();
+    assert!(spec_source.contains("version = \"auralis.graph/v1\""));
+    assert!(spec_source.contains("path = "));
+    assert!(fs::read(&output).unwrap().starts_with(b"fLaC"));
+
+    let check = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(check.status.success(), "stderr: {}", stderr(&check));
+
+    fs::remove_file(&output).unwrap();
+    let run = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(run.status.success(), "stderr: {}", stderr(&run));
+    assert!(fs::read(&output).unwrap().starts_with(b"fLaC"));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(output).unwrap();
+    fs::remove_file(dir.join("Auralis.lock")).unwrap();
+    fs::remove_file(spec).unwrap();
+    fs::remove_dir(dir).unwrap();
+}
+
+#[test]
 fn convert_container_overrides_output_extension() {
     let input = temp_path("auralis-cli-convert-container-input", "wav");
     let output = temp_path("auralis-cli-convert-container-output", "audio");

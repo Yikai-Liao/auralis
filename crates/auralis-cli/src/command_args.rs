@@ -66,6 +66,10 @@ pub(crate) struct ConvertArgs {
     /// Select WAV sample encoding when the output container is WAV.
     #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]
     pub(crate) sample: Option<auralis::WavSampleFormat>,
+
+    /// Write an equivalent Auralis graph spec after conversion succeeds.
+    #[arg(long, value_name = "SPEC")]
+    pub(crate) export: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

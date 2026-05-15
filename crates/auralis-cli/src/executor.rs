@@ -349,7 +349,7 @@ fn open_pipeline(
     Ok(audio.into_pipeline())
 }
 
-fn open_audio_file(
+pub(super) fn open_audio_file(
     input: &Path,
     backend: auralis::BackendKind,
 ) -> Result<auralis::AudioFile, CliError> {
@@ -365,7 +365,7 @@ fn open_audio_file(
     }
 }
 
-fn output_format(
+pub(super) fn output_format(
     output: &Path,
     container: Option<OutputContainer>,
     wav_sample: Option<auralis::WavSampleFormat>,

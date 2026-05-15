@@ -71,6 +71,85 @@ pub fn verify_graph_lock(path: &Path) -> Result<(), GraphSpecError> {
     Ok(())
 }
 
+pub fn validate_convert_graph_export(
+    no_auto_channels: bool,
+    no_auto_rate: bool,
+    guard: bool,
+    container: Option<crate::executor::OutputContainer>,
+    sample: Option<auralis::WavSampleFormat>,
+) -> Result<(), GraphSpecError> {
+    if no_auto_channels || no_auto_rate || guard || container.is_some() || sample.is_some() {
+        return Err(GraphSpecError::UnsupportedConvertExportPolicy);
+    }
+    Ok(())
+}
+
+pub fn write_convert_graph_spec(
+    path: &Path,
+    input: &Path,
+    output: &Path,
+    output_channels: Option<auralis::ChannelCount>,
+    output_sample_rate: Option<auralis::SampleRate>,
+    norm: Option<f64>,
+) -> Result<(), GraphSpecError> {
+    let mut steps = Vec::new();
+    if let Some(channels) = output_channels {
+        steps.push(ChainStepSpec::with_param(
+            "channels",
+            "count",
+            channels.as_u16().to_string(),
+        ));
+    }
+    if let Some(rate) = output_sample_rate {
+        steps.push(ChainStepSpec::with_param(
+            "rate",
+            "frequency",
+            rate.as_u32().to_string(),
+        ));
+    }
+    if let Some(target) = norm {
+        steps.push(ChainStepSpec::with_param(
+            "norm.peak",
+            "target",
+            format!("{target}dBFS"),
+        ));
+    }
+
+    let sink_input = if steps.is_empty() {
+        "input.audio"
+    } else {
+        "convert.audio"
+    };
+    let spec = GraphSpec {
+        version: "auralis.graph/v1".to_owned(),
+        name: Some("convert".to_owned()),
+        sources: vec![SourceSpec {
+            id: "input".to_owned(),
+            path: input.to_path_buf(),
+        }],
+        chains: if steps.is_empty() {
+            Vec::new()
+        } else {
+            vec![ChainSpec {
+                id: "convert".to_owned(),
+                input: "input.audio".to_owned(),
+                steps,
+            }]
+        },
+        nodes: Vec::new(),
+        sinks: vec![SinkSpec {
+            id: "output".to_owned(),
+            input: sink_input.to_owned(),
+            path: output.to_path_buf(),
+        }],
+    };
+    let source = toml::to_string_pretty(&spec).map_err(GraphSpecError::TomlSerialize)?;
+    fs::write(path, source).map_err(|error| GraphSpecError::Write {
+        path: path.to_path_buf(),
+        error,
+    })
+}
+
 fn parse_graph_spec(source: &str) -> Result<GraphSpec, GraphSpecError> {
     toml::from_str::<GraphSpec>(source).map_err(GraphSpecError::Toml)
 }
@@ -236,6 +315,18 @@ struct ChainStepSpec {
     op: String,
     #[serde(default, flatten, skip_serializing_if = "BTreeMap::is_empty")]
     params: BTreeMap<String, toml::Value>,
+}
+
+impl ChainStepSpec {
+    fn with_param(op: &str, param: &str, value: String) -> Self {
+        let mut params = BTreeMap::new();
+        params.insert(param.to_owned(), toml::Value::String(value));
+        Self {
+            id: None,
+            op: op.to_owned(),
+            params,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -519,6 +610,10 @@ pub enum GraphSpecError {
         path: PathBuf,
         error: std::io::Error,
     },
+    Write {
+        path: PathBuf,
+        error: std::io::Error,
+    },
     Toml(toml::de::Error),
     TomlSerialize(toml::ser::Error),
     LockRead {
@@ -583,15 +678,23 @@ pub enum GraphSpecError {
         port: String,
         available_ports: Vec<String>,
     },
+    UnsupportedConvertExportPolicy,
 }
 
-impl fmt::Display for GraphSpecError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl GraphSpecError {
+    fn fmt_file_error(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Read { path, error } => {
                 write!(
                     formatter,
                     "failed to read graph spec {}: {error}",
+                    path.display()
+                )
+            }
+            Self::Write { path, error } => {
+                write!(
+                    formatter,
+                    "failed to write graph spec {}: {error}",
                     path.display()
                 )
             }
@@ -633,6 +736,12 @@ impl fmt::Display for GraphSpecError {
                 formatter,
                 "unsupported graph spec version `{version}`; expected `auralis.graph/v1`"
             ),
+            _ => unreachable!("validation errors are formatted separately"),
+        }
+    }
+
+    fn fmt_validation_error(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
             Self::EmptyId { kind } => write!(formatter, "{kind} id cannot be empty"),
             Self::DuplicateId {
                 id,
@@ -684,6 +793,29 @@ impl fmt::Display for GraphSpecError {
                 "{kind} `{id}` references unknown input port `{port}`; available ports: {}",
                 available_ports.join(", ")
             ),
+            Self::UnsupportedConvertExportPolicy => formatter.write_str(
+                "convert --export currently supports path-inferred output formats and graph-representable --channels, --rate, and --norm policies",
+            ),
+            _ => unreachable!("file errors are formatted separately"),
+        }
+    }
+}
+
+impl fmt::Display for GraphSpecError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read { .. }
+            | Self::Write { .. }
+            | Self::Toml(_)
+            | Self::TomlSerialize(_)
+            | Self::LockRead { .. }
+            | Self::LockWrite { .. }
+            | Self::LockToml(_)
+            | Self::LockSerialize(_)
+            | Self::MissingLock { .. }
+            | Self::LockMismatch { .. }
+            | Self::UnsupportedVersion { .. } => self.fmt_file_error(formatter),
+            _ => self.fmt_validation_error(formatter),
         }
     }
 }

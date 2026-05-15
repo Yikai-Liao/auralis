@@ -36,6 +36,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
             "--norm",
             "--container",
             "--sample",
+            "--export",
         ],
     },
     CompletionSpec {

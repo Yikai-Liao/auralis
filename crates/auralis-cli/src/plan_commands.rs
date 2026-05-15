@@ -103,6 +103,7 @@ fn checked_convert_spec(convert: ConvertArgs) -> Result<spec::CheckedGraphSpec, 
         norm,
         container,
         sample,
+        export: _,
     } = convert;
     validate_convert_options(
         &output,

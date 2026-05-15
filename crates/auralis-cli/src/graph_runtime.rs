@@ -5,12 +5,7 @@ use std::{
 
 use auralis::EffectRegistry;
 
-use crate::{
-    CliError,
-    command_args::CacheMode,
-    command_support::{PathRole, ensure_wav_extension},
-    effect_tokens, executor, spec,
-};
+use crate::{CliError, command_args::CacheMode, effect_tokens, executor, spec};
 
 pub(super) fn run_graph_spec(
     spec: &Path,
@@ -37,10 +32,10 @@ pub(super) fn run_graph_spec(
         let rendered = render_graph_port_audio(&checked, spec_dir, &input_port, &mut render_cache)?;
         for sink in sinks {
             let output = resolve_spec_path(spec_dir, &sink.path);
-            ensure_wav_extension(&output, PathRole::Output)?;
+            let output_format = executor::output_format(&output, None, None)?;
             auralis::AudioFile::from_audio_buffer(rendered.clone())
                 .into_pipeline()
-                .write_wav(&output)?;
+                .write(&output, output_format)?;
             println!("wrote {} <- {}", sink.path.display(), sink.input);
         }
     }
@@ -132,8 +127,7 @@ fn render_graph_input_audio(
 
     if let Some(source) = checked.sources.iter().find(|source| source.id == input_id) {
         let input = resolve_spec_path(spec_dir, &source.path);
-        ensure_wav_extension(&input, PathRole::Input)?;
-        return auralis::AudioFile::open_wav(&input)?
+        return executor::open_audio_file(&input, auralis::BackendKind::Scalar)?
             .into_pipeline()
             .into_audio_buffer()
             .map_err(CliError::from);
