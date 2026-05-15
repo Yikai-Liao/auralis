@@ -18,6 +18,8 @@ fn top_level_man_page_lists_modern_commands() {
         stdout.contains("auralis - modern deterministic audio processing CLI"),
         "{stdout}"
     );
+    assert!(stdout.contains("trim"), "{stdout}");
+    assert!(stdout.contains("normalize"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -41,6 +43,22 @@ fn render_man_page_includes_core_options() {
     assert!(stdout.contains("--fx EFFECT"), "{stdout}");
     assert!(stdout.contains("--chain CHAIN"), "{stdout}");
     assert!(stdout.contains("--combine METHOD"), "{stdout}");
+}
+
+#[test]
+fn normalize_man_page_includes_peak_option() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "normalize"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("normalize - normalize to a peak level"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--peak DBFS"), "{stdout}");
 }
 
 #[test]

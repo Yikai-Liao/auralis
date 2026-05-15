@@ -76,6 +76,41 @@ enum Command {
         sample: Option<auralis::WavSampleFormat>,
     },
 
+    /// Keep one range from an audio file.
+    Trim {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Frame range to keep, for example `10..30` or `10..`.
+        range: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Normalize one audio file to a peak level.
+    Normalize {
+        /// Input audio file to read.
+        input: PathBuf,
+
+        /// Output audio file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Peak target in dBFS, defaulting to 0 dBFS.
+        #[arg(long, value_name = "DBFS", default_value = "0", allow_hyphen_values = true, value_parser = parse_dbfs)]
+        peak: f64,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Render one ordered stream with typed effect syntax.
     Render {
         /// PCM16 WAV input file to read.
@@ -299,6 +334,18 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 sample,
             },
         ),
+        Command::Trim {
+            input,
+            range,
+            output,
+            backend,
+        } => run_trim_recipe(&input, &range, &output, backend),
+        Command::Normalize {
+            input,
+            output,
+            peak,
+            backend,
+        } => normalize_audio(&input, &output, peak, backend),
         Command::Render {
             input,
             output,
@@ -415,6 +462,53 @@ fn convert_audio(input: &Path, output: &Path, options: ConvertOptions) -> Result
         .write(output, format)?;
 
     Ok(())
+}
+
+fn run_trim_recipe(
+    input: &Path,
+    range: &str,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let options = RenderOptions {
+        backend,
+        combine: auralis::CombineMethod::Concatenate,
+        additional_inputs: Vec::new(),
+        output_channels: None,
+        no_auto_channels: false,
+        output_sample_rate: None,
+        no_auto_rate: false,
+        guard: OutputGuard::Disabled,
+        norm: None,
+        dither: OutputDither::Disabled,
+        dither_seed: None,
+        effects_file: None,
+        effect_chain: vec!["trim".to_owned(), range.to_owned()],
+    };
+
+    run_pipeline(input, output, &options)
+}
+
+fn normalize_audio(
+    input: &Path,
+    output: &Path,
+    peak: f64,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    convert_audio(
+        input,
+        output,
+        ConvertOptions {
+            backend,
+            output_channels: None,
+            no_auto_channels: false,
+            output_sample_rate: None,
+            no_auto_rate: false,
+            guard: OutputGuard::Disabled,
+            norm: Some(peak),
+            sample: None,
+        },
+    )
 }
 
 fn run_pipeline(input: &Path, output: &Path, options: &RenderOptions) -> Result<(), CliError> {
@@ -900,6 +994,14 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "trim",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "normalize",
+        options: &["-o", "--output", "--peak", "--backend"],
+    },
+    CompletionSpec {
         name: "render",
         options: &[
             "-o",
@@ -973,6 +1075,8 @@ const MAN_PAGES: &[ManPage] = &[
                 "convert",
                 "Convert one supported audio file into another container format.",
             ),
+            ("trim", "Keep one range from an audio file."),
+            ("normalize", "Normalize one audio file to a peak level."),
             (
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
@@ -989,6 +1093,34 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("run", "Run an Auralis graph spec."),
             ("ops", "Inspect the typed operation registry."),
+        ],
+    },
+    ManPage {
+        name: "trim",
+        summary: "keep one audio range",
+        synopsis: "auralis trim INPUT.wav RANGE -o OUTPUT.wav [--backend BACKEND]",
+        description: "Trim is a recipe alias for keeping one contiguous range. It lowers to the same typed effect pipeline as `render --fx 'trim ...'`.",
+        options: &[
+            (
+                "RANGE",
+                "Frame range to keep, for example `10..30` or `10..`.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "normalize",
+        summary: "normalize to a peak level",
+        synopsis: "auralis normalize INPUT.wav -o OUTPUT.wav [--peak DBFS] [--backend BACKEND]",
+        description: "Normalize is a recipe alias for output-boundary peak normalization. It lowers to the same output policy as `render --norm`.",
+        options: &[
+            ("-o, --output FILE", "Output audio file to create."),
+            (
+                "--peak DBFS",
+                "Peak target in dBFS, accepting values like `-1` or `-1dBFS`.",
+            ),
+            ("--backend BACKEND", "Request scalar or simd processing."),
         ],
     },
     ManPage {
@@ -2455,6 +2587,18 @@ fn format_duration_seconds(frames: u64, sample_rate: u32) -> String {
 fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
     auralis::BackendKind::from_name(value)
         .ok_or_else(|| "backend must be `scalar` or `simd`".to_owned())
+}
+
+fn parse_dbfs(value: &str) -> Result<f64, String> {
+    let trimmed = value.trim();
+    let number = trimmed
+        .strip_suffix("dBFS")
+        .or_else(|| trimmed.strip_suffix("dbfs"))
+        .unwrap_or(trimmed);
+
+    number
+        .parse::<f64>()
+        .map_err(|error| format!("invalid dBFS value `{value}`: {error}"))
 }
 
 fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
