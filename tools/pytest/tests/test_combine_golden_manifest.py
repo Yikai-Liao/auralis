@@ -72,8 +72,9 @@ def test_cli_combine_matches_sox_ng_golden_manifest(
         "--package",
         "auralis-cli",
         "--",
-        "run",
+        "render",
         str(input_paths[0]),
+        "-o",
         str(auralis_output),
         "--combine",
         combine,
@@ -82,7 +83,7 @@ def test_cli_combine_matches_sox_ng_golden_manifest(
             for input_path in input_paths[1:]
             for option in ("--input", str(input_path))
         ],
-        *case["auralis"],
+        *_auralis_effect_args(case["auralis"]),
     ]
     auralis_result = subprocess.run(
         auralis_command,
@@ -136,6 +137,12 @@ def test_cli_combine_matches_sox_ng_golden_manifest(
 def _write_fixture(corpus_id: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return pcm16_corpus_fixture(path, corpus_id)
+
+
+def _auralis_effect_args(args: list[str]) -> list[str]:
+    if not args:
+        return []
+    return ["--fx", " ".join(args)]
 
 
 def _read_pcm16(path: Path) -> tuple[int, np.ndarray]:
