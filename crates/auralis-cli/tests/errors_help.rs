@@ -332,6 +332,23 @@ path = "build/out.wav"
 }
 
 #[test]
+fn check_accepts_documented_named_fade_effect_syntax() {
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", "--fx", "fade in=2 out=3 curve=linear"])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("status: ok"), "{stdout}");
+    assert!(stdout.contains("commands: 1"), "{stdout}");
+}
+
+#[test]
 fn run_graph_spec_writes_direct_source_to_sink_output() {
     let spec = temp_path("auralis-cli-run-spec-direct", "toml");
     let input = temp_path("auralis-cli-run-spec-direct-input", "wav");

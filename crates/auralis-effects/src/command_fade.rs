@@ -1,12 +1,23 @@
 use auralis_core::FrameCount;
 
-use crate::command::{CommandResult, EffectCommand, parse_frame_count, reject_extra_arguments};
+use crate::command::{
+    parse_frame_count, reject_extra_arguments, CommandResult, EffectCommand,
+    EffectCommandParseError,
+};
 use crate::{Fade, FadeCurve};
 
 pub(super) fn parse_fade(effect: &'static str, args: &[&str]) -> CommandResult<EffectCommand> {
+    let named_args;
+    let args = if args.iter().any(|arg| arg.contains('=')) {
+        named_args = named_fade_args(effect, args)?;
+        named_args.iter().map(String::as_str).collect::<Vec<_>>()
+    } else {
+        args.to_vec()
+    };
+
     let (curve, args) = match args.first().and_then(|token| FadeCurve::from_token(token)) {
         Some(curve) => (curve, &args[1..]),
-        None => (FadeCurve::Logarithmic, args),
+        None => (FadeCurve::Logarithmic, args.as_slice()),
     };
 
     let fade_in = crate::command::required_arg(effect, args, "fade-in-frame")?;
@@ -55,4 +66,59 @@ fn parse_fade_stop_position(effect: &'static str, value: &str) -> CommandResult<
     }
 
     parse_frame_count(effect, "stop-position", value)
+}
+
+fn named_fade_args(effect: &'static str, args: &[&str]) -> CommandResult<Vec<String>> {
+    let mut fade_in = None;
+    let mut fade_out = None;
+    let mut curve = None;
+
+    for arg in args {
+        let Some((name, value)) = arg.split_once('=') else {
+            return Err(EffectCommandParseError::UnexpectedArgument {
+                effect,
+                argument: (*arg).to_owned(),
+            });
+        };
+        match name {
+            "in" | "fade_in" => fade_in = Some(value.to_owned()),
+            "out" | "fade_out" => fade_out = Some(value.to_owned()),
+            "curve" => curve = Some(named_fade_curve(effect, arg, value)?),
+            _ => {
+                return Err(EffectCommandParseError::UnexpectedArgument {
+                    effect,
+                    argument: (*arg).to_owned(),
+                });
+            }
+        }
+    }
+
+    let fade_in = fade_in.ok_or(EffectCommandParseError::MissingArgument {
+        effect,
+        argument: "in",
+    })?;
+    let mut parsed = Vec::new();
+    if let Some(curve) = curve {
+        parsed.push(curve);
+    }
+    parsed.push(fade_in);
+    if let Some(fade_out) = fade_out {
+        parsed.push("0".to_owned());
+        parsed.push(fade_out);
+    }
+    Ok(parsed)
+}
+
+fn named_fade_curve(effect: &'static str, original: &str, value: &str) -> CommandResult<String> {
+    match value {
+        "quarter-sine" | "quarter_sine" | "q" => Ok("q".to_owned()),
+        "half-sine" | "half_sine" | "h" => Ok("h".to_owned()),
+        "log" | "logarithmic" | "l" => Ok("l".to_owned()),
+        "linear" | "t" => Ok("t".to_owned()),
+        "parabola" | "inverted-parabola" | "inverted_parabola" | "p" => Ok("p".to_owned()),
+        _ => Err(EffectCommandParseError::UnexpectedArgument {
+            effect,
+            argument: original.to_owned(),
+        }),
+    }
 }

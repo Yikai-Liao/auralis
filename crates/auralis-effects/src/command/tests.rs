@@ -108,6 +108,22 @@ fn sox_ng_fade_stop_position_and_fade_out_length_parse_into_typed_config() {
 }
 
 #[test]
+fn parses_documented_named_fade_form_with_frame_values() {
+    assert_eq!(
+        parse_effect_command(&["fade", "in=2", "out=3", "curve=linear"])
+            .unwrap()
+            .render_tokens(),
+        ["fade", "t", "2", "0", "3"]
+    );
+    assert_eq!(
+        parse_effect_command(&["fade", "fade_in=2", "fade_out=3", "curve=half-sine"])
+            .unwrap()
+            .render_tokens(),
+        ["fade", "h", "2", "0", "3"]
+    );
+}
+
+#[test]
 fn parses_dc_shift_limiter_gain() {
     assert_eq!(
         parse_effect_command(&["dcshift", "0.5", "0.05"]).unwrap(),
