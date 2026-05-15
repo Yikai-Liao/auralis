@@ -65,9 +65,10 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         "--package",
         "auralis-cli",
         "--",
-        "run",
+        "render",
         *_auralis_pipeline_args(input_paths, auralis_output, case),
-        *case["auralis"],
+        "--fx",
+        " ".join(case["auralis"]),
     ]
     auralis_effects_file_command = [
         "cargo",
@@ -76,7 +77,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
         "--package",
         "auralis-cli",
         "--",
-        "run",
+        "render",
         *_auralis_pipeline_args(input_paths, auralis_effects_file_output, case),
         "--effects-file",
         str(auralis_effects_file),
@@ -140,7 +141,7 @@ def test_cli_chain_matches_sox_ng_golden_manifest(
 
 
 def _effects_file_source(args: list[str]) -> str:
-    return "# generated from the golden manifest's positional Auralis arguments\n" + " ".join(
+    return "# generated from the golden manifest's Auralis effect arguments\n" + " ".join(
         args
     ) + "\n"
 
@@ -164,7 +165,7 @@ def _auralis_pipeline_args(
     output_path: Path,
     case: dict[str, Any],
 ) -> list[str]:
-    args = [str(input_paths[0]), str(output_path)]
+    args = [str(input_paths[0]), "-o", str(output_path)]
     if len(input_paths) > 1:
         args.extend(["--combine", case.get("combine", "concatenate")])
         for input_path in input_paths[1:]:
