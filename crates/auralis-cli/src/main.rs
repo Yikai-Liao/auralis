@@ -3,17 +3,18 @@
 mod command_support;
 mod completions;
 mod effect_tokens;
+mod errors;
 mod executor;
 mod graph_commands;
 mod graph_plan;
 mod graph_runtime;
 mod man_pages;
+mod parsers;
 mod recipes;
 mod spec;
 
 use std::{path::PathBuf, process::ExitCode};
 
-use auralis_wav::WavError;
 use clap::{Parser, Subcommand, ValueEnum};
 
 use command_support::{
@@ -21,11 +22,16 @@ use command_support::{
     plan_graph_spec, print_ops, run_graph_spec,
 };
 use completions::{CompletionShell, print_completions};
+pub(crate) use errors::CliError;
 use executor::{
     ConvertOptions, OutputDither, OutputGuard, RenderOptions, convert_audio, run_pipeline,
 };
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
+use parsers::{
+    parse_backend, parse_channel_count, parse_combine_method, parse_dbfs, parse_filter_poles,
+    parse_sample_rate, parse_wav_sample_format,
+};
 use recipes::{
     StretchRecipeOptions, TimingArgs, normalize_audio, run_band_recipe, run_bandpass_recipe,
     run_chorus_recipe, run_combine_recipe, run_dc_shift_recipe, run_delay_recipe,
@@ -2332,252 +2338,5 @@ fn run(cli: Cli) -> Result<(), CliError> {
         Command::Explain { spec, target } => explain_graph_target(&spec, &target),
         Command::Run { spec, locked } => run_graph_spec(&spec, locked),
         Command::Ops { effect, schema } => print_ops(effect.as_deref(), schema),
-    }
-}
-
-fn parse_backend(value: &str) -> Result<auralis::BackendKind, String> {
-    auralis::BackendKind::from_name(value)
-        .ok_or_else(|| "backend must be `scalar` or `simd`".to_owned())
-}
-
-fn parse_dbfs(value: &str) -> Result<f64, String> {
-    let trimmed = value.trim();
-    let number = trimmed
-        .strip_suffix("dBFS")
-        .or_else(|| trimmed.strip_suffix("dbfs"))
-        .unwrap_or(trimmed);
-
-    number
-        .parse::<f64>()
-        .map_err(|error| format!("invalid dBFS value `{value}`: {error}"))
-}
-
-fn parse_filter_poles(value: &str) -> Result<u8, String> {
-    match value {
-        "1" => Ok(1),
-        "2" => Ok(2),
-        _ => Err(format!("invalid pole count `{value}`: expected 1 or 2")),
-    }
-}
-
-fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
-    auralis::CombineMethod::from_name(value).ok_or_else(|| {
-        "combine method must be `concatenate`, `sequence`, `mix`, `mix-power`, `merge`, or `multiply`"
-            .to_owned()
-    })
-}
-
-fn parse_channel_count(value: &str) -> Result<auralis::ChannelCount, String> {
-    let channels = value
-        .parse::<u16>()
-        .map_err(|_| "channels must be a positive integer no larger than 65535".to_owned())?;
-
-    auralis::ChannelCount::new(channels)
-        .map_err(|_| "channels must be a positive integer no larger than 65535".to_owned())
-}
-
-fn parse_sample_rate(value: &str) -> Result<auralis::SampleRate, String> {
-    let sample_rate = value
-        .parse::<u32>()
-        .map_err(|_| "rate must be a positive integer no larger than 4294967295".to_owned())?;
-
-    auralis::SampleRate::new(sample_rate)
-        .map_err(|_| "rate must be a positive integer no larger than 4294967295".to_owned())
-}
-
-fn parse_wav_sample_format(value: &str) -> Result<auralis::WavSampleFormat, String> {
-    match value {
-        "pcm8" => Ok(auralis::WavSampleFormat::Pcm8),
-        "pcm16" => Ok(auralis::WavSampleFormat::Pcm16),
-        "pcm24" => Ok(auralis::WavSampleFormat::Pcm24),
-        "pcm32" => Ok(auralis::WavSampleFormat::Pcm32),
-        "float32" => Ok(auralis::WavSampleFormat::Float32),
-        "float64" => Ok(auralis::WavSampleFormat::Float64),
-        "ulaw" => Ok(auralis::WavSampleFormat::ULaw),
-        "alaw" => Ok(auralis::WavSampleFormat::ALaw),
-        _ => Err(
-            "sample format must be `pcm8`, `pcm16`, `pcm24`, `pcm32`, `float32`, `float64`, `ulaw`, or `alaw`"
-                .to_owned(),
-        ),
-    }
-}
-
-#[derive(Debug)]
-enum CliError {
-    Auralis(auralis::Error),
-    ChainParse(auralis::EffectChainParseError),
-    EffectName(auralis::EffectNameError),
-    EffectsFile(auralis::EffectsFileReadError),
-    GraphSpec(spec::GraphSpecError),
-    Json(serde_json::Error),
-    Io(std::io::Error),
-    Wav(WavError),
-    EmptyEffectSpec,
-    InvalidEffectSpec { spec: String },
-    MissingEffectSpec,
-    MixedCheckInputs,
-    MixedEffectInputs,
-    MixedGuardAndNorm,
-    DitherSeedWithoutDither,
-    NoAutoChannelsWithoutOutputChannels,
-    NoAutoRateWithoutOutputRate,
-    LockedRequiresSpec,
-    GraphSpecNeedsFormatting { path: PathBuf },
-    UnknownManTopic { topic: String },
-    UnknownExplainTarget { target: String },
-    UnsupportedGraphRunShape,
-    UnsupportedGraphNodeInputs { node: String, inputs: Vec<String> },
-    UnsupportedGraphNodeOp { op: String, reason: String },
-    UnsupportedGraphChainInput { chain: String, input: String },
-    UnsupportedGraphSink { sink: String, input: String },
-    UnsupportedConvertInputFormat { path: PathBuf },
-    UnsupportedConvertOutputFormat { path: PathBuf },
-    UnsupportedFormat { path: PathBuf, role: PathRole },
-    WavSampleFormatRequiresWavOutput,
-}
-
-impl std::fmt::Display for CliError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Auralis(error) => write!(formatter, "{error}"),
-            Self::ChainParse(error) => write!(formatter, "{error}"),
-            Self::EffectName(error) => write!(formatter, "{error}"),
-            Self::EffectsFile(error) => write!(formatter, "{error}"),
-            Self::GraphSpec(error) => write!(formatter, "{error}"),
-            Self::Json(error) => write!(formatter, "{error}"),
-            Self::Io(error) => write!(formatter, "{error}"),
-            Self::Wav(error) => write!(formatter, "{error}"),
-            Self::EmptyEffectSpec => {
-                formatter.write_str("effect input requires a non-empty effect")
-            }
-            Self::InvalidEffectSpec { spec } => write!(
-                formatter,
-                "effect string `{spec}` contains unmatched shell quoting"
-            ),
-            Self::MissingEffectSpec => {
-                formatter.write_str("one of SPEC, --fx, --chain, or --effects-file is required")
-            }
-            Self::MixedCheckInputs => {
-                formatter.write_str("check accepts either SPEC or one effect input mode")
-            }
-            Self::MixedEffectInputs => {
-                formatter.write_str("--fx, --chain, and --effects-file are mutually exclusive")
-            }
-            Self::MixedGuardAndNorm => {
-                formatter.write_str("--guard cannot be combined with --norm")
-            }
-            Self::DitherSeedWithoutDither => formatter.write_str("--dither-seed requires --dither"),
-            Self::NoAutoChannelsWithoutOutputChannels => {
-                formatter.write_str("--no-auto-channels requires --channels")
-            }
-            Self::NoAutoRateWithoutOutputRate => {
-                formatter.write_str("--no-auto-rate requires --rate")
-            }
-            Self::LockedRequiresSpec => {
-                formatter.write_str("--locked requires a graph spec input")
-            }
-            Self::GraphSpecNeedsFormatting { path } => write!(
-                formatter,
-                "graph spec {} is not formatted; run `auralis fmt {}`",
-                path.display(),
-                path.display()
-            ),
-            Self::UnknownManTopic { topic } => write!(
-                formatter,
-                "no built-in manual page for `{topic}`"
-            ),
-            Self::UnknownExplainTarget { target } => write!(
-                formatter,
-                "spec does not define a source, chain, node, or sink named `{target}`"
-            ),
-            Self::UnsupportedGraphRunShape => formatter.write_str(
-                "run currently supports source-to-chain-to-sink graph specs only; use `plan` to inspect unsupported nodes",
-            ),
-            Self::UnsupportedGraphNodeInputs { node, inputs } => write!(
-                formatter,
-                "node `{node}` cannot be run with inputs [{}]; only single-input passthrough nodes are supported",
-                inputs.join(", ")
-            ),
-            Self::UnsupportedGraphNodeOp { op, reason } => write!(
-                formatter,
-                "node op `{op}` is not supported by the current graph runner: {reason}"
-            ),
-            Self::UnsupportedGraphChainInput { chain, input } => write!(
-                formatter,
-                "chain `{chain}` cannot be run from unsupported input `{input}`"
-            ),
-            Self::UnsupportedGraphSink { sink, input } => write!(
-                formatter,
-                "sink `{sink}` cannot be run from unsupported input `{input}`"
-            ),
-            Self::UnsupportedConvertInputFormat { path } => write!(
-                formatter,
-                "unsupported convert input format for {}; supported inputs are wav, flac, au, and snd",
-                path.display()
-            ),
-            Self::UnsupportedConvertOutputFormat { path } => write!(
-                formatter,
-                "unsupported convert output format for {}; supported outputs are wav, flac, aiff, aif, aifc, au, and snd",
-                path.display()
-            ),
-            Self::UnsupportedFormat { path, role } => {
-                write!(
-                    formatter,
-                    "unsupported {role} format for {}; only PCM16 WAV is supported",
-                    path.display()
-                )
-            }
-            Self::WavSampleFormatRequiresWavOutput => {
-                formatter.write_str("--sample is supported only for WAV output")
-            }
-        }
-    }
-}
-
-impl From<auralis::Error> for CliError {
-    fn from(error: auralis::Error) -> Self {
-        Self::Auralis(error)
-    }
-}
-
-impl From<auralis::EffectChainParseError> for CliError {
-    fn from(error: auralis::EffectChainParseError) -> Self {
-        Self::ChainParse(error)
-    }
-}
-
-impl From<auralis::EffectNameError> for CliError {
-    fn from(error: auralis::EffectNameError) -> Self {
-        Self::EffectName(error)
-    }
-}
-
-impl From<auralis::EffectsFileReadError> for CliError {
-    fn from(error: auralis::EffectsFileReadError) -> Self {
-        Self::EffectsFile(error)
-    }
-}
-
-impl From<spec::GraphSpecError> for CliError {
-    fn from(error: spec::GraphSpecError) -> Self {
-        Self::GraphSpec(error)
-    }
-}
-
-impl From<serde_json::Error> for CliError {
-    fn from(error: serde_json::Error) -> Self {
-        Self::Json(error)
-    }
-}
-
-impl From<std::io::Error> for CliError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io(error)
-    }
-}
-
-impl From<WavError> for CliError {
-    fn from(error: WavError) -> Self {
-        Self::Wav(error)
     }
 }
