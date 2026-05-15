@@ -56,6 +56,8 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("hilbert"), "{stdout}");
     assert!(stdout.contains("loudness"), "{stdout}");
     assert!(stdout.contains("dither"), "{stdout}");
+    assert!(stdout.contains("reverb"), "{stdout}");
+    assert!(stdout.contains("stretch"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -119,6 +121,8 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'hilbert:hilbert'"), "{stdout}");
     assert!(stdout.contains("'loudness:loudness'"), "{stdout}");
     assert!(stdout.contains("'dither:dither'"), "{stdout}");
+    assert!(stdout.contains("'reverb:reverb'"), "{stdout}");
+    assert!(stdout.contains("'stretch:stretch'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
     assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
@@ -183,18 +187,15 @@ fn fish_completions_include_modern_commands_and_flags() {
         "hilbert",
         "loudness",
         "dither",
+        "reverb",
+        "stretch",
         "mix",
         "concat",
         "mix-power",
         "merge",
         "multiply",
     ] {
-        assert!(
-            stdout.contains(&format!(
-                "complete -c auralis -n '__fish_use_subcommand' -a '{command}'"
-            )),
-            "{stdout}"
-        );
+        assert_fish_subcommand(&stdout, command);
     }
     for (command, option) in [
         ("fade", "out"),
@@ -222,13 +223,28 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("hilbert", "taps"),
         ("loudness", "half-points"),
         ("dither", "noise-shape"),
+        ("reverb", "wet-only"),
+        ("stretch", "fade"),
         ("render", "chain"),
     ] {
-        assert!(
-            stdout.contains(&format!(
-                "complete -c auralis -n '__fish_seen_subcommand_from {command}' -l {option}"
-            )),
-            "{stdout}"
-        );
+        assert_fish_option(&stdout, command, option);
     }
+}
+
+fn assert_fish_subcommand(stdout: &str, command: &str) {
+    assert!(
+        stdout.contains(&format!(
+            "complete -c auralis -n '__fish_use_subcommand' -a '{command}'"
+        )),
+        "{stdout}"
+    );
+}
+
+fn assert_fish_option(stdout: &str, command: &str, option: &str) {
+    assert!(
+        stdout.contains(&format!(
+            "complete -c auralis -n '__fish_seen_subcommand_from {command}' -l {option}"
+        )),
+        "{stdout}"
+    );
 }

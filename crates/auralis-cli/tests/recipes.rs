@@ -636,6 +636,47 @@ fn fir_and_quantization_recipes_lower_to_typed_render_effects() {
     }
 }
 
+#[test]
+fn reverb_and_stretch_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "reverb",
+            vec![
+                "--wet-only",
+                "--reverberance",
+                "75",
+                "--hf-damping",
+                "25",
+                "--room-scale",
+                "50",
+                "--stereo-depth",
+                "0",
+                "--pre-delay",
+                "10",
+                "--wet-gain",
+                "-3",
+            ],
+            "reverb -w 75 25 50 0 10 -3",
+        ),
+        (
+            "stretch",
+            vec![
+                "1.5", "--window", "10", "--fade", "quarter", "--shift", "0.75", "--fading", "0.25",
+            ],
+            "stretch 1.5 10 q 0.75 0.25",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[1000, -2000, 3000, -4000, 5000, -6000],
+        );
+    }
+}
+
 fn assert_recipe_with_args_matches_render_effect(
     effect: &str,
     recipe_args: &[&str],

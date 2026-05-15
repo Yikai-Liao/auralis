@@ -55,6 +55,13 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("delay"), "{stdout}");
     assert!(stdout.contains("pad"), "{stdout}");
     assert!(stdout.contains("repeat"), "{stdout}");
+    assert!(stdout.contains("downsample"), "{stdout}");
+    assert!(stdout.contains("upsample"), "{stdout}");
+    assert!(stdout.contains("hilbert"), "{stdout}");
+    assert!(stdout.contains("loudness"), "{stdout}");
+    assert!(stdout.contains("dither"), "{stdout}");
+    assert!(stdout.contains("reverb"), "{stdout}");
+    assert!(stdout.contains("stretch"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -506,6 +513,18 @@ fn structural_man_pages_describe_recipe_lowering() {
             "dither - apply deterministic dithering",
             "render --fx 'dither ...'",
             "--precision BITS",
+        ),
+        (
+            "reverb",
+            "reverb - apply stereo reverberation",
+            "render --fx 'reverb ...'",
+            "--wet-gain DB",
+        ),
+        (
+            "stretch",
+            "stretch - change duration with windowed stretching",
+            "render --fx 'stretch ...'",
+            "--fade SHAPE",
         ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))

@@ -1239,6 +1239,97 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Apply stereo reverberation to one audio file.
+    Reverb {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Output only the wet reverberated signal.
+        #[arg(long = "wet-only")]
+        wet_only: bool,
+
+        /// Reverberance percentage.
+        #[arg(long, value_name = "PERCENT", default_value = "50")]
+        reverberance: String,
+
+        /// High-frequency damping percentage.
+        #[arg(long = "hf-damping", value_name = "PERCENT", default_value = "50")]
+        hf_damping: String,
+
+        /// Room scale percentage.
+        #[arg(long = "room-scale", value_name = "PERCENT", default_value = "100")]
+        room_scale: String,
+
+        /// Stereo depth percentage.
+        #[arg(long = "stereo-depth", value_name = "PERCENT", default_value = "100")]
+        stereo_depth: String,
+
+        /// Pre-delay in milliseconds.
+        #[arg(long = "pre-delay", value_name = "MS", default_value = "0")]
+        pre_delay: String,
+
+        /// Wet gain in dB.
+        #[arg(
+            long = "wet-gain",
+            value_name = "DB",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        wet_gain: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Change duration with basic windowed stretching.
+    Stretch {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Stretch factor.
+        #[arg(value_name = "FACTOR", default_value = "1", allow_hyphen_values = true)]
+        factor: String,
+
+        /// Analysis window length in milliseconds.
+        #[arg(
+            long,
+            value_name = "MS",
+            default_value = "20",
+            allow_hyphen_values = true
+        )]
+        window: String,
+
+        /// Fade shape: linear, sqrt, half, or quarter.
+        #[arg(long, value_name = "SHAPE", default_value = "linear")]
+        fade: String,
+
+        /// Window shift ratio.
+        #[arg(long, value_name = "RATIO", allow_hyphen_values = true)]
+        shift: Option<String>,
+
+        /// Cross-fade ratio.
+        #[arg(
+            long,
+            value_name = "RATIO",
+            allow_hyphen_values = true,
+            requires = "shift"
+        )]
+        fading: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Mix two or more audio files into one output.
     Mix {
         /// PCM16 WAV input files to mix.
@@ -2023,6 +2114,50 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
+        Command::Reverb {
+            input,
+            wet_only,
+            reverberance,
+            hf_damping,
+            room_scale,
+            stereo_depth,
+            pre_delay,
+            wet_gain,
+            output,
+            backend,
+        } => run_reverb_recipe(
+            &input,
+            wet_only,
+            &reverberance,
+            &hf_damping,
+            &room_scale,
+            &stereo_depth,
+            &pre_delay,
+            &wet_gain,
+            &output,
+            backend,
+        ),
+        Command::Stretch {
+            input,
+            factor,
+            window,
+            fade,
+            shift,
+            fading,
+            output,
+            backend,
+        } => run_stretch_recipe(
+            &input,
+            StretchRecipeOptions {
+                factor: &factor,
+                window: &window,
+                fade: &fade,
+                shift: shift.as_deref(),
+                fading: fading.as_deref(),
+            },
+            &output,
+            backend,
+        ),
         Command::Mix {
             inputs,
             output,
@@ -2616,6 +2751,86 @@ fn run_dither_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_reverb_recipe(
+    input: &Path,
+    wet_only: bool,
+    reverberance: &str,
+    hf_damping: &str,
+    room_scale: &str,
+    stereo_depth: &str,
+    pre_delay: &str,
+    wet_gain: &str,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["reverb".to_owned()];
+    if wet_only {
+        effect_chain.push("-w".to_owned());
+    }
+    effect_chain.extend([
+        reverberance.to_owned(),
+        hf_damping.to_owned(),
+        room_scale.to_owned(),
+        stereo_depth.to_owned(),
+        pre_delay.to_owned(),
+        wet_gain.to_owned(),
+    ]);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+#[derive(Clone, Copy)]
+struct StretchRecipeOptions<'a> {
+    factor: &'a str,
+    window: &'a str,
+    fade: &'a str,
+    shift: Option<&'a str>,
+    fading: Option<&'a str>,
+}
+
+fn run_stretch_recipe(
+    input: &Path,
+    options: StretchRecipeOptions<'_>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec![
+        "stretch".to_owned(),
+        options.factor.to_owned(),
+        options.window.to_owned(),
+        stretch_fade_token(options.fade).to_owned(),
+    ];
+    if let Some(shift) = options.shift {
+        effect_chain.push(shift.to_owned());
+    }
+    if let Some(fading) = options.fading {
+        effect_chain.push(fading.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn stretch_fade_token(fade: &str) -> &str {
+    match fade {
+        "linear" => "l",
+        "sqrt" => "s",
+        "half" => "h",
+        "quarter" => "q",
+        other => other,
+    }
 }
 
 fn run_effect_recipe<'a>(
@@ -3486,6 +3701,33 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "reverb",
+        options: &[
+            "-o",
+            "--output",
+            "--wet-only",
+            "--reverberance",
+            "--hf-damping",
+            "--room-scale",
+            "--stereo-depth",
+            "--pre-delay",
+            "--wet-gain",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "stretch",
+        options: &[
+            "-o",
+            "--output",
+            "--window",
+            "--fade",
+            "--shift",
+            "--fading",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "mix",
         options: &["-o", "--output", "--backend"],
     },
@@ -3621,6 +3863,8 @@ const MAN_PAGES: &[ManPage] = &[
             ("hilbert", "Apply Hilbert transform phase shifting."),
             ("loudness", "Apply loudness compensation filtering."),
             ("dither", "Apply deterministic dithering."),
+            ("reverb", "Apply stereo reverberation."),
+            ("stretch", "Change duration with windowed stretching."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
             (
@@ -4248,6 +4492,41 @@ const MAN_PAGES: &[ManPage] = &[
             ("--sloped", "Use sloped TPDF dither."),
             ("--noise-shape SHAPE", "Noise-shaping filter: shibata."),
             ("--precision BITS", "Target precision in bits."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "reverb",
+        summary: "apply stereo reverberation",
+        synopsis: "auralis reverb INPUT.wav [--wet-only] [--reverberance PERCENT] [--hf-damping PERCENT] [--room-scale PERCENT] [--stereo-depth PERCENT] [--pre-delay MS] [--wet-gain DB] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Reverb is a recipe alias for stereo reverberation. It lowers to the same typed effect pipeline as `render --fx 'reverb ...'`.",
+        options: &[
+            ("--wet-only", "Output only the wet reverberated signal."),
+            ("--reverberance PERCENT", "Reverberance amount."),
+            ("--hf-damping PERCENT", "High-frequency damping amount."),
+            ("--room-scale PERCENT", "Room scale amount."),
+            ("--stereo-depth PERCENT", "Stereo depth amount."),
+            ("--pre-delay MS", "Pre-delay in milliseconds."),
+            ("--wet-gain DB", "Wet gain in dB."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "stretch",
+        summary: "change duration with windowed stretching",
+        synopsis: "auralis stretch INPUT.wav [FACTOR] [--window MS] [--fade SHAPE] [--shift RATIO [--fading RATIO]] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Stretch is a recipe alias for basic windowed cross-fade stretching. It lowers to the same typed effect pipeline as `render --fx 'stretch ...'`.",
+        options: &[
+            ("FACTOR", "Stretch factor."),
+            ("--window MS", "Analysis window length in milliseconds."),
+            (
+                "--fade SHAPE",
+                "Fade shape: linear, sqrt, half, or quarter.",
+            ),
+            ("--shift RATIO", "Window shift ratio."),
+            ("--fading RATIO", "Cross-fade ratio."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
