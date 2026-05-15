@@ -115,7 +115,9 @@ dependencies = [
  "auralis",
  "auralis-wav",
  "clap",
+ "serde",
  "shlex",
+ "toml",
 ]
 
 [[package]]

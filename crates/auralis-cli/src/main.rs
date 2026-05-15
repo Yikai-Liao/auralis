@@ -1,5 +1,7 @@
 //! Auralis command-line entrypoint.
 
+mod spec;
+
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
@@ -136,6 +138,9 @@ enum Command {
 
     /// Validate typed effect syntax without running audio processing.
     Check {
+        /// Auralis graph spec to validate.
+        spec: Option<PathBuf>,
+
         /// Read the effect chain from a SoX-ng-style effects file.
         #[arg(long, value_name = "FILE")]
         effects_file: Option<PathBuf>,
@@ -235,10 +240,16 @@ fn run(cli: Cli) -> Result<(), CliError> {
             run_pipeline(&input, &output, &options)
         }
         Command::Check {
+            spec,
             effects_file,
             fx,
             chain,
-        } => check_effects(effects_file.as_deref(), &fx, chain.as_deref()),
+        } => check_command(
+            spec.as_deref(),
+            effects_file.as_deref(),
+            &fx,
+            chain.as_deref(),
+        ),
         Command::Ops { effect } => print_ops(effect.as_deref()),
     }
 }
@@ -300,6 +311,35 @@ fn run_pipeline(input: &Path, output: &Path, options: &RenderOptions) -> Result<
             .write_wav(output)?,
         None => pipeline.write_wav(output)?,
     }
+
+    Ok(())
+}
+
+fn check_command(
+    spec: Option<&Path>,
+    effects_file: Option<&Path>,
+    fx: &[String],
+    chain: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(spec) = spec {
+        if effects_file.is_some() || !fx.is_empty() || chain.is_some() {
+            return Err(CliError::MixedCheckInputs);
+        }
+        return check_graph_spec(spec);
+    }
+
+    check_effects(effects_file, fx, chain)
+}
+
+fn check_graph_spec(spec: &Path) -> Result<(), CliError> {
+    let checked = spec::check_graph_spec(spec)?;
+
+    println!("status: ok");
+    println!("sources: {}", checked.source_count);
+    println!("chains: {}", checked.chain_count);
+    println!("nodes: {}", checked.node_count);
+    println!("sinks: {}", checked.sink_count);
+    println!("expanded_steps: {}", checked.expanded_step_ids.len());
 
     Ok(())
 }
@@ -791,10 +831,12 @@ enum CliError {
     ChainParse(auralis::EffectChainParseError),
     EffectName(auralis::EffectNameError),
     EffectsFile(auralis::EffectsFileReadError),
+    GraphSpec(spec::GraphSpecError),
     Wav(WavError),
     EmptyEffectSpec,
     InvalidEffectSpec { spec: String },
     MissingEffectSpec,
+    MixedCheckInputs,
     MixedEffectInputs,
     MixedGuardAndNorm,
     DitherSeedWithoutDither,
@@ -828,6 +870,7 @@ impl std::fmt::Display for CliError {
             Self::ChainParse(error) => write!(formatter, "{error}"),
             Self::EffectName(error) => write!(formatter, "{error}"),
             Self::EffectsFile(error) => write!(formatter, "{error}"),
+            Self::GraphSpec(error) => write!(formatter, "{error}"),
             Self::Wav(error) => write!(formatter, "{error}"),
             Self::EmptyEffectSpec => {
                 formatter.write_str("effect input requires a non-empty effect")
@@ -837,7 +880,10 @@ impl std::fmt::Display for CliError {
                 "effect string `{spec}` contains unmatched shell quoting"
             ),
             Self::MissingEffectSpec => {
-                formatter.write_str("one of --fx, --chain, or --effects-file is required")
+                formatter.write_str("one of SPEC, --fx, --chain, or --effects-file is required")
+            }
+            Self::MixedCheckInputs => {
+                formatter.write_str("check accepts either SPEC or one effect input mode")
             }
             Self::MixedEffectInputs => {
                 formatter.write_str("--fx, --chain, and --effects-file are mutually exclusive")
@@ -897,6 +943,12 @@ impl From<auralis::EffectNameError> for CliError {
 impl From<auralis::EffectsFileReadError> for CliError {
     fn from(error: auralis::EffectsFileReadError) -> Self {
         Self::EffectsFile(error)
+    }
+}
+
+impl From<spec::GraphSpecError> for CliError {
+    fn from(error: spec::GraphSpecError) -> Self {
+        Self::GraphSpec(error)
     }
 }
 

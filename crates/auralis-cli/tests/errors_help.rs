@@ -127,6 +127,115 @@ fn check_missing_trim_position_returns_clear_error() {
 }
 
 #[test]
+fn check_graph_spec_reports_summary_for_valid_spec() {
+    let spec = temp_path("auralis-cli-check-spec-valid", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { op = "trim" },
+  { op = "filter.highpass" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(command_output.status.success());
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("status: ok"), "{stdout}");
+    assert!(stdout.contains("sources: 1"), "{stdout}");
+    assert!(stdout.contains("chains: 1"), "{stdout}");
+    assert!(stdout.contains("sinks: 1"), "{stdout}");
+    assert!(stdout.contains("expanded_steps: 2"), "{stdout}");
+}
+
+#[test]
+fn check_graph_spec_reports_unknown_input_port() {
+    let spec = temp_path("auralis-cli-check-spec-unknown-input", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "wav"
+input = "voic.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("unknown input port `voic.audio`"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("voice.audio"), "{stderr}");
+}
+
+#[test]
+fn check_graph_spec_reports_duplicate_graph_ids() {
+    let spec = temp_path("auralis-cli-check-spec-duplicate-id", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[sinks]]
+id = "voice"
+input = "voice.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["check", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("duplicate graph id `voice` is used by both a source and a sink"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn render_help_documents_modern_effect_inputs() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["render", "--help"])

@@ -155,7 +155,7 @@ fn check_requires_fx_or_effects_file() {
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("error: one of --fx, --chain, or --effects-file is required"),
+        stderr.contains("error: one of SPEC, --fx, --chain, or --effects-file is required"),
         "{stderr}"
     );
 }
