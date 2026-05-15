@@ -1061,6 +1061,68 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Delay one audio file by per-channel positions.
+    Delay {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Delay position such as `2s`, `0.25`, or `+1s`; repeat per channel.
+        #[arg(long = "position", value_name = "POSITION", required = true)]
+        positions: Vec<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Add silence before, after, or inside one audio file.
+    Pad {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Silence to prepend, in frames.
+        #[arg(long, value_name = "FRAMES", default_value = "0")]
+        start: String,
+
+        /// Silence to append, in frames.
+        #[arg(long, value_name = "FRAMES", default_value = "0")]
+        end: String,
+
+        /// Positioned silence as `FRAMES@POSITION`; repeat for multiple inserts.
+        #[arg(long = "at", value_name = "FRAMES@POSITION")]
+        positioned: Vec<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Append finite copies of one audio file.
+    Repeat {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Number of extra copies to append.
+        #[arg(value_name = "COUNT", default_value = "1")]
+        count: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Mix two or more audio files into one output.
     Mix {
         /// PCM16 WAV input files to mix.
@@ -1774,6 +1836,26 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
+        Command::Delay {
+            input,
+            positions,
+            output,
+            backend,
+        } => run_delay_recipe(&input, &positions, &output, backend),
+        Command::Pad {
+            input,
+            start,
+            end,
+            positioned,
+            output,
+            backend,
+        } => run_pad_recipe(&input, &start, &end, &positioned, &output, backend),
+        Command::Repeat {
+            input,
+            count,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["repeat", count.as_str()]),
         Command::Mix {
             inputs,
             output,
@@ -1947,6 +2029,43 @@ fn run_fade_recipe(
     if let Some(fade_out) = fade_out {
         effect_chain.push(format!("out={fade_out}"));
     }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_delay_recipe(
+    input: &Path,
+    positions: &[String],
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["delay".to_owned()];
+    effect_chain.extend(positions.iter().cloned());
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_pad_recipe(
+    input: &Path,
+    start: &str,
+    end: &str,
+    positioned: &[String],
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["pad".to_owned(), start.to_owned()];
+    effect_chain.extend(positioned.iter().cloned());
+    effect_chain.push(end.to_owned());
 
     run_effect_recipe(
         input,
@@ -3109,6 +3228,18 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
     CompletionSpec {
+        name: "delay",
+        options: &["-o", "--output", "--position", "--backend"],
+    },
+    CompletionSpec {
+        name: "pad",
+        options: &["-o", "--output", "--start", "--end", "--at", "--backend"],
+    },
+    CompletionSpec {
+        name: "repeat",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "mix",
         options: &["-o", "--output", "--backend"],
     },
@@ -3236,6 +3367,9 @@ const MAN_PAGES: &[ManPage] = &[
             ("highpass", "Apply a high-pass filter."),
             ("lowpass", "Apply a low-pass filter."),
             ("fade", "Fade one audio file in or out."),
+            ("delay", "Delay audio channels."),
+            ("pad", "Add silence padding."),
+            ("repeat", "Append finite copies."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
             (
@@ -3766,6 +3900,44 @@ const MAN_PAGES: &[ManPage] = &[
                 "--curve CURVE",
                 "Fade curve family: linear, quarter-sine, half-sine, log, or parabola.",
             ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "delay",
+        summary: "delay audio channels",
+        synopsis: "auralis delay INPUT.wav --position POSITION... -o OUTPUT.wav [--backend BACKEND]",
+        description: "Delay is a recipe alias for per-channel delay positions. It lowers to the same typed effect pipeline as `render --fx 'delay ...'`.",
+        options: &[
+            (
+                "--position POSITION",
+                "Delay position such as `2s`, `0.25`, or `+1s`; repeat per channel.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "pad",
+        summary: "add silence padding",
+        synopsis: "auralis pad INPUT.wav [--start FRAMES] [--at FRAMES@POSITION]... [--end FRAMES] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Pad is a recipe alias for inserting silence before, after, or inside one audio file. It lowers to the same typed effect pipeline as `render --fx 'pad ...'`.",
+        options: &[
+            ("--start FRAMES", "Silence to prepend, in frames."),
+            ("--at FRAMES@POSITION", "Positioned silence insert."),
+            ("--end FRAMES", "Silence to append, in frames."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "repeat",
+        summary: "append finite copies",
+        synopsis: "auralis repeat INPUT.wav [COUNT] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Repeat is a recipe alias for appending finite copies of one audio file. It lowers to the same typed effect pipeline as `render --fx 'repeat ...'`.",
+        options: &[
+            ("COUNT", "Number of extra copies to append."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

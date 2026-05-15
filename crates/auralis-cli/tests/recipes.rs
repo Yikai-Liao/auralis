@@ -586,6 +586,28 @@ fn fade_recipe_lowers_to_typed_render_fade() {
     fs::remove_file(render_output).unwrap();
 }
 
+#[test]
+fn structural_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        ("delay", vec!["--position", "1s"], "delay 1s"),
+        (
+            "pad",
+            vec!["--start", "1", "--at", "2@2", "--end", "1"],
+            "pad 1 2@2 1",
+        ),
+        ("repeat", vec!["2"], "repeat 2"),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[1000, -2000, 3000],
+        );
+    }
+}
+
 fn assert_recipe_with_args_matches_render_effect(
     effect: &str,
     recipe_args: &[&str],

@@ -52,6 +52,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("highpass"), "{stdout}");
     assert!(stdout.contains("lowpass"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
+    assert!(stdout.contains("delay"), "{stdout}");
+    assert!(stdout.contains("pad"), "{stdout}");
+    assert!(stdout.contains("repeat"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -451,6 +454,42 @@ fn fade_man_page_describes_recipe_lowering() {
     assert!(stdout.contains("--in FRAMES"), "{stdout}");
     assert!(stdout.contains("--out FRAMES"), "{stdout}");
     assert!(stdout.contains("--curve CURVE"), "{stdout}");
+}
+
+#[test]
+fn structural_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "delay",
+            "delay - delay audio channels",
+            "render --fx 'delay ...'",
+            "--position POSITION",
+        ),
+        (
+            "pad",
+            "pad - add silence padding",
+            "render --fx 'pad ...'",
+            "--at FRAMES@POSITION",
+        ),
+        (
+            "repeat",
+            "repeat - append finite copies",
+            "render --fx 'repeat ...'",
+            "COUNT",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
 }
 
 #[test]

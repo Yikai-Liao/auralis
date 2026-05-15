@@ -48,6 +48,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("highpass"), "{stdout}");
     assert!(stdout.contains("lowpass"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
+    assert!(stdout.contains("delay"), "{stdout}");
+    assert!(stdout.contains("pad"), "{stdout}");
+    assert!(stdout.contains("repeat"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("mix-power"), "{stdout}");
@@ -103,6 +106,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'highpass:highpass'"), "{stdout}");
     assert!(stdout.contains("'lowpass:lowpass'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
+    assert!(stdout.contains("'delay:delay'"), "{stdout}");
+    assert!(stdout.contains("'pad:pad'"), "{stdout}");
+    assert!(stdout.contains("'repeat:repeat'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
     assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
@@ -165,6 +171,9 @@ fn fish_completions_include_modern_commands_and_flags() {
         "highpass",
         "lowpass",
         "fade",
+        "delay",
+        "pad",
+        "repeat",
         "mix",
         "concat",
         "mix-power",
@@ -199,6 +208,8 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("highpass", "width"),
         ("lowpass", "poles"),
         ("check", "locked"),
+        ("delay", "position"),
+        ("pad", "at"),
         ("render", "chain"),
     ] {
         assert!(
