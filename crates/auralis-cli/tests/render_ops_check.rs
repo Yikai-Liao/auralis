@@ -427,6 +427,173 @@ fn plan_echo_recipes_json_use_graph_plan_contract() {
 }
 
 #[test]
+fn plan_modulation_recipes_use_graph_plan_contract() {
+    let cases: [(&str, &[&str]); 3] = [
+        (
+            "chorus",
+            &[
+                "--gain-in",
+                "0.5",
+                "--gain-out",
+                "0.8",
+                "--interpolation",
+                "linear",
+                "--wave",
+                "triangle",
+                "--stage",
+                "40,0.4,0.5,2,sine",
+            ],
+        ),
+        (
+            "flanger",
+            &[
+                "--delay",
+                "1",
+                "--depth",
+                "3",
+                "--regen",
+                "4",
+                "--width",
+                "70",
+                "--speed",
+                "0.6",
+                "--wave",
+                "triangle",
+                "--phase",
+                "20",
+                "--interpolation",
+                "linear",
+            ],
+        ),
+        (
+            "phaser",
+            &[
+                "--gain-in",
+                "0.4",
+                "--gain-out",
+                "0.7",
+                "--delay",
+                "3",
+                "--regen",
+                "0.5",
+                "--speed",
+                "0.6",
+                "--wave",
+                "triangle",
+                "--interpolation",
+                "linear",
+            ],
+        ),
+    ];
+
+    for (name, args) in cases {
+        let input = temp_path(&format!("auralis-cli-plan-{name}-input"), "wav");
+        let output = temp_path(&format!("auralis-cli-plan-{name}-output"), "wav");
+        let mut command_args = vec!["plan", "--json", name, input.to_str().unwrap()];
+        command_args.extend(args);
+        command_args.extend(["-o", output.to_str().unwrap()]);
+
+        let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(command_args)
+            .output()
+            .unwrap();
+
+        assert!(
+            command_output.status.success(),
+            "stderr: {}",
+            stderr(&command_output)
+        );
+        let plan: serde_json::Value = serde_json::from_str(&stdout(&command_output)).unwrap();
+        assert_eq!(plan["pipeline"], name);
+        assert_eq!(plan["spec"], format!("command:{name}"));
+        assert_eq!(plan["graph"]["sources"], 1);
+        assert_eq!(plan["graph"]["chains"], 1);
+        assert!(
+            plan["execution"][1]["steps"][0]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("{name}/01-{name}"))
+        );
+    }
+}
+
+#[test]
+fn plan_scalar_and_distortion_recipes_use_graph_plan_contract() {
+    let cases: [(&str, &[&str], &str); 11] = [
+        ("oops", &[], "oops/01-oops"),
+        ("riaa", &[], "riaa/01-riaa"),
+        ("swap", &[], "swap/01-swap"),
+        ("contrast", &["--amount", "61"], "contrast/01-contrast-61"),
+        (
+            "overdrive",
+            &["--gain", "12", "--color", "7"],
+            "overdrive/01-overdrive-12-7",
+        ),
+        (
+            "saturation",
+            &[
+                "--type",
+                "tanh",
+                "--blend",
+                "0.7",
+                "--offset",
+                "0.1",
+                "--parameter",
+                "2",
+            ],
+            "saturation/01-saturation-tanh-07-01-2",
+        ),
+        (
+            "dcshift",
+            &["0.1", "--limiter-gain", "0.5"],
+            "dcshift/01-dcshift-01-05",
+        ),
+        (
+            "vol",
+            &["2", "--type", "amplitude", "--limiter-gain", "0.3"],
+            "vol/01-vol-2-amplitude-03",
+        ),
+        (
+            "softvol",
+            &["--volume", "0.8", "--double-time", "2", "--headroom", "3"],
+            "softvol/01-softvol-08-2-3",
+        ),
+        (
+            "tremolo",
+            &["5", "--depth", "50"],
+            "tremolo/01-tremolo-5-50",
+        ),
+        ("speed", &["1.2"], "speed/01-speed-12"),
+    ];
+
+    for (name, args, step) in cases {
+        let input = temp_path(&format!("auralis-cli-plan-{name}-input"), "wav");
+        let output = temp_path(&format!("auralis-cli-plan-{name}-output"), "wav");
+        let mut command_args = vec!["plan", name, input.to_str().unwrap()];
+        command_args.extend(args);
+        command_args.extend(["-o", output.to_str().unwrap()]);
+
+        let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(command_args)
+            .output()
+            .unwrap();
+
+        assert!(
+            command_output.status.success(),
+            "stderr: {}",
+            stderr(&command_output)
+        );
+        let stdout = stdout(&command_output);
+        assert!(stdout.contains(&format!("Pipeline: {name}")), "{stdout}");
+        assert!(
+            stdout.contains(&format!("Spec: command:{name}")),
+            "{stdout}"
+        );
+        assert!(stdout.contains(step), "{stdout}");
+    }
+}
+
+#[test]
 fn check_fx_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "gain -3", "--fx", "reverse"])

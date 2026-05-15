@@ -3,72 +3,87 @@ use std::{collections::BTreeMap, path::PathBuf};
 use crate::{
     CliError,
     command_args::{
-        ChannelsArgs, EchoArgs, GainArgs, NormArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs,
-        RenderArgs, SimpleRecipeArgs, TrimArgs,
+        ChannelsArgs, ChorusArgs, ContrastArgs, DcShiftArgs, EchoArgs, FlangerArgs, GainArgs,
+        NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs, RenderArgs,
+        SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
     graph_plan,
-    recipes::echo_effect_tokens,
+    recipes::{
+        chorus_effect_tokens, echo_effect_tokens, optional_tail_effect_tokens,
+        phaser_effect_tokens, saturation_effect_tokens, vol_effect_tokens,
+    },
     spec,
 };
 
 pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
-    match args.command {
-        Some(PlanCommand::Render(render)) => {
-            if args.spec.is_some() || args.target.is_some() || args.locked {
-                return Err(CliError::PlanCommandRejectsGraphOptions);
-            }
-            plan_render_command(render, args.json)
+    let PlanArgs {
+        spec,
+        command,
+        target,
+        json,
+        locked,
+    } = args;
+
+    if let Some(command) = command {
+        return plan_modern_command(command, spec.as_ref(), target.as_ref(), locked, json);
+    }
+
+    let spec = spec.ok_or(CliError::MissingPlanInput)?;
+    plan_graph_spec(&spec, target.as_deref(), json, locked)
+}
+
+fn plan_modern_command(
+    command: PlanCommand,
+    spec: Option<&PathBuf>,
+    target: Option<&String>,
+    locked: bool,
+    json: bool,
+) -> Result<(), CliError> {
+    match command {
+        PlanCommand::Render(render) => {
+            reject_graph_plan_options(spec, target, locked)?;
+            plan_render_command(render, json)
         }
-        Some(PlanCommand::Pipe(pipe)) => {
-            if args.spec.is_some() || args.target.is_some() || args.locked {
-                return Err(CliError::PlanCommandRejectsGraphOptions);
-            }
-            plan_pipe_command(pipe, args.json)
+        PlanCommand::Pipe(pipe) => {
+            reject_graph_plan_options(spec, target, locked)?;
+            plan_pipe_command(pipe, json)
         }
-        Some(PlanCommand::Trim(trim)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_trim_command(trim, args.json)
+        recipe => {
+            reject_graph_plan_options(spec, target, locked)?;
+            plan_recipe_surface_command(recipe, json)
         }
-        Some(PlanCommand::Gain(gain)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_gain_command(gain, args.json)
-        }
-        Some(PlanCommand::Norm(norm)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_norm_command(norm, args.json)
-        }
-        Some(PlanCommand::Rate(rate)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_rate_command(rate, args.json)
-        }
-        Some(PlanCommand::Channels(channels)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_channels_command(channels, args.json)
-        }
-        Some(PlanCommand::Reverse(reverse)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_reverse_command(reverse, args.json)
-        }
-        Some(PlanCommand::Deemph(deemph)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_simple_recipe_command("deemph", deemph, args.json)
-        }
-        Some(PlanCommand::Earwax(earwax)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_simple_recipe_command("earwax", earwax, args.json)
-        }
-        Some(PlanCommand::Echo(echo)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_echo_command("echo", echo, args.json)
-        }
-        Some(PlanCommand::Echos(echos)) => {
-            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
-            plan_echo_command("echos", echos, args.json)
-        }
-        None => {
-            let spec = args.spec.ok_or(CliError::MissingPlanInput)?;
-            plan_graph_spec(&spec, args.target.as_deref(), args.json, args.locked)
+    }
+}
+
+fn plan_recipe_surface_command(command: PlanCommand, json: bool) -> Result<(), CliError> {
+    match command {
+        PlanCommand::Trim(trim) => plan_trim_command(trim, json),
+        PlanCommand::Gain(gain) => plan_gain_command(gain, json),
+        PlanCommand::Norm(norm) => plan_norm_command(norm, json),
+        PlanCommand::Rate(rate) => plan_rate_command(rate, json),
+        PlanCommand::Channels(channels) => plan_channels_command(channels, json),
+        PlanCommand::Reverse(reverse) => plan_reverse_command(reverse, json),
+        PlanCommand::Deemph(deemph) => plan_simple_recipe_command("deemph", deemph, json),
+        PlanCommand::Earwax(earwax) => plan_simple_recipe_command("earwax", earwax, json),
+        PlanCommand::Echo(echo) => plan_echo_command("echo", echo, json),
+        PlanCommand::Echos(echos) => plan_echo_command("echos", echos, json),
+        PlanCommand::Chorus(chorus) => plan_chorus_command(chorus, json),
+        PlanCommand::Flanger(flanger) => plan_flanger_command(flanger, json),
+        PlanCommand::Phaser(phaser) => plan_phaser_command(phaser, json),
+        PlanCommand::Oops(oops) => plan_simple_recipe_command("oops", oops, json),
+        PlanCommand::Riaa(riaa) => plan_simple_recipe_command("riaa", riaa, json),
+        PlanCommand::Swap(swap) => plan_simple_recipe_command("swap", swap, json),
+        PlanCommand::Contrast(contrast) => plan_contrast_command(contrast, json),
+        PlanCommand::Overdrive(overdrive) => plan_overdrive_command(overdrive, json),
+        PlanCommand::Saturation(saturation) => plan_saturation_command(saturation, json),
+        PlanCommand::DcShift(dcshift) => plan_dcshift_command(dcshift, json),
+        PlanCommand::Vol(vol) => plan_vol_command(vol, json),
+        PlanCommand::SoftVol(softvol) => plan_softvol_command(softvol, json),
+        PlanCommand::Tremolo(tremolo) => plan_tremolo_command(tremolo, json),
+        PlanCommand::Speed(speed) => plan_speed_command(speed, json),
+        PlanCommand::Render(_) | PlanCommand::Pipe(_) => {
+            unreachable!("render and pipe are handled before recipe planning")
         }
     }
 }
@@ -173,6 +188,231 @@ fn plan_echo_command(effect: &'static str, echo: EchoArgs, json: bool) -> Result
         tokens.iter().map(String::as_str),
         json,
     )
+}
+
+fn plan_chorus_command(chorus: ChorusArgs, json: bool) -> Result<(), CliError> {
+    let ChorusArgs {
+        input,
+        gain_in,
+        gain_out,
+        interpolation,
+        wave,
+        stages,
+        output,
+        backend: _,
+    } = chorus;
+    let tokens = chorus_effect_tokens(&gain_in, &gain_out, &interpolation, &wave, &stages);
+    plan_recipe_command(
+        "chorus",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_flanger_command(flanger: FlangerArgs, json: bool) -> Result<(), CliError> {
+    let FlangerArgs {
+        input,
+        delay,
+        depth,
+        regen,
+        width,
+        speed,
+        wave,
+        phase,
+        interpolation,
+        output,
+        backend: _,
+    } = flanger;
+    plan_recipe_command(
+        "flanger",
+        input,
+        output,
+        [
+            "flanger",
+            delay.as_str(),
+            depth.as_str(),
+            regen.as_str(),
+            width.as_str(),
+            speed.as_str(),
+            wave.as_str(),
+            phase.as_str(),
+            interpolation.as_str(),
+        ],
+        json,
+    )
+}
+
+fn plan_phaser_command(phaser: PhaserArgs, json: bool) -> Result<(), CliError> {
+    let PhaserArgs {
+        input,
+        gain_in,
+        gain_out,
+        delay,
+        regen,
+        speed,
+        wave,
+        interpolation,
+        output,
+        backend: _,
+    } = phaser;
+    let tokens = phaser_effect_tokens(
+        &gain_in,
+        &gain_out,
+        &delay,
+        &regen,
+        &speed,
+        &wave,
+        &interpolation,
+    );
+    plan_recipe_command(
+        "phaser",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_contrast_command(contrast: ContrastArgs, json: bool) -> Result<(), CliError> {
+    let ContrastArgs {
+        input,
+        amount,
+        output,
+        backend: _,
+    } = contrast;
+    plan_recipe_command(
+        "contrast",
+        input,
+        output,
+        ["contrast", amount.as_str()],
+        json,
+    )
+}
+
+fn plan_overdrive_command(overdrive: OverdriveArgs, json: bool) -> Result<(), CliError> {
+    let OverdriveArgs {
+        input,
+        gain,
+        color,
+        output,
+        backend: _,
+    } = overdrive;
+    plan_recipe_command(
+        "overdrive",
+        input,
+        output,
+        ["overdrive", gain.as_str(), color.as_str()],
+        json,
+    )
+}
+
+fn plan_saturation_command(saturation: SaturationArgs, json: bool) -> Result<(), CliError> {
+    let SaturationArgs {
+        input,
+        saturation_type,
+        blend,
+        offset,
+        parameter,
+        output,
+        backend: _,
+    } = saturation;
+    let tokens = saturation_effect_tokens(&saturation_type, &blend, &offset, parameter.as_deref());
+    plan_recipe_command(
+        "saturation",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_dcshift_command(dcshift: DcShiftArgs, json: bool) -> Result<(), CliError> {
+    let DcShiftArgs {
+        input,
+        shift,
+        limiter_gain,
+        output,
+        backend: _,
+    } = dcshift;
+    let tokens = optional_tail_effect_tokens("dcshift", &shift, limiter_gain.as_deref());
+    plan_recipe_command(
+        "dcshift",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_vol_command(vol: VolArgs, json: bool) -> Result<(), CliError> {
+    let VolArgs {
+        input,
+        gain,
+        gain_type,
+        limiter_gain,
+        output,
+        backend: _,
+    } = vol;
+    let tokens = vol_effect_tokens(&gain, gain_type.as_deref(), limiter_gain.as_deref());
+    plan_recipe_command(
+        "vol",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_softvol_command(softvol: SoftVolArgs, json: bool) -> Result<(), CliError> {
+    let SoftVolArgs {
+        input,
+        volume,
+        double_time,
+        headroom,
+        output,
+        backend: _,
+    } = softvol;
+    plan_recipe_command(
+        "softvol",
+        input,
+        output,
+        [
+            "softvol",
+            volume.as_str(),
+            double_time.as_str(),
+            headroom.as_str(),
+        ],
+        json,
+    )
+}
+
+fn plan_tremolo_command(tremolo: TremoloArgs, json: bool) -> Result<(), CliError> {
+    let TremoloArgs {
+        input,
+        speed,
+        depth,
+        output,
+        backend: _,
+    } = tremolo;
+    plan_recipe_command(
+        "tremolo",
+        input,
+        output,
+        ["tremolo", speed.as_str(), depth.as_str()],
+        json,
+    )
+}
+
+fn plan_speed_command(speed: SpeedArgs, json: bool) -> Result<(), CliError> {
+    let SpeedArgs {
+        input,
+        factor,
+        output,
+        backend: _,
+    } = speed;
+    plan_recipe_command("speed", input, output, ["speed", factor.as_str()], json)
 }
 
 fn reject_graph_plan_options(

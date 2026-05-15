@@ -815,6 +815,50 @@ pub(crate) enum PlanCommand {
 
     /// Plan an echos recipe command without executing it.
     Echos(EchoArgs),
+
+    /// Plan a chorus recipe command without executing it.
+    Chorus(ChorusArgs),
+
+    /// Plan a flanger recipe command without executing it.
+    Flanger(FlangerArgs),
+
+    /// Plan a phaser recipe command without executing it.
+    Phaser(PhaserArgs),
+
+    /// Plan an oops recipe command without executing it.
+    Oops(SimpleRecipeArgs),
+
+    /// Plan an RIAA recipe command without executing it.
+    Riaa(SimpleRecipeArgs),
+
+    /// Plan a swap recipe command without executing it.
+    Swap(SimpleRecipeArgs),
+
+    /// Plan a contrast recipe command without executing it.
+    Contrast(ContrastArgs),
+
+    /// Plan an overdrive recipe command without executing it.
+    Overdrive(OverdriveArgs),
+
+    /// Plan a saturation recipe command without executing it.
+    Saturation(SaturationArgs),
+
+    /// Plan a dcshift recipe command without executing it.
+    #[command(name = "dcshift")]
+    DcShift(DcShiftArgs),
+
+    /// Plan a vol recipe command without executing it.
+    Vol(VolArgs),
+
+    /// Plan a softvol recipe command without executing it.
+    #[command(name = "softvol")]
+    SoftVol(SoftVolArgs),
+
+    /// Plan a tremolo recipe command without executing it.
+    Tremolo(TremoloArgs),
+
+    /// Plan a speed recipe command without executing it.
+    Speed(SpeedArgs),
 }
 
 #[derive(Debug, Args)]

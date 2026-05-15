@@ -87,15 +87,7 @@ pub(super) fn run_saturation_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec![
-        "saturation".to_owned(),
-        saturation_type.to_owned(),
-        blend.to_owned(),
-        offset.to_owned(),
-    ];
-    if let Some(parameter) = parameter {
-        effect_chain.push(parameter.to_owned());
-    }
+    let effect_chain = saturation_effect_tokens(saturation_type, blend, offset, parameter);
 
     run_effect_recipe(
         input,
@@ -112,10 +104,7 @@ pub(super) fn run_dc_shift_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["dcshift".to_owned(), shift.to_owned()];
-    if let Some(limiter_gain) = limiter_gain {
-        effect_chain.push(limiter_gain.to_owned());
-    }
+    let effect_chain = optional_tail_effect_tokens("dcshift", shift, limiter_gain);
 
     run_effect_recipe(
         input,
@@ -133,13 +122,7 @@ pub(super) fn run_vol_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["vol".to_owned(), gain.to_owned()];
-    if let Some(gain_type) = gain_type {
-        effect_chain.push(gain_type.to_owned());
-    }
-    if let Some(limiter_gain) = limiter_gain {
-        effect_chain.push(limiter_gain.to_owned());
-    }
+    let effect_chain = vol_effect_tokens(gain, gain_type, limiter_gain);
 
     run_effect_recipe(
         input,
@@ -197,20 +180,7 @@ pub(super) fn run_chorus_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["chorus".to_owned()];
-    push_interpolation_flag(&mut effect_chain, interpolation);
-    push_wave_flag(&mut effect_chain, wave);
-    effect_chain.push(gain_in.to_owned());
-    effect_chain.push(gain_out.to_owned());
-    for stage in stages {
-        for part in stage.split(',') {
-            match part {
-                "sine" => effect_chain.push("-sine".to_owned()),
-                "triangle" => effect_chain.push("-triangle".to_owned()),
-                other => effect_chain.push(other.to_owned()),
-            }
-        }
-    }
+    let effect_chain = chorus_effect_tokens(gain_in, gain_out, interpolation, wave, stages);
 
     run_effect_recipe(
         input,
@@ -233,6 +203,95 @@ pub(super) fn run_phaser_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
+    let effect_chain =
+        phaser_effect_tokens(gain_in, gain_out, delay, regen, speed, wave, interpolation);
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+pub(super) fn saturation_effect_tokens(
+    saturation_type: &str,
+    blend: &str,
+    offset: &str,
+    parameter: Option<&str>,
+) -> Vec<String> {
+    let mut effect_chain = vec![
+        "saturation".to_owned(),
+        saturation_type.to_owned(),
+        blend.to_owned(),
+        offset.to_owned(),
+    ];
+    if let Some(parameter) = parameter {
+        effect_chain.push(parameter.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn optional_tail_effect_tokens(
+    effect: &str,
+    value: &str,
+    tail: Option<&str>,
+) -> Vec<String> {
+    let mut effect_chain = vec![effect.to_owned(), value.to_owned()];
+    if let Some(tail) = tail {
+        effect_chain.push(tail.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn vol_effect_tokens(
+    gain: &str,
+    gain_type: Option<&str>,
+    limiter_gain: Option<&str>,
+) -> Vec<String> {
+    let mut effect_chain = vec!["vol".to_owned(), gain.to_owned()];
+    if let Some(gain_type) = gain_type {
+        effect_chain.push(gain_type.to_owned());
+    }
+    if let Some(limiter_gain) = limiter_gain {
+        effect_chain.push(limiter_gain.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn chorus_effect_tokens(
+    gain_in: &str,
+    gain_out: &str,
+    interpolation: &str,
+    wave: &str,
+    stages: &[String],
+) -> Vec<String> {
+    let mut effect_chain = vec!["chorus".to_owned()];
+    push_interpolation_flag(&mut effect_chain, interpolation);
+    push_wave_flag(&mut effect_chain, wave);
+    effect_chain.push(gain_in.to_owned());
+    effect_chain.push(gain_out.to_owned());
+    for stage in stages {
+        for part in stage.split(',') {
+            match part {
+                "sine" => effect_chain.push("-sine".to_owned()),
+                "triangle" => effect_chain.push("-triangle".to_owned()),
+                other => effect_chain.push(other.to_owned()),
+            }
+        }
+    }
+    effect_chain
+}
+
+pub(super) fn phaser_effect_tokens(
+    gain_in: &str,
+    gain_out: &str,
+    delay: &str,
+    regen: &str,
+    speed: &str,
+    wave: &str,
+    interpolation: &str,
+) -> Vec<String> {
     let mut effect_chain = vec!["phaser".to_owned()];
     push_interpolation_flag(&mut effect_chain, interpolation);
     push_wave_flag(&mut effect_chain, wave);
@@ -243,13 +302,7 @@ pub(super) fn run_phaser_recipe(
         regen.to_owned(),
         speed.to_owned(),
     ]);
-
-    run_effect_recipe(
-        input,
-        output,
-        backend,
-        effect_chain.iter().map(String::as_str),
-    )
+    effect_chain
 }
 
 fn push_interpolation_flag(effect_chain: &mut Vec<String>, interpolation: &str) {
