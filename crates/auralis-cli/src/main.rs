@@ -408,38 +408,72 @@ fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
 
 fn run_graph_spec(spec: &Path) -> Result<(), CliError> {
     let checked = spec::check_graph_spec(spec)?;
-    if !checked.chains.is_empty() || !checked.nodes.is_empty() {
+    if !checked.nodes.is_empty() {
         return Err(CliError::UnsupportedGraphRunShape);
     }
 
     let spec_dir = spec.parent().unwrap_or_else(|| Path::new(""));
     for sink in &checked.sinks {
-        let Some(source_id) = sink.input.strip_suffix(".audio") else {
-            return Err(CliError::UnsupportedGraphSink {
-                sink: sink.id.clone(),
-                input: sink.input.clone(),
-            });
-        };
-        let source = checked
-            .sources
-            .iter()
-            .find(|source| source.id == source_id)
-            .ok_or_else(|| CliError::UnsupportedGraphSink {
-                sink: sink.id.clone(),
-                input: sink.input.clone(),
-            })?;
+        let (source, effect_chain) = resolve_graph_sink_pipeline(&checked, sink)?;
         let input = resolve_spec_path(spec_dir, &source.path);
         let output = resolve_spec_path(spec_dir, &sink.path);
 
         ensure_wav_extension(&input, PathRole::Input)?;
         ensure_wav_extension(&output, PathRole::Output)?;
-        auralis::AudioFile::open_wav(&input)?
-            .into_pipeline()
-            .write_wav(&output)?;
+        let pipeline = auralis::AudioFile::open_wav(&input)?.into_pipeline();
+        match effect_chain {
+            Some(effect_chain) => pipeline
+                .apply_effect_chain(&effect_chain)
+                .write_wav(&output)?,
+            None => pipeline.write_wav(&output)?,
+        }
         println!("wrote {} <- {}", sink.path.display(), sink.input);
     }
 
     Ok(())
+}
+
+fn resolve_graph_sink_pipeline<'a>(
+    checked: &'a spec::CheckedGraphSpec,
+    sink: &spec::CheckedSink,
+) -> Result<(&'a spec::CheckedSource, Option<auralis::EffectChain>), CliError> {
+    let Some(input_id) = sink.input.strip_suffix(".audio") else {
+        return Err(CliError::UnsupportedGraphSink {
+            sink: sink.id.clone(),
+            input: sink.input.clone(),
+        });
+    };
+
+    if let Some(source) = checked.sources.iter().find(|source| source.id == input_id) {
+        return Ok((source, None));
+    }
+
+    let chain = checked
+        .chains
+        .iter()
+        .find(|chain| chain.id == input_id)
+        .ok_or_else(|| CliError::UnsupportedGraphSink {
+            sink: sink.id.clone(),
+            input: sink.input.clone(),
+        })?;
+    let Some(source_id) = chain.input.strip_suffix(".audio") else {
+        return Err(CliError::UnsupportedGraphChainInput {
+            chain: chain.id.clone(),
+            input: chain.input.clone(),
+        });
+    };
+    let source = checked
+        .sources
+        .iter()
+        .find(|source| source.id == source_id)
+        .ok_or_else(|| CliError::UnsupportedGraphChainInput {
+            chain: chain.id.clone(),
+            input: chain.input.clone(),
+        })?;
+    let token_refs: Vec<&str> = chain.effect_tokens.iter().map(String::as_str).collect();
+    let effect_chain = auralis::parse_effect_chain(&token_refs)?;
+
+    Ok((source, Some(effect_chain)))
 }
 
 fn resolve_spec_path(spec_dir: &Path, path: &Path) -> PathBuf {
@@ -949,6 +983,7 @@ enum CliError {
     NoAutoChannelsWithoutOutputChannels,
     NoAutoRateWithoutOutputRate,
     UnsupportedGraphRunShape,
+    UnsupportedGraphChainInput { chain: String, input: String },
     UnsupportedGraphSink { sink: String, input: String },
     UnsupportedConvertInputFormat { path: PathBuf },
     UnsupportedConvertOutputFormat { path: PathBuf },
@@ -1007,7 +1042,11 @@ impl std::fmt::Display for CliError {
                 formatter.write_str("--no-auto-rate requires --rate")
             }
             Self::UnsupportedGraphRunShape => formatter.write_str(
-                "run currently supports direct source-to-sink graph specs only; use `plan` to inspect chains and nodes",
+                "run currently supports source-to-chain-to-sink graph specs only; use `plan` to inspect unsupported nodes",
+            ),
+            Self::UnsupportedGraphChainInput { chain, input } => write!(
+                formatter,
+                "chain `{chain}` cannot be run from unsupported input `{input}`"
             ),
             Self::UnsupportedGraphSink { sink, input } => write!(
                 formatter,

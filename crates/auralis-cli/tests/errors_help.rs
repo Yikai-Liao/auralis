@@ -376,8 +376,59 @@ path = "{}"
 }
 
 #[test]
-fn run_graph_spec_reports_unsupported_chain_execution() {
+fn run_graph_spec_applies_linear_chain_to_sink_output() {
     let spec = temp_path("auralis-cli-run-spec-chain", "toml");
+    let input = temp_path("auralis-cli-run-spec-chain-input", "wav");
+    let output = temp_path("auralis-cli-run-spec-chain-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "voice_reversed"
+input = "voice.audio"
+steps = [
+  {{ op = "reverse" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_reversed.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("wrote"), "{stdout}");
+    assert_eq!(read_pcm16_wav(&output), (1, vec![3000, -2000, 1000]));
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn run_graph_spec_reports_unsupported_node_execution() {
+    let spec = temp_path("auralis-cli-run-spec-node", "toml");
     fs::write(
         &spec,
         r#"version = "auralis.graph/v1"
@@ -386,16 +437,13 @@ fn run_graph_spec_reports_unsupported_chain_execution() {
 id = "voice"
 path = "input/voice.wav"
 
-[[chains]]
-id = "voice_clean"
+[[nodes]]
+id = "master"
 input = "voice.audio"
-steps = [
-  { op = "reverse" },
-]
 
 [[sinks]]
 id = "wav"
-input = "voice_clean.audio"
+input = "master.audio"
 path = "build/out.wav"
 "#,
     )
@@ -410,7 +458,7 @@ path = "build/out.wav"
     assert!(!command_output.status.success());
     let stderr = stderr(&command_output);
     assert!(
-        stderr.contains("run currently supports direct source-to-sink graph specs only"),
+        stderr.contains("run currently supports source-to-chain-to-sink graph specs only"),
         "{stderr}"
     );
 }
