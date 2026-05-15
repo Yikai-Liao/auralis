@@ -11,10 +11,11 @@ mod graph_plan;
 mod graph_runtime;
 mod man_pages;
 mod parsers;
+mod recipe_args;
 mod recipes;
 mod spec;
 
-use std::{path::PathBuf, process::ExitCode};
+use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
@@ -37,7 +38,12 @@ use executor::{
 };
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
-use parsers::{parse_backend, parse_filter_poles};
+use recipe_args::{
+    BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,
+    DownsampleArgs, EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, MergeArgs, MixArgs,
+    MixPowerArgs, MultiplyArgs, PadArgs, PitchArgs, PoleFilterArgs, RepeatArgs, ReverbArgs,
+    StretchArgs, TempoArgs, TrebleArgs, UpsampleArgs,
+};
 use recipes::{
     StretchRecipeOptions, TimingArgs, normalize_audio, run_band_recipe, run_bandpass_recipe,
     run_chorus_recipe, run_combine_recipe, run_dc_shift_recipe, run_delay_recipe,
@@ -141,701 +147,90 @@ enum Command {
     Speed(SpeedArgs),
 
     /// Change tempo without changing pitch.
-    Tempo {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Tempo factor.
-        #[arg(value_name = "FACTOR", allow_hyphen_values = true)]
-        factor: String,
-
-        /// Prefer quicker search.
-        #[arg(long)]
-        quick: bool,
-
-        /// Tuning profile: music, speech, or linear.
-        #[arg(long, value_name = "PROFILE")]
-        profile: Option<String>,
-
-        /// Segment length in milliseconds.
-        #[arg(long, value_name = "MS", allow_hyphen_values = true)]
-        segment: Option<String>,
-
-        /// Search length in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            allow_hyphen_values = true,
-            requires = "segment"
-        )]
-        search: Option<String>,
-
-        /// Overlap length in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            allow_hyphen_values = true,
-            requires = "search"
-        )]
-        overlap: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Tempo(TempoArgs),
 
     /// Shift pitch without changing tempo.
-    Pitch {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Pitch shift in cents.
-        #[arg(value_name = "CENTS", allow_hyphen_values = true)]
-        cents: String,
-
-        /// Prefer quicker search.
-        #[arg(long)]
-        quick: bool,
-
-        /// Segment length in milliseconds.
-        #[arg(long, value_name = "MS", allow_hyphen_values = true)]
-        segment: Option<String>,
-
-        /// Search length in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            allow_hyphen_values = true,
-            requires = "segment"
-        )]
-        search: Option<String>,
-
-        /// Overlap length in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            allow_hyphen_values = true,
-            requires = "search"
-        )]
-        overlap: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Pitch(PitchArgs),
 
     /// Boost or cut bass frequencies in one audio file.
-    Bass {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Shelf gain in dB.
-        #[arg(value_name = "DB", allow_hyphen_values = true)]
-        gain: String,
-
-        /// Shelf frequency in Hz.
-        #[arg(long, value_name = "HZ", default_value = "100")]
-        frequency: String,
-
-        /// Shelf width, for example `0.5s`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH", default_value = "0.5s")]
-        width: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Bass(BassArgs),
 
     /// Boost or cut treble frequencies in one audio file.
-    Treble {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Shelf gain in dB.
-        #[arg(value_name = "DB", allow_hyphen_values = true)]
-        gain: String,
-
-        /// Shelf frequency in Hz.
-        #[arg(long, value_name = "HZ", default_value = "3000")]
-        frequency: String,
-
-        /// Shelf width, for example `0.5s`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH", default_value = "0.5s")]
-        width: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Treble(TrebleArgs),
 
     /// Apply one peaking equalizer band to one audio file.
-    Equalizer {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Center frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Band width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: String,
-
-        /// Band gain in dB.
-        #[arg(long, value_name = "DB", allow_hyphen_values = true)]
-        gain: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Equalizer(EqualizerArgs),
 
     /// Apply an all-pass filter to one audio file.
     #[command(name = "allpass")]
-    AllPass {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: Option<String>,
-
-        /// Pole count for simple one-pole or two-pole forms.
-        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
-        poles: Option<u8>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    AllPass(PoleFilterArgs),
 
     /// Apply a resonator band-pass filter to one audio file.
-    Band {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: Option<String>,
-
-        /// Use the unpitched noise mode.
-        #[arg(long)]
-        unpitched: bool,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Band(BandArgs),
 
     /// Apply an RBJ band-pass filter to one audio file.
     #[command(name = "bandpass")]
-    BandPass {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: String,
-
-        /// Use constant-skirt-gain mode.
-        #[arg(long)]
-        constant_skirt: bool,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    BandPass(BandPassArgs),
 
     /// Apply an RBJ band-reject filter to one audio file.
     #[command(name = "bandreject")]
-    BandReject {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    BandReject(BandRejectArgs),
 
     /// Apply a high-pass filter to one audio file.
     #[command(name = "highpass")]
-    HighPass {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter cutoff frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: Option<String>,
-
-        /// Pole count for simple one-pole or two-pole forms.
-        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
-        poles: Option<u8>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    HighPass(PoleFilterArgs),
 
     /// Apply a low-pass filter to one audio file.
     #[command(name = "lowpass")]
-    LowPass {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Filter cutoff frequency in Hz.
-        #[arg(long, value_name = "HZ")]
-        frequency: String,
-
-        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
-        #[arg(long, value_name = "WIDTH")]
-        width: Option<String>,
-
-        /// Pole count for simple one-pole or two-pole forms.
-        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
-        poles: Option<u8>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    LowPass(PoleFilterArgs),
 
     /// Fade one audio file in or out.
-    Fade {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Fade-in length in frames, for example `24000` or `24000f`.
-        #[arg(long = "in", value_name = "FRAMES", default_value = "0")]
-        fade_in: String,
-
-        /// Fade-out length in frames, for example `24000` or `24000f`.
-        #[arg(long = "out", value_name = "FRAMES")]
-        fade_out: Option<String>,
-
-        /// Fade curve family: linear, quarter-sine, half-sine, log, or parabola.
-        #[arg(long, value_name = "CURVE", default_value = "linear")]
-        curve: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Fade(FadeArgs),
 
     /// Delay one audio file by per-channel positions.
-    Delay {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Delay position such as `2s`, `0.25`, or `+1s`; repeat per channel.
-        #[arg(long = "position", value_name = "POSITION", required = true)]
-        positions: Vec<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Delay(DelayArgs),
 
     /// Add silence before, after, or inside one audio file.
-    Pad {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Silence to prepend, in frames.
-        #[arg(long, value_name = "FRAMES", default_value = "0")]
-        start: String,
-
-        /// Silence to append, in frames.
-        #[arg(long, value_name = "FRAMES", default_value = "0")]
-        end: String,
-
-        /// Positioned silence as `FRAMES@POSITION`; repeat for multiple inserts.
-        #[arg(long = "at", value_name = "FRAMES@POSITION")]
-        positioned: Vec<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Pad(PadArgs),
 
     /// Append finite copies of one audio file.
-    Repeat {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Number of extra copies to append.
-        #[arg(value_name = "COUNT", default_value = "1")]
-        count: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Repeat(RepeatArgs),
 
     /// Keep every Nth sample from one audio file.
-    Downsample {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Integer downsample factor.
-        #[arg(value_name = "FACTOR", default_value = "2")]
-        factor: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Downsample(DownsampleArgs),
 
     /// Insert zero samples between input samples.
-    Upsample {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Integer upsample factor.
-        #[arg(value_name = "FACTOR", default_value = "2")]
-        factor: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Upsample(UpsampleArgs),
 
     /// Apply Hilbert transform phase shifting.
-    Hilbert {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Optional odd FIR tap count.
-        #[arg(long, value_name = "TAPS")]
-        taps: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Hilbert(HilbertArgs),
 
     /// Apply loudness compensation filtering.
-    Loudness {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Gain in dB.
-        #[arg(
-            long,
-            value_name = "DB",
-            default_value = "-10",
-            allow_hyphen_values = true
-        )]
-        gain: String,
-
-        /// Reference level in dB.
-        #[arg(
-            long,
-            value_name = "DB",
-            default_value = "65",
-            allow_hyphen_values = true
-        )]
-        reference: String,
-
-        /// Number of FIR half-points.
-        #[arg(long, value_name = "N", default_value = "1023")]
-        half_points: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Loudness(LoudnessArgs),
 
     /// Apply deterministic dithering.
-    Dither {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Use sloped TPDF dither.
-        #[arg(long)]
-        sloped: bool,
-
-        /// Noise-shaping filter to apply.
-        #[arg(long = "noise-shape", value_name = "SHAPE", value_parser = ["shibata"])]
-        noise_shape: Option<String>,
-
-        /// Target precision in bits.
-        #[arg(long, value_name = "BITS", default_value = "16")]
-        precision: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Dither(DitherArgs),
 
     /// Apply stereo reverberation to one audio file.
-    Reverb {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Output only the wet reverberated signal.
-        #[arg(long = "wet-only")]
-        wet_only: bool,
-
-        /// Reverberance percentage.
-        #[arg(long, value_name = "PERCENT", default_value = "50")]
-        reverberance: String,
-
-        /// High-frequency damping percentage.
-        #[arg(long = "hf-damping", value_name = "PERCENT", default_value = "50")]
-        hf_damping: String,
-
-        /// Room scale percentage.
-        #[arg(long = "room-scale", value_name = "PERCENT", default_value = "100")]
-        room_scale: String,
-
-        /// Stereo depth percentage.
-        #[arg(long = "stereo-depth", value_name = "PERCENT", default_value = "100")]
-        stereo_depth: String,
-
-        /// Pre-delay in milliseconds.
-        #[arg(long = "pre-delay", value_name = "MS", default_value = "0")]
-        pre_delay: String,
-
-        /// Wet gain in dB.
-        #[arg(
-            long = "wet-gain",
-            value_name = "DB",
-            default_value = "0",
-            allow_hyphen_values = true
-        )]
-        wet_gain: String,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Reverb(ReverbArgs),
 
     /// Change duration with basic windowed stretching.
-    Stretch {
-        /// PCM16 WAV input file to read.
-        input: PathBuf,
-
-        /// Stretch factor.
-        #[arg(value_name = "FACTOR", default_value = "1", allow_hyphen_values = true)]
-        factor: String,
-
-        /// Analysis window length in milliseconds.
-        #[arg(
-            long,
-            value_name = "MS",
-            default_value = "20",
-            allow_hyphen_values = true
-        )]
-        window: String,
-
-        /// Fade shape: linear, sqrt, half, or quarter.
-        #[arg(long, value_name = "SHAPE", default_value = "linear")]
-        fade: String,
-
-        /// Window shift ratio.
-        #[arg(long, value_name = "RATIO", allow_hyphen_values = true)]
-        shift: Option<String>,
-
-        /// Cross-fade ratio.
-        #[arg(
-            long,
-            value_name = "RATIO",
-            allow_hyphen_values = true,
-            requires = "shift"
-        )]
-        fading: Option<String>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Stretch(StretchArgs),
 
     /// Mix two or more audio files into one output.
-    Mix {
-        /// PCM16 WAV input files to mix.
-        #[arg(value_name = "INPUT", num_args = 2..)]
-        inputs: Vec<PathBuf>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Mix(MixArgs),
 
     /// Concatenate two or more audio files end-to-end.
-    Concat {
-        /// PCM16 WAV input files to concatenate.
-        #[arg(value_name = "INPUT", num_args = 2..)]
-        inputs: Vec<PathBuf>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Concat(ConcatArgs),
 
     /// Mix two or more audio files using equal-power scaling.
-    MixPower {
-        /// PCM16 WAV input files to equal-power mix.
-        #[arg(value_name = "INPUT", num_args = 2..)]
-        inputs: Vec<PathBuf>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    MixPower(MixPowerArgs),
 
     /// Merge all channels from two or more audio files.
-    Merge {
-        /// PCM16 WAV input files to merge into one multichannel output.
-        #[arg(value_name = "INPUT", num_args = 2..)]
-        inputs: Vec<PathBuf>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Merge(MergeArgs),
 
     /// Multiply corresponding samples from two or more audio files.
-    Multiply {
-        /// PCM16 WAV input files to multiply.
-        #[arg(value_name = "INPUT", num_args = 2..)]
-        inputs: Vec<PathBuf>,
-
-        /// Output WAV file to create.
-        #[arg(short = 'o', long = "output", value_name = "FILE")]
-        output: PathBuf,
-
-        /// Sample-processing backend to request.
-        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
-        backend: auralis::BackendKind,
-    },
+    Multiply(MultiplyArgs),
 
     /// Render one ordered stream with typed effect syntax.
     Render(RenderArgs),
@@ -1154,7 +549,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         }) => run_effect_recipe(&input, &output, backend, ["speed", factor.as_str()]),
-        Command::Tempo {
+        Command::Tempo(TempoArgs {
             input,
             factor,
             quick,
@@ -1164,7 +559,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             overlap,
             output,
             backend,
-        } => run_tempo_recipe(
+        }) => run_tempo_recipe(
             &input,
             &factor,
             quick,
@@ -1177,7 +572,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Pitch {
+        Command::Pitch(PitchArgs {
             input,
             cents,
             quick,
@@ -1186,7 +581,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             overlap,
             output,
             backend,
-        } => run_pitch_recipe(
+        }) => run_pitch_recipe(
             &input,
             &cents,
             quick,
@@ -1198,40 +593,40 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Bass {
+        Command::Bass(BassArgs {
             input,
             gain,
             frequency,
             width,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
             ["bass", gain.as_str(), frequency.as_str(), width.as_str()],
         ),
-        Command::Treble {
+        Command::Treble(TrebleArgs {
             input,
             gain,
             frequency,
             width,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
             ["treble", gain.as_str(), frequency.as_str(), width.as_str()],
         ),
-        Command::Equalizer {
+        Command::Equalizer(EqualizerArgs {
             input,
             frequency,
             width,
             gain,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
@@ -1242,14 +637,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 gain.as_str(),
             ],
         ),
-        Command::AllPass {
+        Command::AllPass(PoleFilterArgs {
             input,
             frequency,
             width,
             poles,
             output,
             backend,
-        } => run_pole_filter_recipe(
+        }) => run_pole_filter_recipe(
             &input,
             "allpass",
             &frequency,
@@ -1258,14 +653,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Band {
+        Command::Band(BandArgs {
             input,
             frequency,
             width,
             unpitched,
             output,
             backend,
-        } => run_band_recipe(
+        }) => run_band_recipe(
             &input,
             &frequency,
             width.as_deref(),
@@ -1273,34 +668,34 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::BandPass {
+        Command::BandPass(BandPassArgs {
             input,
             frequency,
             width,
             constant_skirt,
             output,
             backend,
-        } => run_bandpass_recipe(&input, &frequency, &width, constant_skirt, &output, backend),
-        Command::BandReject {
+        }) => run_bandpass_recipe(&input, &frequency, &width, constant_skirt, &output, backend),
+        Command::BandReject(BandRejectArgs {
             input,
             frequency,
             width,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
             ["bandreject", frequency.as_str(), width.as_str()],
         ),
-        Command::HighPass {
+        Command::HighPass(PoleFilterArgs {
             input,
             frequency,
             width,
             poles,
             output,
             backend,
-        } => run_pole_filter_recipe(
+        }) => run_pole_filter_recipe(
             &input,
             "highpass",
             &frequency,
@@ -1309,14 +704,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::LowPass {
+        Command::LowPass(PoleFilterArgs {
             input,
             frequency,
             width,
             poles,
             output,
             backend,
-        } => run_pole_filter_recipe(
+        }) => run_pole_filter_recipe(
             &input,
             "lowpass",
             &frequency,
@@ -1325,14 +720,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Fade {
+        Command::Fade(FadeArgs {
             input,
             fade_in,
             fade_out,
             curve,
             output,
             backend,
-        } => run_fade_recipe(
+        }) => run_fade_recipe(
             &input,
             &fade_in,
             fade_out.as_deref(),
@@ -1340,52 +735,52 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Delay {
+        Command::Delay(DelayArgs {
             input,
             positions,
             output,
             backend,
-        } => run_delay_recipe(&input, &positions, &output, backend),
-        Command::Pad {
+        }) => run_delay_recipe(&input, &positions, &output, backend),
+        Command::Pad(PadArgs {
             input,
             start,
             end,
             positioned,
             output,
             backend,
-        } => run_pad_recipe(&input, &start, &end, &positioned, &output, backend),
-        Command::Repeat {
+        }) => run_pad_recipe(&input, &start, &end, &positioned, &output, backend),
+        Command::Repeat(RepeatArgs {
             input,
             count,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["repeat", count.as_str()]),
-        Command::Downsample {
+        }) => run_effect_recipe(&input, &output, backend, ["repeat", count.as_str()]),
+        Command::Downsample(DownsampleArgs {
             input,
             factor,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["downsample", factor.as_str()]),
-        Command::Upsample {
+        }) => run_effect_recipe(&input, &output, backend, ["downsample", factor.as_str()]),
+        Command::Upsample(UpsampleArgs {
             input,
             factor,
             output,
             backend,
-        } => run_effect_recipe(&input, &output, backend, ["upsample", factor.as_str()]),
-        Command::Hilbert {
+        }) => run_effect_recipe(&input, &output, backend, ["upsample", factor.as_str()]),
+        Command::Hilbert(HilbertArgs {
             input,
             taps,
             output,
             backend,
-        } => run_hilbert_recipe(&input, taps.as_deref(), &output, backend),
-        Command::Loudness {
+        }) => run_hilbert_recipe(&input, taps.as_deref(), &output, backend),
+        Command::Loudness(LoudnessArgs {
             input,
             gain,
             reference,
             half_points,
             output,
             backend,
-        } => run_effect_recipe(
+        }) => run_effect_recipe(
             &input,
             &output,
             backend,
@@ -1396,14 +791,14 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 half_points.as_str(),
             ],
         ),
-        Command::Dither {
+        Command::Dither(DitherArgs {
             input,
             sloped,
             noise_shape,
             precision,
             output,
             backend,
-        } => run_dither_recipe(
+        }) => run_dither_recipe(
             &input,
             sloped,
             noise_shape.as_deref(),
@@ -1411,7 +806,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Reverb {
+        Command::Reverb(ReverbArgs {
             input,
             wet_only,
             reverberance,
@@ -1422,7 +817,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             wet_gain,
             output,
             backend,
-        } => run_reverb_recipe(
+        }) => run_reverb_recipe(
             &input,
             wet_only,
             &reverberance,
@@ -1434,7 +829,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Stretch {
+        Command::Stretch(StretchArgs {
             input,
             factor,
             window,
@@ -1443,7 +838,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             fading,
             output,
             backend,
-        } => run_stretch_recipe(
+        }) => run_stretch_recipe(
             &input,
             StretchRecipeOptions {
                 factor: &factor,
@@ -1455,36 +850,36 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
-        Command::Mix {
+        Command::Mix(MixArgs {
             inputs,
             output,
             backend,
-        } => run_mix_recipe(&inputs, &output, backend),
-        Command::Concat {
+        }) => run_mix_recipe(&inputs, &output, backend),
+        Command::Concat(ConcatArgs {
             inputs,
             output,
             backend,
-        } => run_combine_recipe(
+        }) => run_combine_recipe(
             &inputs,
             &output,
             backend,
             auralis::CombineMethod::Concatenate,
         ),
-        Command::MixPower {
+        Command::MixPower(MixPowerArgs {
             inputs,
             output,
             backend,
-        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::MixPower),
-        Command::Merge {
+        }) => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::MixPower),
+        Command::Merge(MergeArgs {
             inputs,
             output,
             backend,
-        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Merge),
-        Command::Multiply {
+        }) => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Merge),
+        Command::Multiply(MultiplyArgs {
             inputs,
             output,
             backend,
-        } => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Multiply),
+        }) => run_combine_recipe(&inputs, &output, backend, auralis::CombineMethod::Multiply),
         Command::Render(RenderArgs {
             input,
             output,
