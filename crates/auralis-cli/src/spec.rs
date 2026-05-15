@@ -277,6 +277,23 @@ fn chain_step_effect_tokens(
     step: &ChainStepSpec,
 ) -> Result<Vec<String>, GraphSpecError> {
     match step.op.as_str() {
+        "dcshift" => {
+            let shift = param_as_string(step.params.get("shift").ok_or_else(|| {
+                GraphSpecError::InvalidStepParam {
+                    chain_id: chain.id.clone(),
+                    index,
+                    op: step.op.clone(),
+                    param: "shift",
+                }
+            })?)
+            .ok_or_else(|| GraphSpecError::InvalidStepParam {
+                chain_id: chain.id.clone(),
+                index,
+                op: step.op.clone(),
+                param: "shift",
+            })?;
+            Ok(vec![step.op.clone(), shift])
+        }
         "gain" => {
             let Some(by) = step.params.get("by") else {
                 return Ok(vec![step.op.clone()]);
