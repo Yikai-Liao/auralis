@@ -817,6 +817,10 @@ pub(crate) struct RunArgs {
     /// Require an up-to-date Auralis.lock before running.
     #[arg(long)]
     pub(crate) locked: bool,
+
+    /// Graph execution cache policy.
+    #[arg(long, value_enum, default_value_t = CacheMode::Smart)]
+    pub(crate) cache: CacheMode,
 }
 
 #[derive(Debug, Args)]
@@ -835,4 +839,11 @@ pub(crate) enum GraphFormat {
     Dot,
     Svg,
     Json,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum CacheMode {
+    Off,
+    Smart,
+    Full,
 }

@@ -7,6 +7,7 @@ use auralis::EffectRegistry;
 
 use crate::{
     CliError,
+    command_args::CacheMode,
     command_support::{PathRole, ensure_wav_extension},
     effect_tokens, executor, spec,
 };
@@ -15,6 +16,7 @@ pub(super) fn run_graph_spec(
     spec: &Path,
     target: Option<&str>,
     locked: bool,
+    cache: CacheMode,
 ) -> Result<(), CliError> {
     if locked {
         spec::verify_graph_lock(spec)?;
@@ -29,7 +31,7 @@ pub(super) fn run_graph_spec(
             .or_default()
             .push(sink);
     }
-    let mut render_cache = BTreeMap::<String, auralis::AudioBuffer>::new();
+    let mut render_cache = RenderCache::new(cache);
 
     for (input_port, sinks) in grouped_sinks {
         let rendered = render_graph_port_audio(&checked, spec_dir, &input_port, &mut render_cache)?;
@@ -44,6 +46,32 @@ pub(super) fn run_graph_spec(
     }
 
     Ok(())
+}
+
+struct RenderCache {
+    enabled: bool,
+    buffers: BTreeMap<String, auralis::AudioBuffer>,
+}
+
+impl RenderCache {
+    fn new(mode: CacheMode) -> Self {
+        Self {
+            enabled: mode != CacheMode::Off,
+            buffers: BTreeMap::new(),
+        }
+    }
+
+    fn get(&self, input: &str) -> Option<auralis::AudioBuffer> {
+        self.enabled
+            .then(|| self.buffers.get(input).cloned())
+            .flatten()
+    }
+
+    fn insert(&mut self, input: String, rendered: &auralis::AudioBuffer) {
+        if self.enabled {
+            self.buffers.insert(input, rendered.clone());
+        }
+    }
 }
 
 fn selected_sinks<'a>(
@@ -73,15 +101,15 @@ fn render_graph_port_audio(
     checked: &spec::CheckedGraphSpec,
     spec_dir: &Path,
     input: &str,
-    render_cache: &mut BTreeMap<String, auralis::AudioBuffer>,
+    render_cache: &mut RenderCache,
 ) -> Result<auralis::AudioBuffer, CliError> {
     if let Some(rendered) = render_cache.get(input) {
-        return Ok(rendered.clone());
+        return Ok(rendered);
     }
 
     let mut visited = BTreeSet::new();
     let rendered = render_graph_input_audio(checked, spec_dir, input, render_cache, &mut visited)?;
-    render_cache.insert(input.to_owned(), rendered.clone());
+    render_cache.insert(input.to_owned(), &rendered);
     Ok(rendered)
 }
 
@@ -89,7 +117,7 @@ fn render_graph_input_audio(
     checked: &spec::CheckedGraphSpec,
     spec_dir: &Path,
     input: &str,
-    render_cache: &mut BTreeMap<String, auralis::AudioBuffer>,
+    render_cache: &mut RenderCache,
     visited: &mut BTreeSet<String>,
 ) -> Result<auralis::AudioBuffer, CliError> {
     let Some(input_id) = input.strip_suffix(".audio") else {
@@ -113,7 +141,7 @@ fn render_graph_input_audio(
 
     if let Some(node) = checked.nodes.iter().find(|node| node.id == input_id) {
         let rendered = render_graph_node_audio(checked, spec_dir, node, render_cache)?;
-        render_cache.insert(input.to_owned(), rendered.clone());
+        render_cache.insert(input.to_owned(), &rendered);
         return Ok(rendered);
     }
 
@@ -133,7 +161,7 @@ fn render_graph_node_audio(
     checked: &spec::CheckedGraphSpec,
     spec_dir: &Path,
     node: &spec::CheckedNode,
-    render_cache: &mut BTreeMap<String, auralis::AudioBuffer>,
+    render_cache: &mut RenderCache,
 ) -> Result<auralis::AudioBuffer, CliError> {
     match node.op.as_deref() {
         None if node.inputs.len() == 1 => {
@@ -157,7 +185,7 @@ fn render_graph_mix_sum_node(
     checked: &spec::CheckedGraphSpec,
     spec_dir: &Path,
     node: &spec::CheckedNode,
-    render_cache: &mut BTreeMap<String, auralis::AudioBuffer>,
+    render_cache: &mut RenderCache,
 ) -> Result<auralis::AudioBuffer, CliError> {
     let mut inputs = Vec::with_capacity(node.inputs.len());
     for (index, input) in node.inputs.iter().enumerate() {

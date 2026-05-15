@@ -121,3 +121,64 @@ path = "{}"
     assert!(stdout.contains("Target: master"), "{stdout}");
     let _ = fs::remove_file(output);
 }
+
+#[test]
+fn run_graph_spec_accepts_documented_cache_modes() {
+    let help = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", "--help"])
+        .output()
+        .unwrap();
+    assert!(help.status.success(), "{}", stderr(&help));
+    let help_stdout = stdout(&help);
+    assert!(help_stdout.contains("--cache <CACHE>"), "{help_stdout}");
+    assert!(
+        help_stdout.contains("[possible values: off, smart, full]"),
+        "{help_stdout}"
+    );
+
+    let spec = temp_path("auralis-cli-run-cache-mode-spec", "toml");
+    let input = temp_path("auralis-cli-run-cache-mode-input", "wav");
+    let output = temp_path("auralis-cli-run-cache-mode-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "master"
+input = "voice.audio"
+steps = [
+  {{ op = "reverse" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "master.audio"
+path = "{}"
+"#,
+            input.display(),
+            output.display()
+        ),
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap(), "--cache", "off"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_pcm16_wav(&output), (1, vec![3000, -2000, 1000]));
+    fs::remove_file(output).unwrap();
+}

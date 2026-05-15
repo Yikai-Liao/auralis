@@ -460,7 +460,7 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     },
     CompletionSpec {
         name: "run",
-        options: &["--locked"],
+        options: &["--locked", "--cache"],
     },
     CompletionSpec {
         name: "ops",

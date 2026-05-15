@@ -5,7 +5,7 @@ use auralis_wav::decode_pcm16_path;
 use clap::ValueEnum;
 use serde::Serialize;
 
-use crate::{CliError, graph_plan, graph_runtime, spec};
+use crate::{CliError, command_args::CacheMode, graph_plan, graph_runtime, spec};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(super) enum OpsSchemaFormat {
@@ -92,9 +92,9 @@ pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(
     graph_plan::plan_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), json, locked)
 }
 
-pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
+pub(super) fn run_graph_spec(spec: &Path, locked: bool, cache: CacheMode) -> Result<(), CliError> {
     let spec_ref = parse_graph_spec_ref(spec);
-    graph_runtime::run_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), locked)
+    graph_runtime::run_graph_spec(&spec_ref.path, spec_ref.target.as_deref(), locked, cache)
 }
 
 pub(super) fn init_project(spec: &Path) -> Result<(), CliError> {

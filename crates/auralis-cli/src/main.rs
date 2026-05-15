@@ -976,7 +976,11 @@ fn run(cli: Cli) -> Result<(), CliError> {
         }
         Command::Man(ManArgs { topic }) => print_man_page(topic.as_deref()),
         Command::Explain(ExplainArgs { spec, target }) => explain_graph_target(&spec, &target),
-        Command::Run(RunArgs { spec, locked }) => run_graph_spec(&spec, locked),
+        Command::Run(RunArgs {
+            spec,
+            locked,
+            cache,
+        }) => run_graph_spec(&spec, locked, cache),
         Command::Ops(OpsArgs { effect, schema }) => print_ops(effect.as_deref(), schema),
     }
 }
