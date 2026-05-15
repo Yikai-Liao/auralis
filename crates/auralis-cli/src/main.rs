@@ -318,6 +318,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
             fx,
             chain,
         } => {
+            if effects_file.is_some() && (!fx.is_empty() || chain.is_some()) {
+                return Err(CliError::MixedEffectInputs);
+            }
             let options = RunOptions {
                 backend,
                 combine,
