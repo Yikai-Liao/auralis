@@ -26,6 +26,10 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("contrast"), "{stdout}");
     assert!(stdout.contains("overdrive"), "{stdout}");
     assert!(stdout.contains("saturation"), "{stdout}");
+    assert!(stdout.contains("dcshift"), "{stdout}");
+    assert!(stdout.contains("vol"), "{stdout}");
+    assert!(stdout.contains("softvol"), "{stdout}");
+    assert!(stdout.contains("tremolo"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -60,6 +64,10 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'contrast:contrast'"), "{stdout}");
     assert!(stdout.contains("'overdrive:overdrive'"), "{stdout}");
     assert!(stdout.contains("'saturation:saturation'"), "{stdout}");
+    assert!(stdout.contains("'dcshift:dcshift'"), "{stdout}");
+    assert!(stdout.contains("'vol:vol'"), "{stdout}");
+    assert!(stdout.contains("'softvol:softvol'"), "{stdout}");
+    assert!(stdout.contains("'tremolo:tremolo'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
@@ -90,70 +98,35 @@ fn fish_completions_include_modern_commands_and_flags() {
         stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'trim'"),
         "{stdout}"
     );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'gain'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'reverse'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'deemph'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'earwax'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'oops'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'riaa'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'swap'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'contrast'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'overdrive'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'saturation'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'fade'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'mix'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'concat'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'mix-power'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'merge'"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_use_subcommand' -a 'multiply'"),
-        "{stdout}"
-    );
+    for command in [
+        "gain",
+        "reverse",
+        "deemph",
+        "earwax",
+        "oops",
+        "riaa",
+        "swap",
+        "contrast",
+        "overdrive",
+        "saturation",
+        "dcshift",
+        "vol",
+        "softvol",
+        "tremolo",
+        "fade",
+        "mix",
+        "concat",
+        "mix-power",
+        "merge",
+        "multiply",
+    ] {
+        assert!(
+            stdout.contains(&format!(
+                "complete -c auralis -n '__fish_use_subcommand' -a '{command}'"
+            )),
+            "{stdout}"
+        );
+    }
     assert!(
         stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from fade' -l out"),
         "{stdout}"
@@ -162,6 +135,14 @@ fn fish_completions_include_modern_commands_and_flags() {
         stdout.contains(
             "complete -c auralis -n '__fish_seen_subcommand_from saturation' -l parameter"
         ),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from softvol' -l headroom"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from tremolo' -l depth"),
         "{stdout}"
     );
     assert!(

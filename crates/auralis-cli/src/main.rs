@@ -303,6 +303,124 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Shift the DC level of one audio file.
+    #[command(name = "dcshift")]
+    DcShift {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// DC shift amount.
+        #[arg(value_name = "SHIFT", allow_hyphen_values = true)]
+        shift: String,
+
+        /// Optional limiter gain.
+        #[arg(long, value_name = "GAIN", allow_hyphen_values = true)]
+        limiter_gain: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply SoX-ng volume scaling to one audio file.
+    Vol {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Volume gain value, for example `0.5` or `-6dB`.
+        #[arg(value_name = "GAIN", allow_hyphen_values = true)]
+        gain: String,
+
+        /// Gain interpretation: amplitude, power, or dB.
+        #[arg(long = "type", value_name = "TYPE")]
+        gain_type: Option<String>,
+
+        /// Optional limiter gain.
+        #[arg(long, value_name = "GAIN", allow_hyphen_values = true)]
+        limiter_gain: Option<String>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply soft volume changes to one audio file.
+    #[command(name = "softvol")]
+    SoftVol {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Volume multiplier.
+        #[arg(
+            long,
+            value_name = "VOLUME",
+            default_value = "1",
+            allow_hyphen_values = true
+        )]
+        volume: String,
+
+        /// Seconds required for volume doubling.
+        #[arg(
+            long,
+            value_name = "SECONDS",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        double_time: String,
+
+        /// Extra headroom in dB.
+        #[arg(
+            long,
+            value_name = "DB",
+            default_value = "0",
+            allow_hyphen_values = true
+        )]
+        headroom: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply tremolo modulation to one audio file.
+    Tremolo {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Modulation speed in Hz.
+        #[arg(value_name = "SPEED_HZ", allow_hyphen_values = true)]
+        speed: String,
+
+        /// Modulation depth percentage.
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            default_value = "40",
+            allow_hyphen_values = true
+        )]
+        depth: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Fade one audio file in or out.
     Fade {
         /// PCM16 WAV input file to read.
@@ -710,6 +828,58 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &output,
             backend,
         ),
+        Command::DcShift {
+            input,
+            shift,
+            limiter_gain,
+            output,
+            backend,
+        } => run_dc_shift_recipe(&input, &shift, limiter_gain.as_deref(), &output, backend),
+        Command::Vol {
+            input,
+            gain,
+            gain_type,
+            limiter_gain,
+            output,
+            backend,
+        } => run_vol_recipe(
+            &input,
+            &gain,
+            gain_type.as_deref(),
+            limiter_gain.as_deref(),
+            &output,
+            backend,
+        ),
+        Command::SoftVol {
+            input,
+            volume,
+            double_time,
+            headroom,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            [
+                "softvol",
+                volume.as_str(),
+                double_time.as_str(),
+                headroom.as_str(),
+            ],
+        ),
+        Command::Tremolo {
+            input,
+            speed,
+            depth,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            ["tremolo", speed.as_str(), depth.as_str()],
+        ),
         Command::Fade {
             input,
             fade_in,
@@ -924,6 +1094,50 @@ fn run_saturation_recipe(
     ];
     if let Some(parameter) = parameter {
         effect_chain.push(parameter.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_dc_shift_recipe(
+    input: &Path,
+    shift: &str,
+    limiter_gain: Option<&str>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["dcshift".to_owned(), shift.to_owned()];
+    if let Some(limiter_gain) = limiter_gain {
+        effect_chain.push(limiter_gain.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_vol_recipe(
+    input: &Path,
+    gain: &str,
+    gain_type: Option<&str>,
+    limiter_gain: Option<&str>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["vol".to_owned(), gain.to_owned()];
+    if let Some(gain_type) = gain_type {
+        effect_chain.push(gain_type.to_owned());
+    }
+    if let Some(limiter_gain) = limiter_gain {
+        effect_chain.push(limiter_gain.to_owned());
     }
 
     run_effect_recipe(
@@ -1556,6 +1770,29 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "dcshift",
+        options: &["-o", "--output", "--limiter-gain", "--backend"],
+    },
+    CompletionSpec {
+        name: "vol",
+        options: &["-o", "--output", "--type", "--limiter-gain", "--backend"],
+    },
+    CompletionSpec {
+        name: "softvol",
+        options: &[
+            "-o",
+            "--output",
+            "--volume",
+            "--double-time",
+            "--headroom",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "tremolo",
+        options: &["-o", "--output", "--depth", "--backend"],
+    },
+    CompletionSpec {
         name: "fade",
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
@@ -1665,6 +1902,10 @@ const MAN_PAGES: &[ManPage] = &[
             ("contrast", "Enhance sample contrast."),
             ("overdrive", "Apply overdrive distortion."),
             ("saturation", "Apply saturation distortion."),
+            ("dcshift", "Shift DC level."),
+            ("vol", "Apply SoX-ng volume scaling."),
+            ("softvol", "Apply soft volume changes."),
+            ("tremolo", "Apply tremolo modulation."),
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
@@ -1836,6 +2077,62 @@ const MAN_PAGES: &[ManPage] = &[
                 "--parameter VALUE",
                 "Curve-specific parameter: drive, color, or threshold.",
             ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "dcshift",
+        summary: "shift DC level",
+        synopsis: "auralis dcshift INPUT.wav SHIFT [--limiter-gain GAIN] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Dcshift is a recipe alias for shifting sample DC offset. It lowers to the same typed effect pipeline as `render --fx 'dcshift ...'`.",
+        options: &[
+            ("SHIFT", "DC shift amount."),
+            ("--limiter-gain GAIN", "Optional limiter gain."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "vol",
+        summary: "apply SoX-ng volume scaling",
+        synopsis: "auralis vol INPUT.wav GAIN [--type TYPE] [--limiter-gain GAIN] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Vol is a recipe alias for SoX-ng volume scaling. It lowers to the same typed effect pipeline as `render --fx 'vol ...'`.",
+        options: &[
+            ("GAIN", "Volume gain value, for example `0.5` or `-6dB`."),
+            (
+                "--type TYPE",
+                "Gain interpretation: amplitude, power, or dB.",
+            ),
+            ("--limiter-gain GAIN", "Optional limiter gain."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "softvol",
+        summary: "apply soft volume changes",
+        synopsis: "auralis softvol INPUT.wav [--volume VOLUME] [--double-time SECONDS] [--headroom DB] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Softvol is a recipe alias for soft volume adjustment. It lowers to the same typed effect pipeline as `render --fx 'softvol ...'`.",
+        options: &[
+            ("--volume VOLUME", "Volume multiplier."),
+            (
+                "--double-time SECONDS",
+                "Seconds required for volume doubling.",
+            ),
+            ("--headroom DB", "Extra headroom in dB."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "tremolo",
+        summary: "apply tremolo modulation",
+        synopsis: "auralis tremolo INPUT.wav SPEED_HZ [--depth PERCENT] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Tremolo is a recipe alias for amplitude modulation. It lowers to the same typed effect pipeline as `render --fx 'tremolo ...'`.",
+        options: &[
+            ("SPEED_HZ", "Modulation speed in Hz."),
+            ("--depth PERCENT", "Modulation depth percentage."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

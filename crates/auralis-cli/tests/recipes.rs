@@ -260,6 +260,40 @@ fn distortion_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn level_and_modulation_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "dcshift",
+            vec!["0.1", "--limiter-gain", "0.02"],
+            "dcshift 0.1 0.02",
+            vec![-8000, -4000, 0, 4000, 8000],
+        ),
+        (
+            "vol",
+            vec!["0.25", "--type", "power"],
+            "vol 0.25 power",
+            vec![-12000, -6000, 0, 6000, 12000],
+        ),
+        (
+            "softvol",
+            vec!["--volume", "0.5", "--double-time", "0", "--headroom", "0"],
+            "softvol 0.5 0 0",
+            vec![-12000, -6000, 0, 6000, 12000],
+        ),
+        (
+            "tremolo",
+            vec!["5", "--depth", "60"],
+            "tremolo 5 60",
+            vec![12000, 12000, 12000, 12000, 12000, 12000],
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx, samples) in cases {
+        assert_recipe_with_args_matches_render_effect(effect, &recipe_args, render_fx, &samples);
+    }
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");
