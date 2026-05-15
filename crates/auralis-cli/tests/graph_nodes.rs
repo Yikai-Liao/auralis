@@ -188,6 +188,20 @@ phase = "25"
 interpolation = "quadratic""#,
         "flanger -q -t 1 2 0 71 0.5 triangle 25",
     );
+    assert_graph_node_matches_render(
+        "chorus",
+        samples,
+        "chorus",
+        r#"gain_in = "0.6"
+gain_out = "0.8"
+interpolation = "quadratic"
+wave = "triangle"
+stages = [
+  { delay = "1", decay = "0.25", speed = "1", depth = "0" },
+  { delay = "2", decay = "-0.125", speed = "1", depth = "0", wave = "sine" },
+]"#,
+        "chorus -q -t 0.6 0.8 1 0.25 1 0 2 -0.125 1 0 -sine",
+    );
 }
 
 #[test]

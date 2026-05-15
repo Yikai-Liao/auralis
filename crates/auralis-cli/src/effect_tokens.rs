@@ -21,6 +21,7 @@ pub fn lower_graph_effect_tokens(
         "bandpass" => lower_bandpass_tokens(params),
         "bandreject" => lower_ordered_tokens("bandreject", params, &["frequency", "width"]),
         "bass" => lower_ordered_tokens("bass", params, &["gain", "frequency", "width"]),
+        "chorus" => lower_chorus_tokens(params),
         "contrast" => lower_ordered_tokens("contrast", params, &["amount"]),
         "dcshift" => lower_ordered_tokens("dcshift", params, &["shift", "limiter_gain"]),
         "delay" => lower_repeated_tokens("delay", params, "positions"),
@@ -278,6 +279,44 @@ fn lower_dither_tokens(
     Ok(tokens)
 }
 
+fn lower_chorus_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["chorus".to_owned()];
+    if let Some(interpolation) = params.get("interpolation") {
+        push_interpolation_flag(
+            &mut tokens,
+            param_as_string(interpolation, "interpolation")?,
+            true,
+        );
+    }
+    if let Some(wave) = params.get("wave") {
+        tokens.push(global_wave_flag(param_as_string(wave, "wave")?));
+    }
+
+    let Some(stages) = params.get("stages") else {
+        append_optional_ordered(&mut tokens, params, &["gain_in", "gain_out"])?;
+        return Ok(tokens);
+    };
+
+    tokens.push(
+        params
+            .get("gain_in")
+            .map(|value| param_as_string(value, "gain_in"))
+            .transpose()?
+            .unwrap_or_else(|| "0.5".to_owned()),
+    );
+    tokens.push(
+        params
+            .get("gain_out")
+            .map(|value| param_as_string(value, "gain_out"))
+            .transpose()?
+            .unwrap_or_else(|| "1".to_owned()),
+    );
+    append_chorus_stages(&mut tokens, stages)?;
+    Ok(tokens)
+}
+
 fn lower_flanger_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -308,6 +347,30 @@ fn lower_flanger_tokens(
         tokens.push(param_as_string(phase, "phase")?);
     }
     Ok(tokens)
+}
+
+fn append_chorus_stages(
+    tokens: &mut Vec<String>,
+    value: &toml::Value,
+) -> Result<(), EffectTokenError> {
+    let toml::Value::Array(stages) = value else {
+        return Err(invalid_param("stages"));
+    };
+    for stage in stages {
+        let toml::Value::Table(stage) = stage else {
+            return Err(invalid_param("stages"));
+        };
+        for param in ["delay", "decay", "speed", "depth"] {
+            let Some(value) = stage.get(param) else {
+                return Err(invalid_param("stages"));
+            };
+            tokens.push(param_as_string(value, "stages")?);
+        }
+        if let Some(wave) = stage.get("wave") {
+            tokens.push(stage_wave_flag(param_as_string(wave, "stages")?));
+        }
+    }
+    Ok(())
 }
 
 fn lower_reverb_tokens(
@@ -492,6 +555,22 @@ fn wave_token(value: String) -> String {
     match value.as_str() {
         "s" => "sine".to_owned(),
         "t" => "triangle".to_owned(),
+        _ => value,
+    }
+}
+
+fn global_wave_flag(value: String) -> String {
+    match value.as_str() {
+        "sine" | "s" => "-s".to_owned(),
+        "triangle" | "t" => "-t".to_owned(),
+        _ => value,
+    }
+}
+
+fn stage_wave_flag(value: String) -> String {
+    match value.as_str() {
+        "sine" | "s" => "-sine".to_owned(),
+        "triangle" | "t" => "-triangle".to_owned(),
         _ => value,
     }
 }
