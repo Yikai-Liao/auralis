@@ -158,12 +158,61 @@ headroom = "0""#,
         "softvol 0.5 0 0",
     );
     assert_graph_node_matches_render(
+        "vol",
+        samples,
+        "vol",
+        r#"gain = "2"
+type = "amplitude"
+limiter_gain = "0.05""#,
+        "vol 2 amplitude 0.05",
+    );
+    assert_graph_node_matches_render(
+        "saturation",
+        samples,
+        "saturation",
+        r#"type = "sqrt"
+blend = "0.75"
+offset = "0.1"
+parameter = "0.25""#,
+        "saturation sqrt 0.75 0.1 0.25",
+    );
+    assert_graph_node_matches_render(
         "tremolo",
         samples,
         "tremolo",
         r#"speed = "5"
 depth = "50""#,
         "tremolo 5 50",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_echo_parameters() {
+    let samples = &[1000, 0, 2000, 0, -1000, 0, -2000, 0];
+
+    assert_graph_node_matches_render(
+        "echo",
+        samples,
+        "echo",
+        r#"gain_in = "0.8"
+gain_out = "0.9"
+taps = [
+  { delay = "1", decay = "0.5" },
+  { delay = "2", decay = "-0.25" },
+]"#,
+        "echo 0.8 0.9 1 0.5 2 -0.25",
+    );
+    assert_graph_node_matches_render(
+        "echos",
+        samples,
+        "echos",
+        r#"gain_in = "0.8"
+gain_out = "0.9"
+taps = [
+  { delay = "1", decay = "0.5" },
+  { delay = "2", decay = "0.25" },
+]"#,
+        "echos 0.8 0.9 1 0.5 2 0.25",
     );
 }
 
@@ -222,6 +271,56 @@ fn graph_nodes_lower_named_resampling_and_repeat_parameters() {
         "upsample",
         r#"factor = "2""#,
         "upsample 2",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_routing_and_analysis_parameters() {
+    let samples = &[1000, -2000, 3000, -4000, 5000, -6000];
+
+    assert_graph_node_matches_render(
+        "remix",
+        samples,
+        "remix",
+        r#"level_mode = "automatic"
+mix_power = true
+outputs = ["1", "0"]"#,
+        "remix -a -p 1 0",
+    );
+    assert_graph_node_matches_render(
+        "stat",
+        samples,
+        "stat",
+        r#"scale = "2"
+rms = true
+volume_only = true
+json = true"#,
+        "stat -s 2 -rms -v -j",
+    );
+    assert_graph_node_matches_render(
+        "stats",
+        samples,
+        "stats",
+        r#"signed_bits = "16"
+window = "0.01"
+json = true"#,
+        "stats -b 16 -w 0.01 -j",
+    );
+}
+
+#[test]
+fn graph_nodes_lower_named_sinc_parameters() {
+    let samples = &[1000, -2000, 3000, -4000, 5000, -6000, 7000, -8000];
+
+    assert_graph_node_matches_render(
+        "sinc",
+        samples,
+        "sinc",
+        r#"beta = "8"
+taps = "11"
+round_taps = true
+range = "1000-4000""#,
+        "sinc -b 8 -n 11 -r 1000-4000",
     );
 }
 

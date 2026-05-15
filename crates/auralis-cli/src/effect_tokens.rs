@@ -27,6 +27,8 @@ pub fn lower_graph_effect_tokens(
         "delay" => lower_repeated_tokens("delay", params, "positions"),
         "dither" => lower_dither_tokens(params),
         "downsample" => lower_ordered_tokens("downsample", params, &["factor"]),
+        "echo" => lower_echo_tokens("echo", params),
+        "echos" => lower_echo_tokens("echos", params),
         "equalizer" => lower_ordered_tokens("equalizer", params, &["frequency", "width", "gain"]),
         "gain" => {
             let Some(by) = params.get("by") else {
@@ -74,10 +76,15 @@ pub fn lower_graph_effect_tokens(
         "pitch" => lower_pitch_tokens(params),
         "repeat" => lower_ordered_tokens("repeat", params, &["count"]),
         "reverb" => lower_reverb_tokens(params),
+        "remix" => lower_remix_tokens(params),
+        "saturation" => lower_saturation_tokens(params),
+        "sinc" => lower_sinc_tokens(params),
         "softvol" => {
             lower_ordered_tokens("softvol", params, &["volume", "double_time", "headroom"])
         }
         "speed" => lower_ordered_tokens("speed", params, &["factor"]),
+        "stat" => lower_stat_tokens(params),
+        "stats" => lower_stats_tokens(params),
         "stretch" => lower_stretch_tokens(params),
         "tempo" => lower_tempo_tokens(params),
         "treble" => lower_ordered_tokens("treble", params, &["gain", "frequency", "width"]),
@@ -93,6 +100,7 @@ pub fn lower_graph_effect_tokens(
             Ok(vec![op.to_owned(), start.to_owned(), format!("={end}")])
         }
         "upsample" => lower_ordered_tokens("upsample", params, &["factor"]),
+        "vol" => lower_ordered_tokens("vol", params, &["gain", "type", "limiter_gain"]),
         _ => Ok(vec![op.to_owned()]),
     }
 }
@@ -317,6 +325,19 @@ fn lower_chorus_tokens(
     Ok(tokens)
 }
 
+fn lower_echo_tokens(
+    op: &str,
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let Some(taps) = params.get("taps") else {
+        return lower_ordered_tokens(op, params, &["gain_in", "gain_out"]);
+    };
+
+    let mut tokens = lower_ordered_tokens(op, params, &["gain_in", "gain_out"])?;
+    append_echo_taps(&mut tokens, taps)?;
+    Ok(tokens)
+}
+
 fn lower_flanger_tokens(
     params: &BTreeMap<String, toml::Value>,
 ) -> Result<Vec<String>, EffectTokenError> {
@@ -347,6 +368,24 @@ fn lower_flanger_tokens(
         tokens.push(param_as_string(phase, "phase")?);
     }
     Ok(tokens)
+}
+
+fn append_echo_taps(tokens: &mut Vec<String>, value: &toml::Value) -> Result<(), EffectTokenError> {
+    let toml::Value::Array(taps) = value else {
+        return Err(invalid_param("taps"));
+    };
+    for tap in taps {
+        let toml::Value::Table(tap) = tap else {
+            return Err(invalid_param("taps"));
+        };
+        for param in ["delay", "decay"] {
+            let Some(value) = tap.get(param) else {
+                return Err(invalid_param("taps"));
+            };
+            tokens.push(param_as_string(value, "taps")?);
+        }
+    }
+    Ok(())
 }
 
 fn append_chorus_stages(
@@ -392,6 +431,116 @@ fn lower_reverb_tokens(
             "wet_gain",
         ],
     )?;
+    Ok(tokens)
+}
+
+fn lower_saturation_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let Some(saturation_type) = params.get("type") else {
+        return Ok(vec!["saturation".to_owned()]);
+    };
+    let mut tokens = vec![
+        "saturation".to_owned(),
+        param_as_string(saturation_type, "type")?,
+    ];
+    append_optional_ordered(&mut tokens, params, &["blend", "offset", "parameter"])?;
+    Ok(tokens)
+}
+
+fn lower_sinc_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["sinc".to_owned()];
+    if let Some(beta) = params.get("beta") {
+        tokens.push("-b".to_owned());
+        tokens.push(param_as_string(beta, "beta")?);
+    } else if let Some(attenuation) = params.get("attenuation") {
+        tokens.push("-a".to_owned());
+        tokens.push(param_as_string(attenuation, "attenuation")?);
+    }
+    if let Some(width) = params.get("transition_width") {
+        tokens.push("-t".to_owned());
+        tokens.push(param_as_string(width, "transition_width")?);
+    }
+    if let Some(taps) = params.get("taps") {
+        tokens.push("-n".to_owned());
+        tokens.push(param_as_string(taps, "taps")?);
+    }
+    if param_as_bool(params.get("round_taps"), "round_taps")? {
+        tokens.push("-r".to_owned());
+    }
+    if let Some(range) = params.get("range") {
+        tokens.push(param_as_string(range, "range")?);
+    }
+    if param_as_bool(params.get("delete_at_nyquist"), "delete_at_nyquist")? {
+        tokens.push("-d".to_owned());
+    }
+    Ok(tokens)
+}
+
+fn lower_remix_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["remix".to_owned()];
+    if let Some(level_mode) = params.get("level_mode") {
+        match param_as_string(level_mode, "level_mode")?.as_str() {
+            "automatic" => tokens.push("-a".to_owned()),
+            "manual" => tokens.push("-m".to_owned()),
+            "semi_automatic" => {}
+            _ => return Err(invalid_param("level_mode")),
+        }
+    }
+    if param_as_bool(params.get("mix_power"), "mix_power")? {
+        tokens.push("-p".to_owned());
+    }
+    if let Some(outputs) = params.get("outputs") {
+        tokens.extend(param_as_string_array(outputs, "outputs")?);
+    }
+    Ok(tokens)
+}
+
+fn lower_stat_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["stat".to_owned()];
+    if let Some(scale) = params.get("scale") {
+        tokens.push("-s".to_owned());
+        tokens.push(param_as_string(scale, "scale")?);
+    }
+    if param_as_bool(params.get("rms"), "rms")? {
+        tokens.push("-rms".to_owned());
+    }
+    if param_as_bool(params.get("volume_only"), "volume_only")? {
+        tokens.push("-v".to_owned());
+    }
+    if param_as_bool(params.get("json"), "json")? {
+        tokens.push("-j".to_owned());
+    }
+    Ok(tokens)
+}
+
+fn lower_stats_tokens(
+    params: &BTreeMap<String, toml::Value>,
+) -> Result<Vec<String>, EffectTokenError> {
+    let mut tokens = vec!["stats".to_owned()];
+    if let Some(bits) = params.get("signed_bits") {
+        tokens.push("-b".to_owned());
+        tokens.push(param_as_string(bits, "signed_bits")?);
+    } else if let Some(bits) = params.get("hex_bits") {
+        tokens.push("-x".to_owned());
+        tokens.push(param_as_string(bits, "hex_bits")?);
+    } else if let Some(scale) = params.get("scale") {
+        tokens.push("-s".to_owned());
+        tokens.push(param_as_string(scale, "scale")?);
+    }
+    if let Some(window) = params.get("window") {
+        tokens.push("-w".to_owned());
+        tokens.push(param_as_string(window, "window")?);
+    }
+    if param_as_bool(params.get("json"), "json")? {
+        tokens.push("-j".to_owned());
+    }
     Ok(tokens)
 }
 
