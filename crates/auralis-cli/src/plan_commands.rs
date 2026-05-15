@@ -1,0 +1,217 @@
+use std::{collections::BTreeMap, path::PathBuf};
+
+use crate::{
+    CliError,
+    command_args::{PlanArgs, PlanCommand, RenderArgs},
+    command_support::{effect_input_to_chain_tokens, plan_graph_spec},
+    graph_plan, spec,
+};
+
+pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
+    match args.command {
+        Some(PlanCommand::Render(render)) => {
+            if args.spec.is_some() || args.target.is_some() || args.locked {
+                return Err(CliError::PlanCommandRejectsGraphOptions);
+            }
+            plan_render_command(render, args.json)
+        }
+        None => {
+            let spec = args.spec.ok_or(CliError::MissingPlanInput)?;
+            plan_graph_spec(&spec, args.target.as_deref(), args.json, args.locked)
+        }
+    }
+}
+
+fn plan_render_command(render: RenderArgs, json: bool) -> Result<(), CliError> {
+    let checked = checked_render_spec(render)?;
+    graph_plan::print_checked_plan("command:render", "render", &checked, None, json)
+}
+
+fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, CliError> {
+    let RenderArgs {
+        input,
+        output,
+        backend: _,
+        combine,
+        additional_inputs,
+        output_channels,
+        no_auto_channels,
+        output_sample_rate,
+        no_auto_rate,
+        guard,
+        norm,
+        dither,
+        dither_seed,
+        container,
+        sample,
+        effects_file,
+        fx,
+        chain,
+    } = render;
+    let mut sources = vec![spec::CheckedSource {
+        id: "input".to_owned(),
+        path: input,
+    }];
+    for (index, path) in additional_inputs.into_iter().enumerate() {
+        sources.push(spec::CheckedSource {
+            id: format!("input{}", index + 2),
+            path,
+        });
+    }
+
+    let mut nodes = Vec::new();
+    let upstream = if sources.len() > 1 {
+        nodes.push(spec::CheckedNode {
+            id: "combine".to_owned(),
+            op: Some(format!("combine.{}", combine.as_name())),
+            inputs: sources
+                .iter()
+                .map(|source| format!("{}.audio", source.id))
+                .collect(),
+            input_gains: vec![None; sources.len()],
+            params: BTreeMap::new(),
+        });
+        "combine.audio".to_owned()
+    } else {
+        "input.audio".to_owned()
+    };
+
+    let step_labels = render_step_labels(effects_file.as_ref(), &fx, chain.as_deref())?;
+    let mut step_labels = step_labels;
+    append_render_policy_steps(
+        &mut step_labels,
+        output_channels,
+        no_auto_channels,
+        output_sample_rate,
+        no_auto_rate,
+        guard,
+        norm,
+        dither,
+        dither_seed,
+        container,
+        sample,
+    );
+
+    let (chains, sink_input, expanded_step_ids) = if step_labels.is_empty() {
+        (Vec::new(), upstream, Vec::new())
+    } else {
+        let step_ids = step_labels
+            .iter()
+            .enumerate()
+            .map(|(index, label)| format!("render/{:02}-{}", index + 1, step_slug(label)))
+            .collect::<Vec<_>>();
+        let chain = spec::CheckedChain {
+            id: "render".to_owned(),
+            input: upstream,
+            step_ids: step_ids.clone(),
+            step_labels,
+            effect_tokens: Vec::new(),
+        };
+        (vec![chain], "render.audio".to_owned(), step_ids)
+    };
+
+    Ok(spec::CheckedGraphSpec {
+        name: Some("render".to_owned()),
+        source_count: sources.len(),
+        chain_count: chains.len(),
+        node_count: nodes.len(),
+        sink_count: 1,
+        sources,
+        chains,
+        nodes,
+        sinks: vec![spec::CheckedSink {
+            id: "output".to_owned(),
+            input: sink_input,
+            path: output,
+        }],
+        expanded_step_ids,
+    })
+}
+
+fn render_step_labels(
+    effects_file: Option<&PathBuf>,
+    fx: &[String],
+    chain: Option<&str>,
+) -> Result<Vec<String>, CliError> {
+    match (effects_file, !fx.is_empty(), chain) {
+        (Some(path), false, None) => {
+            auralis::parse_effects_file(path)?;
+            Ok(vec![format!("effects-file {}", path.display())])
+        }
+        (None, true, None) => {
+            validate_effect_input(fx, None)?;
+            Ok(fx.to_vec())
+        }
+        (None, false, Some(chain)) => {
+            validate_effect_input(&[], Some(chain))?;
+            Ok(chain.split('|').map(str::trim).map(str::to_owned).collect())
+        }
+        (None, false, None) => Ok(Vec::new()),
+        _ => Err(CliError::MixedEffectInputs),
+    }
+}
+
+fn validate_effect_input(fx: &[String], chain: Option<&str>) -> Result<(), CliError> {
+    let tokens = effect_input_to_chain_tokens(fx, chain)?;
+    let token_refs = tokens.iter().map(String::as_str).collect::<Vec<_>>();
+    auralis::parse_effect_chain(&token_refs)?;
+    Ok(())
+}
+
+#[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
+fn append_render_policy_steps(
+    step_labels: &mut Vec<String>,
+    output_channels: Option<auralis::ChannelCount>,
+    no_auto_channels: bool,
+    output_sample_rate: Option<auralis::SampleRate>,
+    no_auto_rate: bool,
+    guard: bool,
+    norm: Option<f64>,
+    dither: bool,
+    dither_seed: Option<u32>,
+    container: Option<crate::executor::OutputContainer>,
+    sample: Option<auralis::WavSampleFormat>,
+) {
+    if let Some(channels) = output_channels {
+        let suffix = if no_auto_channels { " no-auto" } else { "" };
+        step_labels.push(format!("channels {}{}", channels.as_u16(), suffix));
+    }
+    if let Some(rate) = output_sample_rate {
+        let suffix = if no_auto_rate { " no-auto" } else { "" };
+        step_labels.push(format!("rate {}{}", rate.as_u32(), suffix));
+    }
+    if guard {
+        step_labels.push("guard".to_owned());
+    }
+    if let Some(norm) = norm {
+        step_labels.push(format!("norm {norm}"));
+    }
+    if dither {
+        step_labels.push(match dither_seed {
+            Some(seed) => format!("dither seed={seed}"),
+            None => "dither".to_owned(),
+        });
+    }
+    if let Some(container) = container {
+        step_labels.push(format!("container {container:?}").to_lowercase());
+    }
+    if let Some(sample) = sample {
+        step_labels.push(format!("sample {sample:?}").to_lowercase());
+    }
+}
+
+fn step_slug(label: &str) -> String {
+    label
+        .chars()
+        .filter_map(|value| {
+            if value.is_ascii_alphanumeric() {
+                Some(value.to_ascii_lowercase())
+            } else if value.is_ascii_whitespace() || value == '-' || value == '_' {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .take(32)
+        .collect()
+}

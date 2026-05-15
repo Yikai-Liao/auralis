@@ -13,6 +13,7 @@ mod graph_plan;
 mod graph_runtime;
 mod man_pages;
 mod parsers;
+mod plan_commands;
 mod recipe_args;
 mod recipes;
 mod spec;
@@ -31,8 +32,8 @@ use command_args::{
     SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
 };
 use command_support::{
-    PathRole, check_command, effect_input_to_chain_tokens, init_project, inspect, plan_graph_spec,
-    print_ops, run_graph_spec,
+    PathRole, check_command, effect_input_to_chain_tokens, init_project, inspect, print_ops,
+    run_graph_spec,
 };
 use completions::print_completions;
 use convert_commands::run_convert_command;
@@ -40,6 +41,7 @@ pub(crate) use errors::CliError;
 use executor::{OutputDither, OutputGuard, RenderOptions, run_pipeline};
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
+use plan_commands::run_plan_command;
 use recipe_args::{
     BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,
     DownsampleArgs, EqualizerArgs, FadeArgs, HilbertArgs, LoudnessArgs, MergeArgs, MixArgs,
@@ -949,12 +951,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             &fx,
             chain.as_deref(),
         ),
-        Command::Plan(PlanArgs {
-            spec,
-            target,
-            json,
-            locked,
-        }) => plan_graph_spec(&spec, target.as_deref(), json, locked),
+        Command::Plan(args) => run_plan_command(args),
         Command::Graph(GraphArgs {
             spec,
             output,

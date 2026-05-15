@@ -21,6 +21,8 @@ pub(crate) enum CliError {
     MissingEffectSpec,
     MixedCheckInputs,
     MixedEffectInputs,
+    MissingPlanInput,
+    PlanCommandRejectsGraphOptions,
     MixedGuardAndNorm,
     DitherSeedWithoutDither,
     CacheClearNeedsConfirmation,
@@ -91,6 +93,12 @@ impl std::fmt::Display for CliError {
             }
             Self::MixedEffectInputs => {
                 formatter.write_str("--fx, --chain, and --effects-file are mutually exclusive")
+            }
+            Self::MissingPlanInput => {
+                formatter.write_str("plan requires a graph spec or a command to plan")
+            }
+            Self::PlanCommandRejectsGraphOptions => {
+                formatter.write_str("plan command forms do not accept graph spec, --target, or --locked")
             }
             Self::MixedGuardAndNorm => formatter.write_str("--guard cannot be combined with --norm"),
             Self::DitherSeedWithoutDither => formatter.write_str("--dither-seed requires --dither"),

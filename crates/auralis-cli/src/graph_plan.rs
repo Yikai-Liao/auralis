@@ -17,18 +17,37 @@ pub(super) fn plan_graph_spec(
     if let Some(target) = target {
         ensure_known_target(&checked, target)?;
     }
-    let plan = build_plan(&checked);
     let pipeline_name = checked
         .name
         .as_deref()
         .or_else(|| spec.file_stem().and_then(OsStr::to_str))
         .unwrap_or("Auralis.toml");
+    print_checked_plan(
+        &spec.display().to_string(),
+        pipeline_name,
+        &checked,
+        target,
+        json,
+    )
+}
+
+pub(super) fn print_checked_plan(
+    spec_label: &str,
+    pipeline_name: &str,
+    checked: &spec::CheckedGraphSpec,
+    target: Option<&str>,
+    json: bool,
+) -> Result<(), CliError> {
+    if let Some(target) = target {
+        ensure_known_target(checked, target)?;
+    }
+    let plan = build_plan(checked);
     if json {
-        return print_json_plan(spec, pipeline_name, &checked, &plan);
+        return print_json_plan(spec_label, pipeline_name, checked, &plan);
     }
 
     println!("Pipeline: {pipeline_name}");
-    println!("Spec: {}", spec.display());
+    println!("Spec: {spec_label}");
     if let Some(target) = target {
         println!("Target: {target}");
     }
@@ -210,7 +229,7 @@ struct GraphPlan {
 }
 
 fn print_json_plan(
-    spec: &Path,
+    spec_label: &str,
     pipeline_name: &str,
     checked: &spec::CheckedGraphSpec,
     plan: &GraphPlan,
@@ -244,7 +263,7 @@ fn print_json_plan(
 
     let plan = JsonPlan {
         pipeline: pipeline_name.to_owned(),
-        spec: spec.display().to_string(),
+        spec: spec_label.to_owned(),
         inputs: checked
             .sources
             .iter()

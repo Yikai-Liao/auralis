@@ -759,7 +759,11 @@ pub(crate) struct CheckArgs {
 #[derive(Debug, Args)]
 pub(crate) struct PlanArgs {
     /// Auralis graph spec to plan.
-    pub(crate) spec: PathBuf,
+    pub(crate) spec: Option<PathBuf>,
+
+    /// Modern command surface to lower and plan.
+    #[command(subcommand)]
+    pub(crate) command: Option<PlanCommand>,
 
     /// Plan only the named target.
     #[arg(long, value_name = "TARGET")]
@@ -772,6 +776,12 @@ pub(crate) struct PlanArgs {
     /// Require an up-to-date Auralis.lock before planning.
     #[arg(long)]
     pub(crate) locked: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum PlanCommand {
+    /// Plan a linear render command without executing it.
+    Render(RenderArgs),
 }
 
 #[derive(Debug, Args)]
