@@ -54,8 +54,9 @@ def test_cli_auto_dither_matches_sox_ng_golden_manifest(
         "--package",
         "auralis-cli",
         "--",
-        "run",
+        "render",
         str(input_path),
+        "-o",
         str(auralis_output),
         *case["auralis"],
     ]
