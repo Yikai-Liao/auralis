@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
     CliError,
-    command_args::{PipeArgs, PlanArgs, PlanCommand, RenderArgs},
+    command_args::{
+        ChannelsArgs, GainArgs, NormArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs, RenderArgs,
+        SimpleRecipeArgs,
+    },
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
     graph_plan, spec,
 };
@@ -21,6 +24,26 @@ pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
             }
             plan_pipe_command(pipe, args.json)
         }
+        Some(PlanCommand::Gain(gain)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_gain_command(gain, args.json)
+        }
+        Some(PlanCommand::Norm(norm)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_norm_command(norm, args.json)
+        }
+        Some(PlanCommand::Rate(rate)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_rate_command(rate, args.json)
+        }
+        Some(PlanCommand::Channels(channels)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_channels_command(channels, args.json)
+        }
+        Some(PlanCommand::Reverse(reverse)) => {
+            reject_graph_plan_options(args.spec.as_ref(), args.target.as_ref(), args.locked)?;
+            plan_reverse_command(reverse, args.json)
+        }
         None => {
             let spec = args.spec.ok_or(CliError::MissingPlanInput)?;
             plan_graph_spec(&spec, args.target.as_deref(), args.json, args.locked)
@@ -36,6 +59,83 @@ fn plan_render_command(render: RenderArgs, json: bool) -> Result<(), CliError> {
 fn plan_pipe_command(pipe: PipeArgs, json: bool) -> Result<(), CliError> {
     let checked = checked_pipe_spec(pipe)?;
     graph_plan::print_checked_plan("command:pipe", "pipe", &checked, None, json)
+}
+
+fn plan_gain_command(gain: GainArgs, json: bool) -> Result<(), CliError> {
+    let GainArgs {
+        input,
+        db,
+        output,
+        backend: _,
+    } = gain;
+    plan_recipe_command("gain", input, output, ["gain", db.as_str()], json)
+}
+
+fn plan_norm_command(norm: NormArgs, json: bool) -> Result<(), CliError> {
+    let NormArgs {
+        input,
+        level,
+        output,
+        backend: _,
+    } = norm;
+    plan_recipe_command("norm", input, output, ["norm", level.as_str()], json)
+}
+
+fn plan_rate_command(rate: RateArgs, json: bool) -> Result<(), CliError> {
+    let RateArgs {
+        input,
+        sample_rate,
+        output,
+        backend: _,
+    } = rate;
+    plan_recipe_command("rate", input, output, ["rate", sample_rate.as_str()], json)
+}
+
+fn plan_channels_command(channels: ChannelsArgs, json: bool) -> Result<(), CliError> {
+    let ChannelsArgs {
+        input,
+        count,
+        output,
+        backend: _,
+    } = channels;
+    plan_recipe_command(
+        "channels",
+        input,
+        output,
+        ["channels", count.as_str()],
+        json,
+    )
+}
+
+fn plan_reverse_command(reverse: SimpleRecipeArgs, json: bool) -> Result<(), CliError> {
+    let SimpleRecipeArgs {
+        input,
+        output,
+        backend: _,
+    } = reverse;
+    plan_recipe_command("reverse", input, output, ["reverse"], json)
+}
+
+fn reject_graph_plan_options(
+    spec: Option<&PathBuf>,
+    target: Option<&String>,
+    locked: bool,
+) -> Result<(), CliError> {
+    if spec.is_some() || target.is_some() || locked {
+        return Err(CliError::PlanCommandRejectsGraphOptions);
+    }
+    Ok(())
+}
+
+fn plan_recipe_command<'a>(
+    name: &str,
+    input: PathBuf,
+    output: PathBuf,
+    tokens: impl IntoIterator<Item = &'a str>,
+    json: bool,
+) -> Result<(), CliError> {
+    let checked = checked_recipe_spec(name, input, output, tokens)?;
+    graph_plan::print_checked_plan(&format!("command:{name}"), name, &checked, None, json)
 }
 
 fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, CliError> {
@@ -136,6 +236,43 @@ fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, Cli
             path: output,
         }],
         expanded_step_ids,
+    })
+}
+
+fn checked_recipe_spec<'a>(
+    name: &str,
+    input: PathBuf,
+    output: PathBuf,
+    tokens: impl IntoIterator<Item = &'a str>,
+) -> Result<spec::CheckedGraphSpec, CliError> {
+    let step_label = tokens.into_iter().collect::<Vec<_>>().join(" ");
+    validate_effect_input(std::slice::from_ref(&step_label), None)?;
+    let step_id = format!("{name}/01-{}", step_slug(&step_label));
+
+    Ok(spec::CheckedGraphSpec {
+        name: Some(name.to_owned()),
+        source_count: 1,
+        chain_count: 1,
+        node_count: 0,
+        sink_count: 1,
+        sources: vec![spec::CheckedSource {
+            id: "input".to_owned(),
+            path: input,
+        }],
+        chains: vec![spec::CheckedChain {
+            id: name.to_owned(),
+            input: "input.audio".to_owned(),
+            step_ids: vec![step_id.clone()],
+            step_labels: vec![step_label],
+            effect_tokens: Vec::new(),
+        }],
+        nodes: Vec::new(),
+        sinks: vec![spec::CheckedSink {
+            id: "output".to_owned(),
+            input: format!("{name}.audio"),
+            path: output,
+        }],
+        expanded_step_ids: vec![step_id],
     })
 }
 

@@ -785,6 +785,21 @@ pub(crate) enum PlanCommand {
 
     /// Plan a compact pipe command without executing it.
     Pipe(PipeArgs),
+
+    /// Plan a gain recipe command without executing it.
+    Gain(GainArgs),
+
+    /// Plan a norm recipe command without executing it.
+    Norm(NormArgs),
+
+    /// Plan a rate recipe command without executing it.
+    Rate(RateArgs),
+
+    /// Plan a channels recipe command without executing it.
+    Channels(ChannelsArgs),
+
+    /// Plan a reverse recipe command without executing it.
+    Reverse(SimpleRecipeArgs),
 }
 
 #[derive(Debug, Args)]
