@@ -338,20 +338,7 @@ pub(super) fn run_tempo_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["tempo".to_owned()];
-    if quick {
-        effect_chain.push("-q".to_owned());
-    }
-    if let Some(profile) = profile {
-        effect_chain.push(match profile {
-            "music" => "-m".to_owned(),
-            "speech" => "-s".to_owned(),
-            "linear" => "-l".to_owned(),
-            _ => profile.to_owned(),
-        });
-    }
-    effect_chain.push(factor.to_owned());
-    push_timing_args(&mut effect_chain, timing);
+    let effect_chain = tempo_effect_tokens(factor, quick, profile, timing);
 
     run_effect_recipe(
         input,
@@ -369,12 +356,7 @@ pub(super) fn run_pitch_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["pitch".to_owned()];
-    if quick {
-        effect_chain.push("-q".to_owned());
-    }
-    effect_chain.push(cents.to_owned());
-    push_timing_args(&mut effect_chain, timing);
+    let effect_chain = pitch_effect_tokens(cents, quick, timing);
 
     run_effect_recipe(
         input,
@@ -382,6 +364,39 @@ pub(super) fn run_pitch_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+pub(super) fn tempo_effect_tokens(
+    factor: &str,
+    quick: bool,
+    profile: Option<&str>,
+    timing: TimingArgs<'_>,
+) -> Vec<String> {
+    let mut effect_chain = vec!["tempo".to_owned()];
+    if quick {
+        effect_chain.push("-q".to_owned());
+    }
+    if let Some(profile) = profile {
+        effect_chain.push(match profile {
+            "music" => "-m".to_owned(),
+            "speech" => "-s".to_owned(),
+            "linear" => "-l".to_owned(),
+            _ => profile.to_owned(),
+        });
+    }
+    effect_chain.push(factor.to_owned());
+    push_timing_args(&mut effect_chain, timing);
+    effect_chain
+}
+
+pub(super) fn pitch_effect_tokens(cents: &str, quick: bool, timing: TimingArgs<'_>) -> Vec<String> {
+    let mut effect_chain = vec!["pitch".to_owned()];
+    if quick {
+        effect_chain.push("-q".to_owned());
+    }
+    effect_chain.push(cents.to_owned());
+    push_timing_args(&mut effect_chain, timing);
+    effect_chain
 }
 
 fn push_timing_args(effect_chain: &mut Vec<String>, timing: TimingArgs<'_>) {
@@ -407,14 +422,7 @@ pub(super) fn run_pole_filter_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec![effect.to_owned()];
-    if let Some(poles) = poles {
-        effect_chain.push(format!("-{poles}"));
-    }
-    effect_chain.push(frequency.to_owned());
-    if let Some(width) = width {
-        effect_chain.push(width.to_owned());
-    }
+    let effect_chain = pole_filter_effect_tokens(effect, frequency, width, poles);
 
     run_effect_recipe(
         input,
@@ -432,14 +440,7 @@ pub(super) fn run_band_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["band".to_owned()];
-    if unpitched {
-        effect_chain.push("-n".to_owned());
-    }
-    effect_chain.push(frequency.to_owned());
-    if let Some(width) = width {
-        effect_chain.push(width.to_owned());
-    }
+    let effect_chain = band_effect_tokens(frequency, width, unpitched);
 
     run_effect_recipe(
         input,
@@ -457,12 +458,7 @@ pub(super) fn run_bandpass_recipe(
     output: &Path,
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
-    let mut effect_chain = vec!["bandpass".to_owned()];
-    if constant_skirt {
-        effect_chain.push("-c".to_owned());
-    }
-    effect_chain.push(frequency.to_owned());
-    effect_chain.push(width.to_owned());
+    let effect_chain = bandpass_effect_tokens(frequency, width, constant_skirt);
 
     run_effect_recipe(
         input,
@@ -470,6 +466,53 @@ pub(super) fn run_bandpass_recipe(
         backend,
         effect_chain.iter().map(String::as_str),
     )
+}
+
+pub(super) fn pole_filter_effect_tokens(
+    effect: &str,
+    frequency: &str,
+    width: Option<&str>,
+    poles: Option<u8>,
+) -> Vec<String> {
+    let mut effect_chain = vec![effect.to_owned()];
+    if let Some(poles) = poles {
+        effect_chain.push(format!("-{poles}"));
+    }
+    effect_chain.push(frequency.to_owned());
+    if let Some(width) = width {
+        effect_chain.push(width.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn band_effect_tokens(
+    frequency: &str,
+    width: Option<&str>,
+    unpitched: bool,
+) -> Vec<String> {
+    let mut effect_chain = vec!["band".to_owned()];
+    if unpitched {
+        effect_chain.push("-n".to_owned());
+    }
+    effect_chain.push(frequency.to_owned());
+    if let Some(width) = width {
+        effect_chain.push(width.to_owned());
+    }
+    effect_chain
+}
+
+pub(super) fn bandpass_effect_tokens(
+    frequency: &str,
+    width: &str,
+    constant_skirt: bool,
+) -> Vec<String> {
+    let mut effect_chain = vec!["bandpass".to_owned()];
+    if constant_skirt {
+        effect_chain.push("-c".to_owned());
+    }
+    effect_chain.push(frequency.to_owned());
+    effect_chain.push(width.to_owned());
+    effect_chain
 }
 
 pub(super) fn run_hilbert_recipe(

@@ -13,6 +13,7 @@ mod graph_plan;
 mod graph_runtime;
 mod man_pages;
 mod parsers;
+mod plan_args;
 mod plan_commands;
 mod recipe_args;
 mod recipes;
@@ -28,8 +29,8 @@ use command_args::{
     CacheArgs, ChannelsArgs, CheckArgs, ChorusArgs, CompletionsArgs, ContrastArgs, ConvertArgs,
     DcShiftArgs, EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs, InitArgs,
     InspectArgs, ManArgs, NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs, PipeArgs,
-    PlanArgs, RateArgs, RenderArgs, RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs,
-    SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+    RateArgs, RenderArgs, RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs,
+    TremoloArgs, TrimArgs, VolArgs,
 };
 use command_support::{
     PathRole, check_command, effect_input_to_chain_tokens, init_project, inspect, print_ops,
@@ -41,6 +42,7 @@ pub(crate) use errors::CliError;
 use executor::{OutputDither, OutputGuard, RenderOptions, run_pipeline};
 use graph_commands::{explain_graph_target, format_graph_spec, graph_spec};
 use man_pages::print_man_page;
+use plan_args::PlanArgs;
 use plan_commands::run_plan_command;
 use recipe_args::{
     BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,

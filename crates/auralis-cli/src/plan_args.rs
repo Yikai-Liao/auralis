@@ -1,0 +1,122 @@
+use std::path::PathBuf;
+
+use clap::{Args, Subcommand};
+
+use crate::{
+    command_args::{
+        ChannelsArgs, ChorusArgs, ContrastArgs, DcShiftArgs, EchoArgs, FlangerArgs, GainArgs,
+        NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs, RenderArgs, SaturationArgs,
+        SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+    },
+    recipe_args::{
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, EqualizerArgs, PitchArgs, PoleFilterArgs,
+        TempoArgs, TrebleArgs,
+    },
+};
+
+#[derive(Debug, Args)]
+pub(crate) struct PlanArgs {
+    /// Auralis graph spec to plan.
+    pub(crate) spec: Option<PathBuf>,
+
+    /// Modern command surface to lower and plan.
+    #[command(subcommand)]
+    pub(crate) command: Option<PlanCommand>,
+
+    /// Plan only the named target.
+    #[arg(long, value_name = "TARGET")]
+    pub(crate) target: Option<String>,
+
+    /// Emit machine-readable JSON output.
+    #[arg(long)]
+    pub(crate) json: bool,
+
+    /// Require an up-to-date Auralis.lock before planning.
+    #[arg(long)]
+    pub(crate) locked: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum PlanCommand {
+    /// Plan a linear render command without executing it.
+    Render(RenderArgs),
+    /// Plan a compact pipe command without executing it.
+    Pipe(PipeArgs),
+    /// Plan a trim recipe command without executing it.
+    Trim(TrimArgs),
+    /// Plan a gain recipe command without executing it.
+    Gain(GainArgs),
+    /// Plan a norm recipe command without executing it.
+    Norm(NormArgs),
+    /// Plan a rate recipe command without executing it.
+    Rate(RateArgs),
+    /// Plan a channels recipe command without executing it.
+    Channels(ChannelsArgs),
+    /// Plan a reverse recipe command without executing it.
+    Reverse(SimpleRecipeArgs),
+    /// Plan a deemph recipe command without executing it.
+    Deemph(SimpleRecipeArgs),
+    /// Plan an earwax recipe command without executing it.
+    Earwax(SimpleRecipeArgs),
+    /// Plan an echo recipe command without executing it.
+    Echo(EchoArgs),
+    /// Plan an echos recipe command without executing it.
+    Echos(EchoArgs),
+    /// Plan a chorus recipe command without executing it.
+    Chorus(ChorusArgs),
+    /// Plan a flanger recipe command without executing it.
+    Flanger(FlangerArgs),
+    /// Plan a phaser recipe command without executing it.
+    Phaser(PhaserArgs),
+    /// Plan an oops recipe command without executing it.
+    Oops(SimpleRecipeArgs),
+    /// Plan an RIAA recipe command without executing it.
+    Riaa(SimpleRecipeArgs),
+    /// Plan a swap recipe command without executing it.
+    Swap(SimpleRecipeArgs),
+    /// Plan a contrast recipe command without executing it.
+    Contrast(ContrastArgs),
+    /// Plan an overdrive recipe command without executing it.
+    Overdrive(OverdriveArgs),
+    /// Plan a saturation recipe command without executing it.
+    Saturation(SaturationArgs),
+    /// Plan a dcshift recipe command without executing it.
+    #[command(name = "dcshift")]
+    DcShift(DcShiftArgs),
+    /// Plan a vol recipe command without executing it.
+    Vol(VolArgs),
+    /// Plan a softvol recipe command without executing it.
+    #[command(name = "softvol")]
+    SoftVol(SoftVolArgs),
+    /// Plan a tremolo recipe command without executing it.
+    Tremolo(TremoloArgs),
+    /// Plan a speed recipe command without executing it.
+    Speed(SpeedArgs),
+    /// Plan a tempo recipe command without executing it.
+    Tempo(TempoArgs),
+    /// Plan a pitch recipe command without executing it.
+    Pitch(PitchArgs),
+    /// Plan a bass recipe command without executing it.
+    Bass(BassArgs),
+    /// Plan a treble recipe command without executing it.
+    Treble(TrebleArgs),
+    /// Plan an equalizer recipe command without executing it.
+    Equalizer(EqualizerArgs),
+    /// Plan an allpass recipe command without executing it.
+    #[command(name = "allpass")]
+    AllPass(PoleFilterArgs),
+    /// Plan a band recipe command without executing it.
+    Band(BandArgs),
+    /// Plan a bandpass recipe command without executing it.
+    #[command(name = "bandpass")]
+    BandPass(BandPassArgs),
+    /// Plan a bandreject recipe command without executing it.
+    #[command(name = "bandreject")]
+    BandReject(BandRejectArgs),
+    /// Plan a highpass recipe command without executing it.
+    #[command(name = "highpass")]
+    HighPass(PoleFilterArgs),
+    /// Plan a lowpass recipe command without executing it.
+    #[command(name = "lowpass")]
+    LowPass(PoleFilterArgs),
+}

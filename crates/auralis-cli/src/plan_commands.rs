@@ -4,14 +4,21 @@ use crate::{
     CliError,
     command_args::{
         ChannelsArgs, ChorusArgs, ContrastArgs, DcShiftArgs, EchoArgs, FlangerArgs, GainArgs,
-        NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, PlanArgs, PlanCommand, RateArgs, RenderArgs,
-        SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+        NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs, RenderArgs, SaturationArgs,
+        SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
     graph_plan,
+    plan_args::{PlanArgs, PlanCommand},
+    recipe_args::{
+        BandArgs, BandPassArgs, BandRejectArgs, BassArgs, EqualizerArgs, PitchArgs, PoleFilterArgs,
+        TempoArgs, TrebleArgs,
+    },
     recipes::{
-        chorus_effect_tokens, echo_effect_tokens, optional_tail_effect_tokens,
-        phaser_effect_tokens, saturation_effect_tokens, vol_effect_tokens,
+        TimingArgs, band_effect_tokens, bandpass_effect_tokens, chorus_effect_tokens,
+        echo_effect_tokens, optional_tail_effect_tokens, phaser_effect_tokens, pitch_effect_tokens,
+        pole_filter_effect_tokens, saturation_effect_tokens, tempo_effect_tokens,
+        vol_effect_tokens,
     },
     spec,
 };
@@ -82,6 +89,17 @@ fn plan_recipe_surface_command(command: PlanCommand, json: bool) -> Result<(), C
         PlanCommand::SoftVol(softvol) => plan_softvol_command(softvol, json),
         PlanCommand::Tremolo(tremolo) => plan_tremolo_command(tremolo, json),
         PlanCommand::Speed(speed) => plan_speed_command(speed, json),
+        PlanCommand::Tempo(tempo) => plan_tempo_command(tempo, json),
+        PlanCommand::Pitch(pitch) => plan_pitch_command(pitch, json),
+        PlanCommand::Bass(bass) => plan_shelf_filter_command("bass", bass, json),
+        PlanCommand::Treble(treble) => plan_treble_command(treble, json),
+        PlanCommand::Equalizer(equalizer) => plan_equalizer_command(equalizer, json),
+        PlanCommand::AllPass(allpass) => plan_pole_filter_command("allpass", allpass, json),
+        PlanCommand::Band(band) => plan_band_command(band, json),
+        PlanCommand::BandPass(bandpass) => plan_bandpass_command(bandpass, json),
+        PlanCommand::BandReject(bandreject) => plan_bandreject_command(bandreject, json),
+        PlanCommand::HighPass(highpass) => plan_pole_filter_command("highpass", highpass, json),
+        PlanCommand::LowPass(lowpass) => plan_pole_filter_command("lowpass", lowpass, json),
         PlanCommand::Render(_) | PlanCommand::Pipe(_) => {
             unreachable!("render and pipe are handled before recipe planning")
         }
@@ -413,6 +431,201 @@ fn plan_speed_command(speed: SpeedArgs, json: bool) -> Result<(), CliError> {
         backend: _,
     } = speed;
     plan_recipe_command("speed", input, output, ["speed", factor.as_str()], json)
+}
+
+fn plan_tempo_command(tempo: TempoArgs, json: bool) -> Result<(), CliError> {
+    let TempoArgs {
+        input,
+        factor,
+        quick,
+        profile,
+        segment,
+        search,
+        overlap,
+        output,
+        backend: _,
+    } = tempo;
+    let tokens = tempo_effect_tokens(
+        &factor,
+        quick,
+        profile.as_deref(),
+        TimingArgs {
+            segment: segment.as_deref(),
+            search: search.as_deref(),
+            overlap: overlap.as_deref(),
+        },
+    );
+    plan_recipe_command(
+        "tempo",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_pitch_command(pitch: PitchArgs, json: bool) -> Result<(), CliError> {
+    let PitchArgs {
+        input,
+        cents,
+        quick,
+        segment,
+        search,
+        overlap,
+        output,
+        backend: _,
+    } = pitch;
+    let tokens = pitch_effect_tokens(
+        &cents,
+        quick,
+        TimingArgs {
+            segment: segment.as_deref(),
+            search: search.as_deref(),
+            overlap: overlap.as_deref(),
+        },
+    );
+    plan_recipe_command(
+        "pitch",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_shelf_filter_command(
+    name: &'static str,
+    shelf: BassArgs,
+    json: bool,
+) -> Result<(), CliError> {
+    let BassArgs {
+        input,
+        gain,
+        frequency,
+        width,
+        output,
+        backend: _,
+    } = shelf;
+    plan_recipe_command(
+        name,
+        input,
+        output,
+        [name, gain.as_str(), frequency.as_str(), width.as_str()],
+        json,
+    )
+}
+
+fn plan_treble_command(treble: TrebleArgs, json: bool) -> Result<(), CliError> {
+    let TrebleArgs {
+        input,
+        gain,
+        frequency,
+        width,
+        output,
+        backend: _,
+    } = treble;
+    plan_recipe_command(
+        "treble",
+        input,
+        output,
+        ["treble", gain.as_str(), frequency.as_str(), width.as_str()],
+        json,
+    )
+}
+
+fn plan_equalizer_command(equalizer: EqualizerArgs, json: bool) -> Result<(), CliError> {
+    let EqualizerArgs {
+        input,
+        frequency,
+        width,
+        gain,
+        output,
+        backend: _,
+    } = equalizer;
+    plan_recipe_command(
+        "equalizer",
+        input,
+        output,
+        [
+            "equalizer",
+            frequency.as_str(),
+            width.as_str(),
+            gain.as_str(),
+        ],
+        json,
+    )
+}
+
+fn plan_pole_filter_command(
+    name: &'static str,
+    filter: PoleFilterArgs,
+    json: bool,
+) -> Result<(), CliError> {
+    let PoleFilterArgs {
+        input,
+        frequency,
+        width,
+        poles,
+        output,
+        backend: _,
+    } = filter;
+    let tokens = pole_filter_effect_tokens(name, &frequency, width.as_deref(), poles);
+    plan_recipe_command(name, input, output, tokens.iter().map(String::as_str), json)
+}
+
+fn plan_band_command(band: BandArgs, json: bool) -> Result<(), CliError> {
+    let BandArgs {
+        input,
+        frequency,
+        width,
+        unpitched,
+        output,
+        backend: _,
+    } = band;
+    let tokens = band_effect_tokens(&frequency, width.as_deref(), unpitched);
+    plan_recipe_command(
+        "band",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_bandpass_command(bandpass: BandPassArgs, json: bool) -> Result<(), CliError> {
+    let BandPassArgs {
+        input,
+        frequency,
+        width,
+        constant_skirt,
+        output,
+        backend: _,
+    } = bandpass;
+    let tokens = bandpass_effect_tokens(&frequency, &width, constant_skirt);
+    plan_recipe_command(
+        "bandpass",
+        input,
+        output,
+        tokens.iter().map(String::as_str),
+        json,
+    )
+}
+
+fn plan_bandreject_command(bandreject: BandRejectArgs, json: bool) -> Result<(), CliError> {
+    let BandRejectArgs {
+        input,
+        frequency,
+        width,
+        output,
+        backend: _,
+    } = bandreject;
+    plan_recipe_command(
+        "bandreject",
+        input,
+        output,
+        ["bandreject", frequency.as_str(), width.as_str()],
+        json,
+    )
 }
 
 fn reject_graph_plan_options(
