@@ -5,14 +5,19 @@ mod support;
 use support::*;
 
 #[test]
-fn run_copies_mono_wav_through_decode_encode_pipeline() {
-    let input = temp_path("auralis-cli-run-mono-input", "wav");
-    let output = temp_path("auralis-cli-run-mono-output", "wav");
+fn render_copies_mono_wav_through_decode_encode_pipeline() {
+    let input = temp_path("auralis-cli-render-mono-input", "wav");
+    let output = temp_path("auralis-cli-render-mono-output", "wav");
     let samples = [-32768, -1024, 0, 1024, 32767];
     write_pcm16_wav_with_metadata(&input, 1, &samples);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
 
@@ -40,14 +45,19 @@ fn run_copies_mono_wav_through_decode_encode_pipeline() {
 }
 
 #[test]
-fn run_copies_stereo_wav_samples_and_metadata() {
-    let input = temp_path("auralis-cli-run-stereo-input", "wav");
-    let output = temp_path("auralis-cli-run-stereo-output", "wav");
+fn render_copies_stereo_wav_samples_and_metadata() {
+    let input = temp_path("auralis-cli-render-stereo-input", "wav");
+    let output = temp_path("auralis-cli-render-stereo-output", "wav");
     let samples = [-32768, 32767, -12_000, 12_000, 0, 4096];
     write_pcm16_wav(&input, 2, &samples);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args(["run", input.to_str().unwrap(), output.to_str().unwrap()])
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
         .output()
         .unwrap();
 

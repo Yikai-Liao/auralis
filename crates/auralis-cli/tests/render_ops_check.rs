@@ -5,10 +5,9 @@ mod support;
 use support::*;
 
 #[test]
-fn render_fx_chain_output_matches_positional_run_chain() {
+fn render_fx_chain_applies_ordered_effects() {
     let input = temp_path("auralis-cli-render-fx-input", "wav");
     let render_output = temp_path("auralis-cli-render-fx-output", "wav");
-    let run_output = temp_path("auralis-cli-render-fx-run-output", "wav");
     write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
 
     let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
@@ -22,25 +21,15 @@ fn render_fx_chain_output_matches_positional_run_chain() {
         ])
         .output()
         .unwrap();
-    let run = Command::new(env!("CARGO_BIN_EXE_auralis"))
-        .args([
-            "run",
-            input.to_str().unwrap(),
-            run_output.to_str().unwrap(),
-            "gain",
-            "-6",
-            "reverse",
-        ])
-        .output()
-        .unwrap();
 
     assert!(render.status.success(), "stderr: {}", stderr(&render));
-    assert!(run.status.success(), "stderr: {}", stderr(&run));
-    assert_eq!(read_pcm16_wav(&render_output), read_pcm16_wav(&run_output));
+    assert_eq!(
+        read_pcm16_wav(&render_output),
+        (1, vec![8211, 4106, 0, -4106, -8211])
+    );
 
     fs::remove_file(input).unwrap();
     fs::remove_file(render_output).unwrap();
-    fs::remove_file(run_output).unwrap();
 }
 
 #[test]
