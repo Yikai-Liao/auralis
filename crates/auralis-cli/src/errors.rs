@@ -144,7 +144,7 @@ impl std::fmt::Display for CliError {
             ),
             Self::UnsupportedConvertOutputFormat { path } => write!(
                 formatter,
-                "unsupported convert output format for {}; supported outputs are wav, flac, aiff, aif, aifc, au, and snd",
+                "unsupported output format for {}; supported outputs are wav, flac, aiff, aif, aifc, au, and snd",
                 path.display()
             ),
             Self::UnsupportedFormat { path, role } => {

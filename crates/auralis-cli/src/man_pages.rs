@@ -858,6 +858,8 @@ const MAN_PAGES: &[ManPage] = &[
                 "--dither",
                 "Apply deterministic TPDF dither before PCM16 encoding.",
             ),
+            ("--container CONTAINER", "Select the output container."),
+            ("--sample FORMAT", "Select WAV sample encoding."),
         ],
     },
     ManPage {

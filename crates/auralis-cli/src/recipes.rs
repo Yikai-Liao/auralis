@@ -554,6 +554,8 @@ pub(super) fn run_effect_recipe<'a>(
         dither_seed: None,
         effects_file: None,
         effect_chain: effect_chain.into_iter().map(ToOwned::to_owned).collect(),
+        container: None,
+        sample: None,
     };
 
     run_pipeline(input, output, &options)
@@ -590,6 +592,8 @@ pub(super) fn run_combine_recipe(
         dither_seed: None,
         effects_file: None,
         effect_chain: Vec::new(),
+        container: None,
+        sample: None,
     };
 
     run_pipeline(input, output, &options)

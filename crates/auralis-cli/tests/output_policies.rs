@@ -238,6 +238,100 @@ fn render_no_auto_rate_requires_output_rate() {
 }
 
 #[test]
+fn render_wav_sample_format_writes_pcm24_header() {
+    let input = temp_path("auralis-cli-render-sample-input", "wav");
+    let output = temp_path("auralis-cli-render-sample-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -1000, 2000, -2000]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--sample",
+            "pcm24",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    assert_eq!(read_wav_bits_per_sample(&output), 24);
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn render_container_overrides_output_extension() {
+    let input = temp_path("auralis-cli-render-container-input", "wav");
+    let output = temp_path("auralis-cli-render-container-output", "audio");
+    write_pcm16_wav(
+        &input,
+        1,
+        &[
+            -16_384, -14_336, -12_288, -10_240, -8_192, -6_144, -4_096, -2_048, 0, 2_048, 4_096,
+            6_144, 8_192, 10_240, 12_288, 14_336,
+        ],
+    );
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--container",
+            "flac",
+            "--fx",
+            "gain -3",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let bytes = fs::read(&output).unwrap();
+    assert_eq!(&bytes[..4], b"fLaC");
+    fs::remove_file(output).unwrap();
+}
+
+#[test]
+fn render_rejects_wav_sample_for_non_wav_output() {
+    let input = temp_path("auralis-cli-render-sample-non-wav-input", "wav");
+    let output = temp_path("auralis-cli-render-sample-non-wav-output", "flac");
+    write_pcm16_wav(&input, 1, &[0]);
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--sample",
+            "pcm24",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(input).unwrap();
+    let _ = fs::remove_file(output);
+    assert!(!command_output.status.success());
+    let stderr = stderr(&command_output);
+    assert!(
+        stderr.contains("error: --sample is supported only for WAV output"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn render_dither_is_explicit_and_repeatable() {
     let input = temp_path("auralis-cli-render-dither-input", "wav");
     let plain_output = temp_path("auralis-cli-render-dither-plain-output", "wav");

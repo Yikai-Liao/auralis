@@ -118,6 +118,13 @@ pub fn read_pcm16_wav_with_sample_rate(path: &Path) -> (u32, u16, Vec<i16>) {
     (sample_rate, channels, samples)
 }
 
+pub fn read_wav_bits_per_sample(path: &Path) -> u16 {
+    let bytes = fs::read(path).unwrap();
+    assert_eq!(&bytes[0..4], b"RIFF");
+    assert_eq!(&bytes[8..12], b"WAVE");
+    u16::from_le_bytes(bytes[34..36].try_into().unwrap())
+}
+
 pub fn metadata_chunk_is_absent(path: &Path) -> bool {
     !fs::read(path)
         .unwrap()

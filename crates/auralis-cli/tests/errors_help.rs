@@ -2277,7 +2277,7 @@ fn render_unsupported_input_extension_returns_clear_error() {
 #[test]
 fn render_unsupported_output_extension_returns_clear_error() {
     let input = temp_path("auralis-cli-render-input", "wav");
-    let output = temp_path("auralis-cli-render-output-unsupported", "flac");
+    let output = temp_path("auralis-cli-render-output-unsupported", "audio");
     write_pcm16_wav(&input, 1, &[0]);
 
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
@@ -2298,5 +2298,8 @@ fn render_unsupported_output_extension_returns_clear_error() {
         stderr.contains("error: unsupported output format"),
         "{stderr}"
     );
-    assert!(stderr.contains("only PCM16 WAV is supported"), "{stderr}");
+    assert!(
+        stderr.contains("supported outputs are wav, flac"),
+        "{stderr}"
+    );
 }

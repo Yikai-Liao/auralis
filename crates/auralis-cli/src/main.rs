@@ -881,6 +881,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
             norm,
             dither,
             dither_seed,
+            container,
+            sample,
             effects_file,
             fx,
             chain,
@@ -902,6 +904,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 dither_seed,
                 effects_file,
                 effect_chain: effect_input_to_chain_tokens(&fx, chain.as_deref())?,
+                container,
+                sample,
             };
 
             run_pipeline(&input, &output, &options)
@@ -926,6 +930,8 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 dither_seed: None,
                 effects_file: None,
                 effect_chain: effect_input_to_chain_tokens(&[], Some(expression.as_str()))?,
+                container: None,
+                sample: None,
             };
 
             run_pipeline(&input, &output, &options)

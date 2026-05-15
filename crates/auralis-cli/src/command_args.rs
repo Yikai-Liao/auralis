@@ -695,6 +695,14 @@ pub(crate) struct RenderArgs {
     #[arg(long, value_name = "SEED")]
     pub(crate) dither_seed: Option<u32>,
 
+    /// Select output container explicitly instead of inferring it from -o.
+    #[arg(long, value_name = "CONTAINER", value_enum)]
+    pub(crate) container: Option<OutputContainer>,
+
+    /// Select WAV sample encoding when the output container is WAV.
+    #[arg(long, value_name = "FORMAT", value_parser = parse_wav_sample_format)]
+    pub(crate) sample: Option<auralis::WavSampleFormat>,
+
     /// Read the effect chain from a SoX-ng-style effects file.
     #[arg(long, value_name = "FILE")]
     pub(crate) effects_file: Option<PathBuf>,

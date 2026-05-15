@@ -418,6 +418,8 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
             "--norm",
             "--dither",
             "--dither-seed",
+            "--container",
+            "--sample",
             "--effects-file",
             "--fx",
             "--chain",

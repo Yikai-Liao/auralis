@@ -26,6 +26,8 @@ pub(super) struct RenderOptions {
     pub(super) dither_seed: Option<u32>,
     pub(super) effects_file: Option<PathBuf>,
     pub(super) effect_chain: Vec<String>,
+    pub(super) container: Option<OutputContainer>,
+    pub(super) sample: Option<auralis::WavSampleFormat>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -99,7 +101,6 @@ pub(super) fn run_pipeline(
     options: &RenderOptions,
 ) -> Result<(), CliError> {
     ensure_wav_extension(input, PathRole::Input)?;
-    ensure_wav_extension(output, PathRole::Output)?;
     for input in &options.additional_inputs {
         ensure_wav_extension(input, PathRole::Input)?;
     }
@@ -108,6 +109,7 @@ pub(super) fn run_pipeline(
     let sample_rate_conversion_policy = options.sample_rate_conversion_policy()?;
     let output_level_policy = options.output_level_policy()?;
     let output_dither_policy = options.output_dither_policy()?;
+    let output_format = output_format(output, options.container, options.sample)?;
     let effect_chain = options.effect_chain()?;
     let pipeline = open_pipeline(input, options, effect_chain.as_ref())?
         .with_backend(backend)
@@ -116,7 +118,7 @@ pub(super) fn run_pipeline(
         .with_output_level_policy(output_level_policy)
         .with_output_dither_policy(output_dither_policy);
 
-    write_pipeline_with_effect_chain(pipeline, output, effect_chain.as_ref())?;
+    write_pipeline_with_effect_chain(pipeline, output, output_format, effect_chain.as_ref())?;
 
     Ok(())
 }
@@ -144,14 +146,15 @@ pub(super) fn apply_effect_token_refs_to_buffer(
 fn write_pipeline_with_effect_chain(
     pipeline: auralis::Pipeline,
     output: &Path,
+    format: auralis::OutputFormat,
     effect_chain: Option<&auralis::EffectChain>,
 ) -> Result<(), CliError> {
     match effect_chain {
         Some(effect_chain) => pipeline
             .apply_effect_chain(effect_chain)
-            .write_wav(output)?,
-        None => pipeline.write_wav(output)?,
-    }
+            .write(output, format)?,
+        None => pipeline.write(output, format)?,
+    };
 
     Ok(())
 }
