@@ -192,3 +192,57 @@ fn reverse_recipe_lowers_to_typed_render_reverse() {
     fs::remove_file(recipe_output).unwrap();
     fs::remove_file(render_output).unwrap();
 }
+
+#[test]
+fn fade_recipe_lowers_to_typed_render_fade() {
+    let input = temp_path("auralis-cli-fade-recipe-input", "wav");
+    let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-fade-render-output", "wav");
+    write_pcm16_wav(
+        &input,
+        2,
+        &[-10000, 10000, -20000, 20000, -30000, 30000, -4000, 4000],
+    );
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "fade",
+            input.to_str().unwrap(),
+            "--in",
+            "2",
+            "--out",
+            "2",
+            "--curve",
+            "linear",
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "fade in=2 out=2 curve=linear",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        (2, vec![0, 0, -10000, 10000, -30000, 30000, -2000, 2000])
+    );
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}

@@ -143,6 +143,32 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Fade one audio file in or out.
+    Fade {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Fade-in length in frames, for example `24000` or `24000f`.
+        #[arg(long = "in", value_name = "FRAMES", default_value = "0")]
+        fade_in: String,
+
+        /// Fade-out length in frames, for example `24000` or `24000f`.
+        #[arg(long = "out", value_name = "FRAMES")]
+        fade_out: Option<String>,
+
+        /// Fade curve family: linear, quarter-sine, half-sine, log, or parabola.
+        #[arg(long, value_name = "CURVE", default_value = "linear")]
+        curve: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Render one ordered stream with typed effect syntax.
     Render {
         /// PCM16 WAV input file to read.
@@ -389,6 +415,21 @@ fn run(cli: Cli) -> Result<(), CliError> {
             output,
             backend,
         } => run_effect_recipe(&input, &output, backend, ["reverse"]),
+        Command::Fade {
+            input,
+            fade_in,
+            fade_out,
+            curve,
+            output,
+            backend,
+        } => run_fade_recipe(
+            &input,
+            &fade_in,
+            fade_out.as_deref(),
+            &curve,
+            &output,
+            backend,
+        ),
         Command::Render {
             input,
             output,
@@ -514,6 +555,31 @@ fn run_trim_recipe(
     backend: auralis::BackendKind,
 ) -> Result<(), CliError> {
     run_effect_recipe(input, output, backend, ["trim", range])
+}
+
+fn run_fade_recipe(
+    input: &Path,
+    fade_in: &str,
+    fade_out: Option<&str>,
+    curve: &str,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec![
+        "fade".to_owned(),
+        format!("in={fade_in}"),
+        format!("curve={curve}"),
+    ];
+    if let Some(fade_out) = fade_out {
+        effect_chain.push(format!("out={fade_out}"));
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
 }
 
 fn run_effect_recipe<'a>(
@@ -1062,6 +1128,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--backend"],
     },
     CompletionSpec {
+        name: "fade",
+        options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
+    },
+    CompletionSpec {
         name: "render",
         options: &[
             "-o",
@@ -1139,6 +1209,7 @@ const MAN_PAGES: &[ManPage] = &[
             ("normalize", "Normalize one audio file to a peak level."),
             ("gain", "Adjust one audio file by a gain amount."),
             ("reverse", "Reverse one audio file."),
+            ("fade", "Fade one audio file in or out."),
             (
                 "render",
                 "Run one ordered DSP pipeline over one combined input stream.",
@@ -1205,6 +1276,28 @@ const MAN_PAGES: &[ManPage] = &[
         synopsis: "auralis reverse INPUT.wav -o OUTPUT.wav [--backend BACKEND]",
         description: "Reverse is a recipe alias for reversing all frames in one input. It lowers to the same typed effect pipeline as `render --fx reverse`.",
         options: &[
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "fade",
+        summary: "fade one audio file in or out",
+        synopsis: "auralis fade INPUT.wav [--in FRAMES] [--out FRAMES] [--curve CURVE] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Fade is a recipe alias for applying one fade envelope. It lowers to the same typed effect pipeline as `render --fx 'fade ...'`.",
+        options: &[
+            (
+                "--in FRAMES",
+                "Fade-in length in frames, accepting values like `24000` or `24000f`.",
+            ),
+            (
+                "--out FRAMES",
+                "Fade-out length in frames, accepting values like `24000` or `24000f`.",
+            ),
+            (
+                "--curve CURVE",
+                "Fade curve family: linear, quarter-sine, half-sine, log, or parabola.",
+            ),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],

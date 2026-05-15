@@ -22,6 +22,7 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("normalize"), "{stdout}");
     assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
+    assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -95,6 +96,25 @@ fn gain_man_page_describes_recipe_lowering() {
     );
     assert!(stdout.contains("render --fx 'gain ...'"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn fade_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "fade"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("fade - fade one audio file in or out"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --fx 'fade ...'"), "{stdout}");
+    assert!(stdout.contains("--in FRAMES"), "{stdout}");
+    assert!(stdout.contains("--out FRAMES"), "{stdout}");
+    assert!(stdout.contains("--curve CURVE"), "{stdout}");
 }
 
 #[test]
