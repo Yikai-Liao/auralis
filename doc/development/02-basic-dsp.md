@@ -40,7 +40,7 @@ Status: implemented.
 
 Acceptance tests:
 
-- `auralis run input.wav output.wav --gain-db -3`;
+- `auralis render input.wav -o output.wav --fx 'gain -3'`;
 - CLI output matches library output;
 - SoX-ng golden comparison.
 

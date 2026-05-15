@@ -39,20 +39,20 @@ fn main() -> auralis::Result<()> {
 The first command-line equivalent should be simple and scriptable:
 
 ```bash
-auralis run input.wav output.wav --gain-db -3
+auralis render input.wav -o output.wav --fx 'gain -3'
 ```
 
-The positional effect-chain form uses the same typed command parser and chain
+The render command uses the same typed command parser and chain
 executor as the library:
 
 ```bash
-auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
+auralis render input.wav -o output.wav --fx 'gain -3' --fx 'dcshift 0.125' --fx reverse
 ```
 
 A structured pipeline form should also exist for reproducible batch workflows:
 
 ```bash
-auralis run pipeline.toml
+auralis run Auralis.toml
 ```
 
 Example `pipeline.toml`:
@@ -527,9 +527,9 @@ boundaries between chain segments, applies implemented commands in caller
 order, supports forced scalar/SIMD backend selection for backend-aware effects,
 and reports processing failures with the zero-based command index, canonical
 command tokens, failed argument family, and typed source error. Flat token
-streams can also be parsed into an `EffectChain`, which is how `auralis run
-<input> <output> gain -3 : reverse` shares the same ordering and diagnostics as
-the library API. The `newfile` and `restart` controls are reserved for later
+streams can also be parsed into an `EffectChain`, which is how `auralis render
+<input> -o <output> --fx "gain -3 : reverse"` shares the same ordering and
+diagnostics as the library API. The `newfile` and `restart` controls are reserved for later
 multi-output/restart features and currently return stable diagnostics.
 
 Effects files use the same token and command model as positional chains. A `#`
@@ -548,9 +548,9 @@ fade t 24000 0 24000
 Parsing this text with `parse_effects_file_str` or `parse_effects_file`
 produces the same typed `EffectChain` as the flat CLI-style token stream `gain
 -3 dcshift 0.125 : reverse fade t 24000 0 24000`. The CLI accepts the same file
-with `auralis run input.wav output.wav --effects-file chain.effects`; effects
-files are mutually exclusive with positional chain tokens and legacy effect
-flags because their relative order would otherwise be ambiguous. Empty boundary
+with `auralis render input.wav -o output.wav --effects-file chain.effects`;
+effects files are mutually exclusive with `--fx` and `--chain` because their
+relative order would otherwise be ambiguous. Empty boundary
 segments, unsupported `newfile`/`restart` controls, malformed quotes, dangling
 escapes, unknown effects, unsupported SoX-ng effects, invalid command
 arguments, missing files, and unreadable files report stable errors.
@@ -635,43 +635,44 @@ Initial CLI goals:
 ```bash
 auralis --version
 auralis inspect input.wav
-auralis run input.wav output.wav
-auralis run input.wav output.wav --gain-db -3
-auralis run input.wav output.wav --backend simd --gain-db -3
-auralis run input.wav output.wav --dc-shift 0.125
-auralis run input.wav output.wav --backend simd --dc-shift 0.125
-auralis run input.wav output.wav --trim-start-frame 48000 --trim-end-frame 96000
-auralis run input.wav output.wav --trim-start-seconds 1.0 --trim-end-seconds 2.0
-auralis run input.wav output.wav trim 48000 24000 -12000
-auralis run input.wav output.wav --pad-start-frame 24000 --pad-end-frame 48000
-auralis run input.wav output.wav pad 24000@12000
-auralis run input.wav output.wav --fade-in-frame 24000 --fade-out-frame 24000
-auralis run input.wav output.wav --backend simd --fade-in-frame 24000 --fade-out-frame 24000
-auralis run input.wav output.wav --reverse
-auralis run input.wav output.wav gain -3 dcshift 0.125 reverse
-auralis run input.wav output.wav gain -3 : dcshift 0.125 reverse
-auralis run input.wav output.wav --backend simd gain -3 fade t 24000 0 24000
-auralis run input.wav output.wav --effects-file chain.effects
-auralis run first.wav output.wav --combine concatenate --input second.wav reverse
-auralis run first.wav output.wav --combine sequence --input second.wav reverse
-auralis run first.wav output.wav --combine mix --input second.wav reverse
-auralis run first.wav output.wav --combine mix-power --input second.wav reverse
-auralis run first.wav output.wav --combine merge --input second.wav reverse
-auralis run first.wav output.wav --combine multiply --input second.wav reverse
-auralis run stereo.wav mono.wav --channels 1
-auralis run pipeline.toml
+auralis convert input.wav -o output.wav
+auralis render input.wav -o output.wav
+auralis render input.wav -o output.wav --fx 'gain -3'
+auralis render input.wav -o output.wav --backend simd --fx 'gain -3'
+auralis render input.wav -o output.wav --fx 'dcshift 0.125'
+auralis render input.wav -o output.wav --backend simd --fx 'dcshift 0.125'
+auralis render input.wav -o output.wav --fx 'trim 48000 =96000'
+auralis render input.wav -o output.wav --fx 'trim 1 =2'
+auralis render input.wav -o output.wav --fx 'trim 48000 24000 -12000'
+auralis render input.wav -o output.wav --fx 'pad 24000 48000'
+auralis render input.wav -o output.wav --fx 'pad 24000@12000'
+auralis render input.wav -o output.wav --fx 'fade t 24000'
+auralis render input.wav -o output.wav --backend simd --fx 'fade t 24000 0 24000'
+auralis render input.wav -o output.wav --fx reverse
+auralis render input.wav -o output.wav --fx 'gain -3' --fx 'dcshift 0.125' --fx reverse
+auralis render input.wav -o output.wav --fx 'gain -3 : dcshift 0.125 reverse'
+auralis render input.wav -o output.wav --backend simd --fx 'gain -3 fade t 24000 0 24000'
+auralis render input.wav -o output.wav --effects-file chain.effects
+auralis render first.wav -o output.wav --combine concatenate --input second.wav --fx reverse
+auralis render first.wav -o output.wav --combine sequence --input second.wav --fx reverse
+auralis render first.wav -o output.wav --combine mix --input second.wav --fx reverse
+auralis render first.wav -o output.wav --combine mix-power --input second.wav --fx reverse
+auralis render first.wav -o output.wav --combine merge --input second.wav --fx reverse
+auralis render first.wav -o output.wav --combine multiply --input second.wav --fx reverse
+auralis convert stereo.wav -o mono.wav --channels 1
+auralis run Auralis.toml
 auralis completions zsh
 ```
 
-The positional effect chain starts after the input and output paths. A `:`
-token preserves an explicit chain boundary in the parsed representation and
-deterministic rendering; current processing still executes the implemented
-commands sequentially in memory. SoX-ng `newfile` and `restart` boundary
-controls are recognized but rejected until their own pipeline features exist.
-Backend selection remains an option, but legacy one-effect flags such as
-`--gain-db` are not combined with positional chain tokens or `--effects-file`
-because their relative order would be ambiguous. Effects files use the same
-parser as the library `parse_effects_file` API.
+Typed effect commands are passed through `--fx` or `--chain` after the input
+and output paths. A `:` token still preserves an explicit chain boundary in the
+parsed representation and deterministic rendering; current processing still
+executes the implemented commands sequentially in memory. SoX-ng `newfile` and
+`restart` boundary controls are recognized but rejected until their own
+pipeline features exist. Backend selection remains an option, and
+`--effects-file` is mutually exclusive with `--fx` and `--chain` because their
+relative order would otherwise be ambiguous. Effects files use the same parser
+as the library `parse_effects_file` API.
 
 Input combiners run before the effect chain. The first input is the
 existing positional input, and each additional input is supplied with
@@ -786,14 +787,14 @@ Golden manifests use TOML tables keyed under `id`:
 [id.gain_minus_3_mono]
 input = "sine_48k_mono.wav"
 corpus_id = "l0/sine_mono_32"
-auralis = ["--gain-db", "-3"]
+auralis = ["gain", "-3"]
 sox_ng = ["gain", "-3"]
 max_abs = 1e-4
 rms = 1e-6
 snr_db = 90.0
 ```
 
-The `auralis` array is appended after `auralis run <input> <output>`, while
+The `auralis` array is appended after `auralis render <input> -o <output>`, while
 `sox_ng` is appended after `sox_ng -R -D <input> <output>`. Case IDs, tolerance
 fields, and command arguments are validated before tests run so failure reports
 can rely on deterministic command rendering. The testkit also renders command

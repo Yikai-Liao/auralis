@@ -85,7 +85,7 @@ Status: implemented.
 Implement:
 
 ```bash
-auralis run input.wav output.wav
+auralis render input.wav -o output.wav
 ```
 
 The command must decode through internal planar `f32` and re-encode, not simply
