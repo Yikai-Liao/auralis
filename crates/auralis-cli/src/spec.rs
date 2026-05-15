@@ -349,6 +349,7 @@ fn chain_step_effect_tokens(
             ])
         }
         "filter.highpass" => highpass_effect_tokens(chain, index, step),
+        "norm.peak" => norm_peak_effect_tokens(chain, index, step),
         "trim" => {
             let Some(range) = step.params.get("range") else {
                 return Ok(vec![step.op.clone()]);
@@ -400,11 +401,39 @@ fn highpass_effect_tokens(
     Ok(tokens)
 }
 
+fn norm_peak_effect_tokens(
+    chain: &ChainSpec,
+    index: usize,
+    step: &ChainStepSpec,
+) -> Result<Vec<String>, GraphSpecError> {
+    let Some(target) = step.params.get("target") else {
+        return Ok(vec!["norm".to_owned()]);
+    };
+    let target = param_as_dbfs(target).ok_or_else(|| GraphSpecError::InvalidStepParam {
+        chain_id: chain.id.clone(),
+        index,
+        op: step.op.clone(),
+        param: "target",
+    })?;
+    Ok(vec!["norm".to_owned(), target])
+}
+
 fn param_as_frequency_hz(value: &toml::Value) -> Option<String> {
     let value = param_as_string(value)?;
     let value = value
         .strip_suffix("Hz")
         .or_else(|| value.strip_suffix("hz"))
+        .unwrap_or(&value);
+    Some(value.to_owned())
+}
+
+fn param_as_dbfs(value: &toml::Value) -> Option<String> {
+    let value = param_as_string(value)?;
+    let value = value
+        .strip_suffix("dBFS")
+        .or_else(|| value.strip_suffix("dbfs"))
+        .or_else(|| value.strip_suffix("dB"))
+        .or_else(|| value.strip_suffix("db"))
         .unwrap_or(&value);
     Some(value.to_owned())
 }
