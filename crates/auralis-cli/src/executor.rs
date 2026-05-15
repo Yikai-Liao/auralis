@@ -95,6 +95,17 @@ pub(super) fn convert_audio(
     Ok(())
 }
 
+pub(super) fn validate_convert_options(
+    output: &Path,
+    options: ConvertOptions,
+) -> Result<(), CliError> {
+    output_format(output, options.container, options.sample)?;
+    options.sample_rate_conversion_policy()?;
+    options.channel_conversion_policy()?;
+    options.output_level_policy()?;
+    Ok(())
+}
+
 pub(super) fn run_pipeline(
     input: &Path,
     output: &Path,

@@ -2,8 +2,9 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
     CliError,
-    command_args::{PipeArgs, RenderArgs},
+    command_args::{ConvertArgs, PipeArgs, RenderArgs},
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
+    executor::{ConvertOptions, OutputGuard, validate_convert_options},
     graph_plan,
     plan_args::{PlanArgs, PlanCommand},
     plan_combine::plan_combine_surface_command,
@@ -36,6 +37,10 @@ fn plan_modern_command(
     json: bool,
 ) -> Result<(), CliError> {
     match command {
+        PlanCommand::Convert(convert) => {
+            reject_graph_plan_options(spec, target, locked)?;
+            plan_convert_command(convert, json)
+        }
         PlanCommand::Render(render) => {
             reject_graph_plan_options(spec, target, locked)?;
             plan_render_command(render, json)
@@ -59,6 +64,11 @@ fn plan_modern_command(
     }
 }
 
+fn plan_convert_command(convert: ConvertArgs, json: bool) -> Result<(), CliError> {
+    let checked = checked_convert_spec(convert)?;
+    graph_plan::print_checked_plan("command:convert", "convert", &checked, None, json)
+}
+
 fn plan_render_command(render: RenderArgs, json: bool) -> Result<(), CliError> {
     let checked = checked_render_spec(render)?;
     graph_plan::print_checked_plan("command:render", "render", &checked, None, json)
@@ -78,6 +88,89 @@ fn reject_graph_plan_options(
         return Err(CliError::PlanCommandRejectsGraphOptions);
     }
     Ok(())
+}
+
+fn checked_convert_spec(convert: ConvertArgs) -> Result<spec::CheckedGraphSpec, CliError> {
+    let ConvertArgs {
+        input,
+        output,
+        backend,
+        output_channels,
+        no_auto_channels,
+        output_sample_rate,
+        no_auto_rate,
+        guard,
+        norm,
+        container,
+        sample,
+    } = convert;
+    validate_convert_options(
+        &output,
+        ConvertOptions {
+            backend,
+            output_channels,
+            no_auto_channels,
+            output_sample_rate,
+            no_auto_rate,
+            guard: OutputGuard::from(guard),
+            norm,
+            container,
+            sample,
+        },
+    )?;
+
+    let mut step_labels = Vec::new();
+    append_render_policy_steps(
+        &mut step_labels,
+        output_channels,
+        no_auto_channels,
+        output_sample_rate,
+        no_auto_rate,
+        guard,
+        norm,
+        false,
+        None,
+        container,
+        sample,
+    );
+
+    let (chains, sink_input, expanded_step_ids) = if step_labels.is_empty() {
+        (Vec::new(), "input.audio".to_owned(), Vec::new())
+    } else {
+        let step_ids = step_labels
+            .iter()
+            .enumerate()
+            .map(|(index, label)| format!("convert/{:02}-{}", index + 1, step_slug(label)))
+            .collect::<Vec<_>>();
+        let chain = spec::CheckedChain {
+            id: "convert".to_owned(),
+            input: "input.audio".to_owned(),
+            step_ids: step_ids.clone(),
+            step_labels,
+            effect_tokens: Vec::new(),
+        };
+        (vec![chain], "convert.audio".to_owned(), step_ids)
+    };
+
+    Ok(spec::CheckedGraphSpec {
+        name: Some("convert".to_owned()),
+        source_count: 1,
+        chain_count: chains.len(),
+        node_count: 0,
+        sink_count: 1,
+        sources: vec![spec::CheckedSource {
+            id: "input".to_owned(),
+            path: input,
+        }],
+        chains,
+        nodes: Vec::new(),
+        sinks: vec![spec::CheckedSink {
+            id: "output".to_owned(),
+            input: sink_input,
+            path: output,
+        }],
+        expanded_step_ids,
+    })
 }
 
 fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, CliError> {

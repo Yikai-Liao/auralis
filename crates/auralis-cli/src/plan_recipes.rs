@@ -76,7 +76,8 @@ pub(super) fn plan_recipe_surface_command(
         PlanCommand::Dither(dither) => plan_dither_command(dither, json),
         PlanCommand::Reverb(reverb) => plan_reverb_command(reverb, json),
         PlanCommand::Stretch(stretch) => plan_stretch_command(stretch, json),
-        PlanCommand::Render(_)
+        PlanCommand::Convert(_)
+        | PlanCommand::Render(_)
         | PlanCommand::Pipe(_)
         | PlanCommand::Mix(_)
         | PlanCommand::Concat(_)

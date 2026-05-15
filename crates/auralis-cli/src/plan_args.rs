@@ -4,9 +4,9 @@ use clap::{Args, Subcommand};
 
 use crate::{
     command_args::{
-        ChannelsArgs, ChorusArgs, ContrastArgs, DcShiftArgs, EchoArgs, FlangerArgs, GainArgs,
-        NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs, RenderArgs, SaturationArgs,
-        SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
+        ChannelsArgs, ChorusArgs, ContrastArgs, ConvertArgs, DcShiftArgs, EchoArgs, FlangerArgs,
+        GainArgs, NormArgs, OverdriveArgs, PhaserArgs, PipeArgs, RateArgs, RenderArgs,
+        SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs, VolArgs,
     },
     recipe_args::{
         BandArgs, BandPassArgs, BandRejectArgs, BassArgs, ConcatArgs, DelayArgs, DitherArgs,
@@ -40,6 +40,8 @@ pub(crate) struct PlanArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum PlanCommand {
+    /// Plan a convert command without executing it.
+    Convert(ConvertArgs),
     /// Plan a linear render command without executing it.
     Render(RenderArgs),
     /// Plan a compact pipe command without executing it.
