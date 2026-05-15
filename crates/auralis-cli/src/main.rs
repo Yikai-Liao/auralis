@@ -9,8 +9,8 @@ use std::{
 };
 
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
-use auralis_wav::{WavError, decode_pcm16_path};
-use clap::{Parser, Subcommand};
+use auralis_wav::{decode_pcm16_path, WavError};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Deterministic audio DSP tools.")]
@@ -160,6 +160,16 @@ enum Command {
         spec: PathBuf,
     },
 
+    /// Emit an Auralis graph spec as a graph description.
+    Graph {
+        /// Auralis graph spec to render.
+        spec: PathBuf,
+
+        /// Output graph format.
+        #[arg(long, value_name = "FORMAT", default_value = "mermaid")]
+        format: GraphFormat,
+    },
+
     /// Run an Auralis graph spec.
     Run {
         /// Auralis graph spec to execute.
@@ -171,6 +181,11 @@ enum Command {
         /// Optional canonical effect name or alias to inspect.
         effect: Option<String>,
     },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum GraphFormat {
+    Mermaid,
 }
 
 fn main() -> ExitCode {
@@ -263,6 +278,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
             chain.as_deref(),
         ),
         Command::Plan { spec } => plan_graph_spec(&spec),
+        Command::Graph { spec, format } => graph_spec(&spec, format),
         Command::Run { spec } => run_graph_spec(&spec),
         Command::Ops { effect } => print_ops(effect.as_deref()),
     }
@@ -404,6 +420,62 @@ fn plan_graph_spec(spec: &Path) -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+fn graph_spec(spec: &Path, format: GraphFormat) -> Result<(), CliError> {
+    let checked = spec::check_graph_spec(spec)?;
+    match format {
+        GraphFormat::Mermaid => print_mermaid_graph(&checked),
+    }
+
+    Ok(())
+}
+
+fn print_mermaid_graph(checked: &spec::CheckedGraphSpec) {
+    println!("flowchart LR");
+    for source in &checked.sources {
+        println!(
+            "  {}[\"source: {}\"]",
+            mermaid_id(&source.id),
+            source.path.display()
+        );
+    }
+    for chain in &checked.chains {
+        let mut previous = chain.input.strip_suffix(".audio").unwrap_or(&chain.input);
+        for (step_id, label) in chain.step_ids.iter().zip(chain.step_labels.iter()) {
+            let node_id = mermaid_id(step_id);
+            println!("  {node_id}[\"{label}\"]");
+            println!("  {} --> {node_id}", mermaid_id(previous));
+            previous = step_id;
+        }
+    }
+    for node in &checked.nodes {
+        println!("  {}[\"{}\"]", mermaid_id(node), node);
+    }
+    for sink in &checked.sinks {
+        println!(
+            "  {}[\"sink: {}\"]",
+            mermaid_id(&sink.id),
+            sink.path.display()
+        );
+        let input = sink.input.strip_suffix(".audio").unwrap_or(&sink.input);
+        let upstream = checked
+            .chains
+            .iter()
+            .find(|chain| chain.id == input)
+            .and_then(|chain| chain.step_ids.last())
+            .map_or(input, String::as_str);
+        println!("  {} --> {}", mermaid_id(upstream), mermaid_id(&sink.id));
+    }
+}
+
+fn mermaid_id(id: &str) -> String {
+    id.chars()
+        .map(|character| match character {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => character,
+            _ => '_',
+        })
+        .collect()
 }
 
 fn run_graph_spec(spec: &Path) -> Result<(), CliError> {

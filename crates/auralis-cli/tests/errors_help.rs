@@ -15,6 +15,7 @@ fn top_level_help_documents_modern_run_subcommand() {
     let stdout = stdout(&command_output);
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("convert"), "{stdout}");
+    assert!(stdout.contains("graph"), "{stdout}");
     assert!(stdout.contains("run"), "{stdout}");
 }
 
@@ -295,6 +296,61 @@ path = "build/out.wav"
     );
     assert!(stdout.contains("node master"), "{stdout}");
     assert!(stdout.contains("write wav <- master.audio"), "{stdout}");
+}
+
+#[test]
+fn graph_spec_reports_mermaid_for_valid_linear_spec() {
+    let spec = temp_path("auralis-cli-graph-spec-mermaid", "toml");
+    fs::write(
+        &spec,
+        r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "input/voice.wav"
+
+[[chains]]
+id = "voice_clean"
+input = "voice.audio"
+steps = [
+  { id = "cut", op = "trim" },
+  { op = "gain", by = "-3dB" },
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_clean.audio"
+path = "build/out.wav"
+"#,
+    )
+    .unwrap();
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["graph", spec.to_str().unwrap(), "--format", "mermaid"])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    assert!(
+        command_output.status.success(),
+        "{}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("flowchart LR"), "{stdout}");
+    assert!(
+        stdout.contains("voice[\"source: input/voice.wav\"]"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("cut[\"trim\"]"), "{stdout}");
+    assert!(stdout.contains("voice --> cut"), "{stdout}");
+    assert!(
+        stdout.contains("voice_clean_02_gain[\"gain -3dB\"]"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("cut --> voice_clean_02_gain"), "{stdout}");
+    assert!(stdout.contains("wav[\"sink: build/out.wav\"]"), "{stdout}");
+    assert!(stdout.contains("voice_clean_02_gain --> wav"), "{stdout}");
 }
 
 #[test]

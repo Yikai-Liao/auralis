@@ -41,6 +41,7 @@ pub struct CheckedChain {
     pub id: String,
     pub input: String,
     pub step_ids: Vec<String>,
+    pub step_labels: Vec<String>,
     pub effect_tokens: Vec<String>,
 }
 
@@ -232,6 +233,7 @@ fn validate_chains(
 
         let mut seen_step_ids = BTreeSet::new();
         let mut step_ids = Vec::new();
+        let mut step_labels = Vec::new();
         let mut effect_tokens = Vec::new();
         for (index, step) in chain.steps.iter().enumerate() {
             if step.op.trim().is_empty() {
@@ -256,7 +258,9 @@ fn validate_chains(
                     step_id: expanded_id,
                 });
             }
-            effect_tokens.extend(chain_step_effect_tokens(chain, index, step)?);
+            let step_effect_tokens = chain_step_effect_tokens(chain, index, step)?;
+            step_labels.push(step_effect_tokens.join(" "));
+            effect_tokens.extend(step_effect_tokens);
             expanded_step_ids.push(expanded_id.clone());
             step_ids.push(expanded_id);
         }
@@ -264,6 +268,7 @@ fn validate_chains(
             id: chain.id.clone(),
             input: chain.input.clone(),
             step_ids,
+            step_labels,
             effect_tokens,
         });
     }
