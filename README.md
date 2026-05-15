@@ -9,10 +9,9 @@ Rust APIs, explicit test contracts, and maintainable modules.
 
 Initial scope is deliberately narrow: **WAV first**, with PCM8, PCM16, PCM24,
 PCM32, float32, float64, u-law, A-law, and RIFX currently implemented. Raw PCM,
-AIFF/AIFC, FLAC, and AU/SND decode/export are growing behind Auralis-owned pure Rust adapters.
-Additional formats are planned only after effect and pipeline behavior are broad
-and stable, and new codec backends must stay pure Rust unless a later
-development-plan change says otherwise.
+AIFF/AIFC, FLAC, and AU/SND decode/export are also implemented behind
+Auralis-owned pure Rust adapters. New codec backends must stay pure Rust unless
+a later development-plan change says otherwise.
 
 ## Current Status
 
@@ -32,6 +31,9 @@ Auralis is pre-alpha. The repository already contains:
   policies, and many typed effects, with
   specialized/native-backed/format-boundary effects classified before
   inclusion;
+- a modern CLI graph-spec slice with `auralis check`, `plan`, `graph`, `run`,
+  and `ops`, where graph execution currently covers validated
+  source-to-chain-to-sink specs;
 - a deterministic Rust testkit, SoX-ng golden manifests with complex
   chain/boundary cases, L0-L7 layered coverage metadata, fuzz/parser seeds,
   optional Python helpers for cross-tool golden execution and reporting, and a
@@ -91,11 +93,11 @@ export AURALIS_SOX_NG_BIN=/usr/local/bin/sox_ng
 ## Quick Commands
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-cargo test --doc --workspace
-cd tools/pytest && uv run pytest
+rtk cargo fmt --all --check
+rtk cargo clippy --workspace --all-targets --all-features -- -D warnings
+rtk cargo test --workspace --all-features
+rtk cargo test --doc --workspace
+cd tools/pytest && rtk uv sync && rtk uv run pytest
 ```
 
 SoX-ng golden jobs must run with a real `sox_ng` binary. Local exploratory runs

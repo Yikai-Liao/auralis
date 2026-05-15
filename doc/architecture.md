@@ -55,24 +55,28 @@ A structured pipeline form should also exist for reproducible batch workflows:
 auralis run Auralis.toml
 ```
 
-Example `pipeline.toml`:
+Example `Auralis.toml`:
 
 ```toml
-input = "input.wav"
-output = "output.wav"
+version = "auralis.graph/v1"
 
-[[effects]]
-type = "gain"
-db = -3.0
+[[sources]]
+id = "input"
+path = "input.wav"
 
-[[effects]]
-type = "trim"
-start_seconds = 0.0
-end_seconds = 10.0
+[[chains]]
+id = "main"
+input = "input.audio"
+steps = [
+  { op = "gain", by = "-3dB" },
+  { op = "trim", range = "0s..10s" },
+  { op = "fade", fade_out = "0.25s" },
+]
 
-[[effects]]
-type = "fade_out"
-duration_seconds = 0.25
+[[sinks]]
+id = "output"
+input = "main.audio"
+path = "output.wav"
 ```
 
 ### 3. Typed effect configuration

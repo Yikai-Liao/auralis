@@ -8,13 +8,17 @@ vocabulary with planar internal audio buffers. The codec trait boundary is in
 place for WAV-first scope and explicit unsupported-format reporting. PCM8 and
 PCM16 WAV decoding into planar `f32` buffers are implemented, PCM16 legacy WAV
 writing remains in place, PCM8/PCM16 writing is available through the newer
-output-format boundary, the `auralis inspect` CLI reports PCM16 WAV metadata,
-and `auralis render input.wav -o output.wav` performs a
-decode-through-buffer copy pipeline and can apply constant gain with
-`--gain-db <DB>`, SoX-ng-style multi-range trim positions, zero padding with
-frame counts and insertion positions, frame-level reversal with `--reverse`,
-constant DC offset with `--dc-shift <SHIFT>`, or linear fades with
-`--fade-in-frame <FRAMES>` and `--fade-out-frame <FRAMES>`.
+output-format boundary, and the `auralis inspect` CLI reports PCM16 WAV
+metadata. The modern CLI surface now exposes `auralis convert`, `render`,
+`check`, `plan`, `graph`, `run`, and `ops`. `auralis convert` can convert
+between the currently supported CLI container set, while
+`auralis render input.wav -o output.wav` executes ordered typed effect chains
+through `--fx`, `--chain`, or `--effects-file`, supports multi-input combine
+modes, and applies explicit output boundary policies such as `--channels`,
+`--rate`, `--guard`, `--norm`, and `--dither`. The graph-spec Phase 2 slice is
+also present: `auralis check <SPEC>`, `plan <SPEC>`, `graph <SPEC> --format
+mermaid|dot|json`, and `run <SPEC>` support validated `Auralis.toml`-style
+specs, with `run` currently limited to source-to-chain-to-sink execution.
 The scalar `gain`, `dcshift`, `fade`, and biquad DSP primitives, the typed `Gain`, `Channels`, `Norm`,
 `Contrast`, `SoftVol`, `Centercut`, `AllPass`, `Band`, `BandPass`, `BandReject`, `Bass`, `Treble`, `Equalizer`, `HighPass`, `Hilbert`, `Sinc`, `Dither`, `LowPass`, `Deemph`, `Riaa`, `Delay`, `Downsample`, `Upsample`, `Speed`, `Splice`, `Stretch`, `Tempo`, `Pitch`, `Rate`, `Echo`, `Echos`, `Chorus`, `Flanger`, `Phaser`, `Reverb`, `Biquad`, `Oops`, `Swap`, `Tremolo`, `Overdrive`, `Saturation`, `Repeat`, `Remix`, `DcShift`, `Trim`, `Pad`, `Reverse`, `Fade`,
 `Compand`, `MCompand`, `NoiseProf`, `NoiseRed`, `Stat`, `Stats`, `Synth`, `Fir`, `FirFit`, `Silence`, `Vad`, and `Vol` effect processors, the high-level library chain API for applying
@@ -232,7 +236,8 @@ backends under the pure-Rust codec policy. Feature 9.1 is blocked: PyO3,
 maturin, NumPy buffer exposure, and Python package release work must wait until
 the Rust API, effect pipeline, error model, buffer model, and binding
 documentation preconditions are re-audited and pass.
-Other effect transform CLI options are still intentionally unimplemented.
+Other legacy one-flag-per-transform CLI options are still intentionally
+unimplemented.
 
 The nearby `sox_ng` checkout is used only as a reference implementation for golden tests. It is not vendored into Auralis and should not shape the internal architecture.
 
