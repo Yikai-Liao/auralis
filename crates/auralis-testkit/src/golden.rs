@@ -182,7 +182,7 @@ impl GoldenCase {
 
     /// Returns the Auralis argument fragment recorded by the manifest.
     ///
-    /// Arguments are appended after `auralis run <input> <output>` by
+    /// Arguments are appended after `auralis render <input> -o <output>` by
     /// [`Self::render_auralis_command`].
     #[must_use]
     pub fn auralis_args(&self) -> &[String] {
@@ -241,10 +241,11 @@ impl GoldenCase {
             .into_iter()
             .map(|path| path_to_command_arg(path.as_ref()))
             .collect::<Vec<_>>();
-        let mut command = vec![executable.as_ref().to_owned(), "run".to_owned()];
+        let mut command = vec![executable.as_ref().to_owned(), "render".to_owned()];
         if let Some(first_input) = input_paths.first() {
             command.push(first_input.clone());
         }
+        command.push("-o".to_owned());
         command.push(path_to_command_arg(output_path.as_ref()));
         if input_paths.len() > 1 {
             command.push("--combine".to_owned());
@@ -262,7 +263,7 @@ impl GoldenCase {
             command.push("--rate".to_owned());
             command.push(output_sample_rate.to_string());
         }
-        command.extend(self.auralis.iter().cloned());
+        command.extend(self.rendered_auralis_effect_args());
         command
     }
 
@@ -433,6 +434,19 @@ impl GoldenCase {
 
     fn rendered_combine_method(&self) -> &str {
         self.combine.as_deref().unwrap_or("concatenate")
+    }
+
+    fn rendered_auralis_effect_args(&self) -> Vec<String> {
+        if self.auralis.is_empty()
+            || self
+                .auralis
+                .first()
+                .is_some_and(|argument| argument.starts_with("--"))
+        {
+            return self.auralis.clone();
+        }
+
+        vec!["--fx".to_owned(), self.auralis.join(" ")]
     }
 }
 

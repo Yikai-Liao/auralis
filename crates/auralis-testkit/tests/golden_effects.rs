@@ -269,7 +269,7 @@ fn effects_golden_manifest_renders_representative_commands() {
 
     assert_eq!(
         gain.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav gain -3"
+        "auralis render in.wav -o out.wav --fx \"gain -3\""
     );
     assert_eq!(
         trim.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
@@ -281,7 +281,7 @@ fn effects_golden_manifest_renders_representative_commands() {
     );
     assert_eq!(
         centercut.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav centercut -a 0.5 -b -w 16"
+        "auralis render in.wav -o out.wav --fx \"centercut -a 0.5 -b -w 16\""
     );
 }
 

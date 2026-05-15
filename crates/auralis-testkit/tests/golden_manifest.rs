@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use auralis_testkit::golden::{
-    GoldenCommand, GoldenManifest, GoldenManifestError, GoldenMetric, quote_command_arg,
-    render_command_line,
+    quote_command_arg, render_command_line, GoldenCommand, GoldenManifest, GoldenManifestError,
+    GoldenMetric,
 };
 
 const VALID_MANIFEST: &str = r#"
@@ -20,7 +20,7 @@ const VALID_MANIFEST: &str = r#"
     [id.gain_minus_3_mono]
     input = "mono/sine.wav"
     corpus_id = "l0/sine_mono_32"
-    auralis = ["--gain-db", "-3"]
+    auralis = ["gain", "-3"]
     sox_ng = ["gain", "-3"]
     max_abs = 0.0001
     rms = 0.000001
@@ -47,7 +47,7 @@ fn manifest_parse_preserves_case_fields() {
     assert_eq!(case.corpus_id(), Some("l0/sine_mono_32"));
     assert_eq!(case.corpus_ids(), ["l0/sine_mono_32"]);
     assert_eq!(case.combine_method(), None);
-    assert_eq!(case.auralis_args(), ["--gain-db", "-3"]);
+    assert_eq!(case.auralis_args(), ["gain", "-3"]);
     assert_eq!(case.sox_ng_args(), ["gain", "-3"]);
     assert_float_eq(case.tolerance().max_abs, 0.000_1);
     assert_float_eq(case.tolerance().rms, 0.000_001);
@@ -60,7 +60,7 @@ fn invalid_manifest_is_rejected_for_missing_fields() {
         r#"
         [id.missing_sox_command]
         input = "mono/sine.wav"
-        auralis = ["--gain-db", "-3"]
+        auralis = ["gain", "-3"]
         max_abs = 0.0001
         rms = 0.000001
         snr_db = 90.0
@@ -77,7 +77,7 @@ fn invalid_manifest_is_rejected_for_bad_case_id() {
         r#"
         [id."gain minus 3"]
         input = "mono/sine.wav"
-        auralis = ["--gain-db", "-3"]
+        auralis = ["gain", "-3"]
         sox_ng = ["gain", "-3"]
         max_abs = 0.0001
         rms = 0.000001
@@ -152,7 +152,7 @@ fn manifest_parse_preserves_multi_input_cases() {
             ["first file.wav", "second file.wav"],
             "out.wav",
         ),
-        "auralis run \"first file.wav\" out.wav --combine concatenate --input \"second file.wav\" gain -3"
+        "auralis render \"first file.wav\" -o out.wav --combine concatenate --input \"second file.wav\" --fx \"gain -3\""
     );
     assert_eq!(
         case.render_sox_ng_command_line_with_inputs(
@@ -188,7 +188,7 @@ fn manifest_parse_preserves_explicit_combine_method() {
             ["first.wav", "second.wav"],
             "out.wav",
         ),
-        "auralis run first.wav out.wav --combine sequence --input second.wav reverse"
+        "auralis render first.wav -o out.wav --combine sequence --input second.wav --fx reverse"
     );
     assert_eq!(
         case.render_sox_ng_command_line_with_inputs(
@@ -271,7 +271,7 @@ fn manifest_parse_records_output_channel_auto_conversion() {
     assert!(case.sox_ng_auto_channels_inserted());
     assert_eq!(
         case.render_auralis_command_line("auralis", "stereo.wav", "mono.wav"),
-        "auralis run stereo.wav mono.wav --channels 1"
+        "auralis render stereo.wav -o mono.wav --channels 1"
     );
     assert_eq!(
         case.render_sox_ng_command_line("sox_ng", "stereo.wav", "mono.wav"),
@@ -301,7 +301,7 @@ fn manifest_parse_records_output_sample_rate_auto_conversion() {
     assert!(case.sox_ng_auto_rate_inserted());
     assert_eq!(
         case.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav --rate 24000"
+        "auralis render in.wav -o out.wav --rate 24000"
     );
     assert_eq!(
         case.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
@@ -421,7 +421,7 @@ fn invalid_manifest_is_rejected_for_negative_tolerance() {
         r#"
         [id.gain_minus_3]
         input = "mono/sine.wav"
-        auralis = ["--gain-db", "-3"]
+        auralis = ["gain", "-3"]
         sox_ng = ["gain", "-3"]
         max_abs = -0.0001
         rms = 0.000001
@@ -449,11 +449,12 @@ fn command_rendering_is_deterministic() {
         case.render_auralis_command("auralis", "/tmp/in.wav", "/tmp/out.wav"),
         [
             "auralis",
-            "run",
+            "render",
             "/tmp/in.wav",
+            "-o",
             "/tmp/out.wav",
-            "--gain-db",
-            "-3"
+            "--fx",
+            "gain -3"
         ],
     );
     assert_eq!(
@@ -474,8 +475,9 @@ fn command_rendering_is_deterministic() {
 fn command_line_rendering_quotes_and_escapes_deterministically() {
     let command = [
         "auralis",
-        "run",
+        "render",
         "input file.wav",
+        "-o",
         "quote\"and\\slash",
         "line\nbreak",
         "tab\tvalue",
@@ -484,7 +486,7 @@ fn command_line_rendering_quotes_and_escapes_deterministically() {
 
     assert_eq!(
         render_command_line(command),
-        "auralis run \"input file.wav\" \"quote\\\"and\\\\slash\" \"line\\nbreak\" \"tab\\tvalue\" \"\""
+        "auralis render \"input file.wav\" -o \"quote\\\"and\\\\slash\" \"line\\nbreak\" \"tab\\tvalue\" \"\""
     );
     assert_eq!(quote_command_arg("safe/path-1.wav"), "safe/path-1.wav");
     assert_eq!(quote_command_arg("needs space"), "\"needs space\"");
@@ -496,7 +498,7 @@ fn golden_manifest_command_line_rendering_is_stable_across_runs() {
         r#"
         [id.quoted_paths]
         input = "fixtures/input file.wav"
-        auralis = ["--gain-db", "-3"]
+        auralis = ["gain", "-3"]
         sox_ng = ["gain", "-3"]
         max_abs = 0.0001
         rms = 0.000001
@@ -520,7 +522,7 @@ fn golden_manifest_command_line_rendering_is_stable_across_runs() {
     assert_eq!(first, second);
     assert_eq!(
         first,
-        "auralis run \"fixtures/input file.wav\" \"tmp/output file.wav\" --gain-db -3"
+        "auralis render \"fixtures/input file.wav\" -o \"tmp/output file.wav\" --fx \"gain -3\""
     );
     assert_eq!(
         case.render_sox_ng_command_line("sox_ng", "fixtures/input file.wav", "tmp/out.wav"),

@@ -44,7 +44,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
 
     assert_eq!(
         level.render_auralis_command_line("auralis", "input file.wav", "out.wav"),
-        "auralis run \"input file.wav\" out.wav gain -3 dcshift 0.125 gain -1"
+        "auralis render \"input file.wav\" -o out.wav --fx \"gain -3 dcshift 0.125 gain -1\""
     );
     assert_eq!(
         filter.render_sox_ng_command_line("sox_ng", "input.wav", "out.wav"),
@@ -58,7 +58,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
             ["front.wav", "tail.wav"],
             "out.wav",
         ),
-        "auralis run front.wav out.wav --combine mix --input tail.wav gain -3 : gain 0 : dcshift 0"
+        "auralis render front.wav -o out.wav --combine mix --input tail.wav --fx \"gain -3 : gain 0 : dcshift 0\""
     );
     assert_eq!(
         boundary.render_sox_ng_command_line_with_inputs(
@@ -76,7 +76,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
             ["front.wav", "tail.wav"],
             "out.wav",
         ),
-        "auralis run front.wav out.wav --combine mix --input tail.wav gain -3 reverse"
+        "auralis render front.wav -o out.wav --combine mix --input tail.wav --fx \"gain -3 reverse\""
     );
     assert_eq!(
         multi_input.render_sox_ng_command_line_with_inputs(
@@ -91,7 +91,7 @@ fn chain_golden_manifest_renders_recorded_commands() {
     assert!(output_policy.sox_ng_auto_channels_inserted());
     assert_eq!(
         output_policy.render_auralis_command_line("auralis", "input.wav", "out.wav"),
-        "auralis run input.wav out.wav --channels 1 gain -3 reverse"
+        "auralis render input.wav -o out.wav --channels 1 --fx \"gain -3 reverse\""
     );
     assert_eq!(
         output_policy.render_sox_ng_command_line("sox_ng", "input.wav", "out.wav"),
@@ -117,7 +117,7 @@ fn chain_golden_manifest_renders_boundary_tokens_deterministically() {
 
     assert_eq!(
         case.render_auralis_command_line("auralis", "input.wav", "out.wav"),
-        "auralis run input.wav out.wav gain -3 : dcshift 0.125"
+        "auralis render input.wav -o out.wav --fx \"gain -3 : dcshift 0.125\""
     );
     assert_eq!(
         case.render_sox_ng_command_line("sox_ng", "input.wav", "out.wav"),

@@ -30,7 +30,7 @@ fn auto_rate_golden_manifest_renders_output_rate_options() {
     assert!(upsample.sox_ng_auto_rate_inserted());
     assert_eq!(
         downsample.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav --rate 24000"
+        "auralis render in.wav -o out.wav --rate 24000"
     );
     assert_eq!(
         downsample.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),

@@ -42,7 +42,7 @@ fn concat_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine concatenate --input long.wav"
+        "auralis render short.wav -o out.wav --combine concatenate --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(
@@ -78,7 +78,7 @@ fn sequence_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine sequence --input long.wav"
+        "auralis render short.wav -o out.wav --combine sequence --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(
@@ -114,7 +114,7 @@ fn mix_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine mix --input long.wav"
+        "auralis render short.wav -o out.wav --combine mix --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(
@@ -153,7 +153,7 @@ fn mix_power_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine mix-power --input long.wav"
+        "auralis render short.wav -o out.wav --combine mix-power --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(
@@ -194,7 +194,7 @@ fn merge_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine merge --input long.wav"
+        "auralis render short.wav -o out.wav --combine merge --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(
@@ -233,7 +233,7 @@ fn multiply_golden_manifest_renders_multi_input_commands() {
             ["short.wav", "long.wav"],
             "out.wav",
         ),
-        "auralis run short.wav out.wav --combine multiply --input long.wav"
+        "auralis render short.wav -o out.wav --combine multiply --input long.wav"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line_with_inputs(

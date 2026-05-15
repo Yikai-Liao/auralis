@@ -30,7 +30,7 @@ fn auto_channels_golden_manifest_renders_output_channel_options() {
     assert!(stereo.sox_ng_auto_channels_inserted());
     assert_eq!(
         stereo.render_auralis_command_line("auralis", "stereo.wav", "mono.wav"),
-        "auralis run stereo.wav mono.wav --channels 1"
+        "auralis render stereo.wav -o mono.wav --channels 1"
     );
     assert_eq!(
         stereo.render_sox_ng_command_line("sox_ng", "stereo.wav", "mono.wav"),

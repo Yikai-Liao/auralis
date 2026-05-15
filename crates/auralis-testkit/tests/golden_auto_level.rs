@@ -27,7 +27,7 @@ fn auto_level_golden_manifest_renders_guard_and_norm_commands() {
 
     assert_eq!(
         guard.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav --guard --gain-db 6"
+        "auralis render in.wav -o out.wav --guard --fx \"gain 6\""
     );
     assert_eq!(
         guard.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
@@ -35,7 +35,7 @@ fn auto_level_golden_manifest_renders_guard_and_norm_commands() {
     );
     assert_eq!(
         norm.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav --norm=-6"
+        "auralis render in.wav -o out.wav --norm=-6"
     );
     assert_eq!(
         norm.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),

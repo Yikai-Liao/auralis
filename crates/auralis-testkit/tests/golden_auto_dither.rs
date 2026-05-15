@@ -20,7 +20,7 @@ fn auto_dither_golden_manifest_renders_sox_ng_without_disabled_dither() {
     assert!(dither.sox_ng_auto_dither_inserted());
     assert_eq!(
         dither.render_auralis_command_line("auralis", "in.wav", "out.wav"),
-        "auralis run in.wav out.wav --dither --gain-db -0.1"
+        "auralis render in.wav -o out.wav --dither --fx \"gain -0.1\""
     );
     assert_eq!(
         dither.render_sox_ng_command_line("sox_ng", "in.wav", "out.wav"),
