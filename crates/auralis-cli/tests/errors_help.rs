@@ -551,6 +551,68 @@ path = "{}"
 }
 
 #[test]
+fn run_graph_spec_applies_trim_chain_step_range() {
+    let spec = temp_path("auralis-cli-run-spec-trim-range", "toml");
+    let input = temp_path("auralis-cli-run-spec-trim-range-input", "wav");
+    let graph_output = temp_path("auralis-cli-run-spec-trim-range-output", "wav");
+    let render_output = temp_path("auralis-cli-run-spec-trim-range-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[-1000, -500, 0, 500, 1000]);
+    fs::write(
+        &spec,
+        format!(
+            r#"version = "auralis.graph/v1"
+
+[[sources]]
+id = "voice"
+path = "{}"
+
+[[chains]]
+id = "voice_trimmed"
+input = "voice.audio"
+steps = [
+  {{ op = "trim", range = "1..4" }},
+]
+
+[[sinks]]
+id = "wav"
+input = "voice_trimmed.audio"
+path = "{}"
+"#,
+            input.display(),
+            graph_output.display()
+        ),
+    )
+    .unwrap();
+
+    let graph = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["run", spec.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "trim 1 =4",
+        ])
+        .output()
+        .unwrap();
+
+    fs::remove_file(spec).unwrap();
+    fs::remove_file(input).unwrap();
+    assert!(graph.status.success(), "{}", stderr(&graph));
+    assert!(render.status.success(), "{}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&graph_output),
+        read_pcm16_wav(&render_output)
+    );
+    fs::remove_file(graph_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn run_graph_spec_reports_unsupported_node_execution() {
     let spec = temp_path("auralis-cli-run-spec-node", "toml");
     fs::write(

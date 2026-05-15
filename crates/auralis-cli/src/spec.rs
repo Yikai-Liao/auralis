@@ -306,6 +306,26 @@ fn chain_step_effect_tokens(
             })?;
             Ok(vec![step.op.clone(), by])
         }
+        "trim" => {
+            let Some(range) = step.params.get("range") else {
+                return Ok(vec![step.op.clone()]);
+            };
+            let range = param_as_string(range).ok_or_else(|| GraphSpecError::InvalidStepParam {
+                chain_id: chain.id.clone(),
+                index,
+                op: step.op.clone(),
+                param: "range",
+            })?;
+            let Some((start, end)) = range.split_once("..") else {
+                return Err(GraphSpecError::InvalidStepParam {
+                    chain_id: chain.id.clone(),
+                    index,
+                    op: step.op.clone(),
+                    param: "range",
+                });
+            };
+            Ok(vec![step.op.clone(), start.to_owned(), format!("={end}")])
+        }
         _ => Ok(vec![step.op.clone()]),
     }
 }
