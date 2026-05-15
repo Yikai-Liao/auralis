@@ -111,6 +111,60 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Normalize one audio file with the typed norm effect.
+    Norm {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Peak target in dBFS.
+        #[arg(value_name = "DBFS", default_value = "0", allow_hyphen_values = true)]
+        level: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Resample one audio file with the typed rate effect.
+    Rate {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Target sample rate in Hz.
+        #[arg(value_name = "RATE")]
+        sample_rate: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Convert one audio file to a target channel count.
+    Channels {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Target channel count.
+        #[arg(value_name = "CHANNELS")]
+        count: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Adjust one audio file by a gain amount.
     Gain {
         /// PCM16 WAV input file to read.
@@ -1640,6 +1694,24 @@ fn run(cli: Cli) -> Result<(), CliError> {
             peak,
             backend,
         } => normalize_audio(&input, &output, peak, backend),
+        Command::Norm {
+            input,
+            level,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["norm", level.as_str()]),
+        Command::Rate {
+            input,
+            sample_rate,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["rate", sample_rate.as_str()]),
+        Command::Channels {
+            input,
+            count,
+            output,
+            backend,
+        } => run_effect_recipe(&input, &output, backend, ["channels", count.as_str()]),
         Command::Gain {
             input,
             db,
@@ -3407,6 +3479,18 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         options: &["-o", "--output", "--peak", "--backend"],
     },
     CompletionSpec {
+        name: "norm",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "rate",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
+        name: "channels",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "gain",
         options: &["-o", "--output", "--backend"],
     },
@@ -3823,6 +3907,9 @@ const MAN_PAGES: &[ManPage] = &[
             ),
             ("trim", "Keep one range from an audio file."),
             ("normalize", "Normalize one audio file to a peak level."),
+            ("norm", "Normalize with the typed norm effect."),
+            ("rate", "Resample with the typed rate effect."),
+            ("channels", "Convert to a target channel count."),
             ("gain", "Adjust one audio file by a gain amount."),
             ("reverse", "Reverse one audio file."),
             ("deemph", "Apply CD/DAT de-emphasis to one audio file."),
@@ -3919,6 +4006,39 @@ const MAN_PAGES: &[ManPage] = &[
                 "--peak DBFS",
                 "Peak target in dBFS, accepting values like `-1` or `-1dBFS`.",
             ),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "norm",
+        summary: "normalize with the typed norm effect",
+        synopsis: "auralis norm INPUT.wav [DBFS] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Norm is a recipe alias for the typed peak-normalization effect. It lowers to the same typed effect pipeline as `render --fx 'norm ...'`.",
+        options: &[
+            ("DBFS", "Peak target in dBFS."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "rate",
+        summary: "resample with the typed rate effect",
+        synopsis: "auralis rate INPUT.wav RATE -o OUTPUT.wav [--backend BACKEND]",
+        description: "Rate is a recipe alias for typed sample-rate conversion. It lowers to the same typed effect pipeline as `render --fx 'rate ...'`.",
+        options: &[
+            ("RATE", "Target sample rate in Hz."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "channels",
+        summary: "convert to a target channel count",
+        synopsis: "auralis channels INPUT.wav CHANNELS -o OUTPUT.wav [--backend BACKEND]",
+        description: "Channels is a recipe alias for typed channel-count conversion. It lowers to the same typed effect pipeline as `render --fx 'channels ...'`.",
+        options: &[
+            ("CHANNELS", "Target channel count."),
+            ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
     },

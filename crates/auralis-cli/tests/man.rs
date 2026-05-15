@@ -20,6 +20,9 @@ fn top_level_man_page_lists_modern_commands() {
     );
     assert!(stdout.contains("trim"), "{stdout}");
     assert!(stdout.contains("normalize"), "{stdout}");
+    assert!(stdout.contains("norm"), "{stdout}");
+    assert!(stdout.contains("rate"), "{stdout}");
+    assert!(stdout.contains("channels"), "{stdout}");
     assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("deemph"), "{stdout}");
@@ -106,6 +109,42 @@ fn normalize_man_page_includes_peak_option() {
         "{stdout}"
     );
     assert!(stdout.contains("--peak DBFS"), "{stdout}");
+}
+
+#[test]
+fn boundary_effect_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "norm",
+            "norm - normalize with the typed norm effect",
+            "render --fx 'norm ...'",
+            "DBFS",
+        ),
+        (
+            "rate",
+            "rate - resample with the typed rate effect",
+            "render --fx 'rate ...'",
+            "RATE",
+        ),
+        (
+            "channels",
+            "channels - convert to a target channel count",
+            "render --fx 'channels ...'",
+            "CHANNELS",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
 }
 
 #[test]

@@ -98,6 +98,63 @@ fn normalize_recipe_accepts_dbfs_suffix_and_uses_render_norm_policy() {
 }
 
 #[test]
+fn boundary_effect_recipes_lower_to_typed_render_effects() {
+    let norm = ("norm", vec!["-6"], "norm -6", vec![4096, -16_384]);
+    let channels = (
+        "channels",
+        vec!["2"],
+        "channels 2",
+        vec![1000, -2000, 3000, -4000],
+    );
+
+    for (effect, recipe_args, render_fx, samples) in [norm, channels] {
+        assert_recipe_with_args_matches_render_effect(effect, &recipe_args, render_fx, &samples);
+    }
+}
+
+#[test]
+fn rate_recipe_lowers_to_typed_render_effect_and_preserves_output_rate() {
+    let input = temp_path("auralis-cli-rate-recipe-input", "wav");
+    let recipe_output = temp_path("auralis-cli-rate-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-rate-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[1000, -2000, 3000, -4000, 5000, -6000]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "rate",
+            input.to_str().unwrap(),
+            "24000",
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--fx",
+            "rate 24000",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav_with_sample_rate(&recipe_output),
+        read_pcm16_wav_with_sample_rate(&render_output)
+    );
+    assert_eq!(read_pcm16_wav_with_sample_rate(&recipe_output).0, 24_000);
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn gain_recipe_lowers_to_typed_render_gain() {
     let input = temp_path("auralis-cli-gain-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-gain-recipe-output", "wav");

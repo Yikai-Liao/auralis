@@ -16,6 +16,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("_auralis_completions()"), "{stdout}");
     assert!(stdout.contains("trim"), "{stdout}");
     assert!(stdout.contains("normalize"), "{stdout}");
+    assert!(stdout.contains("norm"), "{stdout}");
+    assert!(stdout.contains("rate"), "{stdout}");
+    assert!(stdout.contains("channels"), "{stdout}");
     assert!(stdout.contains("gain"), "{stdout}");
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("deemph"), "{stdout}");
@@ -81,6 +84,9 @@ fn zsh_completions_include_modern_commands_and_flags() {
     let stdout = stdout(&output);
     assert!(stdout.contains("#compdef auralis"), "{stdout}");
     assert!(stdout.contains("'normalize:normalize'"), "{stdout}");
+    assert!(stdout.contains("'norm:norm'"), "{stdout}");
+    assert!(stdout.contains("'rate:rate'"), "{stdout}");
+    assert!(stdout.contains("'channels:channels'"), "{stdout}");
     assert!(stdout.contains("'gain:gain'"), "{stdout}");
     assert!(stdout.contains("'reverse:reverse'"), "{stdout}");
     assert!(stdout.contains("'deemph:deemph'"), "{stdout}");
@@ -147,6 +153,9 @@ fn fish_completions_include_modern_commands_and_flags() {
     for command in [
         "ops",
         "trim",
+        "norm",
+        "rate",
+        "channels",
         "gain",
         "reverse",
         "deemph",
