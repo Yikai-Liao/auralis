@@ -324,6 +324,51 @@ fn eq_recipes_lower_to_typed_render_effects() {
 }
 
 #[test]
+fn filter_recipes_lower_to_typed_render_effects() {
+    let cases = [
+        (
+            "allpass",
+            vec!["--frequency", "1k", "--width", "0.707q"],
+            "allpass 1k 0.707q",
+        ),
+        (
+            "band",
+            vec!["--frequency", "750", "--width", "1o", "--unpitched"],
+            "band -n 750 1o",
+        ),
+        (
+            "bandpass",
+            vec!["--frequency", "1k", "--width", "500", "--constant-skirt"],
+            "bandpass -c 1k 500",
+        ),
+        (
+            "bandreject",
+            vec!["--frequency", "2k", "--width", "0.5k"],
+            "bandreject 2k 0.5k",
+        ),
+        (
+            "highpass",
+            vec!["--frequency", "300", "--width", "0.707q"],
+            "highpass 300 0.707q",
+        ),
+        (
+            "lowpass",
+            vec!["--frequency", "3k", "--poles", "1"],
+            "lowpass -1 3k",
+        ),
+    ];
+
+    for (effect, recipe_args, render_fx) in cases {
+        assert_recipe_with_args_matches_render_effect(
+            effect,
+            &recipe_args,
+            render_fx,
+            &[-12000, -6000, 0, 6000, 12000, 6000, 0, -6000],
+        );
+    }
+}
+
+#[test]
 fn fade_recipe_lowers_to_typed_render_fade() {
     let input = temp_path("auralis-cli-fade-recipe-input", "wav");
     let recipe_output = temp_path("auralis-cli-fade-recipe-output", "wav");

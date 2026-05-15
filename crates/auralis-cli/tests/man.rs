@@ -37,6 +37,12 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("bass"), "{stdout}");
     assert!(stdout.contains("treble"), "{stdout}");
     assert!(stdout.contains("equalizer"), "{stdout}");
+    assert!(stdout.contains("allpass"), "{stdout}");
+    assert!(stdout.contains("band"), "{stdout}");
+    assert!(stdout.contains("bandpass"), "{stdout}");
+    assert!(stdout.contains("bandreject"), "{stdout}");
+    assert!(stdout.contains("highpass"), "{stdout}");
+    assert!(stdout.contains("lowpass"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -250,6 +256,60 @@ fn eq_man_pages_describe_recipe_lowering() {
             "equalizer - apply one peaking equalizer band",
             "render --fx 'equalizer ...'",
             "--gain DB",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+            .args(["man", topic])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        let stdout = stdout(&output);
+        assert!(stdout.contains(summary), "{stdout}");
+        assert!(stdout.contains(render_form), "{stdout}");
+        assert!(stdout.contains(option), "{stdout}");
+        assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+    }
+}
+
+#[test]
+fn filter_man_pages_describe_recipe_lowering() {
+    for (topic, summary, render_form, option) in [
+        (
+            "allpass",
+            "allpass - apply an all-pass filter",
+            "render --fx 'allpass ...'",
+            "--poles 1|2",
+        ),
+        (
+            "band",
+            "band - apply a resonator band-pass filter",
+            "render --fx 'band ...'",
+            "--unpitched",
+        ),
+        (
+            "bandpass",
+            "bandpass - apply an RBJ band-pass filter",
+            "render --fx 'bandpass ...'",
+            "--constant-skirt",
+        ),
+        (
+            "bandreject",
+            "bandreject - apply an RBJ band-reject filter",
+            "render --fx 'bandreject ...'",
+            "--width WIDTH",
+        ),
+        (
+            "highpass",
+            "highpass - apply a high-pass filter",
+            "render --fx 'highpass ...'",
+            "--poles 1|2",
+        ),
+        (
+            "lowpass",
+            "lowpass - apply a low-pass filter",
+            "render --fx 'lowpass ...'",
+            "--frequency HZ",
         ),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_auralis"))

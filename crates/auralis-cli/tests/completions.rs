@@ -33,6 +33,12 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("bass"), "{stdout}");
     assert!(stdout.contains("treble"), "{stdout}");
     assert!(stdout.contains("equalizer"), "{stdout}");
+    assert!(stdout.contains("allpass"), "{stdout}");
+    assert!(stdout.contains("band"), "{stdout}");
+    assert!(stdout.contains("bandpass"), "{stdout}");
+    assert!(stdout.contains("bandreject"), "{stdout}");
+    assert!(stdout.contains("highpass"), "{stdout}");
+    assert!(stdout.contains("lowpass"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
     assert!(stdout.contains("concat"), "{stdout}");
@@ -74,6 +80,12 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'bass:bass'"), "{stdout}");
     assert!(stdout.contains("'treble:treble'"), "{stdout}");
     assert!(stdout.contains("'equalizer:equalizer'"), "{stdout}");
+    assert!(stdout.contains("'allpass:allpass'"), "{stdout}");
+    assert!(stdout.contains("'band:band'"), "{stdout}");
+    assert!(stdout.contains("'bandpass:bandpass'"), "{stdout}");
+    assert!(stdout.contains("'bandreject:bandreject'"), "{stdout}");
+    assert!(stdout.contains("'highpass:highpass'"), "{stdout}");
+    assert!(stdout.contains("'lowpass:lowpass'"), "{stdout}");
     assert!(stdout.contains("'fade:fade'"), "{stdout}");
     assert!(stdout.contains("'mix:mix'"), "{stdout}");
     assert!(stdout.contains("'concat:concat'"), "{stdout}");
@@ -122,6 +134,12 @@ fn fish_completions_include_modern_commands_and_flags() {
         "bass",
         "treble",
         "equalizer",
+        "allpass",
+        "band",
+        "bandpass",
+        "bandreject",
+        "highpass",
+        "lowpass",
         "fade",
         "mix",
         "concat",
@@ -136,42 +154,27 @@ fn fish_completions_include_modern_commands_and_flags() {
             "{stdout}"
         );
     }
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from fade' -l out"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains(
-            "complete -c auralis -n '__fish_seen_subcommand_from saturation' -l parameter"
-        ),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from softvol' -l headroom"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from tremolo' -l depth"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from bass' -l frequency"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from treble' -l width"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from equalizer' -l gain"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from check' -l locked"),
-        "{stdout}"
-    );
-    assert!(
-        stdout.contains("complete -c auralis -n '__fish_seen_subcommand_from render' -l chain"),
-        "{stdout}"
-    );
+    for (command, option) in [
+        ("fade", "out"),
+        ("saturation", "parameter"),
+        ("softvol", "headroom"),
+        ("tremolo", "depth"),
+        ("bass", "frequency"),
+        ("treble", "width"),
+        ("equalizer", "gain"),
+        ("allpass", "poles"),
+        ("band", "unpitched"),
+        ("bandpass", "constant-skirt"),
+        ("highpass", "width"),
+        ("lowpass", "poles"),
+        ("check", "locked"),
+        ("render", "chain"),
+    ] {
+        assert!(
+            stdout.contains(&format!(
+                "complete -c auralis -n '__fish_seen_subcommand_from {command}' -l {option}"
+            )),
+            "{stdout}"
+        );
+    }
 }

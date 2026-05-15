@@ -499,6 +499,163 @@ enum Command {
         backend: auralis::BackendKind,
     },
 
+    /// Apply an all-pass filter to one audio file.
+    #[command(name = "allpass")]
+    AllPass {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: Option<String>,
+
+        /// Pole count for simple one-pole or two-pole forms.
+        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
+        poles: Option<u8>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply a resonator band-pass filter to one audio file.
+    Band {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: Option<String>,
+
+        /// Use the unpitched noise mode.
+        #[arg(long)]
+        unpitched: bool,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply an RBJ band-pass filter to one audio file.
+    #[command(name = "bandpass")]
+    BandPass {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: String,
+
+        /// Use constant-skirt-gain mode.
+        #[arg(long)]
+        constant_skirt: bool,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply an RBJ band-reject filter to one audio file.
+    #[command(name = "bandreject")]
+    BandReject {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: String,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply a high-pass filter to one audio file.
+    #[command(name = "highpass")]
+    HighPass {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter cutoff frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: Option<String>,
+
+        /// Pole count for simple one-pole or two-pole forms.
+        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
+        poles: Option<u8>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
+    /// Apply a low-pass filter to one audio file.
+    #[command(name = "lowpass")]
+    LowPass {
+        /// PCM16 WAV input file to read.
+        input: PathBuf,
+
+        /// Filter cutoff frequency in Hz.
+        #[arg(long, value_name = "HZ")]
+        frequency: String,
+
+        /// Optional filter width, for example `500h`, `0.707q`, or `1o`.
+        #[arg(long, value_name = "WIDTH")]
+        width: Option<String>,
+
+        /// Pole count for simple one-pole or two-pole forms.
+        #[arg(long, value_name = "1|2", value_parser = parse_filter_poles)]
+        poles: Option<u8>,
+
+        /// Output WAV file to create.
+        #[arg(short = 'o', long = "output", value_name = "FILE")]
+        output: PathBuf,
+
+        /// Sample-processing backend to request.
+        #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+        backend: auralis::BackendKind,
+    },
+
     /// Fade one audio file in or out.
     Fade {
         /// PCM16 WAV input file to read.
@@ -1002,6 +1159,89 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 gain.as_str(),
             ],
         ),
+        Command::AllPass {
+            input,
+            frequency,
+            width,
+            poles,
+            output,
+            backend,
+        } => run_pole_filter_recipe(
+            &input,
+            "allpass",
+            &frequency,
+            width.as_deref(),
+            poles,
+            &output,
+            backend,
+        ),
+        Command::Band {
+            input,
+            frequency,
+            width,
+            unpitched,
+            output,
+            backend,
+        } => run_band_recipe(
+            &input,
+            &frequency,
+            width.as_deref(),
+            unpitched,
+            &output,
+            backend,
+        ),
+        Command::BandPass {
+            input,
+            frequency,
+            width,
+            constant_skirt,
+            output,
+            backend,
+        } => run_bandpass_recipe(&input, &frequency, &width, constant_skirt, &output, backend),
+        Command::BandReject {
+            input,
+            frequency,
+            width,
+            output,
+            backend,
+        } => run_effect_recipe(
+            &input,
+            &output,
+            backend,
+            ["bandreject", frequency.as_str(), width.as_str()],
+        ),
+        Command::HighPass {
+            input,
+            frequency,
+            width,
+            poles,
+            output,
+            backend,
+        } => run_pole_filter_recipe(
+            &input,
+            "highpass",
+            &frequency,
+            width.as_deref(),
+            poles,
+            &output,
+            backend,
+        ),
+        Command::LowPass {
+            input,
+            frequency,
+            width,
+            poles,
+            output,
+            backend,
+        } => run_pole_filter_recipe(
+            &input,
+            "lowpass",
+            &frequency,
+            width.as_deref(),
+            poles,
+            &output,
+            backend,
+        ),
         Command::Fade {
             input,
             fade_in,
@@ -1261,6 +1501,80 @@ fn run_vol_recipe(
     if let Some(limiter_gain) = limiter_gain {
         effect_chain.push(limiter_gain.to_owned());
     }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_pole_filter_recipe(
+    input: &Path,
+    effect: &str,
+    frequency: &str,
+    width: Option<&str>,
+    poles: Option<u8>,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec![effect.to_owned()];
+    if let Some(poles) = poles {
+        effect_chain.push(format!("-{poles}"));
+    }
+    effect_chain.push(frequency.to_owned());
+    if let Some(width) = width {
+        effect_chain.push(width.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_band_recipe(
+    input: &Path,
+    frequency: &str,
+    width: Option<&str>,
+    unpitched: bool,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["band".to_owned()];
+    if unpitched {
+        effect_chain.push("-n".to_owned());
+    }
+    effect_chain.push(frequency.to_owned());
+    if let Some(width) = width {
+        effect_chain.push(width.to_owned());
+    }
+
+    run_effect_recipe(
+        input,
+        output,
+        backend,
+        effect_chain.iter().map(String::as_str),
+    )
+}
+
+fn run_bandpass_recipe(
+    input: &Path,
+    frequency: &str,
+    width: &str,
+    constant_skirt: bool,
+    output: &Path,
+    backend: auralis::BackendKind,
+) -> Result<(), CliError> {
+    let mut effect_chain = vec!["bandpass".to_owned()];
+    if constant_skirt {
+        effect_chain.push("-c".to_owned());
+    }
+    effect_chain.push(frequency.to_owned());
+    effect_chain.push(width.to_owned());
 
     run_effect_recipe(
         input,
@@ -1934,6 +2248,65 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "allpass",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--poles",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "band",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--unpitched",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "bandpass",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--constant-skirt",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "bandreject",
+        options: &["-o", "--output", "--frequency", "--width", "--backend"],
+    },
+    CompletionSpec {
+        name: "highpass",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--poles",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
+        name: "lowpass",
+        options: &[
+            "-o",
+            "--output",
+            "--frequency",
+            "--width",
+            "--poles",
+            "--backend",
+        ],
+    },
+    CompletionSpec {
         name: "fade",
         options: &["-o", "--output", "--in", "--out", "--curve", "--backend"],
     },
@@ -2050,6 +2423,12 @@ const MAN_PAGES: &[ManPage] = &[
             ("bass", "Boost or cut bass frequencies."),
             ("treble", "Boost or cut treble frequencies."),
             ("equalizer", "Apply one peaking equalizer band."),
+            ("allpass", "Apply an all-pass filter."),
+            ("band", "Apply a resonator band-pass filter."),
+            ("bandpass", "Apply an RBJ band-pass filter."),
+            ("bandreject", "Apply an RBJ band-reject filter."),
+            ("highpass", "Apply a high-pass filter."),
+            ("lowpass", "Apply a low-pass filter."),
             ("fade", "Fade one audio file in or out."),
             ("mix", "Mix two or more audio files into one output."),
             ("concat", "Concatenate two or more audio files end-to-end."),
@@ -2325,6 +2704,101 @@ const MAN_PAGES: &[ManPage] = &[
                 "Band width, accepting values like `500h`, `0.707q`, or `1o`.",
             ),
             ("--gain DB", "Band gain in dB."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "allpass",
+        summary: "apply an all-pass filter",
+        synopsis: "auralis allpass INPUT.wav --frequency HZ [--width WIDTH] [--poles 1|2] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Allpass is a recipe alias for one all-pass filter stage. It lowers to the same typed effect pipeline as `render --fx 'allpass ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--poles 1|2", "Use the one-pole or two-pole simple form."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "band",
+        summary: "apply a resonator band-pass filter",
+        synopsis: "auralis band INPUT.wav --frequency HZ [--width WIDTH] [--unpitched] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Band is a recipe alias for one resonator band-pass filter stage. It lowers to the same typed effect pipeline as `render --fx 'band ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Optional filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--unpitched", "Use the unpitched noise mode."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "bandpass",
+        summary: "apply an RBJ band-pass filter",
+        synopsis: "auralis bandpass INPUT.wav --frequency HZ --width WIDTH [--constant-skirt] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Bandpass is a recipe alias for one RBJ band-pass filter stage. It lowers to the same typed effect pipeline as `render --fx 'bandpass ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--constant-skirt", "Use constant-skirt-gain mode."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "bandreject",
+        summary: "apply an RBJ band-reject filter",
+        synopsis: "auralis bandreject INPUT.wav --frequency HZ --width WIDTH -o OUTPUT.wav [--backend BACKEND]",
+        description: "Bandreject is a recipe alias for one RBJ band-reject filter stage. It lowers to the same typed effect pipeline as `render --fx 'bandreject ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "highpass",
+        summary: "apply a high-pass filter",
+        synopsis: "auralis highpass INPUT.wav --frequency HZ [--width WIDTH] [--poles 1|2] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Highpass is a recipe alias for one high-pass filter stage. It lowers to the same typed effect pipeline as `render --fx 'highpass ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter cutoff frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Optional filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--poles 1|2", "Use the one-pole or two-pole form."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
+        name: "lowpass",
+        summary: "apply a low-pass filter",
+        synopsis: "auralis lowpass INPUT.wav --frequency HZ [--width WIDTH] [--poles 1|2] -o OUTPUT.wav [--backend BACKEND]",
+        description: "Lowpass is a recipe alias for one low-pass filter stage. It lowers to the same typed effect pipeline as `render --fx 'lowpass ...'`.",
+        options: &[
+            ("--frequency HZ", "Filter cutoff frequency in Hz."),
+            (
+                "--width WIDTH",
+                "Optional filter width, accepting values like `500h`, `0.707q`, or `1o`.",
+            ),
+            ("--poles 1|2", "Use the one-pole or two-pole form."),
             ("-o, --output FILE", "Output WAV file to create."),
             ("--backend BACKEND", "Request scalar or simd processing."),
         ],
@@ -3885,6 +4359,14 @@ fn parse_dbfs(value: &str) -> Result<f64, String> {
     number
         .parse::<f64>()
         .map_err(|error| format!("invalid dBFS value `{value}`: {error}"))
+}
+
+fn parse_filter_poles(value: &str) -> Result<u8, String> {
+    match value {
+        "1" => Ok(1),
+        "2" => Ok(2),
+        _ => Err(format!("invalid pole count `{value}`: expected 1 or 2")),
+    }
 }
 
 fn parse_combine_method(value: &str) -> Result<auralis::CombineMethod, String> {
