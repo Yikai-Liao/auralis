@@ -782,6 +782,9 @@ pub(crate) struct PlanArgs {
 pub(crate) enum PlanCommand {
     /// Plan a linear render command without executing it.
     Render(RenderArgs),
+
+    /// Plan a compact pipe command without executing it.
+    Pipe(PipeArgs),
 }
 
 #[derive(Debug, Args)]

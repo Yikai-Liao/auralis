@@ -226,6 +226,71 @@ fn plan_render_json_uses_graph_plan_contract() {
 }
 
 #[test]
+fn plan_pipe_lowers_compact_command_to_graph_plan() {
+    let input = temp_path("auralis-cli-plan-pipe-input", "wav");
+    let output = temp_path("auralis-cli-plan-pipe-output", "wav");
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "plan",
+            "pipe",
+            input.to_str().unwrap(),
+            "gain -3 | reverse",
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let stdout = stdout(&command_output);
+    assert!(stdout.contains("Pipeline: pipe"), "{stdout}");
+    assert!(stdout.contains("Spec: command:pipe"), "{stdout}");
+    assert!(stdout.contains("step pipe/01-gain--3"), "{stdout}");
+    assert!(stdout.contains("step pipe/02-reverse"), "{stdout}");
+    assert!(stdout.contains("whole-buffer barrier"), "{stdout}");
+}
+
+#[test]
+fn plan_pipe_json_uses_graph_plan_contract() {
+    let input = temp_path("auralis-cli-plan-pipe-json-input", "wav");
+    let output = temp_path("auralis-cli-plan-pipe-json-output", "wav");
+
+    let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "plan",
+            "--json",
+            "pipe",
+            input.to_str().unwrap(),
+            "gain -3",
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        command_output.status.success(),
+        "stderr: {}",
+        stderr(&command_output)
+    );
+    let plan: serde_json::Value = serde_json::from_str(&stdout(&command_output)).unwrap();
+    assert_eq!(plan["pipeline"], "pipe");
+    assert_eq!(plan["spec"], "command:pipe");
+    assert_eq!(plan["graph"]["sources"], 1);
+    assert_eq!(plan["graph"]["chains"], 1);
+    assert_eq!(plan["execution"][1]["action"], "chain");
+    assert_eq!(
+        plan["execution"][1]["steps"],
+        serde_json::json!(["pipe/01-gain--3"])
+    );
+}
+
+#[test]
 fn check_fx_reports_ok_summary() {
     let command_output = Command::new(env!("CARGO_BIN_EXE_auralis"))
         .args(["check", "--fx", "gain -3", "--fx", "reverse"])

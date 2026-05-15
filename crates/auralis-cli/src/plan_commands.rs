@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
     CliError,
-    command_args::{PlanArgs, PlanCommand, RenderArgs},
+    command_args::{PipeArgs, PlanArgs, PlanCommand, RenderArgs},
     command_support::{effect_input_to_chain_tokens, plan_graph_spec},
     graph_plan, spec,
 };
@@ -15,6 +15,12 @@ pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
             }
             plan_render_command(render, args.json)
         }
+        Some(PlanCommand::Pipe(pipe)) => {
+            if args.spec.is_some() || args.target.is_some() || args.locked {
+                return Err(CliError::PlanCommandRejectsGraphOptions);
+            }
+            plan_pipe_command(pipe, args.json)
+        }
         None => {
             let spec = args.spec.ok_or(CliError::MissingPlanInput)?;
             plan_graph_spec(&spec, args.target.as_deref(), args.json, args.locked)
@@ -25,6 +31,11 @@ pub(super) fn run_plan_command(args: PlanArgs) -> Result<(), CliError> {
 fn plan_render_command(render: RenderArgs, json: bool) -> Result<(), CliError> {
     let checked = checked_render_spec(render)?;
     graph_plan::print_checked_plan("command:render", "render", &checked, None, json)
+}
+
+fn plan_pipe_command(pipe: PipeArgs, json: bool) -> Result<(), CliError> {
+    let checked = checked_pipe_spec(pipe)?;
+    graph_plan::print_checked_plan("command:pipe", "pipe", &checked, None, json)
 }
 
 fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, CliError> {
@@ -125,6 +136,52 @@ fn checked_render_spec(render: RenderArgs) -> Result<spec::CheckedGraphSpec, Cli
             path: output,
         }],
         expanded_step_ids,
+    })
+}
+
+fn checked_pipe_spec(pipe: PipeArgs) -> Result<spec::CheckedGraphSpec, CliError> {
+    let PipeArgs {
+        input,
+        expression,
+        output,
+        backend: _,
+    } = pipe;
+    validate_effect_input(&[], Some(expression.as_str()))?;
+    let step_labels = expression
+        .split('|')
+        .map(str::trim)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let step_ids = step_labels
+        .iter()
+        .enumerate()
+        .map(|(index, label)| format!("pipe/{:02}-{}", index + 1, step_slug(label)))
+        .collect::<Vec<_>>();
+
+    Ok(spec::CheckedGraphSpec {
+        name: Some("pipe".to_owned()),
+        source_count: 1,
+        chain_count: 1,
+        node_count: 0,
+        sink_count: 1,
+        sources: vec![spec::CheckedSource {
+            id: "input".to_owned(),
+            path: input,
+        }],
+        chains: vec![spec::CheckedChain {
+            id: "pipe".to_owned(),
+            input: "input.audio".to_owned(),
+            step_ids: step_ids.clone(),
+            step_labels,
+            effect_tokens: Vec::new(),
+        }],
+        nodes: Vec::new(),
+        sinks: vec![spec::CheckedSink {
+            id: "output".to_owned(),
+            input: "pipe.audio".to_owned(),
+            path: output,
+        }],
+        expanded_step_ids: step_ids,
     })
 }
 
