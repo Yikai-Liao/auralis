@@ -71,7 +71,9 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("merge"), "{stdout}");
     assert!(stdout.contains("multiply"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
+    assert!(stdout.contains("pipe"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
+    assert!(stdout.contains("init"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("man"), "{stdout}");
 }
@@ -93,6 +95,46 @@ fn render_man_page_includes_core_options() {
     assert!(stdout.contains("--fx EFFECT"), "{stdout}");
     assert!(stdout.contains("--chain CHAIN"), "{stdout}");
     assert!(stdout.contains("--combine METHOD"), "{stdout}");
+}
+
+#[test]
+fn pipe_man_page_includes_core_options() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "pipe"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("pipe - run one compact DSP expression"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("auralis pipe INPUT.wav EXPR -o OUTPUT.wav"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("--backend BACKEND"), "{stdout}");
+}
+
+#[test]
+fn init_man_page_includes_scaffold_contract() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "init"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("init - create a graph spec scaffold"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("auralis init [SPEC]"), "{stdout}");
+    assert!(
+        stdout.contains("will not overwrite an existing file"),
+        "{stdout}"
+    );
 }
 
 #[test]

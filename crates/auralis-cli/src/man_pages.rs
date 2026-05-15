@@ -855,6 +855,17 @@ const MAN_PAGES: &[ManPage] = &[
         ],
     },
     ManPage {
+        name: "pipe",
+        summary: "run one compact DSP expression",
+        synopsis: "auralis pipe INPUT.wav EXPR -o OUTPUT.wav [--backend BACKEND]",
+        description: "Pipe is a compact exploratory form for one ordered stream. It parses the expression as the same pipe-delimited typed effect chain accepted by `render --chain`.",
+        options: &[
+            ("EXPR", "Pipe-delimited ordered effect expression."),
+            ("-o, --output FILE", "Output WAV file to create."),
+            ("--backend BACKEND", "Request scalar or simd processing."),
+        ],
+    },
+    ManPage {
         name: "plan",
         summary: "preview graph execution",
         synopsis: "auralis plan SPEC [--json] [--locked]",
@@ -875,6 +886,16 @@ const MAN_PAGES: &[ManPage] = &[
         options: &[(
             "--locked",
             "Require a matching Auralis.lock before running.",
+        )],
+    },
+    ManPage {
+        name: "init",
+        summary: "create a graph spec scaffold",
+        synopsis: "auralis init [SPEC]",
+        description: "Init creates a minimal Auralis graph spec with one source, one empty chain, and one sink. It uses create-new semantics and will not overwrite an existing file.",
+        options: &[(
+            "SPEC",
+            "Graph spec path to create, defaulting to Auralis.toml.",
         )],
     },
     ManPage {

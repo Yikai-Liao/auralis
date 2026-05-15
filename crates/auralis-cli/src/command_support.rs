@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, fs::OpenOptions, io::Write, path::Path};
 
 use auralis::{EffectRegistry, SUPPORTED_EFFECTS};
 use auralis_wav::decode_pcm16_path;
@@ -94,6 +94,39 @@ pub(super) fn plan_graph_spec(spec: &Path, json: bool, locked: bool) -> Result<(
 pub(super) fn run_graph_spec(spec: &Path, locked: bool) -> Result<(), CliError> {
     graph_runtime::run_graph_spec(spec, locked)
 }
+
+pub(super) fn init_project(spec: &Path) -> Result<(), CliError> {
+    let mut file = OpenOptions::new().write(true).create_new(true).open(spec)?;
+    file.write_all(DEFAULT_GRAPH_SPEC.as_bytes())?;
+    println!("created {}", spec.display());
+
+    Ok(())
+}
+
+const DEFAULT_GRAPH_SPEC: &str = r#"version = "auralis.graph/v1"
+name = "auralis-project"
+
+[defaults]
+backend = "auto"
+cache = "smart"
+block = "65536f"
+
+[[sources]]
+id = "input"
+path = "input/input.wav"
+
+[[chains]]
+id = "master"
+input = "input.audio"
+steps = [
+  { op = "gain", by = "0dB" },
+]
+
+[[sinks]]
+id = "output"
+input = "master.audio"
+path = "build/output.wav"
+"#;
 
 pub(super) fn print_ops(
     effect: Option<&str>,

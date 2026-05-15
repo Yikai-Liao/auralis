@@ -423,6 +423,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
         ],
     },
     CompletionSpec {
+        name: "pipe",
+        options: &["-o", "--output", "--backend"],
+    },
+    CompletionSpec {
         name: "check",
         options: &["--locked", "--effects-file", "--fx", "--chain"],
     },
@@ -437,6 +441,10 @@ const COMPLETION_SPECS: &[CompletionSpec] = &[
     CompletionSpec {
         name: "fmt",
         options: &["--check"],
+    },
+    CompletionSpec {
+        name: "init",
+        options: &[],
     },
     CompletionSpec {
         name: "completions",

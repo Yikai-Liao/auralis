@@ -67,7 +67,9 @@ fn bash_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("merge"), "{stdout}");
     assert!(stdout.contains("multiply"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
+    assert!(stdout.contains("pipe"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
+    assert!(stdout.contains("init"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
     assert!(stdout.contains("--locked"), "{stdout}");
     assert!(stdout.contains("--schema"), "{stdout}");
@@ -134,6 +136,8 @@ fn zsh_completions_include_modern_commands_and_flags() {
     assert!(stdout.contains("'mix-power:mix-power'"), "{stdout}");
     assert!(stdout.contains("'merge:merge'"), "{stdout}");
     assert!(stdout.contains("'multiply:multiply'"), "{stdout}");
+    assert!(stdout.contains("'pipe:pipe'"), "{stdout}");
+    assert!(stdout.contains("'init:init'"), "{stdout}");
     assert!(stdout.contains("'fmt:fmt'"), "{stdout}");
     assert!(stdout.contains("'--check[fmt option]'"), "{stdout}");
     assert!(stdout.contains("'--peak[normalize option]'"), "{stdout}");
@@ -203,6 +207,8 @@ fn fish_completions_include_modern_commands_and_flags() {
         "mix-power",
         "merge",
         "multiply",
+        "pipe",
+        "init",
     ] {
         assert_fish_subcommand(&stdout, command);
     }
@@ -235,6 +241,7 @@ fn fish_completions_include_modern_commands_and_flags() {
         ("reverb", "wet-only"),
         ("stretch", "fade"),
         ("render", "chain"),
+        ("pipe", "output"),
     ] {
         assert_fish_option(&stdout, command, option);
     }

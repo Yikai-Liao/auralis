@@ -74,6 +74,44 @@ fn render_chain_output_matches_repeated_fx_chain() {
 }
 
 #[test]
+fn pipe_output_matches_render_chain() {
+    let input = temp_path("auralis-cli-pipe-input", "wav");
+    let pipe_output = temp_path("auralis-cli-pipe-output", "wav");
+    let render_output = temp_path("auralis-cli-pipe-render-output", "wav");
+    write_pcm16_wav(&input, 1, &[-16_384, -8_192, 0, 8_192, 16_384]);
+
+    let pipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "pipe",
+            input.to_str().unwrap(),
+            "gain -6 | reverse",
+            "-o",
+            pipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            input.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--chain",
+            "gain -6 | reverse",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(pipe.status.success(), "stderr: {}", stderr(&pipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(read_pcm16_wav(&pipe_output), read_pcm16_wav(&render_output));
+
+    fs::remove_file(input).unwrap();
+    fs::remove_file(pipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
+
+#[test]
 fn render_mix_combines_inputs_before_chain() {
     let first = temp_path("auralis-cli-render-mix-first", "wav");
     let second = temp_path("auralis-cli-render-mix-second", "wav");

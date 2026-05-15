@@ -704,6 +704,24 @@ pub(crate) struct RenderArgs {
 }
 
 #[derive(Debug, Args)]
+pub(crate) struct PipeArgs {
+    /// PCM16 WAV input file to read.
+    pub(crate) input: PathBuf,
+
+    /// Pipe-delimited ordered effect expression, for example `gain -3 | reverse`.
+    #[arg(value_name = "EXPR")]
+    pub(crate) expression: String,
+
+    /// Output WAV file to create.
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub(crate) output: PathBuf,
+
+    /// Sample-processing backend to request.
+    #[arg(long, value_name = "BACKEND", default_value = "scalar", value_parser = parse_backend)]
+    pub(crate) backend: auralis::BackendKind,
+}
+
+#[derive(Debug, Args)]
 pub(crate) struct CheckArgs {
     /// Auralis graph spec to validate.
     pub(crate) spec: Option<PathBuf>,
@@ -757,6 +775,13 @@ pub(crate) struct FmtArgs {
     /// Check whether formatting changes would be required.
     #[arg(long)]
     pub(crate) check: bool,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct InitArgs {
+    /// Graph spec path to create.
+    #[arg(default_value = "Auralis.toml")]
+    pub(crate) spec: PathBuf,
 }
 
 #[derive(Debug, Args)]

@@ -22,14 +22,14 @@ use clap::{Parser, Subcommand};
 pub(crate) use command_args::GraphFormat;
 use command_args::{
     ChannelsArgs, CheckArgs, ChorusArgs, CompletionsArgs, ContrastArgs, ConvertArgs, DcShiftArgs,
-    EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs, InspectArgs, ManArgs,
-    NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs, PlanArgs, RateArgs, RenderArgs,
-    RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs, TremoloArgs, TrimArgs,
-    VolArgs,
+    EchoArgs, ExplainArgs, FlangerArgs, FmtArgs, GainArgs, GraphArgs, InitArgs, InspectArgs,
+    ManArgs, NormArgs, NormalizeArgs, OpsArgs, OverdriveArgs, PhaserArgs, PipeArgs, PlanArgs,
+    RateArgs, RenderArgs, RunArgs, SaturationArgs, SimpleRecipeArgs, SoftVolArgs, SpeedArgs,
+    TremoloArgs, TrimArgs, VolArgs,
 };
 use command_support::{
-    PathRole, check_command, effect_input_to_chain_tokens, inspect, plan_graph_spec, print_ops,
-    run_graph_spec,
+    PathRole, check_command, effect_input_to_chain_tokens, init_project, inspect, plan_graph_spec,
+    print_ops, run_graph_spec,
 };
 use completions::print_completions;
 pub(crate) use errors::CliError;
@@ -235,6 +235,9 @@ enum Command {
     /// Render one ordered stream with typed effect syntax.
     Render(RenderArgs),
 
+    /// Run one compact pipe-delimited DSP expression.
+    Pipe(PipeArgs),
+
     /// Validate typed effect syntax without running audio processing.
     Check(CheckArgs),
 
@@ -246,6 +249,9 @@ enum Command {
 
     /// Format an Auralis graph spec.
     Fmt(FmtArgs),
+
+    /// Create an Auralis graph spec scaffold.
+    Init(InitArgs),
 
     /// Generate shell completion scripts.
     Completions(CompletionsArgs),
@@ -919,6 +925,30 @@ fn run(cli: Cli) -> Result<(), CliError> {
 
             run_pipeline(&input, &output, &options)
         }
+        Command::Pipe(PipeArgs {
+            input,
+            expression,
+            output,
+            backend,
+        }) => {
+            let options = RenderOptions {
+                backend,
+                combine: auralis::CombineMethod::Concatenate,
+                additional_inputs: Vec::new(),
+                output_channels: None,
+                no_auto_channels: false,
+                output_sample_rate: None,
+                no_auto_rate: false,
+                guard: OutputGuard::Disabled,
+                norm: None,
+                dither: OutputDither::Disabled,
+                dither_seed: None,
+                effects_file: None,
+                effect_chain: effect_input_to_chain_tokens(&[], Some(expression.as_str()))?,
+            };
+
+            run_pipeline(&input, &output, &options)
+        }
         Command::Check(CheckArgs {
             spec,
             locked,
@@ -935,6 +965,7 @@ fn run(cli: Cli) -> Result<(), CliError> {
         Command::Plan(PlanArgs { spec, json, locked }) => plan_graph_spec(&spec, json, locked),
         Command::Graph(GraphArgs { spec, format }) => graph_spec(&spec, format),
         Command::Fmt(FmtArgs { spec, check }) => format_graph_spec(&spec, check),
+        Command::Init(InitArgs { spec }) => init_project(&spec),
         Command::Completions(CompletionsArgs { shell }) => {
             print_completions(shell);
             Ok(())
