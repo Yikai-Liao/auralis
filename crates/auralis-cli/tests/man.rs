@@ -24,6 +24,7 @@ fn top_level_man_page_lists_modern_commands() {
     assert!(stdout.contains("reverse"), "{stdout}");
     assert!(stdout.contains("fade"), "{stdout}");
     assert!(stdout.contains("mix"), "{stdout}");
+    assert!(stdout.contains("concat"), "{stdout}");
     assert!(stdout.contains("render"), "{stdout}");
     assert!(stdout.contains("plan"), "{stdout}");
     assert!(stdout.contains("completions"), "{stdout}");
@@ -129,6 +130,23 @@ fn mix_man_page_describes_recipe_lowering() {
     let stdout = stdout(&output);
     assert!(stdout.contains("mix - mix audio files"), "{stdout}");
     assert!(stdout.contains("render --combine mix"), "{stdout}");
+    assert!(stdout.contains("-o, --output FILE"), "{stdout}");
+}
+
+#[test]
+fn concat_man_page_describes_recipe_lowering() {
+    let output = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args(["man", "concat"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let stdout = stdout(&output);
+    assert!(
+        stdout.contains("concat - concatenate audio files"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("render --combine concatenate"), "{stdout}");
     assert!(stdout.contains("-o, --output FILE"), "{stdout}");
 }
 

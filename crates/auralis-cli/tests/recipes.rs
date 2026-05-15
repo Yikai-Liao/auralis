@@ -299,3 +299,59 @@ fn mix_recipe_lowers_to_typed_render_mix() {
     fs::remove_file(recipe_output).unwrap();
     fs::remove_file(render_output).unwrap();
 }
+
+#[test]
+fn concat_recipe_lowers_to_typed_render_concatenate() {
+    let first = temp_path("auralis-cli-concat-recipe-first", "wav");
+    let second = temp_path("auralis-cli-concat-recipe-second", "wav");
+    let third = temp_path("auralis-cli-concat-recipe-third", "wav");
+    let recipe_output = temp_path("auralis-cli-concat-recipe-output", "wav");
+    let render_output = temp_path("auralis-cli-concat-render-output", "wav");
+    write_pcm16_wav(&first, 1, &[100, 200]);
+    write_pcm16_wav(&second, 1, &[-300, -400, -500]);
+    write_pcm16_wav(&third, 1, &[600]);
+
+    let recipe = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "concat",
+            first.to_str().unwrap(),
+            second.to_str().unwrap(),
+            third.to_str().unwrap(),
+            "-o",
+            recipe_output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let render = Command::new(env!("CARGO_BIN_EXE_auralis"))
+        .args([
+            "render",
+            first.to_str().unwrap(),
+            "-o",
+            render_output.to_str().unwrap(),
+            "--combine",
+            "concatenate",
+            "--input",
+            second.to_str().unwrap(),
+            "--input",
+            third.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(recipe.status.success(), "stderr: {}", stderr(&recipe));
+    assert!(render.status.success(), "stderr: {}", stderr(&render));
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        read_pcm16_wav(&render_output)
+    );
+    assert_eq!(
+        read_pcm16_wav(&recipe_output),
+        (1, vec![100, 200, -300, -400, -500, 600])
+    );
+
+    fs::remove_file(first).unwrap();
+    fs::remove_file(second).unwrap();
+    fs::remove_file(third).unwrap();
+    fs::remove_file(recipe_output).unwrap();
+    fs::remove_file(render_output).unwrap();
+}
