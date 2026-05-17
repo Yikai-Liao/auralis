@@ -29,11 +29,9 @@ to multiple effects.
 | `speech-denoise` | planned | RNNoise and SpeexDSP | future speech-denoise effect; not `noisered` | `oracles/speech-denoise.md` |
 | `voice-activity` | planned | WebRTC VAD with Auralis edit semantics | vad | `oracles/voice-activity.md` |
 | `modulation-delay` | planned | Faust `phaflangers.lib`, DaisySP Chorus/Flanger | phaser, chorus, flanger, future vibrato | `oracles/modulation-delay.md` |
-| `reverb` | planned | Faust reverbs; Freeverb for compat baseline | reverb and future room/ambience variants | migration target: `oracles/reverb.md` |
-| `saturation-distortion` | planned | DaisySP Overdrive, MusicDSP formulas, Airwindows listening references | overdrive, saturation, contrast | migration target: `oracles/saturation-distortion.md` |
-| `dynamics` | planned | Faust compressors for modern dynamics; SoX for compat curves | compand, mcompand, future compressor/limiter | migration target: `oracles/dynamics.md` |
+| `reverb` | planned | Faust reverbs; Freeverb for compat baseline | reverb and future room/ambience variants | `oracles/reverb.md` |
+| `saturation-distortion` | planned | DaisySP Overdrive, MusicDSP formulas, Airwindows listening references | overdrive, saturation, contrast | `oracles/saturation-distortion.md` |
+| `dynamics` | planned | Faust compressors for modern dynamics; SoX for compat curves | compand, mcompand, future compressor/limiter | `oracles/dynamics.md` |
 
-Rows marked `migration target` preserve shared reference-policy scope before
-their flat note files are written. Create each note from
-`doc/development/templates/oracle-notes.md` when the corresponding effects are
-migrated.
+Create new oracle notes from `doc/development/templates/oracle-notes.md` when a
+shared reference policy is needed.
