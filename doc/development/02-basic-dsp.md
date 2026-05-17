@@ -1,7 +1,18 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - dsp.md
+  - effects.md
+  - simd.md
+---
+
 # 2.x Basic DSP Milestone
 
 This milestone established the initial scalar DSP kernels, typed effects,
 library facade, and CLI transforms.
+It is retained for history and acceptance traceability; new DSP, effect, and
+SIMD planning belongs in the short target documents.
 
 ## Feature 2.1: scalar `gain` kernel
 

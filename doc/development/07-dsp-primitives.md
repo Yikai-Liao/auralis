@@ -1,8 +1,21 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - dsp.md
+  - simd.md
+---
+
 # 7.x Reusable DSP Primitives Roadmap
 
-This is a future-plan track for extracting reusable DSP kernels after the
-current specialized-effect classification work. It does not reopen completed
-2.x, 4.x, or 6.1-6.8 milestone plans.
+This is the historical roadmap for extracting reusable DSP kernels after the
+specialized-effect classification work. It is retained for analysis history and
+coverage evidence; new DSP primitive planning belongs in `dsp.md`, `dsp/*.md`,
+`simd.md`, and `simd/*.md`.
+
+Historical entries below may mention streaming or chunked state contracts.
+Those notes are not active graph-execution goals; ADR 0004 keeps Auralis graph
+execution whole-buffer only.
 
 ## Scope
 

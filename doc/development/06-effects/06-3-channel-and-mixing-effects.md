@@ -1,4 +1,17 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../effects.md
+  - ../oracles.md
+  - ../testing.md
+---
+
 ## Milestone 6.3: channel and mixing effects
+
+This milestone record is retained for implemented effect history and coverage
+evidence. New effect or oracle planning belongs in the flat short documents
+under `../effects/` and `../oracles/`.
 
 ### Feature 6.3.1: `channels`
 

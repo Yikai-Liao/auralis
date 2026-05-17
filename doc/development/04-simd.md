@@ -1,9 +1,19 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - simd.md
+  - dsp.md
+---
+
 # 4.x SIMD Foundation Milestone
 
 SIMD is part of the normal implementation path after Feature 3.3, not a late
 optimization phase. Every new sample-processing feature must ship with a scalar
 reference path and a SIMD backend when the core loop is data-parallel. If SIMD
 is not applicable, the feature must document why.
+This file is retained for policy history and acceptance traceability; new SIMD
+kernel planning belongs in `simd.md` and `simd/*.md`.
 
 ## Milestone 4.1: backend contract and dispatch
 

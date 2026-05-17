@@ -1,4 +1,18 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../effects.md
+  - ../dsp.md
+  - ../oracles.md
+  - ../testing.md
+---
+
 ## Milestone 6.5: delay, echo, and modulation effects
+
+This milestone record is retained for implemented effect and primitive history
+and coverage evidence. New effect, DSP, or oracle planning belongs in the flat
+short documents under `../effects/`, `../dsp/`, and `../oracles/`.
 
 ### Feature 6.5.1: `delay`
 

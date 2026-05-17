@@ -1,9 +1,19 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../../DEVELOPMENT.md
+  - README.md
+---
+
 # Feature 5.6.1 Source Module Map
 
 This file records the file-size audit and ownership plan for Milestone 5.6.
 The goal is to make the later split features mechanical and reviewable: move
 code by ownership boundary, keep public APIs stable, and avoid behavior changes
 until the target modules are in place.
+It is retained for source-split history; current source-size policy belongs in
+the root development guide and agent instructions.
 
 ## Repeatable Audit Command
 

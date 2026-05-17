@@ -1,8 +1,19 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - testing.md
+  - ci.md
+  - oracles.md
+---
+
 # 3.x Test Infrastructure Milestone
 
 This milestone established shared metric and golden-test infrastructure. The
 README L0-L7 conformance audit is tracked separately in Feature 5.7.x because
 the current infrastructure does not yet fully implement every README layer.
+It is retained for implementation history; new testing and oracle planning
+belongs in the short target documents.
 
 ## Feature 3.1: Rust metrics module
 

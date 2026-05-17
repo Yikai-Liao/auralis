@@ -1,15 +1,31 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - effects.md
+  - oracles.md
+  - testing.md
+---
+
 # 6.x Effect Coverage Index
 
-This file is the lightweight index for SoX-ng effect coverage. The detailed 6.x milestone plans are mechanically split under [`06-effects/`](06-effects/) so each file stays reviewable.
+This file is the historical index for SoX-ng effect coverage. The detailed 6.x
+milestone records are mechanically split under [`06-effects/`](06-effects/) so
+each file stays reviewable. It is retained for implementation history and
+coverage evidence, not as an authoritative planning surface.
 
 Every effect feature must still follow the test contract in [`03-test-infrastructure.md`](03-test-infrastructure.md), the SIMD policy in [`04-simd.md`](04-simd.md), and the layered coverage gate from Feature 5.7.7.
 
 ## Current 6.x Execution Rules
 
 - Implement or block exactly one leaf feature per gnhf iteration.
-- Keep this file as the index and cross-milestone policy surface. Effect-by-effect details belong in the matching `06-effects/06-N-*.md` file, not in README.
+- Keep future effect planning in [`effects.md`](effects.md),
+  [`effects/*.md`](effects/), [`oracles.md`](oracles.md), and
+  [`oracles/*.md`](oracles/). Do not add new detailed plans here.
 - README must not carry effect-by-effect status, exception notes, or compatibility matrices; put detailed status in this 6.x plan, golden manifests, or dedicated status docs.
-- Treat each `06-effects/06-N-*.md` file as the authoritative plan for its milestone. Moving an effect between files must update this index and preserve one leaf-feature-per-gnhf iteration.
+- Treat each `06-effects/06-N-*.md` file as historical evidence for its
+  milestone. Moving active effect plans now means updating the flat short
+  effect and oracle documents, not this index.
 - Before implementing any specialized, external-host, native-backed, or license-sensitive effect, run a feasibility/classification pass first and record one of: `implemented`, `partial`, `blocked`, or `not planned`.
 - Specialized/native/license-sensitive effects must not enter normal implementation work until that classification says there is a MIT-compatible pure-Rust path with stable diagnostics and test coverage expectations.
 - MIT-compatible pure Rust remains the default. GPL/native-wrapper paths must stay blocked or not planned unless the project policy changes.

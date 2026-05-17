@@ -227,7 +227,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono frame delay and stereo per-channel frame delay.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover per-channel delay, trailing alignment silence, seconds-to-frames resolution, command parsing, canonical rendering, chain execution, invalid positions, and too-many-channel rejection.", tests = ["crates/auralis-effects/src/delay.rs", "crates/auralis-effects/src/command_delay.rs", "crates/auralis-effects/tests/delay.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Delay API is a whole-buffer length-changing transform; streaming chunk invariance belongs to a future streaming API that can expose state and explicit tail flush.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Delay API is a whole-buffer length-changing transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Delay inserts and copies whole channel spans and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers delay position parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/delay"] }
 
@@ -392,7 +392,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover linear-interpolated mono chorus and stereo multi-stage chorus command shapes.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover delay-tail extension, interpolation padding, triangle wave parsing, multi-stage summing, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/chorus.rs", "crates/auralis-effects/src/command_chorus.rs", "crates/auralis-effects/tests/chorus.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Chorus API is a whole-buffer length-changing transform; streaming chunk invariance belongs to a future streaming API that can expose delay-line state, modulation phase, and explicit tail flush.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Chorus API is a whole-buffer length-changing transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Chorus is a scalar stateful delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers chorus interpolation, wave, gain, and stage parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/chorus"] }
 
@@ -407,7 +407,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover linear mono flanger and triangle/no-interpolation stereo flanger command shapes.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover length preservation, dry/wet balancing, feedback-capable swept delay processing, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/flanger.rs", "crates/auralis-effects/src/command_flanger.rs", "crates/auralis-effects/tests/flanger.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Flanger API is a whole-buffer stateful transform; streaming chunk invariance belongs to a future streaming API that can expose delay-line state and modulation phase.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Flanger API is a whole-buffer stateful transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Flanger is a scalar stateful delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers flanger interpolation, wave, feedback, width, speed, phase, and positional mode parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/flanger"] }
 
@@ -422,7 +422,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover linear mono phaser and triangle/no-interpolation stereo phaser command shapes.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover length preservation, channel-local feedback delay processing, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/phaser.rs", "crates/auralis-effects/src/command_phaser.rs", "crates/auralis-effects/tests/phaser.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Phaser API is a whole-buffer stateful transform; streaming chunk invariance belongs to a future streaming API that can expose delay-line state and modulation phase.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Phaser API is a whole-buffer stateful transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Phaser is a scalar stateful delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers phaser interpolation, wave, gain, feedback, speed, and trailing wave-option parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/phaser"] }
 
@@ -437,7 +437,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono delayed echo and stereo zero-delay gain mixing.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover delay-tail extension, zero-delay behavior, clipping, milliseconds-to-frame resolution, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/echo.rs", "crates/auralis-effects/src/command_echo.rs", "crates/auralis-effects/tests/echo.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Echo API is a whole-buffer length-changing transform; streaming chunk invariance belongs to a future streaming API that can expose delay state and explicit tail flush.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Echo API is a whole-buffer length-changing transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Echo is a stateful delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers echo gain, delay, and decay parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/echo"] }
 
@@ -452,7 +452,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono cascaded echos and stereo single-tap echos.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests cover cascaded delay feeding, delay-tail extension, milliseconds-to-frame resolution, command parsing, canonical rendering, chain execution, and invalid config rejection.", tests = ["crates/auralis-effects/src/echos.rs", "crates/auralis-effects/src/command_echos.rs", "crates/auralis-effects/tests/echos.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded generated input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current public Echos API is a whole-buffer length-changing transform; streaming chunk invariance belongs to a future streaming API that can preserve cascaded delay state and expose explicit tail flush.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current public Echos API is a whole-buffer length-changing transform; no graph-level streaming or chunked state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "Echos is a stateful cascaded delay-line transform and has no data-parallel SIMD kernel in this implementation.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers echos gain, delay, and decay parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/echos"] }
 
@@ -872,7 +872,7 @@ l1 = { status = "not_applicable", reason = "The typed effect operates on decoded
 l2 = { status = "covered", reason = "Standalone SoX-ng golden cases cover mono wet-only and stereo dry-plus-wet reverb commands.", tests = ["tests/golden/effects.toml", "tools/pytest/tests/test_effect_golden_manifest.py", "crates/auralis-testkit/tests/golden_effects.rs"] }
 l3 = { status = "covered", reason = "Analytical and integration tests check defaults, wet-only parsing, mono shape preservation, dry suppression, invalid parameters, and typed processor equivalence.", tests = ["crates/auralis-effects/src/reverb.rs", "crates/auralis-effects/src/command_reverb.rs", "crates/auralis-effects/tests/reverb.rs"] }
 l4 = { status = "covered", reason = "Property tests include finite-output coverage for bounded finite input.", tests = ["crates/auralis-effects/tests/property_metamorphic.rs"] }
-l5 = { status = "not_applicable", reason = "The current reverb API is a whole-buffer processor and does not expose reusable comb/all-pass state for chunked streaming.", tests = [] }
+l5 = { status = "not_applicable", reason = "The current reverb API is a whole-buffer processor and has no graph-level streaming or chunked state contract.", tests = [] }
 l6 = { status = "not_applicable", reason = "Reverb uses stateful delay networks and currently has no data-parallel SIMD kernel.", tests = [] }
 l7 = { status = "covered", reason = "Effect command fuzzing covers reverb option and numeric argument parsing through the shared command parser.", tests = ["crates/auralis-fuzz-targets/tests/smoke.rs", "fuzz/fuzz_targets/effect_command.rs", "fuzz/corpus/effect_command/reverb"] }
 
@@ -1217,7 +1217,7 @@ l1 = { status = "covered", reason = "Legacy AIFF codec tests cover signed 8/16/2
 l2 = { status = "not_applicable", reason = "AIFF PCM is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
 l3 = { status = "covered", reason = "Analytical legacy-adapter tests cover quantized sample values, interleaved-to-planar conversion, float pass-through, G.711 companding values, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
 l4 = { status = "not_applicable", reason = "The current AIFF PCM feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
-l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
+l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no graph-level streaming-state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "AIFF/AIFC conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "AIFF output options are typed Rust values today; no CLI parser or fuzz target consumes serialized AIFF option text.", tests = [] }
 
@@ -1262,6 +1262,6 @@ l1 = { status = "covered", reason = "Legacy AU/SND codec tests cover in-memory e
 l2 = { status = "not_applicable", reason = "AU/SND is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
 l3 = { status = "covered", reason = "Analytical legacy-adapter tests cover AU header metadata, interleaved-to-planar conversion, integer quantization, float pass-through, G.711 round trips, malformed and unsupported diagnostics, non-finite diagnostics, and EncodeSummary metadata.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
 l4 = { status = "not_applicable", reason = "The current AU/SND feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
-l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
+l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no graph-level streaming-state contract is planned.", tests = [] }
 l6 = { status = "not_applicable", reason = "AU/SND conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
 l7 = { status = "not_applicable", reason = "AU/SND output options are typed Rust values today; no CLI parser or fuzz target consumes serialized AU option text.", tests = [] }

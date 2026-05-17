@@ -18,8 +18,8 @@ This numbered roadmap has been superseded by the short target documents:
   parameters, distributed registration, and `ops` discovery.
 
 Do not add new detailed plans here. Migrate any remaining unique information
-into the target short documents, then delete this file when no transition
-references depend on it.
+into the target short documents, then delete this file when it no longer
+preserves useful history.
 
 Important corrections from the superseding ADRs:
 

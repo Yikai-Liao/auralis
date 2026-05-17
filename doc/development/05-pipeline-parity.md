@@ -1,7 +1,19 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - testing.md
+  - cli.md
+  - graph-engine.md
+  - oracles.md
+---
+
 # 5.x Pipeline Parity Milestone
 
 Pipeline behavior is higher priority than additional file formats because many
 SoX-ng effects only make sense inside chains.
+This file is retained for implemented parity history and coverage evidence; new
+CLI, graph, testing, and oracle planning belongs in the short target documents.
 
 ## Milestone 5.1: effect command model
 

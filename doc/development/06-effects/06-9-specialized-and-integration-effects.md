@@ -1,4 +1,17 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../effects.md
+  - ../oracles.md
+  - ../testing.md
+---
+
 ## Milestone 6.9: specialized and integration effects
+
+This milestone record is retained for specialized-effect classification history
+and coverage evidence. New effect or oracle planning belongs in the flat short
+documents under `../effects/` and `../oracles/`.
 
 ### 6.9 triage rule: specialized effects are not normal implementation items
 

@@ -1,8 +1,17 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../../DEVELOPMENT.md
+  - README.md
+---
+
 # 0.x Bootstrap Plan
 
 This file contains the implemented repository-bootstrap features. These entries
 are kept for history and acceptance traceability; new work should continue from
 the priority order in the root [`DEVELOPMENT.md`](../../DEVELOPMENT.md).
+It is not an authoritative planning surface.
 
 ## Feature 0.1: workspace skeleton
 

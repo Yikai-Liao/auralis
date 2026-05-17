@@ -1,7 +1,17 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - formats.md
+  - formats/wav.md
+---
+
 # 1.x WAV Milestone
 
 The initial format scope is WAV PCM16. Other formats remain behind explicit
 unsupported-format diagnostics until the format-support milestone.
+This file is retained for implementation history and acceptance traceability;
+new format planning belongs in the short format documents.
 
 ## Feature 1.1: WAV codec trait boundary
 

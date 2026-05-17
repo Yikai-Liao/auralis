@@ -1,4 +1,17 @@
+---
+kind: historical-roadmap
+status: superseded
+superseded_by:
+  - ../effects.md
+  - ../oracles.md
+  - ../testing.md
+---
+
 ## Milestone 6.2: volume, level, and simple modulation effects
+
+This milestone record is retained for implemented effect history and coverage
+evidence. New effect or oracle planning belongs in the flat short documents
+under `../effects/` and `../oracles/`.
 
 ### Feature 6.2.1: `vol`
 
