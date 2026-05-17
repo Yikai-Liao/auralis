@@ -333,20 +333,19 @@ Use:
 doc/development/templates/ci-benchmark-job.md
 ```
 
-## Legacy Plan Migration
+## Legacy Numbered Documents
 
-Existing numbered roadmap files remain readable during the rewrite, but new
-detailed work should move toward the target paths above.
+Existing numbered roadmap files remain readable while unique historical or
+coverage notes are being retired, but new detailed work belongs in the target
+paths above.
 
-Migration rules:
+Rules:
 
 - new graph, CLI, op-registration, CI, Python, effect, DSP, and SIMD planning
   must be written in the target paths above;
-- commit 1 creates the target skeleton files and root collaboration rules, but
-  does not perform the full content migration;
 - every existing effect, DSP primitive plan, SIMD plan, CI plan, and Python
-  plan must migrate; partial first batches are allowed only as commit slicing,
-  not as final scope reduction;
+  plan must either live in a target short document or be explicitly marked
+  superseded;
 - old numbered files are transition references, not the place to add new
   detailed plans;
 - when a target document fully covers an old numbered document, add front matter
@@ -354,17 +353,8 @@ Migration rules:
   then keep only a short migration note unless a later focused cleanup removes
   the file;
 - do not keep duplicate living plans for the same subject.
-- after the full migration is complete, remove migration-only scaffolding from
-  the live documentation: commit-split notes, "intentionally incomplete"
-  placeholders, migration-target stubs, and old numbered superseded documents
-  that no longer carry unique information.
-
-Suggested commit split:
-
-- commit 1: glossary, ADRs, documentation map, templates, examples, root
-  document policy, and migration rules;
-- commit 2: full migration of all existing effect, DSP, SIMD, CI, Python,
-  architecture, README, DEVELOPMENT, and AGENTS content into the new structure.
+- remove superseded numbered documents once they no longer preserve useful
+  links or historical evidence.
 
 | Existing area | Target path |
 | --- | --- |

@@ -5,7 +5,7 @@ status: active
 
 # Op Registration
 
-This file is the migration target for the `auralis-op` contract crate and
+This file is the authoritative plan for the `auralis-op` contract crate and
 distributed operation registration.
 
 ## Target Boundary

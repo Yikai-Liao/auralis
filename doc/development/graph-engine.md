@@ -5,7 +5,7 @@ status: active
 
 # Graph Execution Engine
 
-This file is the migration target for the shared Auralis graph engine design.
+This file is the authoritative plan for the shared Auralis graph engine design.
 The engine is a Rust library boundary used by CLI lowering, Rust helpers, TOML
 graph specs, and future bindings.
 

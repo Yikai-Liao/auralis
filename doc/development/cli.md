@@ -5,8 +5,8 @@ status: active
 
 # CLI Development Plan
 
-This file is the migration target for the lightweight CLI design. It describes
-the target shape, not the current implementation snapshot.
+This file is the authoritative plan for the lightweight CLI design. It
+describes the target shape, not the current implementation snapshot.
 
 ## Current Migration Debt
 
