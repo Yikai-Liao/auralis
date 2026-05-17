@@ -161,7 +161,6 @@ auralis/
 │   ├── auralis/
 │   ├── auralis-core/
 │   ├── auralis-codec/
-│   ├── auralis-wav/
 │   ├── auralis-dsp/
 │   ├── auralis-effects/
 │   ├── auralis-simd/
@@ -227,7 +226,8 @@ the lower-level crates available for focused testing and specialized use.
 
 ### `auralis-codec`
 
-Defines codec traits and format-neutral interfaces:
+Defines codec traits, format-neutral interfaces, and the facade over backend
+decoders and encoders:
 
 - `AudioReader`
 - `AudioWriter`
@@ -235,7 +235,7 @@ Defines codec traits and format-neutral interfaces:
 - `DecodedAudio`
 - `EncodedAudioFormat`
 
-It should include placeholders for future formats:
+It should include the file kinds that the facade can dispatch:
 
 ```rust
 pub enum CodecKind {
@@ -248,33 +248,10 @@ pub enum CodecKind {
 }
 ```
 
-Only WAV is implemented initially.
-
-### `auralis-wav`
-
-Implements WAV reading and writing.
-
-The crate root is a small facade over focused modules:
-
-- `reader`: PCM16 stream/path decode helpers and `Pcm16WavReader`;
-- `writer`: PCM16 stream/path encode helpers and `Pcm16WavWriter`;
-- `format`: WAV sample encoding, PCM16 validation, hound spec construction,
-  frame counts, and malformed-input mapping;
-- `sample_conversion`: backend-dispatched PCM16/`f32` conversion glue;
-- `error`: typed `WavError`, result alias, and codec-error conversion.
-
-Initial WAV scope:
-
-- PCM 16-bit little-endian.
-- PCM 24-bit little-endian if practical in the first pass; otherwise reserve the API and explicitly return `UnsupportedFormat`.
-- IEEE float 32-bit if practical; otherwise reserve the API and explicitly return `UnsupportedFormat`.
-- Mono and stereo first; multi-channel support should be designed but may be gated behind tests.
-
-The WAV module should expose decoded planar `f32` buffers to the rest of the system.
-PCM16 decode uses the Auralis sample-conversion backend boundary, with an
-explicit backend entry point for scalar-vs-SIMD decode validation.
-
-Candidate crate: `hound`, wrapped behind Auralis traits rather than exposed directly.
+The target decode path uses Symphonia first. WAV also starts with Symphonia;
+`hound` is only a fallback or special-case WAV path when Symphonia cannot handle
+an Auralis-supported case. Existing per-format codec crates are migration debt
+to consolidate behind this facade, not the desired architecture.
 
 ### `auralis-dsp`
 
@@ -847,8 +824,8 @@ Core rule:
 > crates belong at boundary layers, test layers, CLI layers, or replaceable
 > backend layers.
 
-Users of `auralis-core` should not see names such as `hound`, `clap`,
-`rten-simd`, `rubato`, `pyo3`, or `ndarray` in public API types.
+Users of `auralis-core` should not see names such as `symphonia`, `hound`,
+`clap`, `rten-simd`, `rubato`, `pyo3`, or `ndarray` in public API types.
 
 ### Add in the first workspace pass
 
@@ -857,7 +834,8 @@ Users of `auralis-core` should not see names such as `hound`, `clap`,
 | CLI | `clap`, `clap_complete`, `clap_mangen` | `auralis-cli`; generated help/completions/man pages from one definition |
 | Errors | `thiserror`, `miette`, small amounts of `anyhow` | `thiserror` for typed library errors; `miette` and `anyhow` stay in binaries, tests, and glue |
 | Config and reports | `serde`, `toml`, `serde_json` | pipeline manifests are TOML; machine-readable reports are JSON |
-| WAV | `hound` | wrapped inside the WAV codec crate; never exposed by `auralis-core` |
+| Codec decode | `symphonia` | wrapped inside `auralis-codec`; never exposed by `auralis-core` |
+| WAV fallback | `hound` | used only when Symphonia cannot cover an Auralis-supported WAV case |
 | Observability | `tracing`, `tracing-subscriber` | libraries emit structured events; CLI initializes subscribers |
 | Float assertions | `approx` | dev/test only |
 | Property tests | `proptest` | dev/test only |
@@ -866,15 +844,17 @@ Users of `auralis-core` should not see names such as `hound`, `clap`,
 | Benchmarks | `criterion` | dev/bench only |
 
 Library APIs must return typed errors, not `anyhow::Result<T>`. `miette` is for
-diagnostic presentation at the CLI boundary. `hound` handles initial WAV I/O,
-but Auralis tests compare decoded PCM and metadata rather than whole WAV bytes
+diagnostic presentation at the CLI boundary. Symphonia handles normal decode
+inside `auralis-codec`; `hound` handles only the documented WAV fallback cases.
+Auralis tests compare decoded PCM and metadata rather than whole file bytes
 unless a test is specifically about serialization.
 
-Future format support follows a pure Rust policy unless DEVELOPMENT explicitly
-changes that policy. Codec adapters may depend on audited pure Rust crates
-behind feature gates, but the current roadmap does not plan external `ffmpeg`
-command backends, `ffmpeg-next`, libFLAC wrappers, LAME wrappers, libvorbis
-wrappers, `libopusenc`, FDK-AAC, or other native codec-library bindings.
+Future format support goes through `auralis-codec` unless DEVELOPMENT
+explicitly changes that policy. Codec adapters may depend on audited backend
+crates behind feature gates, but the current roadmap does not plan external
+`ffmpeg` command backends, `ffmpeg-next`, libFLAC wrappers, LAME wrappers,
+libvorbis wrappers, `libopusenc`, FDK-AAC, other native codec-library bindings,
+or new per-format target crates for complex codecs.
 
 ### Selected direction, but optional or later
 
@@ -892,7 +872,7 @@ wrappers, `libopusenc`, FDK-AAC, or other native codec-library bindings.
 | Crate | Decision |
 |---|---|
 | `rubato` | Do not make it the core resampler. Later it may be a reference or benchmark target against Auralis scalar rate and SoX-ng golden tests. |
-| `symphonia` | Do not add until the WAV-only milestone is stable and multi-format decoding is actually in scope. |
+| `symphonia` | Primary decode backend behind `auralis-codec`; backend types must not leak into public APIs. |
 | `ffmpeg` / `ffmpeg-next` | Not planned under the current pure Rust codec policy. |
 | `ndarray` | Do not use in `auralis-core` public APIs. Keep the core buffer as planar `Vec<f32>` and convert at Python/test boundaries later. |
 | `serde_yaml` | Do not use. Configuration is TOML; machine reports are JSON. |
@@ -906,6 +886,7 @@ thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 toml = "1"
 serde_json = "1"
+symphonia = { version = "0.5", default-features = false, features = ["pcm", "wav"] }
 hound = "3"
 clap = { version = "4", features = ["derive", "wrap_help"] }
 clap_complete = "4"

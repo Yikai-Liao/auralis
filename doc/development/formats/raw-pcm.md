@@ -2,8 +2,8 @@
 kind: format
 format: "raw-pcm"
 status: implemented
-owner: "auralis-raw"
-backend: "Auralis-owned raw PCM adapter"
+owner: "auralis-codec"
+backend: "codec-internal raw PCM parser/writer"
 decode: implemented
 encode: implemented
 ---
@@ -12,15 +12,16 @@ encode: implemented
 
 ## Scope
 
-Raw PCM is an explicit sample-layout boundary with caller-provided metadata
-such as sample format, byte order, bit order, nibble order, sample rate, and
-channel count.
+Raw PCM is an explicit sample-layout boundary inside `auralis-codec` with
+caller-provided metadata such as sample format, byte order, bit order, nibble
+order, sample rate, and channel count.
 
 ## Adapter Rule
 
 Raw PCM must remain an adapter around Auralis buffers and `OutputFormat`.
 Because raw files carry little or no metadata, graph or CLI callers must provide
-the missing format facts before decode or encode.
+the missing format facts before decode or encode. It must not become a separate
+crate-level architecture parallel to `auralis-codec`.
 
 ## Sample Representation
 
@@ -50,5 +51,5 @@ where possible.
 
 ## Done When
 
-Raw PCM stays a small Auralis-owned boundary and does not become a second graph
-or parameter language.
+Raw PCM stays a small `auralis-codec` boundary and does not become a second
+graph, parameter language, or self-contained codec crate.

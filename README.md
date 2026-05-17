@@ -7,20 +7,18 @@ SoX clone, but it uses SoX-ng as the behavioral oracle for comparable command
 line effects while rebuilding the core around deterministic behavior, typed
 Rust APIs, explicit test contracts, and maintainable modules.
 
-Initial scope is deliberately narrow: **WAV first**, with PCM8, PCM16, PCM24,
-PCM32, float32, float64, u-law, A-law, and RIFX currently implemented. Raw PCM,
-AIFF/AIFC, FLAC, and AU/SND decode/export are also implemented behind
-Auralis-owned pure Rust adapters. New codec backends must stay pure Rust unless
-a later development-plan change says otherwise.
+Initial scope is deliberately narrow: **WAV first**. The target codec
+architecture is `auralis-codec` as a small facade over Symphonia for decode.
+WAV decode also tries Symphonia first; `hound` is only a fallback or
+special-case WAV path when Symphonia cannot cover an Auralis-supported case.
 
 ## Current Status
 
 Auralis is pre-alpha. The repository already contains:
 
-- a Rust workspace with `auralis`, `auralis-aiff`, `auralis-au`, `auralis-flac`,
-  `auralis-core`, `auralis-wav`, `auralis-raw`, `auralis-dsp`,
-  `auralis-effects`, `auralis-simd`, `auralis-testkit`, and `auralis-cli`
-  crates;
+- a Rust workspace with facade, core, codec, DSP/effect, SIMD, testkit, and CLI
+  crates. Existing per-format codec crates are migration debt to consolidate
+  behind `auralis-codec`, not the target architecture;
 - PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law WAV decode plus RIFX
   container decode, PCM16 legacy output, and
   PCM8/PCM16/PCM24/PCM32/float32/float64/u-law/A-law RIFF or RIFX output through
@@ -39,19 +37,14 @@ Auralis is pre-alpha. The repository already contains:
   optional Python helpers for cross-tool golden execution and reporting, and a
   7.x primitive ownership audit with reusable biquad, FIR, and deterministic
   dither/noise primitive extractions into `auralis-dsp`;
-- an 8.0 codec-backend policy that keeps WAV and future format work behind
-  Auralis-owned adapters, classifies AIFF/AIFC as optional pure Rust adapter
-  work, FLAC as experimental pure Rust adapter work, closes external `ffmpeg`
-  backends and native codec wrappers as not planned under the current roadmap;
+- an 8.0 codec-backend correction that keeps file I/O behind `auralis-codec`,
+  uses Symphonia as the default decode backend, keeps `hound` as WAV fallback
+  only, and treats per-format codec crates or local complex codec
+  implementations as migration debt rather than the target design;
 - an Auralis-owned output-format boundary with `OutputFormat`,
-  per-format encode option types, `AudioEncoder`/`EncodeSummary`, a WAV encoder
-  adapter, raw signed/unsigned integer and float PCM export with explicit
-  raw byte-order, bit-order, and nibble-order options through an
-  Auralis-owned adapter, plain AIFF signed-integer PCM plus AIFC little-endian
-  integer, float32/float64, and G.711 u-law/A-law decode/export through the
-  pure Rust `aifc` adapter, FLAC decode/export through pure Rust
-  `claxon`/`flacenc` adapters, and AU/SND PCM, float, and G.711 decode/export
-  through an Auralis-owned container adapter;
+  per-format encode option types, `AudioEncoder`/`EncodeSummary`, and explicit
+  policy that encode support is planned per format instead of inferred from
+  decode support;
 - Python packaging is blocked until the Rust API, effect pipeline behavior,
   error model, buffer model, and binding documentation are stable enough for a
   public package contract.

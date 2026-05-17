@@ -8,15 +8,19 @@ decode: not-planned
 encode: not-planned
 ---
 
-# Unsupported Native Codec Wrappers
+# Unsupported Codec Shortcuts
 
 ## Scope
 
-This document records codec backend families that are not planned under the
-current pure Rust policy.
+This document records codec backend families and architecture shortcuts that
+are not planned under the current `auralis-codec` facade policy.
 
 ## Not Planned
 
+- new per-format target crates such as `auralis-flac`, `auralis-aiff`, or
+  `auralis-au`;
+- local implementations of complex codecs when Symphonia can provide decode;
+- using `hound` as the primary WAV decode architecture instead of a fallback;
 - external `ffmpeg` command backends;
 - `ffmpeg-next` or other FFmpeg link-time wrappers;
 - libFLAC wrappers;
@@ -29,10 +33,10 @@ current pure Rust policy.
 
 ## Adapter Rule
 
-If MP3, Ogg Vorbis, Ogg Opus, AAC/M4A, ALAC/MP4, or WavPack is reconsidered,
-the new plan must first select a credible pure Rust backend or explicitly
-change the policy. It must still remain an adapter over Auralis-owned buffers,
-diagnostics, and graph outputs.
+If MP3, Ogg Vorbis, Ogg Opus, AAC/M4A, ALAC/MP4, WavPack, or encode support
+for currently decode-only formats is reconsidered, the new plan must first
+select a credible backend and keep it behind `auralis-codec`. It must still
+remain an adapter over Auralis-owned buffers, diagnostics, and graph outputs.
 
 ## Validation
 
@@ -46,5 +50,6 @@ moved out of `not-planned`.
 
 ## Done When
 
-Native-wrapper shortcuts remain closed and format support decisions stay in
-short format documents instead of command docs or README prose.
+Codec shortcuts remain closed, `auralis-codec` stays the facade, and format
+support decisions stay in short format documents instead of command docs or
+README prose.

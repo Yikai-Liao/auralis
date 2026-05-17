@@ -1,30 +1,31 @@
 ---
 kind: format
 format: "au-snd"
-status: implemented
-owner: "auralis-au"
-backend: "Auralis-owned AU/SND container adapter"
-decode: implemented
-encode: implemented
+status: planned
+owner: "auralis-codec"
+backend: "Symphonia decode"
+decode: planned
+encode: not-planned
 ---
 
 # AU/SND Format Boundary
 
 ## Scope
 
-AU/SND support handles `.snd` streams for linear PCM, IEEE float, u-law, and
-A-law encodings where implemented.
+AU/SND support should be a thin decode path inside `auralis-codec`, backed by
+Symphonia when the format is in scope.
 
 ## Adapter Rule
 
-AU/SND is a compact Auralis-owned container adapter. It must not introduce
-native codec dependencies, graph-specific validation, or effect behavior.
+AU/SND is a codec facade entry, not a separate target crate. It must not
+introduce native codec dependencies, graph-specific validation, local codec
+implementations, or effect behavior.
 
 ## Sample Representation
 
-AU/SND multi-byte samples are big-endian. Decode normalizes supported samples
-into planar `f32`; export serializes from Auralis buffers through explicit
-format options.
+AU/SND multi-byte samples are big-endian. Decode normalizes supported
+Symphonia output into planar `f32`; export stays out of scope until an encoder
+backend is deliberately selected.
 
 ## Validation
 
@@ -32,21 +33,22 @@ format options.
   count;
 - reject unsupported encoding codes;
 - handle known and unknown data size according to documented policy;
-- reject or report non-finite samples for integer encode.
+- keep encode options absent until encode is deliberately planned.
 
 ## Tests
 
-- u-law, A-law, integer PCM, and float fixtures;
+- u-law, A-law, integer PCM, and float decode fixtures where Symphonia supports
+  them;
 - invalid header diagnostics;
 - big-endian sample fixtures;
-- encode/decode deterministic checks.
+- deterministic decode checks.
 
 ## Benchmarks
 
-Benchmark decode and encode separately. AU/SND does not require SoX-ng as an
-implementation dependency.
+Benchmark decode separately from graph execution. AU/SND does not require
+SoX-ng as an implementation dependency.
 
 ## Done When
 
-AU/SND remains an in-tree adapter and all unsupported encodings fail with typed
-diagnostics.
+AU/SND is covered by the `auralis-codec` facade and all unsupported encodings
+fail with typed diagnostics.

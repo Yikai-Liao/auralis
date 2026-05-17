@@ -201,24 +201,17 @@ FIR state, and deterministic dither/noise state plus quantization helpers into
 `auralis-dsp` while preserving `auralis-effects` command parsing and public
 compatibility wrappers. Dither SIMD remains intentionally not applicable
 because the PRNG and noise-shaping state order is semantically observable.
-The 8.0 format-support policy now records that future codec backends must stay
-pure Rust unless the development plan changes explicitly. WAV remains the
-built-in adapter path, RAW PCM is planned as an Auralis-owned boundary,
-AIFF/AIFC is classified as feature-gated pure Rust adapter work, FLAC decode/export
-is implemented through experimental pure Rust `claxon`/`flacenc` adapters, AU/SND is
-implemented through an Auralis-owned PCM/float/G.711 container adapter, and external
-`ffmpeg` or native codec wrappers remain not planned under the current roadmap. The codec
-boundary now also owns `OutputFormat`, per-format encode option models,
-`EncodeSummary`, and the `AudioEncoder` trait; the current WAV adapter plugs
-into that surface while the raw adapter now writes signed/unsigned integer and
-IEEE float PCM bytes with explicit raw byte-order, bit-order, and nibble-order
-options through `OutputFormat::RawPcm`, while plain AIFF signed-integer PCM and
-AIFC little-endian integer, float32/float64, and G.711 u-law/A-law encodings now
-decode and export through the pure Rust `aifc` adapter. FLAC decode now opens
-integer streams into planar f32 through `auralis-flac`, FLAC writes now
-export deterministic PCM16 FLAC through `OutputFormat::Flac`, and AU/SND decode/export
-now supports `.snd` u-law, signed integer PCM, IEEE float, and A-law streams through
-`AudioFile::open_au` and `OutputFormat::Au`.
+The 8.0 format-support policy has been corrected: the target file-I/O
+architecture is a single `auralis-codec` facade over backend decoders, with
+Symphonia as the default decode backend. WAV decode must try Symphonia first;
+`hound` is only a fallback or special-case WAV path when Symphonia cannot cover
+an Auralis-supported case. Existing per-format codec crates and local complex
+codec implementations are consolidation debt behind `auralis-codec`, not the
+long-term design. External `ffmpeg` command backends, native codec wrappers,
+and new per-format target crates remain not planned under the current roadmap.
+The codec boundary owns `OutputFormat`, per-format encode option models,
+`EncodeSummary`, and the `AudioEncoder` trait; encode support is planned
+per-format and must not be inferred from Symphonia decode support.
 Feature 8.1.1 through Feature 8.1.7 are now complete: generic WAV
 decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
 u-law, A-law, and RIFX containers, and WAV writes can now target PCM8, PCM16,

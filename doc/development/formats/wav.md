@@ -2,8 +2,8 @@
 kind: format
 format: "wav"
 status: implemented
-owner: "auralis-wav"
-backend: "Auralis-owned WAV adapter"
+owner: "auralis-codec"
+backend: "Symphonia first, hound fallback only when needed"
 decode: implemented
 encode: implemented
 ---
@@ -12,16 +12,18 @@ encode: implemented
 
 ## Scope
 
-WAV is the built-in default audio container boundary. It decodes supported WAV
-sample formats into Auralis planar `f32` buffers and encodes Auralis buffers
-through `OutputFormat::Wav(WavEncodeOptions)`.
+WAV is the built-in default audio container boundary. The target architecture
+keeps the public boundary in `auralis-codec`: decode uses Symphonia first for
+every WAV file. `hound` is only the fallback or special-case WAV path when
+Symphonia explicitly cannot handle an Auralis-supported requirement. Encode
+remains an Auralis-owned boundary and may use `hound` internally.
 
 ## Adapter Rule
 
 WAV is a codec/container adapter only. It must not own graph validation, graph
 semantics, effect parameter parsing, or execution behavior. CLI and graph
-frontends lower to `GraphRequest`; WAV only materializes audio sources and
-sinks.
+frontends lower to `GraphRequest`; `auralis-codec` only materializes audio
+sources and sinks.
 
 ## Sample Representation
 
@@ -48,6 +50,8 @@ deterministic and match the documented full-scale denominators.
 - round trips where the format permits deterministic round trip;
 - unsupported-format diagnostics;
 - RIFX byte-order coverage;
+- fallback selection fixtures proving Symphonia is attempted first and `hound`
+  is used only for the documented fallback cases;
 - effect pipeline tests only after standalone codec coverage passes.
 
 ## Benchmarks
@@ -57,5 +61,6 @@ write to `target/benchmarks/sox_ng`.
 
 ## Done When
 
-WAV remains the default built-in adapter and no WAV-specific behavior leaks into
-graph validation or execution.
+WAV remains the default built-in `auralis-codec` adapter, backend crate types do
+not leak out, and no WAV-specific behavior leaks into graph validation or
+execution.

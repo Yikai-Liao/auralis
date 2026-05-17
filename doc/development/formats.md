@@ -16,7 +16,7 @@ sample representation, validation rules, tests, and benchmarks in
 | Format | container or raw audio boundary |
 | Status | shared status value |
 | Owner | crate/module responsible for the boundary |
-| Backend | pure Rust adapter or internal implementation |
+| Backend | decoder or encoder backend wrapped by `auralis-codec` |
 | Decode | decode support status |
 | Encode | encode support status |
 | Detail | link to the format document |
@@ -25,11 +25,11 @@ sample representation, validation rules, tests, and benchmarks in
 
 | Format | Status | Owner | Backend | Decode | Encode | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
-| WAV | implemented | `auralis-wav` | Auralis-owned | implemented | implemented | `formats/wav.md` |
-| Raw PCM | implemented | `auralis-raw` | Auralis-owned | implemented | implemented | `formats/raw-pcm.md` |
-| AIFF/AIFC | implemented | `auralis-aiff` | pure Rust adapter | implemented | implemented | `formats/aiff-aifc.md` |
-| FLAC | implemented | `auralis-flac` | pure Rust adapter | implemented | implemented | `formats/flac.md` |
-| AU/SND | implemented | `auralis-au` | Auralis-owned | implemented | implemented | `formats/au-snd.md` |
+| WAV | active | `auralis-codec` | Symphonia first, `hound` fallback only when needed | active | active | `formats/wav.md` |
+| Raw PCM | active | `auralis-codec` | codec-internal parser/writer | active | active | `formats/raw-pcm.md` |
+| AIFF/AIFC | planned | `auralis-codec` | Symphonia decode | planned | not-planned | `formats/aiff-aifc.md` |
+| FLAC | planned | `auralis-codec` | Symphonia decode | planned | not-planned | `formats/flac.md` |
+| AU/SND | planned | `auralis-codec` | Symphonia decode | planned | not-planned | `formats/au-snd.md` |
 | Native codec wrappers | not-planned | codec boundary | none | not-planned | not-planned | `formats/unsupported-native-codecs.md` |
 
 Create new format documents as short adapter-boundary files under

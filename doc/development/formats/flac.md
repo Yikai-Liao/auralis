@@ -1,52 +1,52 @@
 ---
 kind: format
 format: "flac"
-status: implemented
-owner: "auralis-flac"
-backend: "pure Rust claxon/flacenc adapters behind Auralis-owned types"
-decode: implemented
-encode: implemented
+status: planned
+owner: "auralis-codec"
+backend: "Symphonia decode"
+decode: planned
+encode: not-planned
 ---
 
 # FLAC Format Boundary
 
 ## Scope
 
-FLAC support decodes integer FLAC streams into planar `f32` buffers and exports
-deterministic PCM16 FLAC through `OutputFormat::Flac`.
+FLAC support should be a thin `auralis-codec` decode path backed by Symphonia.
+Auralis should not maintain a separate `auralis-flac` implementation as the
+target architecture.
 
 ## Adapter Rule
 
-`claxon` and `flacenc` are backend details. Auralis owns public options,
-diagnostics, and encode summaries. Native libFLAC wrappers are not planned
-under the current policy.
+Symphonia is the backend detail. Auralis owns public options and diagnostics.
+FLAC encode is not planned until a concrete encoder policy is selected; do not
+add a custom Auralis FLAC encoder or keep `claxon`/`flacenc` as the development
+target.
 
 ## Sample Representation
 
 Decode normalizes integer samples by the same convention used by WAV integer
-PCM. Encode currently targets a conservative deterministic PCM16 FLAC profile
-unless a later format document expands controls.
+PCM. Unsupported stream properties should surface as typed codec diagnostics.
 
 ## Validation
 
 - reject unsupported FLAC stream properties with typed errors;
-- reject unsupported encode options;
-- keep compression-level choices explicit if they are added later;
+- keep encode options absent until encode is deliberately planned;
 - ensure non-finite samples cannot silently enter integer encode.
 
 ## Tests
 
 - tiny deterministic FLAC fixture decode;
-- encode fixture and decode-back validation;
 - unsupported stream diagnostics;
-- no dependency on external `flac` or `ffmpeg` commands.
+- no dependency on external `flac`, `ffmpeg`, `claxon`, or `flacenc` paths.
 
 ## Benchmarks
 
-Benchmark decode and encode separately, with fresh output directories and no
-write to `target/benchmarks/sox_ng`.
+Benchmark decode separately from graph execution, with fresh output directories
+and no write to `target/benchmarks/sox_ng`.
 
 ## Done When
 
-FLAC remains a pure Rust adapter with no native wrapper dependency and no
-format-specific graph semantics.
+FLAC is covered by the `auralis-codec` facade through Symphonia decode, with no
+local FLAC implementation, native wrapper dependency, or format-specific graph
+semantics.
