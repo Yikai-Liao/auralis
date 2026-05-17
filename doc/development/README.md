@@ -333,39 +333,11 @@ Use:
 doc/development/templates/ci-benchmark-job.md
 ```
 
-## Legacy Numbered Documents
+## Removed Numbered Roadmaps
 
-Existing numbered roadmap files remain readable while unique historical or
-coverage notes are being retired, but new detailed work belongs in the target
-paths above.
-
-Rules:
-
-- new graph, CLI, op-registration, CI, Python, effect, DSP, and SIMD planning
-  must be written in the target paths above;
-- every existing effect, DSP primitive plan, SIMD plan, CI plan, and Python
-  plan must either live in a target short document or be explicitly marked
-  superseded;
-- old numbered files are reference material, not the place to add new detailed
-  plans;
-- when a target document fully covers an old numbered document, add front matter
-  to the old document with `status: superseded` and `superseded_by: [...]`,
-  then keep only a short migration note unless a later focused cleanup removes
-  the file;
-- do not keep duplicate living plans for the same subject.
-- remove superseded numbered documents once they no longer preserve useful
-  links or historical evidence.
-
-| Existing area | Target path |
-| --- | --- |
-| `doc/development/03-test-infrastructure.md` | `doc/development/testing.md` |
-| `doc/development/10-cli-interaction-model.md` | `doc/development/cli.md` |
-| `doc/development/06-effect-coverage.md` and `06-effects/*.md` | `doc/development/effects/*.md` |
-| `doc/development/07-dsp-primitives.md` | `doc/development/dsp/*.md` plus summary in `doc/architecture.md` |
-| `doc/development/04-simd.md` | `doc/development/simd/*.md` plus SIMD policy in `doc/testing.md` |
-| `doc/development/08-format-support.md` | `doc/development/formats.md` and `doc/development/formats/*.md` |
-| CI and benchmark planning scattered in status or commands docs | `doc/development/ci.md` |
-| `doc/development/09-python-package.md` | `doc/development/python.md` |
+The old numbered roadmap Markdown files were retired after their planning
+surfaces moved into the short target documents above. Do not recreate numbered
+roadmap files for new work.
 
 ## Size Rule
 

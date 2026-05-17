@@ -62,9 +62,10 @@ Effect-by-effect status intentionally lives outside this README.
   SoX-ng golden rules, metrics, fuzzing, sanitizers, and coverage reporting.
 - [doc/development-commands.md](doc/development-commands.md): local commands
   for formatting, tests, uv/pytest, and milestone validation.
-- [doc/development/06-effect-coverage.md](doc/development/06-effect-coverage.md):
-  the 6.x effect-coverage index; detailed milestones are split under
-  `doc/development/06-effects/`.
+- [doc/development/effects.md](doc/development/effects.md): effect planning
+  index with flat per-effect documents under `doc/development/effects/`.
+- [doc/development/oracles.md](doc/development/oracles.md): shared oracle and
+  reference-target planning.
 
 ## Local Layout
 

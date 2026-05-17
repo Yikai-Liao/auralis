@@ -180,8 +180,8 @@ sample conversion in both directions, and backend-dispatched linear
 L4 property/metamorphic and L5 chunk-invariance coverage are tracked through
 the Rust testkit and the layered coverage matrix described in
 [testing.md](testing.md).
-Source modularization debt is scoped by a checked-in file-size audit and module
-ownership map in `doc/development/05-source-module-map.md`. The high-level
+Source modularization debt is now governed by the root development guide,
+agent instructions, and the checked source-size guard. The high-level
 `auralis` facade has been split into ownership modules while keeping its public
 re-exports stable, and `auralis-simd` now keeps backend metadata, selection,
 conversion, arithmetic kernels, and focused conformance tests in separate
@@ -192,9 +192,9 @@ writer, format validation, sample-conversion glue, and focused integration
 tests in separate ownership modules. The remaining oversized CLI and testkit
 files have been split, and `python3 tools/check_rust_source_lines.py` enforces
 the no-thousand-line Rust source policy locally.
-The 7.x DSP primitive audit in `doc/development/07-dsp-primitives.md` records
-shared-kernel ownership across biquad, FIR, modulation, delay-line, time-scale,
-spectral, dither, resampling, mixing, and analyzer primitives. The first
+The DSP primitive plan in `doc/development/dsp.md` records shared-kernel
+ownership across biquad, FIR, modulation, delay-line, time-scale, spectral,
+dither, resampling, mixing, and analyzer primitives. The first
 extractions moved the direct-form biquad runtime, normalized coefficient type,
 generic RBJ helper ownership, reusable FIR coefficient validation, and centered
 FIR state, and deterministic dither/noise state plus quantization helpers into

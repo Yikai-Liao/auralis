@@ -52,8 +52,8 @@ Co-authored-by: Codex <noreply@openai.com>
 - Graph, CLI, op-registration, testing, Python, effect, DSP, SIMD, oracle,
   format, and CI plans must use their target short document paths under
   `doc/development/`.
-- Old numbered development docs are reference material, not authoritative
-  planning surfaces. Do not add new detailed plans there.
+- Old numbered development roadmap Markdown files have been retired. Do not
+  recreate them for new work.
 - Do not keep duplicate living plans for the same subject.
 - Remove migration-only scaffolding such as commit-split notes,
   "intentionally incomplete" markers, migration-target stubs, and superseded

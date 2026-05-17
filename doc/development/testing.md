@@ -9,9 +9,8 @@ status: active
 work needed to improve that contract: CI gates, fuzzing, oracle replacement,
 coverage debt, benchmark correctness gates, and release validation.
 
-## Migration Scope
+## Scope
 
-- Move future work out of `doc/development/03-test-infrastructure.md`.
 - Keep current-state claims out of this file unless they explain a planned
   migration.
 - Keep runnable commands in `doc/development-commands.md`.
