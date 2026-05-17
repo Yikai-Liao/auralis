@@ -2,6 +2,8 @@
 
 This file is the stable development index for Auralis. Keep it at the repository
 root. Detailed milestone plans live under [`doc/development/`](doc/development/).
+The target layout for short development documents is defined in
+[`doc/development/README.md`](doc/development/README.md).
 
 The core rule:
 
