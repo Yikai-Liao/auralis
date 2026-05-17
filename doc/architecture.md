@@ -142,7 +142,7 @@ Each public function should document:
 - Error conditions.
 - Whether it is deterministic.
 - Numerical tolerance or exactness expectations.
-- Whether processing is streaming-safe.
+- Whole-buffer behavior and any internal state assumptions.
 - Complexity or memory behavior when relevant.
 - Examples.
 
@@ -328,7 +328,9 @@ Contains typed effect processors built from DSP primitives:
 - `Silence`
 - `Vad`
 
-Effect implementations should be block-based and streaming-aware from the beginning, even if the initial CLI processes whole files.
+Effect implementations should be whole-buffer-first and may keep local state
+inside an op, but that state must not imply graph-level streaming, chunked, or
+realtime execution.
 The crate root is a small facade; effect-local behavior lives in focused
 `gain`, `channels`, `norm`, `contrast`, `softvol`, `loudness`, `centercut`, `allpass`, `band`, `bandpass`, `bandreject`, `bass`, `treble`, `equalizer`, `highpass`, `lowpass`, `deemph`, `riaa`, `delay`, `downsample`, `upsample`, `speed`, `stretch`, `synth`, `tempo`, `pitch`, `bend`, `rate`, `chorus`, `compand`, `mcompand`, `noiseprof`, `noisered`, `stat`, `stats`, `flanger`, `phaser`, `reverb`, `echo`, `echos`, `oops`, `swap`, `tremolo`, `overdrive`, `saturation`, `silence`, `vad`, `repeat`, `remix`, `dcshift`, `trim`, `pad`, `reverse`, `fade`, and `vol` modules, with shared
 typed errors in `error`.
