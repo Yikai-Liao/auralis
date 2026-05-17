@@ -23,12 +23,12 @@ to multiple effects.
 
 | Subject | Status | Reference target | Applies to | Detail |
 | --- | --- | --- | --- | --- |
-| `time-pitch` | planned | Signalsmith Stretch; Rubber Band as quality reference | stretch, tempo, pitch, bend | migration target: `oracles/time-pitch.md` |
-| `extreme-stretch` | planned | PaulStretch / PaulXStretch | future extreme stretch mode | migration target: `oracles/extreme-stretch.md` |
-| `spectral-denoise` | planned | noisereduce-style stationary spectral gating | noiseprof, noisered | migration target: `oracles/spectral-denoise.md` |
-| `speech-denoise` | planned | RNNoise and SpeexDSP | future speech-denoise effect; not `noisered` | migration target: `oracles/speech-denoise.md` |
-| `voice-activity` | planned | WebRTC VAD with Auralis edit semantics | vad | migration target: `oracles/voice-activity.md` |
-| `modulation-delay` | planned | Faust `phaflangers.lib`, DaisySP Chorus/Flanger | phaser, chorus, flanger, future vibrato | migration target: `oracles/modulation-delay.md` |
+| `time-pitch` | planned | Signalsmith Stretch; Rubber Band as quality reference | stretch, tempo, pitch, bend | `oracles/time-pitch.md` |
+| `extreme-stretch` | planned | PaulStretch / PaulXStretch | future extreme stretch mode | `oracles/extreme-stretch.md` |
+| `spectral-denoise` | planned | noisereduce-style stationary spectral gating | noiseprof, noisered | `oracles/spectral-denoise.md` |
+| `speech-denoise` | planned | RNNoise and SpeexDSP | future speech-denoise effect; not `noisered` | `oracles/speech-denoise.md` |
+| `voice-activity` | planned | WebRTC VAD with Auralis edit semantics | vad | `oracles/voice-activity.md` |
+| `modulation-delay` | planned | Faust `phaflangers.lib`, DaisySP Chorus/Flanger | phaser, chorus, flanger, future vibrato | `oracles/modulation-delay.md` |
 | `reverb` | planned | Faust reverbs; Freeverb for compat baseline | reverb and future room/ambience variants | migration target: `oracles/reverb.md` |
 | `saturation-distortion` | planned | DaisySP Overdrive, MusicDSP formulas, Airwindows listening references | overdrive, saturation, contrast | migration target: `oracles/saturation-distortion.md` |
 | `dynamics` | planned | Faust compressors for modern dynamics; SoX for compat curves | compand, mcompand, future compressor/limiter | migration target: `oracles/dynamics.md` |

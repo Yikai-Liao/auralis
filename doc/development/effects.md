@@ -24,11 +24,11 @@ notes in `doc/development/effects/<effect>.md`.
 
 | Effect | Status | Reference target | SoX-ng role | Priority | Detail |
 | --- | --- | --- | --- | --- | --- |
-| `phaser` | planned | Faust `phaser2_*` | rejected for default; compat only | P1 | migration target: `effects/phaser.md` |
-| `stretch` | planned | Signalsmith Stretch; PaulStretch for extreme stretch | rejected for default; compat only | P1 | migration target: `effects/stretch.md` |
-| `noiseprof` | planned | stationary spectral profile model | legacy profile reference only | P1 | migration target: `effects/noiseprof.md` |
-| `noisered` | planned | noisereduce-style stationary spectral gating | rejected for default; compat only | P1 | migration target: `effects/noisered.md` |
-| `vad` | planned | WebRTC VAD wrapped in Auralis trim/padding semantics | rejected for default; compat only | P1 | migration target: `effects/vad.md` |
+| `phaser` | planned | Faust `phaser2_*` | rejected for default; compat only | P1 | `effects/phaser.md` |
+| `stretch` | planned | Signalsmith Stretch; PaulStretch for extreme stretch | rejected for default; compat only | P1 | `effects/stretch.md` |
+| `noiseprof` | planned | stationary spectral profile model | legacy profile reference only | P1 | `effects/noiseprof.md` |
+| `noisered` | planned | noisereduce-style stationary spectral gating | rejected for default; compat only | P1 | `effects/noisered.md` |
+| `vad` | planned | WebRTC VAD wrapped in Auralis trim/padding semantics | rejected for default; compat only | P1 | `effects/vad.md` |
 | `tempo` | planned | Signalsmith Stretch; Rubber Band as quality reference | baseline and compat only | P2 | migration target: `effects/tempo.md` |
 | `pitch` | planned | Signalsmith Stretch; Rubber Band as quality reference | baseline and compat only | P2 | migration target: `effects/pitch.md` |
 | `bend` | planned | Signalsmith Stretch; Rubber Band as quality reference | baseline and compat only | P2 | migration target: `effects/bend.md` |
