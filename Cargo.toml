@@ -10,6 +10,7 @@ members = [
     "crates/auralis-effects",
     "crates/auralis-flac",
     "crates/auralis-fuzz-targets",
+    "crates/auralis-op",
     "crates/auralis-raw",
     "crates/auralis-simd",
     "crates/auralis-testkit",
