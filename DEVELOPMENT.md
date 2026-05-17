@@ -14,9 +14,9 @@ The core rule:
 
 ## Current Priority
 
-The active priority is the development-documentation migration. The goal is to
-move future-facing design and planning out of large numbered roadmap files into
-short target documents with clear ownership.
+The active priority is keeping development planning in the short target
+documents with clear ownership. Large numbered roadmap files are retained only
+when they still preserve useful historical or coverage evidence.
 
 Work in this order:
 
@@ -33,15 +33,15 @@ Work in this order:
 4. Use [`effects.md`](doc/development/effects.md),
    [`dsp.md`](doc/development/dsp.md), and
    [`simd.md`](doc/development/simd.md) as indexes, then create flat detail
-   files from the templates as each effect, primitive, or kernel is migrated.
+   files from the templates as each effect, primitive, or kernel is planned.
 5. Keep [`python.md`](doc/development/python.md) at `not-planned` until the
    Rust graph, effect, parameter, error, and buffer contracts stabilize.
-6. Retire old numbered development files only after their unique information is
-   migrated into the target short documents.
+6. Retire old numbered development files after their unique information is
+   captured in the target short documents or is no longer useful.
 
 Old numbered documents under `doc/development/00-*.md` through
-`doc/development/10-*.md` are transition references. Do not add new detailed
-plans to them unless the change is part of migrating or superseding that file.
+`doc/development/10-*.md` are reference material, not authoritative planning
+surfaces. Do not add new detailed plans to them.
 
 ---
 

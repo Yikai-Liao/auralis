@@ -52,14 +52,12 @@ Co-authored-by: Codex <noreply@openai.com>
 - Graph, CLI, op-registration, testing, Python, effect, DSP, SIMD, oracle,
   format, and CI plans must use their target short document paths under
   `doc/development/`.
-- Old numbered development docs are transition references; do not add new
-  detailed plans there unless the change is part of migrating or superseding
-  that file.
+- Old numbered development docs are reference material, not authoritative
+  planning surfaces. Do not add new detailed plans there.
 - Do not keep duplicate living plans for the same subject.
-- After the documentation migration is complete, remove migration-only
-  scaffolding such as commit-split notes, "intentionally incomplete" markers,
-  migration-target stubs, and superseded numbered docs that no longer carry
-  unique information.
+- Remove migration-only scaffolding such as commit-split notes,
+  "intentionally incomplete" markers, migration-target stubs, and superseded
+  numbered docs that no longer carry unique information.
 
 ## Architecture Boundaries
 

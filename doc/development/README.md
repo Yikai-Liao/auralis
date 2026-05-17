@@ -346,8 +346,8 @@ Rules:
 - every existing effect, DSP primitive plan, SIMD plan, CI plan, and Python
   plan must either live in a target short document or be explicitly marked
   superseded;
-- old numbered files are transition references, not the place to add new
-  detailed plans;
+- old numbered files are reference material, not the place to add new detailed
+  plans;
 - when a target document fully covers an old numbered document, add front matter
   to the old document with `status: superseded` and `superseded_by: [...]`,
   then keep only a short migration note unless a later focused cleanup removes
