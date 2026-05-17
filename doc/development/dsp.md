@@ -24,15 +24,14 @@ and performance notes in `doc/development/dsp/<primitive>.md`.
 
 | Primitive | Status | Owner | Callers | SIMD status | Detail |
 | --- | --- | --- | --- | --- | --- |
-| `axpy` | planned | `auralis-dsp` | mix, remix, wet/dry | planned | migration target: `dsp/axpy.md` |
-| `scale-into` | planned | `auralis-dsp` | gain-style transforms, normalization, remix | planned | migration target: `dsp/scale-into.md` |
-| `mul-by-slice` | planned | `auralis-dsp` | tremolo, modulation, envelope apply | planned | migration target: `dsp/mul-by-slice.md` |
-| `clamp` | planned | `auralis-dsp` | output policies, remix, nonlinear effects | planned | migration target: `dsp/clamp.md` |
-| `finite-peak-rms` | planned | `auralis-dsp` | stats, normalize, write validation | planned | migration target: `dsp/finite-peak-rms.md` |
-| `fractional-delay` | planned | `auralis-dsp` | chorus, flanger, phaser, future vibrato | not applicable first pass | migration target: `dsp/fractional-delay.md` |
-| `stft-profile` | planned | `auralis-dsp` | noiseprof, noisered, denoise experiments | not applicable first pass | migration target: `dsp/stft-profile.md` |
-| `fixed-direct-fir` | planned | `auralis-dsp` | fir, earwax, loudness, sinc/hilbert support | planned | migration target: `dsp/fixed-direct-fir.md` |
+| `axpy` | planned | `auralis-dsp` | mix, remix, wet/dry | planned | `dsp/axpy.md` |
+| `scale-into` | planned | `auralis-dsp` | gain-style transforms, normalization, remix | planned | `dsp/scale-into.md` |
+| `mul-by-slice` | planned | `auralis-dsp` | tremolo, modulation, envelope apply | planned | `dsp/mul-by-slice.md` |
+| `clamp` | planned | `auralis-dsp` | output policies, remix, nonlinear effects | planned | `dsp/clamp.md` |
+| `finite-peak-rms` | planned | `auralis-dsp` | stats, normalize, write validation | planned | `dsp/finite-peak-rms.md` |
+| `fractional-delay` | planned | `auralis-dsp` | chorus, flanger, phaser, future vibrato | not applicable first pass | `dsp/fractional-delay.md` |
+| `stft-profile` | planned | `auralis-dsp` | noiseprof, noisered, denoise experiments | not applicable first pass | `dsp/stft-profile.md` |
+| `fixed-direct-fir` | planned | `auralis-dsp` | fir, earwax, loudness, sinc/hilbert support | planned | `dsp/fixed-direct-fir.md` |
 
-Rows marked `migration target` preserve primitive scope before flat detail files
-are written. Create each detail file from
-`doc/development/templates/dsp-primitive.md` when migrating that primitive.
+Create new DSP primitive documents from
+`doc/development/templates/dsp-primitive.md`.
