@@ -867,6 +867,7 @@ planned exception.
 |---|---|---|
 | SIMD | `rten-simd` behind `simd` | optional backend only; scalar remains the reference |
 | Frequency-domain effects and tests | `rustfft`, later `realfft` if needed | `rustfft` is used inside `auralis-effects` for `bend`; do not expose FFT crates through public core APIs |
+| FLAC encode | `flacenc` | planned behind `auralis-codec`; Symphonia remains decode-only |
 | Batch parallelism | `rayon` behind `parallel` | for many files, test cases, stems, or render jobs; not the initial single-stream effect chain |
 | Byte casting | `bytemuck` behind `pod` | only after normal parsing is correct and profiling justifies it |
 | Small allocation optimization | `smallvec` behind `smallvec` | only for proven small-vector pressure |
@@ -877,8 +878,7 @@ planned exception.
 | Crate | Decision |
 |---|---|
 | `rubato` | Do not make it the core resampler. Later it may be a reference or benchmark target against Auralis scalar rate and SoX-ng golden tests. |
-| `symphonia` | Primary decode backend behind `auralis-codec`; backend types must not leak into public APIs. |
-| `ffmpeg` / `ffmpeg-next` | Not planned under the current pure Rust codec policy. |
+| `ffmpeg` / `ffmpeg-next` | Not planned under the current codec facade policy. |
 | `ndarray` | Do not use in `auralis-core` public APIs. Keep the core buffer as planar `Vec<f32>` and convert at Python/test boundaries later. |
 | `serde_yaml` | Do not use. Configuration is TOML; machine reports are JSON. |
 | `tokio` | Do not use in the initial offline CPU-bound DSP phase. Use synchronous file I/O and add batch parallelism later via Rayon if needed. |
