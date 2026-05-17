@@ -1,6 +1,9 @@
 //! Integration coverage for the public effect registry.
 
-use auralis_effects::{EffectKind, EffectNameError, EffectRegistry, SUPPORTED_EFFECTS};
+use auralis_effects::{
+    EffectKind, EffectNameError, EffectRegistry, SUPPORTED_EFFECTS, operation_catalog,
+};
+use auralis_op::{ParamKind, PortKind};
 
 #[test]
 fn supported_canonical_names_resolve_to_descriptors() {
@@ -156,4 +159,44 @@ fn implemented_sox_ng_names_are_supported_effect_descriptors() {
         ));
         assert!(EffectRegistry::resolve(descriptor.canonical_name()).is_ok());
     }
+}
+
+#[test]
+fn initial_effect_ops_build_a_valid_catalog() {
+    let catalog = operation_catalog().unwrap();
+    let names = catalog
+        .descriptors()
+        .iter()
+        .map(|descriptor| descriptor.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(names, ["fade", "gain", "trim"]);
+    assert_eq!(catalog.resolve("gain-db").unwrap().name, "gain");
+
+    for descriptor in catalog.descriptors() {
+        assert_eq!(descriptor.inputs[0].kind, PortKind::Audio);
+        assert_eq!(descriptor.outputs[0].kind, PortKind::Audio);
+        assert!(descriptor.capabilities.deterministic);
+        assert!(descriptor.capabilities.whole_buffer);
+    }
+}
+
+#[test]
+fn initial_effect_ops_expose_named_parameters() {
+    let catalog = operation_catalog().unwrap();
+    let gain = catalog.resolve("gain").unwrap();
+    let trim = catalog.resolve("trim").unwrap();
+    let fade = catalog.resolve("fade").unwrap();
+
+    assert!(
+        gain.params.iter().any(|param| {
+            param.name == "by" && param.kind == ParamKind::String && !param.required
+        })
+    );
+    assert!(trim.params.iter().any(|param| {
+        param.name == "position" && param.kind == ParamKind::String && param.required
+    }));
+    assert!(fade.params.iter().any(|param| {
+        param.name == "in" && param.kind == ParamKind::Integer && !param.required
+    }));
 }

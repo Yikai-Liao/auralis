@@ -129,6 +129,7 @@ mod noiseprof;
 mod noisered;
 mod norm;
 mod oops;
+mod op_catalog;
 mod overdrive;
 mod pad;
 mod phaser;
@@ -208,6 +209,7 @@ pub use noiseprof::{NOISE_PROFILE_FREQ_COUNT, NOISE_PROFILE_WINDOW_SIZE, NoisePr
 pub use noisered::NoiseRed;
 pub use norm::Norm;
 pub use oops::Oops;
+pub use op_catalog::{SUPPORTED_OPS, operation_catalog};
 pub use overdrive::{Overdrive, OverdriveState};
 pub use pad::{Pad, PositionedPad};
 pub use phaser::{Phaser, PhaserInterpolation, PhaserWave};

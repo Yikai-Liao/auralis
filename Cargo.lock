@@ -152,6 +152,7 @@ version = "0.0.0"
 dependencies = [
  "auralis-core",
  "auralis-dsp",
+ "auralis-op",
  "auralis-simd",
  "auralis-testkit",
  "proptest",
