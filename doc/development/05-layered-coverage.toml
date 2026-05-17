@@ -1195,12 +1195,12 @@ l7 = { status = "covered", reason = "Golden-manifest fuzzing covers the auto-dit
 id = "primitive.raw_pcm_encoder"
 kind = "primitive"
 name = "raw-pcm-encoder"
-summary = "Headerless raw PCM output boundary for signed, unsigned, and IEEE-float samples with explicit byte, bit, and nibble ordering."
+summary = "Legacy raw PCM output coverage retained until the codec facade consolidation decides whether raw encode leaves placeholder status."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "The raw encoder tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
 l1 = { status = "not_applicable", reason = "Headerless raw PCM has no WAV container behavior; WAV I/O coverage remains separate.", tests = [] }
 l2 = { status = "not_applicable", reason = "This leaf is byte serialization for raw PCM output and has no SoX-ng effect command surface.", tests = [] }
-l3 = { status = "covered", reason = "Raw encoder tests cover signed, unsigned, float, interleaving, big-endian byte order, bit-order transforms, nibble-order transforms, non-finite diagnostics, and codec-boundary encoding.", tests = ["crates/auralis-raw/tests/encode.rs", "crates/auralis-codec/src/lib.rs", "crates/auralis/tests/pipeline.rs"] }
+l3 = { status = "covered", reason = "Legacy raw encoder tests cover signed, unsigned, float, interleaving, big-endian byte order, bit-order transforms, nibble-order transforms, non-finite diagnostics, and codec-boundary encoding. ADR 0015 and doc/development/formats/raw-pcm.md own the target placeholder policy.", tests = ["crates/auralis-raw/tests/encode.rs", "crates/auralis-codec/src/lib.rs", "crates/auralis/tests/pipeline.rs"] }
 l4 = { status = "not_applicable", reason = "The current raw output feature is deterministic serialization rather than a sample-processing property surface.", tests = [] }
 l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer at the output boundary and does not expose streaming state.", tests = [] }
 l6 = { status = "not_applicable", reason = "Raw PCM output ordering is scalar format-boundary serialization with no backend-dispatched SIMD kernel.", tests = [] }
@@ -1210,12 +1210,12 @@ l7 = { status = "not_applicable", reason = "Raw output options are typed Rust va
 id = "primitive.aiff_pcm_codec"
 kind = "primitive"
 name = "aiff-pcm-codec"
-summary = "AIFF-family decode and export boundary through the pure Rust aifc adapter."
+summary = "Legacy AIFF/AIFC adapter coverage retained for existing pre-consolidation code; target planning is Symphonia-backed decode behind auralis-codec."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "AIFF codec tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
-l1 = { status = "covered", reason = "AIFF codec tests cover signed 8/16/24/32-bit PCM output headers, AIFC little-endian integer, float32/float64, and G.711 output headers, AIFF/AIFC decode back into planar f32 buffers, pipeline OutputFormat dispatch, and unsupported AIFC rejection.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
+l1 = { status = "covered", reason = "Legacy AIFF codec tests cover signed 8/16/24/32-bit PCM output headers, AIFC little-endian integer, float32/float64, and G.711 output headers, AIFF/AIFC decode back into planar f32 buffers, pipeline OutputFormat dispatch, and unsupported AIFC rejection. ADR 0015 supersedes this as target architecture: future planning uses auralis-codec plus Symphonia decode and leaves encode as a placeholder.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
 l2 = { status = "not_applicable", reason = "AIFF PCM is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
-l3 = { status = "covered", reason = "Analytical codec-boundary tests cover quantized sample values, interleaved-to-planar conversion, float pass-through, G.711 companding values, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
+l3 = { status = "covered", reason = "Analytical legacy-adapter tests cover quantized sample values, interleaved-to-planar conversion, float pass-through, G.711 companding values, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-aiff/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
 l4 = { status = "not_applicable", reason = "The current AIFF PCM feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
 l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
 l6 = { status = "not_applicable", reason = "AIFF/AIFC conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
@@ -1225,12 +1225,12 @@ l7 = { status = "not_applicable", reason = "AIFF output options are typed Rust v
 id = "primitive.flac_decoder"
 kind = "primitive"
 name = "flac-decoder"
-summary = "FLAC decode boundary through the pure Rust claxon adapter."
+summary = "Legacy FLAC decode coverage retained for existing pre-consolidation code; target planning is Symphonia-backed decode behind auralis-codec."
 [subject.layers]
-l0 = { status = "covered", reason = "FLAC decode tests embed a tiny deterministic FLAC fixture and verify decoded metadata plus normalized sample values.", tests = ["crates/auralis-flac/tests/decode.rs"] }
-l1 = { status = "covered", reason = "FLAC codec tests cover in-memory and path decode into planar f32 buffers, and high-level pipeline tests cover AudioFile::open_flac followed by WAV output dispatch.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
+l0 = { status = "covered", reason = "Legacy FLAC decode tests embed a tiny deterministic FLAC fixture and verify decoded metadata plus normalized sample values.", tests = ["crates/auralis-flac/tests/decode.rs"] }
+l1 = { status = "covered", reason = "Legacy FLAC codec tests cover in-memory and path decode into planar f32 buffers, and high-level pipeline tests cover AudioFile::open_flac followed by WAV output dispatch. ADR 0015 supersedes the claxon path as target architecture; future planning uses auralis-codec plus Symphonia decode.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
 l2 = { status = "not_applicable", reason = "The locally installed SoX-ng has no FLAC format handler, so direct FLAC decode comparison cannot be used as a gate for this leaf.", tests = [] }
-l3 = { status = "covered", reason = "Analytical codec-boundary tests cover streaminfo sample rate, channel count, frame count, integer normalization, malformed-input diagnostics, and pipeline metadata.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
+l3 = { status = "covered", reason = "Analytical legacy-adapter tests cover streaminfo sample rate, channel count, frame count, integer normalization, malformed-input diagnostics, and pipeline metadata.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/flac_decode.rs"] }
 l4 = { status = "not_applicable", reason = "FLAC decode is deterministic parsing and sample normalization rather than a sample-processing property surface.", tests = [] }
 l5 = { status = "not_applicable", reason = "The current adapter materializes a full buffer and does not expose streaming decoder state.", tests = [] }
 l6 = { status = "not_applicable", reason = "FLAC decode is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
@@ -1240,10 +1240,10 @@ l7 = { status = "not_applicable", reason = "FLAC input fuzzing is not yet wired 
 id = "primitive.flac_encoder"
 kind = "primitive"
 name = "flac-encoder"
-summary = "FLAC encode boundary through the pure Rust flacenc adapter."
+summary = "FLAC encode coverage for the planned flacenc backend, retained behind the auralis-codec facade policy."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "FLAC encode tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
-l1 = { status = "covered", reason = "FLAC codec tests cover in-memory encode, codec-boundary encode, decode-back verification, and high-level pipeline OutputFormat dispatch.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/pipeline.rs"] }
+l1 = { status = "covered", reason = "FLAC codec tests cover in-memory encode, codec-boundary encode, decode-back verification, and high-level pipeline OutputFormat dispatch. ADR 0015 keeps flacenc as the planned FLAC encode backend while moving the public boundary behind auralis-codec.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/pipeline.rs"] }
 l2 = { status = "not_applicable", reason = "The locally installed SoX-ng has no FLAC format handler, so direct FLAC encode comparison cannot be used as a gate for this leaf.", tests = [] }
 l3 = { status = "covered", reason = "Analytical codec-boundary tests cover PCM16 quantization, frame count/spec metadata, short-buffer rejection, non-finite diagnostics with channel/frame positions, and EncodeSummary metadata.", tests = ["crates/auralis-flac/tests/decode.rs", "crates/auralis/tests/pipeline.rs"] }
 l4 = { status = "not_applicable", reason = "FLAC encode is deterministic format serialization rather than a sample-processing property surface.", tests = [] }
@@ -1255,12 +1255,12 @@ l7 = { status = "not_applicable", reason = "FLAC output options are typed Rust v
 id = "primitive.au_snd_codec"
 kind = "primitive"
 name = "au-snd-codec"
-summary = "AU/SND decode and export boundary through an Auralis-owned .snd container adapter."
+summary = "Legacy AU/SND adapter coverage retained for existing pre-consolidation code; target planning is Symphonia-backed decode behind auralis-codec."
 [subject.layers]
 l0 = { status = "not_applicable", reason = "AU/SND codec tests construct deterministic in-memory AudioBuffer values directly rather than consuming named corpus IDs.", tests = [] }
-l1 = { status = "covered", reason = "AU/SND codec tests cover in-memory encode/decode, path helpers, supported sample encoding headers, high-level AudioFile::open_au, and pipeline OutputFormat dispatch.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
+l1 = { status = "covered", reason = "Legacy AU/SND codec tests cover in-memory encode/decode, path helpers, supported sample encoding headers, high-level AudioFile::open_au, and pipeline OutputFormat dispatch. ADR 0015 supersedes this as target architecture: future planning uses auralis-codec plus Symphonia decode and leaves encode as a placeholder.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis/tests/pipeline.rs"] }
 l2 = { status = "not_applicable", reason = "AU/SND is a file-format boundary and has no SoX-ng effect command surface.", tests = [] }
-l3 = { status = "covered", reason = "Analytical codec-boundary tests cover AU header metadata, interleaved-to-planar conversion, integer quantization, float pass-through, G.711 round trips, malformed and unsupported diagnostics, non-finite diagnostics, and EncodeSummary metadata.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
+l3 = { status = "covered", reason = "Analytical legacy-adapter tests cover AU header metadata, interleaved-to-planar conversion, integer quantization, float pass-through, G.711 round trips, malformed and unsupported diagnostics, non-finite diagnostics, and EncodeSummary metadata.", tests = ["crates/auralis-au/tests/codec.rs", "crates/auralis-codec/src/lib.rs"] }
 l4 = { status = "not_applicable", reason = "The current AU/SND feature is deterministic container serialization and parsing rather than a sample-processing property surface.", tests = [] }
 l5 = { status = "not_applicable", reason = "The encoder serializes an already materialized buffer and the decoder materializes a full buffer; no streaming-state contract is exposed yet.", tests = [] }
 l6 = { status = "not_applicable", reason = "AU/SND conversion is scalar format-boundary work with no backend-dispatched SIMD kernel.", tests = [] }
