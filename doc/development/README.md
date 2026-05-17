@@ -1,3 +1,8 @@
+---
+kind: path-map
+status: active
+---
+
 # Development Documentation Map
 
 This directory uses short, focused documents. A document should describe one
