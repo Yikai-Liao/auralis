@@ -181,6 +181,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auralis-graph"
+version = "0.0.0"
+dependencies = [
+ "auralis-op",
+ "thiserror",
+]
+
+[[package]]
 name = "auralis-op"
 version = "0.0.0"
 
