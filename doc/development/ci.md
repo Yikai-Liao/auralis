@@ -22,6 +22,12 @@ trigger rules, artifacts, pass/fail behavior, and upload details in
 
 | Job | Status | Trigger | Purpose | Detail |
 | --- | --- | --- | --- | --- |
-| `test-workspace` | planned | pull request and push | formatting, clippy, Rust tests, doc tests | `ci/test-workspace.md` |
-| `benchmark-effects` | planned | scheduled and manual | stable effect benchmark subset | `ci/benchmark-effects.md` |
-| `upload-bencher` | planned | scheduled benchmark completion | upload benchmark JSON to Bencher Cloud | `ci/upload-bencher.md` |
+| `test-workspace` | planned | pull request and push | formatting, clippy, Rust tests, doc tests | migration target: `ci/test-workspace.md` |
+| `golden-sox-ng` | planned | pull request, push, and release/gnhf gate | required SoX-ng golden checks with missing-oracle failure in release contexts | migration target: `ci/golden-sox-ng.md` |
+| `external-binary-release` | planned | manual release in dependency repository | publish third-party benchmark/test binaries such as `sox_ng` | migration target: `ci/external-binary-release.md` |
+| `benchmark-effects` | planned | scheduled and manual | stable effect benchmark subset using fresh output directories | migration target: `ci/benchmark-effects.md` |
+| `upload-bencher` | planned | scheduled benchmark completion | upload benchmark JSON to Bencher Cloud | migration target: `ci/upload-bencher.md` |
+
+Rows marked `migration target` preserve CI scope before flat job documents are
+written. Create each job document from
+`doc/development/templates/ci-benchmark-job.md` when migrating that job.

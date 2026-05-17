@@ -49,8 +49,12 @@ Co-authored-by: Codex <noreply@openai.com>
 - Root `README.md` is an entry point, not a long roadmap.
 - Root `DEVELOPMENT.md` is an index and priority guide, not an algorithm dump.
 - `doc/status.md` is a current-state snapshot, not a future plan.
-- Effect, DSP, SIMD, oracle, format, and CI plans must use their target short
-  document paths.
+- Graph, CLI, op-registration, testing, Python, effect, DSP, SIMD, oracle,
+  format, and CI plans must use their target short document paths under
+  `doc/development/`.
+- Old numbered development docs are transition references; do not add new
+  detailed plans there unless the change is part of migrating or superseding
+  that file.
 - Do not keep duplicate living plans for the same subject.
 - After the documentation migration is complete, remove migration-only
   scaffolding such as commit-split notes, "intentionally incomplete" markers,
