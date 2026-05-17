@@ -25,8 +25,12 @@ sample representation, validation rules, tests, and benchmarks in
 
 | Format | Status | Owner | Backend | Decode | Encode | Detail |
 | --- | --- | --- | --- | --- | --- | --- |
-| WAV | planned | `auralis-wav` | Auralis-owned | implemented | implemented | `formats/wav.md` |
-| FLAC | planned | `auralis-flac` | pure Rust adapter | implemented | implemented | `formats/flac.md` |
+| WAV | implemented | `auralis-wav` | Auralis-owned | implemented | implemented | `formats/wav.md` |
+| Raw PCM | implemented | `auralis-raw` | Auralis-owned | implemented | implemented | `formats/raw-pcm.md` |
+| AIFF/AIFC | implemented | `auralis-aiff` | pure Rust adapter | implemented | implemented | `formats/aiff-aifc.md` |
+| FLAC | implemented | `auralis-flac` | pure Rust adapter | implemented | implemented | `formats/flac.md` |
+| AU/SND | implemented | `auralis-au` | Auralis-owned | implemented | implemented | `formats/au-snd.md` |
+| Native codec wrappers | not-planned | codec boundary | none | not-planned | not-planned | `formats/unsupported-native-codecs.md` |
 
-This table is intentionally incomplete until the full migration commit moves
-the format roadmap into flat format documents.
+Create new format documents as short adapter-boundary files under
+`doc/development/formats/`.
