@@ -24,13 +24,13 @@ benchmark details in `doc/development/simd/<kernel>.md`.
 
 | Kernel | Priority | Status | Callers | Backend | Detail |
 | --- | --- | --- | --- | --- | --- |
-| `finite-peak-rms` | A1 | planned | stats, normalize, write validation | `rten-simd` | migration target: `simd/finite-peak-rms.md` |
-| `axpy-scale-mul-clamp` | A2 | planned | DSP primitives, mix, remix, wet/dry paths | `rten-simd` | migration target: `simd/axpy-scale-mul-clamp.md` |
-| `tremolo-modulation` | A3 | planned | tremolo channel modulation multiply | `rten-simd` | migration target: `simd/tremolo-modulation.md` |
-| `remix-accumulate` | A4 | planned | remix scale, accumulate, clamp | `rten-simd` | migration target: `simd/remix-accumulate.md` |
-| `pcm-conversion-wide` | A5 | planned | PCM8, PCM24, PCM32, float32 validation/copy | `rten-simd` | migration target: `simd/pcm-conversion-wide.md` |
-| `planar-interleaved-conversion` | A6 | planned | WAV writer, format adapters, mono/stereo fast paths | `rten-simd` | migration target: `simd/planar-interleaved-conversion.md` |
-| `fixed-direct-fir` | A7 | planned | fixed/direct FIR, especially 11-tap FIR users | `rten-simd` | migration target: `simd/fixed-direct-fir.md` |
+| `finite-peak-rms` | A1 | planned | stats, normalize, write validation | `rten-simd` | `simd/finite-peak-rms.md` |
+| `axpy-scale-mul-clamp` | A2 | planned | DSP primitives, mix, remix, wet/dry paths | `rten-simd` | `simd/axpy-scale-mul-clamp.md` |
+| `tremolo-modulation` | A3 | planned | tremolo channel modulation multiply | `rten-simd` | `simd/tremolo-modulation.md` |
+| `remix-accumulate` | A4 | planned | remix scale, accumulate, clamp | `rten-simd` | `simd/remix-accumulate.md` |
+| `pcm-conversion-wide` | A5 | planned | PCM8, PCM24, PCM32, float32 validation/copy | `rten-simd` | `simd/pcm-conversion-wide.md` |
+| `planar-interleaved-conversion` | A6 | planned | WAV writer, format adapters, mono/stereo fast paths | `rten-simd` | `simd/planar-interleaved-conversion.md` |
+| `fixed-direct-fir` | A7 | planned | fixed/direct FIR, especially 11-tap FIR users | `rten-simd` | `simd/fixed-direct-fir.md` |
 
 ## Lower Priority Or Not Planned For SIMD First Pass
 
@@ -43,6 +43,4 @@ benchmark details in `doc/development/simd/<kernel>.md`.
 | contrast / tanh saturation | blocked | needs vector math or an explicit approximation-error policy |
 | FFT internals | not-planned | delegated to FFT libraries unless profiling proves a pointwise bottleneck |
 
-Rows marked `migration target` preserve the SIMD scope before flat detail files
-are written. Create each detail file from
-`doc/development/templates/simd-kernel.md` when migrating that kernel.
+Create new SIMD detail files from `doc/development/templates/simd-kernel.md`.
