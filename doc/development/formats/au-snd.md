@@ -3,9 +3,9 @@ kind: format
 format: "au-snd"
 status: planned
 owner: "auralis-codec"
-backend: "Symphonia decode"
+backend: "Symphonia decode only"
 decode: planned
-encode: not-planned
+encode: placeholder
 ---
 
 # AU/SND Format Boundary
@@ -13,7 +13,7 @@ encode: not-planned
 ## Scope
 
 AU/SND support should be a thin decode path inside `auralis-codec`, backed by
-Symphonia when the format is in scope.
+Symphonia when the format is in scope. Symphonia does not provide encode.
 
 ## Adapter Rule
 
@@ -24,8 +24,8 @@ implementations, or effect behavior.
 ## Sample Representation
 
 AU/SND multi-byte samples are big-endian. Decode normalizes supported
-Symphonia output into planar `f32`; export stays out of scope until an encoder
-backend is deliberately selected.
+Symphonia output into planar `f32`; export stays as a placeholder until an
+encoder backend is deliberately selected.
 
 ## Validation
 
@@ -33,7 +33,7 @@ backend is deliberately selected.
   count;
 - reject unsupported encoding codes;
 - handle known and unknown data size according to documented policy;
-- keep encode options absent until encode is deliberately planned.
+- keep encode options absent while encode is only a placeholder.
 
 ## Tests
 

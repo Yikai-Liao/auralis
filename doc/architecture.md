@@ -227,7 +227,7 @@ the lower-level crates available for focused testing and specialized use.
 ### `auralis-codec`
 
 Defines codec traits, format-neutral interfaces, and the facade over backend
-decoders and encoders:
+decoders plus the narrow planned encode paths:
 
 - `AudioReader`
 - `AudioWriter`
@@ -250,8 +250,11 @@ pub enum CodecKind {
 
 The target decode path uses Symphonia first. WAV also starts with Symphonia;
 `hound` is only a fallback or special-case WAV path when Symphonia cannot handle
-an Auralis-supported case. Existing per-format codec crates are migration debt
-to consolidate behind this facade, not the desired architecture.
+an Auralis-supported case. Symphonia is decode-only. The target encode path
+starts with WAV; FLAC encode may be planned through `flacenc`; other non-WAV
+encode entries are placeholders until a separate encoder policy exists.
+Existing per-format codec crates are migration debt to consolidate behind this
+facade, not the desired architecture.
 
 ### `auralis-dsp`
 
@@ -849,12 +852,14 @@ inside `auralis-codec`; `hound` handles only the documented WAV fallback cases.
 Auralis tests compare decoded PCM and metadata rather than whole file bytes
 unless a test is specifically about serialization.
 
-Future format support goes through `auralis-codec` unless DEVELOPMENT
+Future decode support goes through `auralis-codec` unless DEVELOPMENT
 explicitly changes that policy. Codec adapters may depend on audited backend
 crates behind feature gates, but the current roadmap does not plan external
 `ffmpeg` command backends, `ffmpeg-next`, libFLAC wrappers, LAME wrappers,
 libvorbis wrappers, `libopusenc`, FDK-AAC, other native codec-library bindings,
-or new per-format target crates for complex codecs.
+new per-format target crates for complex codecs, or non-WAV encode paths before
+an explicit encoder policy exists. FLAC encode through `flacenc` is the named
+planned exception.
 
 ### Selected direction, but optional or later
 

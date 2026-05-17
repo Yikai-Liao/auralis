@@ -39,12 +39,13 @@ Auralis is pre-alpha. The repository already contains:
   dither/noise primitive extractions into `auralis-dsp`;
 - an 8.0 codec-backend correction that keeps file I/O behind `auralis-codec`,
   uses Symphonia as the default decode backend, keeps `hound` as WAV fallback
-  only, and treats per-format codec crates or local complex codec
-  implementations as migration debt rather than the target design;
+  only, treats Symphonia as decode-only, and treats per-format codec crates or
+  local complex codec implementations as migration debt rather than the target
+  design;
 - an Auralis-owned output-format boundary with `OutputFormat`,
-  per-format encode option types, `AudioEncoder`/`EncodeSummary`, and explicit
-  policy that encode support is planned per format instead of inferred from
-  decode support;
+  `AudioEncoder`/`EncodeSummary`, WAV encode support, planned FLAC encode
+  through `flacenc`, and remaining non-WAV encode placeholders reserved for
+  later encoder policy instead of inferred from decode support;
 - Python packaging is blocked until the Rust API, effect pipeline behavior,
   error model, buffer model, and binding documentation are stable enough for a
   public package contract.

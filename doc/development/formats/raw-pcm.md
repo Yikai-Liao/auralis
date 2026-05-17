@@ -1,33 +1,33 @@
 ---
 kind: format
 format: "raw-pcm"
-status: implemented
+status: planned
 owner: "auralis-codec"
 backend: "codec-internal raw PCM parser/writer"
-decode: implemented
-encode: implemented
+decode: placeholder
+encode: placeholder
 ---
 
 # Raw PCM Format Boundary
 
 ## Scope
 
-Raw PCM is an explicit sample-layout boundary inside `auralis-codec` with
-caller-provided metadata such as sample format, byte order, bit order, nibble
-order, sample rate, and channel count.
+Raw PCM is a placeholder for an explicit sample-layout boundary inside
+`auralis-codec` with caller-provided metadata such as sample format, byte
+order, bit order, nibble order, sample rate, and channel count.
 
 ## Adapter Rule
 
-Raw PCM must remain an adapter around Auralis buffers and `OutputFormat`.
-Because raw files carry little or no metadata, graph or CLI callers must provide
-the missing format facts before decode or encode. It must not become a separate
-crate-level architecture parallel to `auralis-codec`.
+Raw PCM must remain an adapter around Auralis buffers and explicit codec
+options. Because raw files carry little or no metadata, graph or CLI callers
+must provide the missing format facts before decode or encode. It must not
+become a separate crate-level architecture parallel to `auralis-codec`.
 
 ## Sample Representation
 
-Supported families include signed/unsigned integer PCM and IEEE float PCM where
-the current adapter implements them. Decode normalizes into planar `f32`;
-encode serializes from materialized Auralis buffers.
+Reserved families include signed/unsigned integer PCM and IEEE float PCM.
+Decode should normalize into planar `f32`; encode remains a placeholder until
+non-WAV encode policy is selected.
 
 ## Validation
 
@@ -42,7 +42,7 @@ encode serializes from materialized Auralis buffers.
 - float fixtures;
 - byte-order and bit-order fixtures;
 - invalid metadata diagnostics;
-- deterministic encode byte fixtures.
+- deterministic byte fixtures when the placeholder is activated.
 
 ## Benchmarks
 
@@ -51,5 +51,5 @@ where possible.
 
 ## Done When
 
-Raw PCM stays a small `auralis-codec` boundary and does not become a second
+Raw PCM stays a small `auralis-codec` placeholder and does not become a second
 graph, parameter language, or self-contained codec crate.

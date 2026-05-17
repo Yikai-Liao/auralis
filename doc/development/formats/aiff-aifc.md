@@ -3,9 +3,9 @@ kind: format
 format: "aiff-aifc"
 status: planned
 owner: "auralis-codec"
-backend: "Symphonia decode"
+backend: "Symphonia decode only"
 decode: planned
-encode: not-planned
+encode: placeholder
 ---
 
 # AIFF And AIFC Format Boundary
@@ -13,13 +13,14 @@ encode: not-planned
 ## Scope
 
 AIFF/AIFC support should be a thin decode path inside `auralis-codec`, using
-Symphonia when the format is in scope. Auralis should not build and maintain a
-separate `auralis-aiff` implementation as the target architecture.
+Symphonia when the format is in scope. Symphonia does not provide encode.
+Auralis should not build and maintain a separate `auralis-aiff`
+implementation as the target architecture.
 
 ## Adapter Rule
 
-Symphonia is the backend detail. Public API and graph behavior must use
-Auralis-owned options, diagnostics, and buffer types. Encode is out of scope
+Symphonia is the decode backend detail. Public API and graph behavior must use
+Auralis-owned options, diagnostics, and buffer types. Encode is a placeholder
 until a concrete encoder backend is selected; do not add a custom Auralis AIFF
 encoder just to fill the matrix.
 
@@ -35,7 +36,7 @@ with typed unsupported-format diagnostics instead of growing local codecs.
 - validate bit depth and channel metadata;
 - preserve deterministic handling for metadata and marker chunks that Auralis
   intentionally ignores or passes through;
-- keep encode options absent until encode is deliberately planned.
+- keep encode options absent while encode is only a placeholder.
 
 ## Tests
 
@@ -52,4 +53,4 @@ local encoder work in this plan.
 ## Done When
 
 AIFF/AIFC is covered by the `auralis-codec` facade, backend crate types do not
-leak into public graph or library contracts, and encode remains unplanned.
+leak into public graph or library contracts, and encode remains a placeholder.

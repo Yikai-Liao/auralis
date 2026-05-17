@@ -209,23 +209,21 @@ an Auralis-supported case. Existing per-format codec crates and local complex
 codec implementations are consolidation debt behind `auralis-codec`, not the
 long-term design. External `ffmpeg` command backends, native codec wrappers,
 and new per-format target crates remain not planned under the current roadmap.
-The codec boundary owns `OutputFormat`, per-format encode option models,
-`EncodeSummary`, and the `AudioEncoder` trait; encode support is planned
-per-format and must not be inferred from Symphonia decode support.
+Symphonia is decode-only. The codec boundary owns `OutputFormat`,
+`EncodeSummary`, and the `AudioEncoder` trait; the target encode surface starts
+with WAV, FLAC encode may be planned through `flacenc`, and other non-WAV
+encode entries remain placeholders until a separate encoder policy is selected.
 Feature 8.1.1 through Feature 8.1.7 are now complete: generic WAV
 decode/high-level open now cover PCM8, PCM16, PCM24, PCM32, float32, float64,
 u-law, A-law, and RIFX containers, and WAV writes can now target PCM8, PCM16,
 PCM24, PCM32, float32, float64, u-law, or A-law through RIFF or RIFX
 `WavEncodeOptions` while the legacy `write_wav` path stays PCM16-only for
-backward compatibility. Feature 8.2.1 through Feature 8.2.3 are now complete
-for signed/unsigned integer and float raw PCM export plus explicit raw
-byte-order, bit-order, and nibble-order options. Feature 8.3.1 is complete for
-plain AIFF signed-integer PCM decode/export, Feature 8.3.2 is complete for
-AIFC little-endian integer, float32/float64, and G.711 encodings, Feature
-8.4.1 is complete for FLAC decode, Feature 8.4.2 is complete for FLAC
-encode, Feature 8.5.1 is complete for AU/SND, and Features 8.6.1 and 8.6.2
-are closed as not planned for external `ffmpeg` and native codec wrapper
-backends under the pure-Rust codec policy. Feature 9.1 is blocked: PyO3,
+backward compatibility. The older Feature 8.2 through 8.5 per-format roadmap is
+superseded by `doc/development/formats.md` and ADR 0015: Symphonia-backed
+decode is planned behind `auralis-codec`, FLAC encode may be planned through
+`flacenc`, and other non-WAV encode paths remain placeholders. Features 8.6.1
+and 8.6.2 remain closed for external `ffmpeg` and native codec wrapper
+backends. Feature 9.1 is blocked: PyO3,
 maturin, NumPy buffer exposure, and Python package release work must wait until
 the Rust API, effect pipeline, error model, buffer model, and binding
 documentation preconditions are re-audited and pass.

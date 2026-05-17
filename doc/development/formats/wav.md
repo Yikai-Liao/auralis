@@ -16,7 +16,7 @@ WAV is the built-in default audio container boundary. The target architecture
 keeps the public boundary in `auralis-codec`: decode uses Symphonia first for
 every WAV file. `hound` is only the fallback or special-case WAV path when
 Symphonia explicitly cannot handle an Auralis-supported requirement. Encode
-remains an Auralis-owned boundary and may use `hound` internally.
+is currently supported only for WAV and may use `hound` internally.
 
 ## Adapter Rule
 

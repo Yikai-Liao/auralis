@@ -21,6 +21,8 @@ are not planned under the current `auralis-codec` facade policy.
   `auralis-au`;
 - local implementations of complex codecs when Symphonia can provide decode;
 - using `hound` as the primary WAV decode architecture instead of a fallback;
+- adding non-WAV encode paths before an explicit encoder policy exists, except
+  the planned FLAC encode path through `flacenc`;
 - external `ffmpeg` command backends;
 - `ffmpeg-next` or other FFmpeg link-time wrappers;
 - libFLAC wrappers;
@@ -35,8 +37,9 @@ are not planned under the current `auralis-codec` facade policy.
 
 If MP3, Ogg Vorbis, Ogg Opus, AAC/M4A, ALAC/MP4, WavPack, or encode support
 for currently decode-only formats is reconsidered, the new plan must first
-select a credible backend and keep it behind `auralis-codec`. It must still
-remain an adapter over Auralis-owned buffers, diagnostics, and graph outputs.
+select a credible encoder backend and keep it behind `auralis-codec`. It must
+still remain an adapter over Auralis-owned buffers, diagnostics, and graph
+outputs.
 
 ## Validation
 
